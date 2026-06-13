@@ -1,0 +1,8 @@
+---
+description: pull request作成時はテンプレート必須
+alwaysApply: true
+---
+
+# Pull Request: テンプレート必須
+
+Pull Request を作成するときは、必ず `.github/pull_request_template.md` のテンプレートに従い、必須セクションをすべて埋める。

@@ -1,0 +1,4 @@
+worktree-path = "{{ repo_path }}/.worktree/{{ branch | sanitize }}"
+
+[post-create]
+deps = "bun install"

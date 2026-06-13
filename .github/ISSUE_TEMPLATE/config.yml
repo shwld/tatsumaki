@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/shwld/tatsumaki/security/advisories
+    about: Please report security vulnerabilities privately, not through public issues.
+  - name: Contributing guidelines
+    url: https://github.com/shwld/tatsumaki/blob/main/CONTRIBUTING.md
+    about: Read this before opening larger feature proposals or pull requests.

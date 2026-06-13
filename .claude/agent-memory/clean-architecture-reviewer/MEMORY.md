@@ -1,0 +1,1 @@
+- [project_architecture.md](./project_architecture.md) - Layer structure, directory conventions, and client/server patterns in tatsumaki web app

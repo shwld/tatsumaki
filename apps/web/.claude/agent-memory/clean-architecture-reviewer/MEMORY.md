@@ -1,0 +1,1 @@
+- [architecture_conventions.md](./architecture_conventions.md) - tatsumaki layer structure, DI patterns, naming conventions

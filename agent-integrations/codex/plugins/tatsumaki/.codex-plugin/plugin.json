@@ -1,0 +1,22 @@
+{
+  "name": "tatsumaki",
+  "version": "0.1.0",
+  "description": "Operate tatsumaki stories, projects, and work-items safely through the tm CLI.",
+  "author": {
+    "name": "tatsumaki maintainers"
+  },
+  "repository": "https://github.com/shwld/tatsumaki",
+  "license": "MIT",
+  "keywords": ["tatsumaki", "story", "work-item", "tm"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "tatsumaki",
+    "shortDescription": "Operate tatsumaki work safely",
+    "longDescription": "Adds guidance for agents working with tatsumaki stories, projects, and work-items through the official tm CLI, including authentication checks, JSON-first reads, and confirmation before writes.",
+    "developerName": "tatsumaki maintainers",
+    "category": "Developer Tools",
+    "capabilities": ["Interactive", "Write"],
+    "websiteURL": "https://github.com/shwld/tatsumaki",
+    "defaultPrompt": "Use tatsumaki to inspect and update stories, projects, or work-items safely."
+  }
+}

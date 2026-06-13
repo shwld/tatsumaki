@@ -1,0 +1,3 @@
+-- Migration number: 0017 	 2026-04-04T06:56:00.000Z
+
+ALTER TABLE stories ADD COLUMN is_icebox INTEGER NOT NULL DEFAULT 0;

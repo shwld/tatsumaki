@@ -1,0 +1,37 @@
+"$schema" = "./node_modules/wrangler/config-schema.json"
+name = "tatsumaki"
+main = "src/index.ts"
+compatibility_date = "2025-03-05"
+compatibility_flags = ["global_fetch_strictly_public"]
+keep_vars = true
+
+[assets]
+directory = "./dist/client"
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "tatsumaki-db"
+migrations_dir = "migrations"
+
+[[kv_namespaces]]
+binding = "OAUTH_KV"
+
+[[r2_buckets]]
+binding = "STORY_ATTACHMENTS"
+bucket_name = "tatsumaki-story-attachments"
+
+[[r2_buckets]]
+binding = "USER_AVATARS"
+bucket_name = "tatsumaki-user-avatars"
+
+[triggers]
+crons = ["0 * * * *"]
+
+[[durable_objects.bindings]]
+name = "PLANNING_POKER_DO"
+class_name = "PlanningPokerDO"
+
+[[migrations]]
+tag = "v1-planning-poker-do"
+new_sqlite_classes = ["PlanningPokerDO"]

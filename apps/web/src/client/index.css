@@ -1,0 +1,101 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+/* useTheme が html に付ける .dark と同期（既定の prefers-color-scheme だけではアプリ内トグルと不一致になる） */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  color-scheme: light;
+  --color-bg: #f8fafc;
+  --color-surface: #ffffff;
+  --color-text: #0f172a;
+  --color-muted: #475569;
+  --color-border: #d1d5db;
+  --color-hover: #e2e8f0;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-bg: #020617;
+  --color-surface: #0f172a;
+  --color-text: #e2e8f0;
+  --color-muted: #cbd5e1;
+  --color-border: #334155;
+  --color-hover: #1e293b;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+}
+
+:root[data-theme="dark"] .bg-white {
+  background-color: #0f172a !important;
+}
+
+:root[data-theme="dark"] .bg-gray-50 {
+  background-color: #0b1220 !important;
+}
+
+:root[data-theme="dark"] .bg-gray-100 {
+  background-color: #1e293b !important;
+}
+
+:root[data-theme="dark"] .bg-gray-200 {
+  background-color: #334155 !important;
+}
+
+:root[data-theme="dark"] .text-gray-900 {
+  color: #e2e8f0 !important;
+}
+
+:root[data-theme="dark"] .text-gray-800 {
+  color: #e2e8f0 !important;
+}
+
+:root[data-theme="dark"] .text-gray-700,
+:root[data-theme="dark"] .text-gray-600,
+:root[data-theme="dark"] .text-gray-500 {
+  color: #cbd5e1 !important;
+}
+
+:root[data-theme="dark"] .border-gray-300,
+:root[data-theme="dark"] .border-gray-200 {
+  border-color: #334155 !important;
+}
+
+:root[data-theme="dark"] .hover\:bg-gray-50:hover {
+  background-color: #1e293b !important;
+}
+
+:root[data-theme="dark"] .hover\:bg-gray-100:hover {
+  background-color: #334155 !important;
+}
+
+:root[data-theme="dark"] .hover\:bg-gray-200:hover {
+  background-color: #475569 !important;
+}
+
+:root[data-theme="dark"] .bg-emerald-50 {
+  background-color: #0f2f26 !important;
+}
+
+:root[data-theme="dark"] .border-emerald-200 {
+  border-color: #1f7a5f !important;
+}
+
+:root[data-theme="dark"] .border-emerald-400 {
+  border-color: #34d399 !important;
+}
+
+:root[data-theme="dark"] .hover\:border-emerald-300:hover {
+  border-color: #34d399 !important;
+}

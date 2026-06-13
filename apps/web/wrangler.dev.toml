@@ -1,0 +1,45 @@
+"$schema" = "./node_modules/wrangler/config-schema.json"
+# Local development only. Do not use this config for production deployment.
+name = "tatsumaki-web-dev"
+main = "src/index.ts"
+compatibility_date = "2025-03-05"
+compatibility_flags = ["global_fetch_strictly_public"]
+
+[vars]
+ACCESS_AUD = "test-access-audience"
+ACCESS_TEAM_DOMAIN = "test-team.cloudflareaccess.com"
+ACCESS_JWKS_JSON = "{\"keys\":[{\"key_ops\":[\"verify\"],\"ext\":true,\"kty\":\"RSA\",\"n\":\"puuPKyVCxnuIEolWMa6tTQCX-MdNi7QAdt7DhB_XOpL9vPD9gZK-3JUhVGHmCvrBFJoaBeu72i5CIQ5uFZi2xkx0_m1Wuzd0Cx3ALWIr1gv3w_n1qEAy88LRa2olF7BB74U5dFvdFZc0i1E40xZc5srcFP2QTsqwwRLX-vNjOgLJ15m_xKlXgNSgzDeIA7YZBMPBnkLbpvkMO8JI3dqzQX3mh1cS41GCQFqM9Wi66fVs-6imzMSLdvfbr3BFbn73NT6R1iaq74fHu-y3JLdk42VLymZxHT7cQMLCoyz9mi61jc0lYpOOh8MomQlFwWwBQOb9SkiwPH-mh4M8JI5cNQ\",\"e\":\"AQAB\",\"alg\":\"RS256\",\"kid\":\"test-access-key\",\"use\":\"sig\"}]}"
+DEV_AUTH_EMAIL = "dev@localhost"
+
+[assets]
+directory = "./dist/client"
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "tatsumaki-db"
+database_id = "<unique-ID-for-your-database>"
+migrations_dir = "migrations"
+
+[[kv_namespaces]]
+binding = "OAUTH_KV"
+id = "<unique-ID-for-your-oauth-kv>"
+
+[[r2_buckets]]
+binding = "STORY_ATTACHMENTS"
+bucket_name = "tatsumaki-story-attachments-dev"
+
+[[r2_buckets]]
+binding = "USER_AVATARS"
+bucket_name = "tatsumaki-story-attachments-dev"
+
+[triggers]
+crons = ["0 * * * *"]
+
+[[durable_objects.bindings]]
+name = "PLANNING_POKER_DO"
+class_name = "PlanningPokerDO"
+
+[[migrations]]
+tag = "v1-planning-poker-do"
+new_sqlite_classes = ["PlanningPokerDO"]

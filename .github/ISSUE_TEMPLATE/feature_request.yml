@@ -1,0 +1,47 @@
+name: Feature request
+description: Propose an improvement or new capability.
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Larger changes should start as an issue before implementation. Please describe the user problem first.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user problem or workflow gap should this solve?
+      placeholder: "As a ..., I want ..., because ..."
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What should tatsumaki do differently?
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Web app
+        - CLI
+        - Desktop app
+        - Self-hosting / deployment
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches, workarounds, or related tools.
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope notes
+      description: Constraints, non-goals, compatibility concerns, or migration impact.

@@ -1,0 +1,171 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  dispatch-from-pr-comment:
+    timeout-minutes: 10
+    if: github.event_name == 'issue_comment' && github.event.issue.pull_request && startsWith(github.event.comment.body, '/ci') && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      issues: write
+      pull-requests: read
+    steps:
+      - name: Resolve PR head branch
+        id: pr
+        uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553 # v9
+        with:
+          script: |
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.issue.number
+            });
+            core.setOutput('head_ref', pr.data.head.ref);
+
+      - name: Dispatch CI workflow
+        uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553 # v9
+        env:
+          HEAD_REF: ${{ steps.pr.outputs.head_ref }}
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'ci.yml',
+              ref: process.env.HEAD_REF
+            });
+
+      - name: Post result comment
+        uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553 # v9
+        env:
+          HEAD_REF: ${{ steps.pr.outputs.head_ref }}
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.issue.number,
+              body: [
+                '✅ **CI** を手動実行しました。',
+                '',
+                `Branch: \`${process.env.HEAD_REF}\``,
+                `Runs: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/workflows/ci.yml`
+              ].join('\n')
+            });
+
+  lint:
+    timeout-minutes: 10
+    if: github.event_name != 'issue_comment'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          node-version: "24"
+      - run: bun install
+      - run: bun run lint
+
+  typecheck:
+    timeout-minutes: 10
+    if: github.event_name != 'issue_comment'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          node-version: "24"
+      - run: bun install
+        working-directory: apps/web
+      - run: bun run typecheck
+        working-directory: apps/web
+
+  openapi-check:
+    timeout-minutes: 10
+    if: github.event_name != 'issue_comment'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          node-version: "24"
+      - run: bun install
+        working-directory: apps/web
+      - run: bun run openapi:check
+        working-directory: apps/web
+
+  test:
+    timeout-minutes: 10
+    if: github.event_name != 'issue_comment'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          node-version: "24"
+      - run: bun install
+        working-directory: apps/web
+      - run: bun run test
+        working-directory: apps/web
+      - run: bun run test:components
+        working-directory: apps/web
+
+  cli-build:
+    timeout-minutes: 15
+    if: github.event_name != 'issue_comment'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae # v2
+        with:
+          workspaces: "apps/cli -> target"
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          shared-key: cli-${{ runner.os }}
+      - name: Build tm CLI
+        run: cargo build --manifest-path apps/cli/Cargo.toml --release
+
+  ui-screenshot-diff:
+    timeout-minutes: 10
+    if: github.event_name != 'issue_comment'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          node-version: "24"
+      - run: bun install
+        working-directory: apps/web
+      - name: Cache Playwright browsers
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('apps/web/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+      - name: Install Playwright browser
+        run: bunx playwright install --with-deps chromium
+        working-directory: apps/web
+      - name: Run screenshot tests
+        run: bun run test:ui
+        working-directory: apps/web
+      - name: Upload screenshot artifacts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: ui-screenshot-diff
+          path: |
+            apps/web/test-results/
+            apps/web/playwright-report/
+          if-no-files-found: ignore

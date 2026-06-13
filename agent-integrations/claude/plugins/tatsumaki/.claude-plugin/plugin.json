@@ -1,0 +1,8 @@
+{
+  "name": "tatsumaki",
+  "description": "Operate tatsumaki stories, projects, and work-items safely through the tm CLI.",
+  "version": "0.1.0",
+  "author": {
+    "name": "tatsumaki maintainers"
+  }
+}

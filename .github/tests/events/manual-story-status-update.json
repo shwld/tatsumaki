@@ -1,0 +1,7 @@
+{
+  "inputs": {
+    "story_number": "271",
+    "target_status": "Delivered",
+    "dry_run": "true"
+  }
+}

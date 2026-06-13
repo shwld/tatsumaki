@@ -1,0 +1,17 @@
+# Codex configuration for tatsumaki
+# Converted from .claude/agents/*.md
+
+# Read CLAUDE.md as fallback for project instructions
+project_doc_fallback_filenames = ["CLAUDE.md"]
+
+[agents.clean-architecture-reviewer]
+description = "Review code for clean architecture principles: layering, dependency direction, cohesion, DRY, and boundary design. Use after implementing or refactoring code."
+config_file = "../agents/clean-architecture-reviewer.toml"
+
+[agents.performance-reviewer]
+description = "Review code changes for latency hotspots, query efficiency, memory and CPU cost, rendering overhead, and scalability risks."
+config_file = "../agents/performance-reviewer.toml"
+
+[agents.security-reviewer]
+description = "Review code changes for authentication and authorization flaws, injection risks, sensitive data handling, dependency risk, and OWASP-style vulnerabilities."
+config_file = "../agents/security-reviewer.toml"

@@ -1,0 +1,21 @@
+/cache
+node_modules/
+.serena
+.worktree
+!.config
+.dev.vars
+artifacts/
+artifacts/cli-release/
+dev-logs/*.log
+.playwright-mcp/
+lefthook-local.yml
+.claude/worktrees
+.claude/review-logs/
+.worktree
+.worktrees
+
+# Rust build artifacts
+apps/cli/target/
+
+# Rust build artifacts
+apps/cli/target/

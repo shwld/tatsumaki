@@ -1,0 +1,6 @@
+---
+description: 実装判断の正本は docs/guidelines/implementation-decision-policy.md（常時は概要のみ）
+alwaysApply: true
+---
+
+実装判断の正本: [実装判断ポリシー](docs/guidelines/implementation-decision-policy.md)（長期最適優先）。詳細・例外は同ファイルのみを参照すること。

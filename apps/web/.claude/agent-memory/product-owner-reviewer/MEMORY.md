@@ -1,0 +1,4 @@
+- [domain_my-work-concept.md](./domain_my-work-concept.md) — My Work consolidated to filter; server-side dead code remains
+- [domain_story-status-workflow.md](./domain_story-status-workflow.md) — Story status workflow transitions and estimate rules (PivotalTracker convention)
+- [domain_icebox-panel-gap.md](./domain_icebox-panel-gap.md) — Icebox panel in UI but no domain mapping; needs Iteration concept
+- [domain_saved-filter-vs-story-filter.md](./domain_saved-filter-vs-story-filter.md) — SavedFilter条件とListStories条件が二重化、共通ValueObject未整備

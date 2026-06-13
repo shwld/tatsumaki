@@ -1,0 +1,28 @@
+{
+  "name": "tatsumaki-desktop",
+  "version": "0.0.2",
+  "license": "Apache-2.0",
+  "private": true,
+  "main": "dist/main.js",
+  "type": "commonjs",
+  "scripts": {
+    "icon:mac": "bash scripts/generate-macos-icon.sh",
+    "build": "tsc -p tsconfig.json",
+    "dev": "bun run build && electron .",
+    "start": "bun run build && electron .",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "package": "bun run build && electron-forge package",
+    "make": "bun run build && electron-forge make",
+    "make:mac": "bun run build && electron-forge make --platform darwin",
+    "verify:mac": "bash scripts/verify-macos-artifact.sh"
+  },
+  "devDependencies": {
+    "@electron-forge/cli": "^7.11.1",
+    "@electron-forge/maker-dmg": "^7.11.1",
+    "@electron-forge/maker-zip": "^7.11.1",
+    "@types/node": "^25.9.2",
+    "electron": "^42.3.3",
+    "png2icons": "^2.0.1",
+    "typescript": "^6.0.3"
+  }
+}

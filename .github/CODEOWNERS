@@ -1,0 +1,37 @@
+# Default owner for the repository.
+* @shwld
+
+# GitHub community health, automation, and release workflows.
+.github/ @shwld
+.github/workflows/ @shwld
+.github/ISSUE_TEMPLATE/ @shwld
+.github/pull_request_template.md @shwld
+
+# Security, licensing, and contributor-facing policy.
+LICENSE @shwld
+SECURITY.md @shwld
+CONTRIBUTING.md @shwld
+CODE_OF_CONDUCT.md @shwld
+
+# Package, runtime, and deployment configuration.
+package.json @shwld
+bun.lock @shwld
+apps/*/package.json @shwld
+apps/*/bun.lock @shwld
+apps/cli/Cargo.toml @shwld
+apps/cli/Cargo.lock @shwld
+apps/cli/crates/*/Cargo.toml @shwld
+apps/web/wrangler*.toml @shwld
+lefthook.yml @shwld
+biome.json @shwld
+
+# Release and safety scripts.
+scripts/ @shwld
+
+# Architecture and operating rules.
+AGENTS.md @shwld
+CLAUDE.md @shwld
+docs/guidelines/ @shwld
+docs/workflow/ @shwld
+docs/adr/ @shwld
+docs/adr-guide.md @shwld

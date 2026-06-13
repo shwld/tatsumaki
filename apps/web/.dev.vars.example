@@ -1,0 +1,4 @@
+# Cloudflare Access values required for production authentication.
+# Deploy to Cloudflare prompts for these values and stores them as Worker secrets.
+ACCESS_AUD=
+ACCESS_TEAM_DOMAIN=

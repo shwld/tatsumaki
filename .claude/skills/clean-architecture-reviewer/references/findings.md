@@ -1,0 +1,32 @@
+# Review Findings
+
+- Storyのラベル/タグ相互変換は `apps/web/src/client/lib/story-labels.ts` を唯一の変換境界として扱う。
+- 画面側で同等の分割ロジックを重複実装しない（表示用途でも共通utilityを再利用する）。
+- Backlog優先順位UIは、`/api/stories` と `/api/stories/reorder` と `/api/stories/priority-history` の既存APIを再利用して実装する。
+- Backlog の優先順位変更操作が複数（例: `Move to` 入力と D&D）ある場合、画面内で永続化境界を1つ（例: `persistReorderedStories`）に集約し、API呼び出し・成功時の stories/history 同期・エラー時復旧の挙動を分岐ごとに重複実装しない。
+- 並び替え成功時は、`/stories/reorder` の返却 `stories` で画面順を更新し、続けて `priority-history` を再取得して表示同期する。
+- フロントエンド画面でのAPIエラー表示は `parseErrorMessage` を利用して既存スクリーンと統一する。
+- 実装開始条件は `Plan + DoD + verify` を必須とし、未達Issueは `In progress` への昇格および実装フェーズ開始を禁止する。
+- 実行ゲートの判定は issue 本文の `## Plan` セクション内で評価し、`DoD` と `verify` の明記を検査する。
+- ADR運用の変更は、`docs/adr-rule-mapping.md`（対応表）・`docs/adr-guide.md`（更新手順）・`.github/pull_request_template.md`（レビュー導線）を同時に整合させる。
+- ハーネスのガベージコレクション運用（逸脱定義、修正責任、エスカレーション）と KPI 定義は `docs/harness-gc-and-kpi-operations.md` を正本として一元管理する。
+- 週次・月次レポートは `docs/reports/harness/weekly-template.md` と `docs/reports/harness/monthly-template.md` にテンプレートを分離し、運用ルール本体から再利用する。
+- `scripts/adr-lint.sh` の違反出力は `report_violation` を経由し、`ERROR [RULE_ID] / WHY / FIX / EXAMPLE / REFERENCE` の5要素を必須フォーマットとして統一する。
+- Projects 一覧の状態分岐は `loading -> error -> empty -> list` の優先順で `ProjectListContent` に集約し、`ProjectListScreen` は取得と状態供給に専念する。
+- フォーム送信中の多重実行防止や遷移などの副作用は screen が保持し、form component は `isSubmitting` / `validationError` / `requestError` を受けて表示と入力制御だけを担当する。
+- `apps/web` の `test` は `scripts/run-vitest.ts` を経由し、`src/client/` 配下を指定した実行では `vitest.component.config.ts` を自動選択する。client UI の対象テストは `bun run --cwd apps/web test -- src/client/...` または `bun run --cwd apps/web test:components` を使い、config 乖離を起こさない。
+- `StoryStatus` の遷移ルールは domain (`apps/web/src/domain/entities/story.ts`) を正本とし、client で同一の遷移表を再定義しない。表示都合のラベル付けは client で持てるが、遷移可否の規則を複製すると domain と UI の乖離を招く。
+- `apps/web` の認可エラーUIは、401 を `AuthErrorProvider` 経由の再ログイン導線、403 を `PermissionDenied` コンポーネント経由の「理由説明 + 次アクション + 再試行/退避導線」に分離する。各 screen は 403 時の復帰文脈を `retryRequestRef` に保持し、共通コンポーネントへ action を注入する。
+- Story は project 配下のネストリソースとして扱い、client/router/API で未スコープの `/stories` や `/api/stories` を新設しない。URL/API 生成は `apps/web/src/client/lib/story-routes.ts` の helper を使い、server 側は `requireProjectMembership` を route 境界で先に通してから story use case を呼ぶ。
+- Story の一括更新（status/labels）は repository を直接更新せず、`updateStory` usecase を経由して単体更新時の業務検証とアクティビティ記録を再利用する。bulk 専用で同等ロジックを重複実装しない。
+- project スコープ化 migration では親リソースIDの付与だけでなく、認可境界で参照する membership データも同時に移行する。`project_members` が未整備だと、`requireProjectMembership` 配下の resource は移行直後に誰からも参照できなくなる。
+- セッション再開運用（Story #109）は、`docs/session-start-routine-and-progress-json.md`（手順と運用ルール）・`docs/schemas/session-progress.schema.json`（構造制約）・`docs/reports/session-handoff-replay-*.md`（再開検証証跡）を分離し、規約・スキーマ・検証結果の責務を混在させない。
+- 破壊的操作（例: story削除）は `window.confirm` に依存せず、画面内モーダルで「対象名の明示」「キャンセル」「確定」を提供して操作文脈を保持する。
+- Story削除確認モーダルの文言/挙動は `StoryForm` と一覧画面で重複実装せず、共通コンポーネントに集約して仕様差分の混入を防ぐ。
+- Story一覧の複合フィルタ（例: 未見積もり + typeタブ）は、`counts` と `visible list` の算出元を同一の中間配列に統一する。件数だけ全件基準・表示だけ部分配列基準に分離すると、バッジ値と表示結果が乖離する。
+- 添付ファイル機能は、メタデータを D1 (`story_attachments`) に、実体を Object Store (R2) に分離し、ユースケース層は `StoryAttachmentObjectStore` port 経由でのみ実体アクセスする。永続層や route から R2 SDK へ直接依存しない。
+- Story Board UI（`/projects/:projectId/stories/board`）は `STORY_STATUSES` を列定義の単一ソースとして用い、ステータス更新は project スコープの `projectStoriesApiPath(projectId)` 経由で `PATCH /api/projects/:projectId/stories/:storyId` に統一する。
+- フロントエンドの状態更新経路は単一のヘルパー関数に集約し、複数のイベントハンドラが個別に低レベル setter（例: `setStories`）を直接呼ばない。正本となるステート（例: `panelStories`）に対する更新関数（例: `applyUpdatedStory`）が存在する場合、すべてのハンドラがその関数を経由する。一部だけ別経路で更新すると、派生ステートとの不整合（画面に反映されない等）を招く。検出基準: 同一コンポーネント内で「正本ステートの setter を直接呼ぶハンドラ」と「ヘルパー経由のハンドラ」が混在していたら違反。ただし、初回データロード（API レスポンスでパネル全体を差し替える `loadPanel` 等）は例外とし、setter 直接操作を許容する。
+- パネル単位の取得エラー（`panelErrors`）を導入している画面では、全体空状態（`hasActiveFilters && filteredStories.length === 0`）が優先されてもエラー可視化が失われないようにする。空状態UIが先に描画されると、件数バッジや再試行導線のエラー表示責務が破綻する。
+- Story一覧を React Query の `useInfiniteQuery` へ移行する場合、`panel` ごとに query を分離し、query key に `currentIterationId` と全フィルタ（`q/owner/label/myWork/type`）を含める。これを欠くと、フィルタ切り替え時に別条件のページネーション状態が再利用され、`Load more` と表示件数が破綻する。
+- Currentパネルの Accepted 一覧は query を `order=statusChangedAtDesc`（最新から取得）に固定し、client-side 表示は `statusChangedAtAsc`（古い順）で整列する。追加読み込み時は新規ページのみ昇順化して先頭挿入し、`newPageAsc + existingAsc` の順序保持で表示の一貫性を維持する。

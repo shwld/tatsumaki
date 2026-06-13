@@ -1,0 +1,73 @@
+name: Bug report
+description: Report a reproducible problem in tatsumaki.
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Please do not report security vulnerabilities here; use the private reporting process in SECURITY.md.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened?
+      placeholder: Describe the bug clearly.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: List the smallest set of steps that reproduces the problem.
+      placeholder: |
+        1. Go to ...
+        2. Click ...
+        3. See ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What happened instead?
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Web app
+        - CLI
+        - Desktop app
+        - Self-hosting / deployment
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: Version, tag, or commit SHA if known.
+      placeholder: "0.0.x, cli-v0.0.x, or commit SHA"
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Browser, OS, runtime, Cloudflare setup, or CLI/Desktop platform.
+      placeholder: "macOS 15, Chrome, Bun 1.x, Cloudflare Workers, ..."
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Paste relevant logs, screenshots, or error messages. Remove secrets before posting.
+      render: text

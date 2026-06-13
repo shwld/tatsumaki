@@ -1,0 +1,9 @@
+{
+  "pull_request": {
+    "merged": true,
+    "body": "## Related Issue or Story\n- #271\n",
+    "head": {
+      "ref": "feature/story-271-status-update"
+    }
+  }
+}

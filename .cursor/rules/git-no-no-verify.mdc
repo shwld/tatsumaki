@@ -1,0 +1,8 @@
+---
+description: git commit / push で --no-verify（-n）を使わない
+alwaysApply: true
+---
+
+# Git: `--no-verify` を使わない
+
+`git commit` および `git push` に **`--no-verify`**（短縮 **`-n`**）を付けない。ローカルの pre-commit / pre-push などに通してからコミット・プッシュする。

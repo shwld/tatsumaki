@@ -1,0 +1,38 @@
+{
+  "name": "tatsumaki",
+  "version": "0.0.1",
+  "license": "Apache-2.0",
+  "private": true,
+  "scripts": {
+    "dev": "bun run --cwd apps/web dev",
+    "seed:scroll": "bun run --cwd apps/web seed:scroll",
+    "agent-skills:sync": "bash scripts/sync-agent-skill-links.sh",
+    "agent-integrations:sync-skills": "bash scripts/sync-agent-integration-skills.sh",
+    "postinstall": "bun install --cwd apps/web && bash scripts/sync-agent-skill-links.sh",
+    "build:web": "bun run --cwd apps/web build:client",
+    "format": "biome format --write --files-ignore-unknown=true .",
+    "format:staged": "biome format --write --staged --files-ignore-unknown=true --no-errors-on-unmatched",
+    "lint": "bun --bun oxlint apps/ && bun run lint:custom",
+    "docs:lint": "bash scripts/check-docs-links.sh",
+    "db:migrate:web": "cd apps/web && bun run db:migrate",
+    "deploy:web": "bun run build:web && cd apps/web && bun run deploy",
+    "openapi:generate": "bun run --cwd apps/web openapi:generate",
+    "openapi:check": "bun run --cwd apps/web openapi:check",
+    "playwright:install": "bun run --cwd apps/web playwright install chromium",
+    "wrangler": "bun run --cwd apps/web wrangler",
+    "lint:custom": "bash scripts/agent-custom-lint.sh && bash scripts/lint-screenshot-coverage.sh",
+    "lint:custom:test": "bash scripts/agent-custom-lint-test.sh && bash scripts/lint-screenshot-coverage.test.sh",
+    "test": "bun run --cwd apps/web test",
+    "test:components": "bun run --cwd apps/web test:components",
+    "test:ui": "bun run --cwd apps/web test:ui",
+    "test:ui:update": "bun run --cwd apps/web test:ui:update",
+    "cli:release:upload": "bash scripts/cli-release-upload.sh",
+    "typecheck": "bun run --cwd apps/web typecheck"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.13",
+    "@testing-library/user-event": "^14.6.1",
+    "lefthook": "^2.1.3",
+    "oxlint": "^1.51.0"
+  }
+}

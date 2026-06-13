@@ -1,0 +1,590 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "tatsumaki CLI API",
+    "version": "0.0.7"
+  },
+  "components": {
+    "schemas": {
+      "StoryGetResponse": {
+        "type": "object",
+        "properties": {
+          "story": {
+            "$ref": "#/components/schemas/Story"
+          }
+        },
+        "required": ["story"]
+      },
+      "Story": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "01KNCFJZJ0Z74X92QPCE0D9MK8"
+          },
+          "storyNumber": {
+            "type": "number",
+            "example": 95
+          },
+          "title": {
+            "type": "string",
+            "example": "CLIを用意する"
+          },
+          "status": {
+            "type": "string",
+            "example": "Started"
+          },
+          "type": {
+            "type": "string",
+            "example": "feature"
+          }
+        },
+        "required": ["id", "storyNumber", "title", "status", "type"]
+      },
+      "StoryListResponse": {
+        "type": "object",
+        "properties": {
+          "stories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Story"
+            }
+          }
+        },
+        "required": ["stories"]
+      },
+      "StoryStatus": {
+        "type": "string",
+        "enum": [
+          "Unstarted",
+          "Started",
+          "Finished",
+          "Delivered",
+          "Accepted",
+          "Rejected"
+        ],
+        "example": "Unstarted"
+      },
+      "ProjectGetResponse": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "$ref": "#/components/schemas/Project"
+          }
+        },
+        "required": ["project"]
+      },
+      "Project": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "01KN9P32R248P2PK1413DKQQG5"
+          },
+          "name": {
+            "type": "string",
+            "example": "tatsumaki"
+          }
+        },
+        "required": ["id", "name"]
+      },
+      "CliVersionCompatibilityResponse": {
+        "type": "object",
+        "properties": {
+          "apiVersion": {
+            "type": "string",
+            "example": "0.0.7"
+          },
+          "minClientVersion": {
+            "type": "string",
+            "example": "0.0.7"
+          }
+        },
+        "required": ["apiVersion", "minClientVersion"]
+      },
+      "CliWhoamiResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "01KN9P32R248P2PK1413DKQQG5"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "user@example.com"
+          },
+          "displayName": {
+            "type": "string",
+            "example": "Taro"
+          }
+        },
+        "required": ["id", "email", "displayName"]
+      }
+    },
+    "parameters": {}
+  },
+  "paths": {
+    "/programmatic-api/v1/projects/{projectId}/stories/{storyNumber}": {
+      "get": {
+        "operationId": "getStoryByNumber",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "example": "project-123"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "example": "95"
+            },
+            "required": true,
+            "name": "storyNumber",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Story found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoryGetResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Story not found"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateStory",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "example": "project-123"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "example": "95"
+            },
+            "required": true,
+            "name": "storyNumber",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": ["feature", "bug", "chore", "release"]
+                  },
+                  "storyPoint": {
+                    "type": "integer",
+                    "nullable": true
+                  },
+                  "labels": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "isIcebox": {
+                    "type": "boolean"
+                  },
+                  "status": {
+                    "$ref": "#/components/schemas/StoryStatus"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Story updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoryGetResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request body"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Story not found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        }
+      }
+    },
+    "/programmatic-api/v1/projects/{projectId}/stories": {
+      "get": {
+        "operationId": "listStories",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "example": "project-123"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "$ref": "#/components/schemas/StoryStatus"
+            },
+            "required": false,
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": ["current"],
+              "example": "current"
+            },
+            "required": false,
+            "name": "iterationDateScope",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$",
+              "example": "10"
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stories matching the filter",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoryListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createStory",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "example": "project-123"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": ["feature", "bug", "chore", "release"]
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "isIcebox": {
+                    "type": "boolean"
+                  }
+                },
+                "required": ["title", "type", "description"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Story created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoryGetResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request body"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        }
+      }
+    },
+    "/programmatic-api/v1/projects/{projectId}/stories/reorder": {
+      "post": {
+        "operationId": "reorderStories",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "example": "project-123"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "orderedIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  }
+                },
+                "required": ["orderedIds"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Stories reordered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoryListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request body"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/programmatic-api/v1/projects/{projectId}/stories/{storyNumber}/comments": {
+      "post": {
+        "operationId": "createStoryComment",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "example": "project-123"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "example": "95"
+            },
+            "required": true,
+            "name": "storyNumber",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "body": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": ["body"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Comment created"
+          },
+          "400": {
+            "description": "Invalid request body"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Story not found"
+          }
+        }
+      }
+    },
+    "/programmatic-api/v1/projects/{projectId}": {
+      "get": {
+        "operationId": "getProject",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "example": "project-123"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Project found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectGetResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Project not found"
+          }
+        }
+      }
+    },
+    "/programmatic-api/v1/version": {
+      "get": {
+        "operationId": "getCliVersionCompatibility",
+        "responses": {
+          "200": {
+            "description": "CLI compatibility versions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CliVersionCompatibilityResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/programmatic-api/v1/whoami": {
+      "get": {
+        "operationId": "getCliWhoami",
+        "responses": {
+          "200": {
+            "description": "Current CLI user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CliWhoamiResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    }
+  },
+  "webhooks": {}
+}

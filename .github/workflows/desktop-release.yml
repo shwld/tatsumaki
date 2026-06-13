@@ -1,0 +1,194 @@
+name: Desktop Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (desktop-vX.Y.Z)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    name: Validate Tag And Version
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.validate.outputs.tag }}
+      version: ${{ steps.validate.outputs.version }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: "24"
+      - name: Validate tag format and version sync
+        id: validate
+        run: |
+          TAG="${{ github.event.inputs.tag }}"
+          if [[ ! "$TAG" =~ ^desktop-v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "Tag must match desktop-vX.Y.Z" >&2
+            exit 1
+          fi
+
+          TAG_VERSION="${BASH_REMATCH[1]}"
+          APP_VERSION="$(node -p "require('./apps/desktop/package.json').version")"
+
+          if [[ "$APP_VERSION" != "$TAG_VERSION" ]]; then
+            echo "Version mismatch: tag=$TAG_VERSION package.json=$APP_VERSION" >&2
+            exit 1
+          fi
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$APP_VERSION" >> "$GITHUB_OUTPUT"
+
+  build-sign-notarize:
+    name: Build Sign Notarize (macOS)
+    needs: preflight
+    timeout-minutes: 30
+    runs-on: macos-latest
+    environment: desktop-release
+    env:
+      DESKTOP_MAC_SIGN_REQUIRED: "true"
+      APPLE_SIGN_IDENTITY: ${{ secrets.DESKTOP_APPLE_SIGN_IDENTITY }}
+      APPLE_API_KEY_ID: ${{ secrets.DESKTOP_APPLE_API_KEY_ID }}
+      APPLE_API_ISSUER: ${{ secrets.DESKTOP_APPLE_API_ISSUER }}
+      DESKTOP_APPLE_CERT_P12_BASE64: ${{ secrets.DESKTOP_APPLE_CERT_P12_BASE64 }}
+      DESKTOP_APPLE_CERT_P12_PASSWORD: ${{ secrets.DESKTOP_APPLE_CERT_P12_PASSWORD }}
+      DESKTOP_APPLE_KEYCHAIN_PASSWORD: ${{ secrets.DESKTOP_APPLE_KEYCHAIN_PASSWORD }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+      - run: bun install
+        working-directory: apps/desktop
+      - name: Import Apple signing certificate
+        run: |
+          if [[ -z "${DESKTOP_APPLE_CERT_P12_BASE64:-}" ]]; then
+            echo "Missing required secret: DESKTOP_APPLE_CERT_P12_BASE64" >&2
+            exit 1
+          fi
+          if [[ -z "${DESKTOP_APPLE_CERT_P12_PASSWORD:-}" ]]; then
+            echo "Missing required secret: DESKTOP_APPLE_CERT_P12_PASSWORD" >&2
+            exit 1
+          fi
+          if [[ -z "${DESKTOP_APPLE_KEYCHAIN_PASSWORD:-}" ]]; then
+            echo "Missing required secret: DESKTOP_APPLE_KEYCHAIN_PASSWORD" >&2
+            exit 1
+          fi
+
+          KEYCHAIN_PATH="$RUNNER_TEMP/desktop-signing.keychain-db"
+          CERT_PATH="$RUNNER_TEMP/desktop-signing-cert.p12"
+
+          echo "$DESKTOP_APPLE_CERT_P12_BASE64" | base64 --decode > "$CERT_PATH"
+
+          security create-keychain -p "$DESKTOP_APPLE_KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$DESKTOP_APPLE_KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -k "$KEYCHAIN_PATH" -P "$DESKTOP_APPLE_CERT_P12_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$DESKTOP_APPLE_KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
+          echo "APPLE_KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+
+          rm -f "$CERT_PATH"
+      - name: Verify signing identity availability
+        run: |
+          if [[ -z "${APPLE_SIGN_IDENTITY:-}" ]]; then
+            echo "Missing APPLE_SIGN_IDENTITY" >&2
+            exit 1
+          fi
+          security find-identity -v -p codesigning "$APPLE_KEYCHAIN_PATH"
+          if ! security find-identity -v -p codesigning "$APPLE_KEYCHAIN_PATH" | grep -F "$APPLE_SIGN_IDENTITY" >/dev/null; then
+            echo "Configured APPLE_SIGN_IDENTITY not found in imported keychain." >&2
+            echo "Expected: $APPLE_SIGN_IDENTITY" >&2
+            exit 1
+          fi
+      - name: Prepare notary API key
+        env:
+          APPLE_API_KEY_CONTENT: ${{ secrets.DESKTOP_APPLE_API_KEY_CONTENT }}
+        run: |
+          if [[ -z "${APPLE_API_KEY_CONTENT:-}" ]]; then
+            echo "Missing required secret: DESKTOP_APPLE_API_KEY_CONTENT" >&2
+            exit 1
+          fi
+          KEY_PATH="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY_ID}.p8"
+          printf '%s' "$APPLE_API_KEY_CONTENT" > "$KEY_PATH"
+          chmod 600 "$KEY_PATH"
+          echo "APPLE_API_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
+      - run: bun run icon:mac
+        working-directory: apps/desktop
+      - run: bun run make:mac
+        working-directory: apps/desktop
+      - name: Notarize and staple DMG
+        run: |
+          DMG_PATHS=()
+          while IFS= read -r p; do
+            DMG_PATHS+=("$p")
+          done < <(find apps/desktop/out/make -type f -name '*.dmg')
+          if [[ "${#DMG_PATHS[@]}" -eq 0 ]]; then
+            echo "DMG artifact not found under apps/desktop/out/make" >&2
+            exit 1
+          fi
+          if [[ "${#DMG_PATHS[@]}" -ne 1 ]]; then
+            echo "Expected exactly one DMG artifact, found ${#DMG_PATHS[@]}:" >&2
+            printf '%s\n' "${DMG_PATHS[@]}" >&2
+            exit 1
+          fi
+          DMG_PATH="${DMG_PATHS[0]}"
+
+          xcrun notarytool submit "$DMG_PATH" \
+            --key "$APPLE_API_KEY_PATH" \
+            --key-id "$APPLE_API_KEY_ID" \
+            --issuer "$APPLE_API_ISSUER" \
+            --wait
+
+          xcrun stapler staple "$DMG_PATH"
+          xcrun stapler validate "$DMG_PATH"
+      - run: DESKTOP_MAC_SIGN_REQUIRED=true bun run verify:mac
+        working-directory: apps/desktop
+      - name: Upload desktop artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: desktop-release-assets
+          path: |
+            apps/desktop/out/make/*.dmg
+            apps/desktop/out/make/zip/darwin/**/*.zip
+          if-no-files-found: error
+
+  publish-release:
+    name: Publish GitHub Release (Linux)
+    needs: [preflight, build-sign-notarize]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ needs.preflight.outputs.tag }}
+      RELEASE_VERSION: ${{ needs.preflight.outputs.version }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: desktop-release-assets
+          path: release-assets
+      - name: Prepare release files
+        run: |
+          mkdir -p publish
+          find release-assets -type f \( -name '*.dmg' -o -name '*.zip' \) -exec cp {} publish/ \;
+          ls -lh publish
+          cd publish
+          sha256sum *.dmg *.zip | tee sha256sums.txt
+      - name: Ensure release exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" \
+              --target "${GITHUB_SHA}" \
+              --title "$RELEASE_TAG" \
+              --notes "Desktop release $RELEASE_VERSION"
+          fi
+      - name: Upload release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "$RELEASE_TAG" publish/*.dmg publish/*.zip publish/sha256sums.txt --clobber

@@ -1,0 +1,34 @@
+assert_lefthook_installed: true
+
+pre-commit:
+  parallel: false
+  commands:
+    deps-check:
+      run: |
+        if [[ ! -d node_modules/.bin ]] || [[ node_modules/.bin -ot bun.lock ]]; then
+          echo "node_modules が古いか存在しません。bun install を実行してください。"
+          exit 1
+        fi
+    config-guard:
+      run: CONFIG_GUARD_MODE=pre-commit bash scripts/config-guard.sh {staged_files}
+    custom-lint-domain-staged:
+      run: bash scripts/hook-agent-custom-lint.sh {staged_files}
+    docs-lint:
+      run: bash scripts/check-docs-links.sh
+    migration-guard:
+      run: bash scripts/hook-migration-guard.sh {staged_files}
+    biome-format:
+      run: bun run format:staged
+      stage_fixed: true
+
+pre-push:
+  parallel: false
+  commands:
+    require-signed-commits:
+      run: bash scripts/hook-require-signed-commits.sh
+    config-guard:
+      run: CONFIG_GUARD_MODE=pre-push bash scripts/config-guard.sh {push_files}
+    docs-lint:
+      run: bash scripts/check-docs-links.sh
+    completion-gate:
+      run: bash scripts/completion-gate.sh
