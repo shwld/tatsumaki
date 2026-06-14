@@ -49,7 +49,7 @@
   },
   "dependencies": {
     "@cfworker/json-schema": "^4.1.1",
-    "@cloudflare/workers-oauth-provider": "^0.7.2",
+    "@cloudflare/workers-oauth-provider": "^0.8.0",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
@@ -60,7 +60,7 @@
     "@radix-ui/react-popover": "^1.1.15",
     "@tailwindcss/typography": "^0.5.19",
     "@tanstack/react-query": "^5.90.21",
-    "@tiptap/extension-image": "3.26.0",
+    "@tiptap/extension-image": "3.26.1",
     "@tiptap/extension-mention": "^3.22.5",
     "@tiptap/markdown": "^3.22.5",
     "@tiptap/react": "^3.22.5",
