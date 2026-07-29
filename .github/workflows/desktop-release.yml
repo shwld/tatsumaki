@@ -19,7 +19,7 @@ jobs:
       tag: ${{ steps.validate.outputs.tag }}
       version: ${{ steps.validate.outputs.version }}
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
         with:
           node-version: "24"
@@ -58,7 +58,7 @@ jobs:
       DESKTOP_APPLE_CERT_P12_PASSWORD: ${{ secrets.DESKTOP_APPLE_CERT_P12_PASSWORD }}
       DESKTOP_APPLE_KEYCHAIN_PASSWORD: ${{ secrets.DESKTOP_APPLE_KEYCHAIN_PASSWORD }}
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
       - run: bun install
         working-directory: apps/desktop
@@ -165,7 +165,7 @@ jobs:
       RELEASE_TAG: ${{ needs.preflight.outputs.tag }}
       RELEASE_VERSION: ${{ needs.preflight.outputs.version }}
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: desktop-release-assets
