@@ -126,6 +126,8 @@ export const mockAuthMe = async (page: Page) => {
 
 export const mockStoriesList = async (page: Page) => {
   const today = screenshotReferenceDate;
+  await page.clock.setFixedTime(today);
+
   const start = new Date(today);
   start.setDate(today.getDate() - 3);
   const end = new Date(today);
