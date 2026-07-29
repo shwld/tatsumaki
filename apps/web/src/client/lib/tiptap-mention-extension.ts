@@ -7,9 +7,14 @@ type MentionSuggestionItem = {
   label: string;
 };
 
-type MentionRenderProps = SuggestionProps<
+type MentionSuggestionProps = SuggestionProps<
   MentionSuggestionItem,
   MentionSuggestionItem
+>;
+
+type MentionRenderProps = Pick<
+  MentionSuggestionProps,
+  "clientRect" | "command" | "items"
 >;
 
 type MentionKeyDownProps = {
