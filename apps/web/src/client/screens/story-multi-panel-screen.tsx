@@ -78,6 +78,7 @@ import {
   panelTypeFromDropZoneGroupId,
 } from "../lib/story-multi-panel-drop-allowed";
 import {
+  insertStoryAtDropTarget,
   reorderStoriesById,
   reindexStoriesPosition,
 } from "../lib/story-reorder";
@@ -992,11 +993,14 @@ export function StoryMultiPanelScreen() {
     }
   };
 
-  const moveStoryToPanel = async (storyId: string, targetPanel: PanelType) => {
-    if (!projectId) return;
+  const moveStoryToPanel = async (
+    storyId: string,
+    targetPanel: PanelType,
+  ): Promise<Story | null> => {
+    if (!projectId) return null;
 
     const originalStory = allStories.find((s) => s.id === storyId);
-    if (!originalStory) return;
+    if (!originalStory) return null;
 
     const plan = planStoryMoveToPanel({
       story: originalStory,
@@ -1005,19 +1009,20 @@ export function StoryMultiPanelScreen() {
     });
     if (!plan.ok) {
       showToast("error", plan.error);
-      return;
+      return null;
     }
 
     setError(null);
 
     try {
-      await movePanelMutation.mutateAsync({
+      return await movePanelMutation.mutateAsync({
         story: originalStory,
         targetPanel,
         plan,
       });
     } catch {
       // Rollback and toast are handled in the mutation hook.
+      return null;
     }
   };
 
@@ -1049,6 +1054,43 @@ export function StoryMultiPanelScreen() {
       shouldCombineCurrentBacklog,
     ],
   );
+
+  const persistPanelOrder = async (
+    panel: PanelType,
+    reordered: Story[],
+    rollbackStories: Story[],
+  ) => {
+    if (!projectId) return;
+
+    const optimisticReordered = reindexStoriesPosition(reordered);
+    const nextRequestVersion =
+      (reorderRequestVersionRef.current[panel] ?? 0) + 1;
+    reorderRequestVersionRef.current[panel] = nextRequestVersion;
+    const isLatestRequest = () =>
+      reorderRequestVersionRef.current[panel] === nextRequestVersion;
+
+    panelQueries.replacePanelStories(panel, optimisticReordered);
+    await persistStoryReorder({
+      projectId,
+      sourcePanel: panel,
+      optimisticReordered,
+      rollbackStories,
+      isLatestRequest,
+      replacePanelStories: panelQueries.replacePanelStories,
+      applyExistingStoriesInPanel: panelQueries.applyExistingStoriesInPanel,
+      invalidatePanel: (targetPanel) =>
+        panelQueries.invalidatePanels({
+          panels: [targetPanel],
+          refetchType: "none",
+        }),
+      setError,
+      notifySessionExpired,
+      showSuccessToast: () =>
+        showToast("success", t("storyMultiPanelScreen.toast.reorderSaved")),
+      showErrorToast: () =>
+        showToast("error", t("storyMultiPanelScreen.toast.reorderFailed")),
+    });
+  };
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const overId = event.over?.id;
@@ -1096,7 +1138,24 @@ export function StoryMultiPanelScreen() {
         targetPanel === "Current" ||
         targetPanel === "Icebox"
       ) {
-        void moveStoryToPanel(activeId, targetPanel);
+        const movedStory = await moveStoryToPanel(activeId, targetPanel);
+        if (!movedStory) return;
+
+        const targetStories =
+          targetPanel === "Backlog"
+            ? groupedStories.Backlog
+            : targetPanel === "Current"
+              ? currentUnacceptedStories
+              : groupedStories.Icebox;
+        const reordered = insertStoryAtDropTarget(
+          targetStories,
+          movedStory,
+          overIdStr,
+        );
+        const rollbackStories = [...targetStories, movedStory].sort(
+          (a, b) => a.position - b.position,
+        );
+        await persistPanelOrder(targetPanel, reordered, rollbackStories);
       }
       // Done panel is read-only.
       return;
@@ -1153,35 +1212,9 @@ export function StoryMultiPanelScreen() {
     }
     const reordered = reorderStoriesById(sorted, activeId, resolvedOverId);
     if (!reordered) return;
-    const optimisticReordered = reindexStoriesPosition(reordered);
 
     const rollbackStories = panelQueries.panels[sourcePanel].stories;
-    const nextRequestVersion =
-      (reorderRequestVersionRef.current[sourcePanel] ?? 0) + 1;
-    reorderRequestVersionRef.current[sourcePanel] = nextRequestVersion;
-    const isLatestRequest = () =>
-      reorderRequestVersionRef.current[sourcePanel] === nextRequestVersion;
-
-    // Optimistic update
-    panelQueries.replacePanelStories(sourcePanel, optimisticReordered);
-
-    await persistStoryReorder({
-      projectId,
-      sourcePanel,
-      optimisticReordered,
-      rollbackStories,
-      isLatestRequest,
-      replacePanelStories: panelQueries.replacePanelStories,
-      applyExistingStoriesInPanel: panelQueries.applyExistingStoriesInPanel,
-      invalidatePanel: (panel) =>
-        panelQueries.invalidatePanels({ panels: [panel], refetchType: "none" }),
-      setError,
-      notifySessionExpired,
-      showSuccessToast: () =>
-        showToast("success", t("storyMultiPanelScreen.toast.reorderSaved")),
-      showErrorToast: () =>
-        showToast("error", t("storyMultiPanelScreen.toast.reorderFailed")),
-    });
+    await persistPanelOrder(sourcePanel, reordered, rollbackStories);
   };
 
   const dropAllowanceBase = useMemo(
