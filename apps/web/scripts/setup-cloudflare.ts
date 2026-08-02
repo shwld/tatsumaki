@@ -14,6 +14,7 @@ Options:
   --allow-email <email>    Allow an email address through Access (repeatable)
   --allow-domain <domain>  Allow an email domain through Access (repeatable)
   --with-staging           Also create an isolated staging environment
+  --staging-only           Create or update only the isolated staging environment
   --name-prefix <name>     Resource name prefix (default: tatsumaki)
   --dry-run                Print the plan without contacting Cloudflare
   --help                   Show this help
@@ -31,6 +32,7 @@ export function parseArguments(
     allowEmails: [],
     allowDomains: [],
     withStaging: false,
+    stagingOnly: false,
     dryRun: false,
     namePrefix: "tatsumaki",
   };
@@ -38,6 +40,7 @@ export function parseArguments(
   for (let index = 0; index < args.length; index += 1) {
     const argument = args[index];
     if (argument === "--with-staging") options.withStaging = true;
+    else if (argument === "--staging-only") options.stagingOnly = true;
     else if (argument === "--dry-run") options.dryRun = true;
     else if (argument === "--allow-email")
       options.allowEmails.push(requiredValue(args, ++index, argument));

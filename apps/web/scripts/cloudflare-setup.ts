@@ -15,6 +15,7 @@ export type SetupOptions = {
   allowEmails: string[];
   allowDomains: string[];
   withStaging: boolean;
+  stagingOnly: boolean;
   dryRun: boolean;
   namePrefix: string;
 };
@@ -29,6 +30,11 @@ export type EnvironmentPlan = {
   accessName: string;
   accessPolicyName: string;
 };
+
+export type EnvironmentSelection =
+  | "production"
+  | "production-and-staging"
+  | "staging";
 
 type ApiEnvelope<T> = {
   success: boolean;
@@ -56,7 +62,7 @@ export type SetupDependencies = {
 
 export function buildEnvironmentPlans(
   namePrefix: string,
-  withStaging: boolean,
+  selection: EnvironmentSelection,
 ): EnvironmentPlan[] {
   const build = (environment: "production" | "staging"): EnvironmentPlan => {
     const base =
@@ -73,12 +79,28 @@ export function buildEnvironmentPlans(
     };
   };
 
-  return withStaging
-    ? [build("production"), build("staging")]
-    : [build("production")];
+  if (selection === "staging") return [build("staging")];
+  if (selection === "production-and-staging") {
+    return [build("production"), build("staging")];
+  }
+  return [build("production")];
+}
+
+export function resolveEnvironmentSelection(
+  options: Pick<SetupOptions, "withStaging" | "stagingOnly">,
+): EnvironmentSelection {
+  if (options.withStaging && options.stagingOnly) {
+    throw new Error(
+      "--with-staging and --staging-only cannot be used together.",
+    );
+  }
+  if (options.stagingOnly) return "staging";
+  if (options.withStaging) return "production-and-staging";
+  return "production";
 }
 
 export function validateSetupOptions(options: SetupOptions): void {
+  const environmentSelection = resolveEnvironmentSelection(options);
   if (!/^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/.test(options.namePrefix)) {
     throw new Error(
       "--name-prefix must be 3-63 lowercase letters, numbers, or hyphens.",
@@ -99,7 +121,7 @@ export function validateSetupOptions(options: SetupOptions): void {
   }
   for (const plan of buildEnvironmentPlans(
     options.namePrefix,
-    options.withStaging,
+    environmentSelection,
   )) {
     for (const name of [
       plan.workerName,
@@ -129,7 +151,10 @@ export async function setupCloudflare(
 ): Promise<void> {
   validateSetupOptions(options);
   const log = dependencies.log ?? console.log;
-  const plans = buildEnvironmentPlans(options.namePrefix, options.withStaging);
+  const plans = buildEnvironmentPlans(
+    options.namePrefix,
+    resolveEnvironmentSelection(options),
+  );
 
   for (const plan of plans) {
     log(`\n[${plan.environment}]`);

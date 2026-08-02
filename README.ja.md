@@ -86,6 +86,14 @@ CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_ACCESS_TEAM_DOMAIN
 
 stagingは専用の `tatsumaki-staging` Worker、D1 database、KV namespace、R2 buckets、Durable Object storage、Access application、Access policyを使い、production dataを共有しません。
 
+既存環境でproductionへ触れずにstagingの作成・修復・再deployだけを行う場合は、`--staging-only` を使います。production resourceの検索、migration、deploy、変更は行いません。
+
+```bash
+CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_ACCESS_TEAM_DOMAIN=your-team.cloudflareaccess.com bun apps/web/scripts/setup-cloudflare.ts --allow-email you@example.com --staging-only
+```
+
+`--with-staging` と `--staging-only` は同時指定できません。最初に `--dry-run` も付け、`[staging]` planだけが表示されることを確認してください。
+
 コマンドは再実行可能です。同名resourceを検索して再利用するため、network errorや権限修正後は同じコマンドを再度実行してください。同名resourceは重複作成されません。別のインストールが既定名を使用済みなら `--name-prefix` を指定できます。
 
 `apps/web/wrangler.toml` は後続の手動deploy用の公開reference設定として残り、account固有IDやsecretを含みません。既存の `bun run deploy:web` はproduction D1 migrationを適用してから公開し、dashboard管理のvariablesを保持します。
