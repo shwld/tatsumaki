@@ -98,12 +98,28 @@ bun run deploy:web
 
 `wrangler.toml` sets `keep_vars = true`, and `deploy:worker` also passes `--keep-vars`, so dashboard-managed variables are preserved across Wrangler deploys.
 
+### Staging Deployment
+
+The `staging` Wrangler environment deploys a separate `tatsumaki-staging` Worker. Its D1 database and R2 buckets use staging-specific names, and its KV and Durable Object bindings are separate from the top-level production Worker.
+
+Before the first staging deployment:
+
+1. Create the D1 database `tatsumaki-staging-db` in Cloudflare. The workflow applies migrations before publishing the Worker, so it fails safely if this database is missing.
+2. Create a GitHub Environment named `staging` and add `CLOUDFLARE_ACCOUNT_ID` and a narrowly scoped `CLOUDFLARE_API_TOKEN` as environment secrets.
+3. Create a separate Cloudflare Access application for the staging domain, then configure `ACCESS_AUD` and `ACCESS_TEAM_DOMAIN` as runtime values for `tatsumaki-staging`.
+4. Configure the staging custom domain or route. Do not reuse the production Access application, D1 database, KV namespace, or R2 buckets.
+
+After `.github/workflows/deploy-staging.yml` has been merged into the default branch, run **Deploy staging** from GitHub Actions and select the repository branch to verify. This allows a feature branch to be tested on staging before it is merged. The workflow serializes deployments to the shared staging environment, builds the web app, applies remote D1 migrations, and then deploys with `wrangler deploy --env staging`. Configure required reviewers or branch restrictions on the GitHub Environment when deployments need approval. Wrangler automatically provisions or reuses the staging KV namespace and the staging R2 buckets declared without account-specific IDs; those IDs remain outside git.
+
 References:
 
 - [Cloudflare Deploy to Cloudflare buttons](https://developers.cloudflare.com/workers/platform/deploy-buttons/)
 - [Cloudflare Workers Builds configuration](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/)
+- [Cloudflare GitHub Actions deployment](https://developers.cloudflare.com/workers/ci-cd/external-cicd/github-actions/)
 - [Cloudflare Wrangler configuration](https://developers.cloudflare.com/workers/wrangler/configuration/)
+- [Cloudflare Wrangler environments](https://developers.cloudflare.com/workers/wrangler/environments/)
 - [Cloudflare environment variables and secrets](https://developers.cloudflare.com/workers/configuration/environment-variables/)
+- [Manually running GitHub Actions workflows](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow?tool=cli)
 
 ## Target Users
 
