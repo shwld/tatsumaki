@@ -8,8 +8,8 @@ description: "tatsumaki の初回セットアップ、ローカル起動、Cloud
 ## 原則
 
 - safe automation と user-owned/personal steps を分ける。
-- secret、API token、domain、Cloudflare dashboard 操作は自動実行しない。
-- remote D1 migration、Worker deploy、Cloudflare resource 作成は、ユーザーが明示したときだけ実行またはコマンド提示する。
+- API token の作成、team domain の確認、Accessで許可するidentity、custom domainはuser-owned stepとして扱う。
+- remote D1 migration、Worker deploy、Cloudflare resource 作成は、ユーザーが明示したときだけセットアップコマンドを実行または提示する。
 - repo root から操作する。package script alias は追加しない。
 
 ## Workflow
@@ -27,10 +27,12 @@ description: "tatsumaki の初回セットアップ、ローカル起動、Cloud
    - UI スクロール検証などデータ量が必要な場合だけ seed を使う。
 5. **self-hosting readiness check**
    - Cloudflare 手順が必要になったら [references/cloudflare-self-hosting.md](references/cloudflare-self-hosting.md) を読む。
-6. **Cloudflare user-owned steps**
-   - dashboard、domain、Access、secret 設定は手順またはコマンドを提示し、ユーザーに実行してもらう。
+6. **Cloudflare bootstrap**
+   - ユーザーがremote構築を明示した場合、API token、Account ID、Access team domain、許可identityを確認して `bun apps/web/scripts/setup-cloudflare.ts` を使う。
+   - productionのみが既定。stagingも必要な場合だけ `--with-staging` を付ける。
+   - 実行前に `--dry-run` でresource planを確認する。
 7. **deploy 前確認**
-   - remote deploy 前に `TATSUMAKI_D1_DATABASE_ID`、Access values、R2 bucket names、Workers Builds path/commands を確認する。
+   - remote deploy 前にtoken権限、Account ID、Access team domain、許可identityを確認する。
 8. **README/docs 過不足確認**
    - setup 手順を変更した場合は README を短く更新し、詳細は skill/reference に寄せる。
    - 最後に `bash scripts/check-docs-links.sh` と `bash scripts/check-skill-links.sh` を実行する。
@@ -51,14 +53,15 @@ bash .claude/skills/self-hosting-setup/scripts/safe-local-setup.sh --seed-scroll
 
 ## User-Owned Steps
 
-次は自動実行しない。必要な値を確認し、ユーザーにコマンドまたは dashboard 手順を渡す。
+次は自動実行しない。必要な値をユーザーに確認し、dashboard手順を渡す。
 
-- `wrangler login`
-- `wrangler d1 create`
-- `wrangler kv namespace create`
-- `wrangler r2 bucket create`
-- Cloudflare Access Application 作成
+- scoped Cloudflare API token 作成
+- Cloudflare Account ID と Access team domain の確認
+- Accessで許可するemailまたはemail domainの選択
 - custom domain / route 設定
-- runtime variables / secrets 設定
-- `bun run deploy:web`
 
+ユーザーがremote構築を明示した場合、次のコマンドがD1/KV/R2/Worker/Access/secret/deployを一括で処理する。
+
+```bash
+CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_ACCESS_TEAM_DOMAIN=your-team.cloudflareaccess.com bun apps/web/scripts/setup-cloudflare.ts --allow-email you@example.com
+```

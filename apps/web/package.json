@@ -84,15 +84,5 @@
     "tailwind-merge": "^3.5.0",
     "ulid": "^3.0.2",
     "zod": "^4.4.2"
-  },
-  "cloudflare": {
-    "bindings": {
-      "ACCESS_AUD": {
-        "description": "Cloudflare Access Application Audience (AUD) tag. Find it in Zero Trust > Access > Applications > your tatsumaki application."
-      },
-      "ACCESS_TEAM_DOMAIN": {
-        "description": "Cloudflare Access team domain, for example `your-team.cloudflareaccess.com`. Find it in Zero Trust settings."
-      }
-    }
   }
 }
