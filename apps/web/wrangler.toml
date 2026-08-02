@@ -35,3 +35,30 @@ class_name = "PlanningPokerDO"
 [[migrations]]
 tag = "v1-planning-poker-do"
 new_sqlite_classes = ["PlanningPokerDO"]
+
+[env.staging.assets]
+directory = "./dist/client"
+binding = "ASSETS"
+
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "tatsumaki-staging-db"
+migrations_dir = "migrations"
+
+[[env.staging.kv_namespaces]]
+binding = "OAUTH_KV"
+
+[[env.staging.r2_buckets]]
+binding = "STORY_ATTACHMENTS"
+bucket_name = "tatsumaki-staging-story-attachments"
+
+[[env.staging.r2_buckets]]
+binding = "USER_AVATARS"
+bucket_name = "tatsumaki-staging-user-avatars"
+
+[env.staging.triggers]
+crons = ["0 * * * *"]
+
+[[env.staging.durable_objects.bindings]]
+name = "PLANNING_POKER_DO"
+class_name = "PlanningPokerDO"
