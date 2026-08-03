@@ -48,7 +48,13 @@ Create production:
 CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_ACCESS_TEAM_DOMAIN=your-team.cloudflareaccess.com bun apps/web/scripts/setup-cloudflare.ts --allow-email you@example.com
 ```
 
-Append `--with-staging` only when staging is requested. The command is restartable: exact-name resources are reused and missing resources are created. After a transient failure or permission correction, rerun the same command.
+Append `--with-staging` to create production and staging together. For an existing installation, process only staging without reading or changing production resources:
+
+```bash
+CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_ACCESS_TEAM_DOMAIN=your-team.cloudflareaccess.com bun apps/web/scripts/setup-cloudflare.ts --allow-email you@example.com --staging-only
+```
+
+`--with-staging` and `--staging-only` are mutually exclusive. Add `--dry-run` first and confirm that staging-only output contains `[staging]` but not `[production]`. The command is restartable: exact-name resources are reused and missing resources are created. After a transient failure or permission correction, rerun the same command.
 
 ## Local Access Verification
 
@@ -63,7 +69,7 @@ Before presenting a deploy command, confirm:
 - The API token has only the required account permissions.
 - Account ID and Access team domain belong to the intended account.
 - At least one Access email or email domain is explicitly allowed.
-- `--dry-run` shows the intended production and optional staging names.
+- `--dry-run` shows exactly the intended production and/or staging names.
 - The user understands the bootstrap applies remote D1 migrations and deploys the Worker.
 
 ## References

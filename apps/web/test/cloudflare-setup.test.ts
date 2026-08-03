@@ -16,13 +16,16 @@ const baseOptions: SetupOptions = {
   allowEmails: ["owner@example.com"],
   allowDomains: [],
   withStaging: false,
+  stagingOnly: false,
   dryRun: false,
   namePrefix: "tatsumaki",
 };
 
 describe("Cloudflare self-hosting setup", () => {
   it("builds isolated production and staging resource names", () => {
-    expect(buildEnvironmentPlans("tatsumaki", true)).toEqual([
+    expect(
+      buildEnvironmentPlans("tatsumaki", "production-and-staging"),
+    ).toEqual([
       expect.objectContaining({
         environment: "production",
         workerName: "tatsumaki",
@@ -40,8 +43,22 @@ describe("Cloudflare self-hosting setup", () => {
     ]);
   });
 
+  it("builds only the staging plan when staging-only is selected", () => {
+    expect(buildEnvironmentPlans("tatsumaki", "staging")).toEqual([
+      expect.objectContaining({
+        environment: "staging",
+        workerName: "tatsumaki-staging",
+        d1Name: "tatsumaki-staging-db",
+        kvName: "tatsumaki-staging-oauth-kv",
+        storyAttachmentsBucket: "tatsumaki-staging-story-attachments",
+        userAvatarsBucket: "tatsumaki-staging-user-avatars",
+        accessName: "tatsumaki-staging",
+      }),
+    ]);
+  });
+
   it("renders resolved binding IDs into a temporary Wrangler configuration", () => {
-    const [plan] = buildEnvironmentPlans("tatsumaki", false);
+    const [plan] = buildEnvironmentPlans("tatsumaki", "production");
     const config = renderWranglerConfig(plan, "d1-id", "kv-id");
     expect(config).toContain('name = "tatsumaki"');
     expect(config).toContain('database_id = "d1-id"');
@@ -210,6 +227,75 @@ describe("Cloudflare self-hosting setup", () => {
     expect(methods).toEqual(["GET", "GET", "GET", "GET", "GET", "GET", "GET"]);
   });
 
+  it("provisions staging-only without touching production resources", async () => {
+    const calls: Array<{ url: string; method: string; body?: unknown }> = [];
+    const responses = [
+      envelope([]),
+      envelope({ id: "staging-d1-id", name: "tatsumaki-staging-db" }),
+      envelope([]),
+      envelope({ id: "staging-kv-id", title: "tatsumaki-staging-oauth-kv" }),
+      envelope({ buckets: [] }),
+      envelope({ name: "tatsumaki-staging-story-attachments" }),
+      envelope({ buckets: [] }),
+      envelope({ name: "tatsumaki-staging-user-avatars" }),
+      envelope({ subdomain: "account-subdomain" }),
+      envelope([]),
+      envelope({
+        id: "staging-app-id",
+        name: "tatsumaki-staging",
+        aud: "staging-access-aud",
+      }),
+      envelope([]),
+      envelope({
+        id: "staging-policy-id",
+        name: "tatsumaki-staging allowed users",
+      }),
+    ];
+    const fetchMock = vi.fn(
+      async (input: string | URL | Request, init?: RequestInit) => {
+        calls.push({
+          url: input.toString(),
+          method: init?.method ?? "GET",
+          body:
+            typeof init?.body === "string" ? JSON.parse(init.body) : undefined,
+        });
+        const response = responses.shift();
+        if (!response) throw new Error("Unexpected request");
+        return new Response(JSON.stringify(response), { status: 200 });
+      },
+    );
+    const commands: string[][] = [];
+    let generatedConfig = "";
+
+    await setupCloudflare(
+      { ...baseOptions, stagingOnly: true },
+      {
+        fetch: fetchMock as typeof fetch,
+        runCommand: async (command) => {
+          commands.push(command);
+          const configIndex = command.indexOf("--config");
+          if (configIndex >= 0)
+            generatedConfig = await readFile(command[configIndex + 1], "utf8");
+        },
+        log: () => undefined,
+      },
+    );
+
+    expect(responses).toHaveLength(0);
+    expect(generatedConfig).toContain('name = "tatsumaki-staging"');
+    expect(generatedConfig).toContain('database_name = "tatsumaki-staging-db"');
+    expect(generatedConfig).not.toContain('name = "tatsumaki"\n');
+    expect(calls.map((call) => JSON.stringify(call)).join("\n")).not.toMatch(
+      /tatsumaki-(?:db|oauth-kv|story-attachments|user-avatars)(?:["?}]|$)/,
+    );
+    expect(commands.map((command) => command.join(" "))).toEqual([
+      "bun run build:client",
+      expect.stringContaining("wrangler d1 migrations apply DB --remote"),
+      expect.stringContaining("wrangler deploy --keep-vars"),
+      expect.stringContaining("wrangler secret bulk"),
+    ]);
+  });
+
   it("parses repeatable Access allow rules and staging", () => {
     expect(
       parseArguments(
@@ -231,8 +317,27 @@ describe("Cloudflare self-hosting setup", () => {
         allowEmails: ["a@example.com"],
         allowDomains: ["example.org"],
         withStaging: true,
+        stagingOnly: false,
       }),
     );
+  });
+
+  it("parses staging-only", () => {
+    expect(
+      parseArguments(["--allow-email", "a@example.com", "--staging-only"], {}),
+    ).toEqual(
+      expect.objectContaining({ withStaging: false, stagingOnly: true }),
+    );
+  });
+
+  it("rejects selecting both staging modes", () => {
+    expect(() =>
+      validateSetupOptions({
+        ...baseOptions,
+        withStaging: true,
+        stagingOnly: true,
+      }),
+    ).toThrow("cannot be used together");
   });
 
   it("requires an explicit Access allow rule", () => {
