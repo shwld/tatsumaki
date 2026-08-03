@@ -27,7 +27,7 @@
     "openapi:check": "bun --bun src/presentation/openapi/check-cli-openapi.ts"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.18.8",
+    "@cloudflare/vitest-pool-workers": "^0.19.1",
     "@cloudflare/workers-types": "^5.20260726.1",
     "@playwright/test": "^1.58.2",
     "@tailwindcss/vite": "^4.2.1",
@@ -39,7 +39,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.2",
     "agent-browser": "^0.33.0",
-    "jsdom": "^29.1.1",
+    "jsdom": "^30.0.1",
     "oxlint": "^1.51.0",
     "tailwindcss": "^4.2.1",
     "typescript": "^7.0.2",
