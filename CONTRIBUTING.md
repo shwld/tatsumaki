@@ -27,7 +27,7 @@ bun run typecheck
 bun run docs:lint
 ```
 
-Cloudflare deployment configuration lives in `apps/web/wrangler.toml` with only public self-hosting defaults and binding names. Keep environment-specific values in the Cloudflare dashboard or local-only configuration: Access variables (`ACCESS_AUD`, `ACCESS_TEAM_DOMAIN`), deployment IDs (`TATSUMAKI_D1_DATABASE_ID`, optional `TATSUMAKI_OAUTH_KV_NAMESPACE_ID`), custom domains/routes, and account-specific resources must not be committed.
+Cloudflare deployment configuration lives in `apps/web/wrangler.toml` with only public self-hosting defaults and binding names. The self-hosting bootstrap writes resolved IDs and Access values only to temporary files and Cloudflare Worker secrets. Keep API tokens, account IDs, Access values, custom domains/routes, and all other account-specific values out of git.
 
 ## Pull Requests
 

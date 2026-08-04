@@ -2,6 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 import { createAppMentionExtension } from "./tiptap-mention-extension";
 
 describe("createAppMentionExtension", () => {
+  const createItemsContext = (query: string) => ({
+    editor: {} as never,
+    query,
+    signal: new AbortController().signal,
+  });
+
   const candidates = [
     {
       id: "github|member-1",
@@ -22,7 +28,7 @@ describe("createAppMentionExtension", () => {
     const suggestion = extension.options.suggestion;
     expect(suggestion?.char).toBe("@");
 
-    const items = suggestion?.items?.({ editor: {} as never, query: "shw" });
+    const items = suggestion?.items?.(createItemsContext("shw"));
     expect(items).toEqual([{ id: "github|shwld", label: "shwld" }]);
   });
 
@@ -43,6 +49,16 @@ describe("createAppMentionExtension", () => {
       command,
       decorationNode: document.createElement("span"),
       clientRect: null,
+      placement: "bottom-start",
+      offset: { mainAxis: 4, crossAxis: 0 },
+      flip: true,
+      floatingUi: {
+        placement: "bottom-start",
+        strategy: "absolute",
+        middleware: [],
+      },
+      mount: () => () => undefined,
+      loading: false,
     });
 
     expect(screenHasButton("@Member One")).toBe(true);
@@ -62,12 +78,12 @@ describe("createAppMentionExtension", () => {
     const extension = createAppMentionExtension(() => currentCandidates);
     const suggestion = extension.options.suggestion;
 
-    expect(suggestion?.items?.({ editor: {} as never, query: "" })).toEqual([
+    expect(suggestion?.items?.(createItemsContext(""))).toEqual([
       { id: "github|member-1", label: "Member One" },
     ]);
 
     currentCandidates = candidates;
-    expect(suggestion?.items?.({ editor: {} as never, query: "shw" })).toEqual([
+    expect(suggestion?.items?.(createItemsContext("shw"))).toEqual([
       { id: "github|shwld", label: "shwld" },
     ]);
   });

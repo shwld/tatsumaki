@@ -1,4 +1,5 @@
 # Cloudflare Access values required for production authentication.
-# Deploy to Cloudflare prompts for these values and stores them as Worker secrets.
+# The self-hosting setup command discovers and stores these values as Worker secrets.
+# Set them manually only for local testing against a real Cloudflare Access application.
 ACCESS_AUD=
 ACCESS_TEAM_DOMAIN=

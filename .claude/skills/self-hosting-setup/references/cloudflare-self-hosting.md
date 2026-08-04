@@ -2,9 +2,9 @@
 
 Use this reference only when the user wants Cloudflare self-hosting, deploy readiness checks, or setup troubleshooting.
 
-## User-Owned Resources
+## Automated Resources
 
-Ask the user to create or confirm these Cloudflare resources. Do not create them automatically unless the user explicitly asks.
+When the user explicitly requests remote setup, `bun apps/web/scripts/setup-cloudflare.ts` creates or reuses these resources.
 
 | Resource | Expected value |
 | --- | --- |
@@ -14,34 +14,47 @@ Ask the user to create or confirm these Cloudflare resources. Do not create them
 | R2 bucket | `tatsumaki-story-attachments` |
 | R2 bucket | `tatsumaki-user-avatars` |
 | Durable Object | `PLANNING_POKER_DO` from `apps/web/wrangler.toml` |
-| Access Application | Protects the production custom domain or route |
-| Domain / Route | Production custom domain or route |
+| Access Application | Protects the Worker destination |
+| Access Policy | Explicitly allowed email addresses or email domains |
 
-## Required Values
+With `--with-staging`, every row receives an isolated `tatsumaki-staging` equivalent. No D1, KV, R2, Durable Object, or Access resource is shared with production.
 
-Set environment-specific values outside git.
+## User-Owned Inputs
+
+Create or obtain these outside git before the command is run.
 
 | Value | Source | Where to set |
 | --- | --- | --- |
-| `ACCESS_AUD` | Cloudflare Access Application Audience tag | Worker runtime variable/secret |
-| `ACCESS_TEAM_DOMAIN` | Zero Trust team domain, for example `<team>.cloudflareaccess.com` | Worker runtime variable/secret |
-| `TATSUMAKI_D1_DATABASE_ID` | UUID for remote D1 database `tatsumaki-db` | Workers Builds variable |
-| `TATSUMAKI_OAUTH_KV_NAMESPACE_ID` | Existing OAuth KV namespace ID, optional | Workers Builds variable |
+| `CLOUDFLARE_API_TOKEN` | Scoped API token | Process environment only |
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare dashboard | Process environment only |
+| `CLOUDFLARE_ACCESS_TEAM_DOMAIN` | Zero Trust team domain, for example `<team>.cloudflareaccess.com` | Process environment only |
+| allowed identity | User-owned email or email domain | `--allow-email` / `--allow-domain` |
 
 Do not commit `.dev.vars`, `.env`, account IDs, resource IDs, API tokens, or secrets.
 
-## Workers Builds Settings
+The token needs D1 Write, Workers KV Storage Write, Workers R2 Storage Write, Workers Scripts Write, and Access: Apps and Policies Write account permissions.
 
-Use these settings when configuring Cloudflare Workers Builds for this repository.
+## Bootstrap Command
 
-| Field | Value |
-| --- | --- |
-| Path / Root directory | `apps/web` |
-| Build command | `bun run build:client` |
-| Deploy command | `bun run db:migrate && bun run deploy:worker` |
-| Non-production branch deploy command | `bun run deploy:upload` |
+Inspect the plan without network access or mutation first:
 
-The deploy command applies remote D1 migrations before publishing the Worker. Non-production branch deploys upload a Worker version without running production database migrations.
+```bash
+bun apps/web/scripts/setup-cloudflare.ts --allow-email you@example.com --with-staging --dry-run
+```
+
+Create production:
+
+```bash
+CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_ACCESS_TEAM_DOMAIN=your-team.cloudflareaccess.com bun apps/web/scripts/setup-cloudflare.ts --allow-email you@example.com
+```
+
+Append `--with-staging` to create production and staging together. For an existing installation, process only staging without reading or changing production resources:
+
+```bash
+CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_ACCESS_TEAM_DOMAIN=your-team.cloudflareaccess.com bun apps/web/scripts/setup-cloudflare.ts --allow-email you@example.com --staging-only
+```
+
+`--with-staging` and `--staging-only` are mutually exclusive. Add `--dry-run` first and confirm that staging-only output contains `[staging]` but not `[production]`. The command is restartable: exact-name resources are reused and missing resources are created. After a transient failure or permission correction, rerun the same command.
 
 ## Local Access Verification
 
@@ -53,16 +66,15 @@ Use `docs/local-cloudflare-access-setup.md` only when the user wants to verify t
 
 Before presenting a deploy command, confirm:
 
-- The production domain or route is configured.
-- The Access Application protects that domain or route.
-- `ACCESS_AUD` and `ACCESS_TEAM_DOMAIN` are configured as runtime values.
-- `TATSUMAKI_D1_DATABASE_ID` is configured as a build value.
-- R2 buckets and KV namespace match `apps/web/wrangler.toml` bindings.
-- The user understands `bun run deploy:web` runs remote D1 migrations and deploys the Worker.
+- The API token has only the required account permissions.
+- Account ID and Access team domain belong to the intended account.
+- At least one Access email or email domain is explicitly allowed.
+- `--dry-run` shows exactly the intended production and/or staging names.
+- The user understands the bootstrap applies remote D1 migrations and deploys the Worker.
 
 ## References
 
-- Cloudflare D1 Wrangler commands: https://developers.cloudflare.com/d1/wrangler-commands/
-- Cloudflare Workers Builds configuration: https://developers.cloudflare.com/workers/ci-cd/builds/configuration/
-- Cloudflare environment variables and secrets: https://developers.cloudflare.com/workers/configuration/environment-variables/
-
+- Cloudflare Access applications API: https://developers.cloudflare.com/api/resources/zero_trust/subresources/access/subresources/applications/methods/create/
+- Cloudflare D1 database API: https://developers.cloudflare.com/api/resources/d1/subresources/database/methods/create/
+- Cloudflare KV namespaces API: https://developers.cloudflare.com/api/resources/kv/subresources/namespaces/methods/create/
+- Cloudflare R2 buckets API: https://developers.cloudflare.com/api/resources/r2/subresources/buckets/methods/create/

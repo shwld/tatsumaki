@@ -6,8 +6,6 @@ tatsumaki is an agile project management tool for small Scrum teams that want a 
 
 The project is inspired by the workflow strengths of Pivotal Tracker, while being built as self-hostable open source software for modern web, CLI, and automation workflows.
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/shwld/tatsumaki/tree/main/apps/web)
-
 ![Story panels screenshot](apps/web/test/ui-screenshot/stories.spec.ts-snapshots/stories-panels.png)
 
 ## Features
@@ -53,57 +51,60 @@ For an agent-guided setup from local first run through Cloudflare self-hosting r
 
 ## Self-Hosting Outline
 
-1. Create a Cloudflare Access application for tatsumaki and note its Audience (AUD) tag and team domain.
-2. Click the Deploy to Cloudflare button and provide the Access values when prompted.
-3. Let Cloudflare provision the Worker resources defined in `apps/web/wrangler.toml`.
-4. Configure the production custom domain or route in the Worker dashboard.
-5. Confirm that D1 migrations ran during the deploy command.
+1. Clone this repository and install dependencies with `bun install`.
+2. Create a scoped Cloudflare API token and note your Account ID and Access team domain.
+3. Run the setup command below with an explicitly allowed email address or email domain.
+4. Optionally configure a production custom domain or route in the Worker dashboard.
 
 ## Deployment Configuration
 
-`apps/web/wrangler.toml` is committed as the public self-hosting configuration. It defines the Worker entrypoint, compatibility settings, static asset binding, D1/KV/R2/Durable Object binding names, cron trigger, and Durable Object migration. It intentionally does not contain Cloudflare Access values or route settings.
-
-Deploy to Cloudflare uses this repository subdirectory:
-
-```text
-https://github.com/shwld/tatsumaki/tree/main/apps/web
-```
-
-Use these environment-specific settings:
-
-| Area | Values |
-|---|---|
-| Variables and Secrets | `ACCESS_AUD`, `ACCESS_TEAM_DOMAIN` |
-| Domains & Routes | Production custom domain or route |
-| Bindings | `DB`, `OAUTH_KV`, `STORY_ATTACHMENTS`, `USER_AVATARS`, `PLANNING_POKER_DO`, `ASSETS` |
-
-Recommended Cloudflare Workers Builds settings:
-
-| Field | Value |
-|---|---|
-| Build command | `bun run build` |
-| Deploy command | `bun run deploy` |
-| Non-production branch deploy command | `bun run deploy:upload` |
-| Path | `apps/web` |
-
-The production deploy commands (`bun run deploy` and `bun run deploy:worker`) apply D1 migrations through the `DB` binding before publishing the Worker so schema changes are not skipped. Non-production branch deploys upload Worker versions without running production database migrations.
-
-`ACCESS_AUD` is the Audience (AUD) tag for the Cloudflare Access application that protects tatsumaki. `ACCESS_TEAM_DOMAIN` is the Access team domain, such as `your-team.cloudflareaccess.com`.
-
-Local deploys can use the root helper:
+The bootstrap command creates or reuses the Worker, D1 database, KV namespace, two R2 buckets, Durable Object migration, Cloudflare Access application and allow policy, applies D1 migrations, deploys the Worker, and sets its Access values. Production is the default:
 
 ```bash
-bun run deploy:web
+CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_ACCESS_TEAM_DOMAIN=your-team.cloudflareaccess.com bun apps/web/scripts/setup-cloudflare.ts --allow-email you@example.com
 ```
 
-`wrangler.toml` sets `keep_vars = true`, and `deploy:worker` also passes `--keep-vars`, so dashboard-managed variables are preserved across Wrangler deploys.
+Use `--allow-domain example.com` instead of, or in addition to, `--allow-email`. To preview every action without contacting Cloudflare, append `--dry-run`.
+
+The API token needs these account permissions:
+
+- D1 Write
+- Workers KV Storage Write
+- Workers R2 Storage Write
+- Workers Scripts Write
+- Access: Apps and Policies Write
+
+The setup command reads the token only from the environment and never writes account IDs, resource IDs, Access values, or secrets into the repository.
+
+### Optional staging environment
+
+Append `--with-staging` to create both production and a fully isolated staging environment in the same run:
+
+```bash
+CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_ACCESS_TEAM_DOMAIN=your-team.cloudflareaccess.com bun apps/web/scripts/setup-cloudflare.ts --allow-email you@example.com --with-staging
+```
+
+Staging uses its own `tatsumaki-staging` Worker, D1 database, KV namespace, R2 buckets, Durable Object storage, Access application, and Access policy. It does not share production data.
+
+For an existing installation, use `--staging-only` to create, repair, or redeploy staging without looking up, migrating, deploying, or changing any production resource:
+
+```bash
+CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_ACCESS_TEAM_DOMAIN=your-team.cloudflareaccess.com bun apps/web/scripts/setup-cloudflare.ts --allow-email you@example.com --staging-only
+```
+
+`--with-staging` and `--staging-only` are mutually exclusive. Add `--dry-run` first to confirm that only the `[staging]` plan is shown.
+
+The command is restartable. It looks up resources by their exact names and reuses them, so after a network error or permission fix, run the same command again. It will not create duplicate named resources. A different `--name-prefix` can be used when an account already uses the default names for another installation.
+
+`apps/web/wrangler.toml` remains the public reference configuration for later manual deploys. It contains no account-specific IDs or secrets. The existing `bun run deploy:web` command applies production D1 migrations before publishing and preserves dashboard-managed variables.
 
 References:
 
-- [Cloudflare Deploy to Cloudflare buttons](https://developers.cloudflare.com/workers/platform/deploy-buttons/)
-- [Cloudflare Workers Builds configuration](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/)
+- [Cloudflare Access applications API](https://developers.cloudflare.com/api/resources/zero_trust/subresources/access/subresources/applications/methods/create/)
+- [Cloudflare D1 database API](https://developers.cloudflare.com/api/resources/d1/subresources/database/methods/create/)
+- [Cloudflare KV namespaces API](https://developers.cloudflare.com/api/resources/kv/subresources/namespaces/methods/create/)
+- [Cloudflare R2 buckets API](https://developers.cloudflare.com/api/resources/r2/subresources/buckets/methods/create/)
 - [Cloudflare Wrangler configuration](https://developers.cloudflare.com/workers/wrangler/configuration/)
-- [Cloudflare environment variables and secrets](https://developers.cloudflare.com/workers/configuration/environment-variables/)
 
 ## Target Users
 
