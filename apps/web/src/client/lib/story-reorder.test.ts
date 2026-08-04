@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { reindexStoriesPosition, reorderStoriesById } from "./story-reorder";
+import {
+  insertStoryAtDropTarget,
+  reindexStoriesPosition,
+  reorderStoriesById,
+} from "./story-reorder";
 
 const items = [
   { id: "a", name: "A" },
@@ -34,6 +38,43 @@ describe("reorderStoriesById", () => {
     const original = [...items];
     reorderStoriesById(items, "a", "c");
     expect(items).toEqual(original);
+  });
+});
+
+describe("insertStoryAtDropTarget", () => {
+  it("inserts a cross-panel story before a release marker target", () => {
+    const release = { id: "release", position: 2 };
+    const moved = { id: "moved", position: 10 };
+
+    expect(insertStoryAtDropTarget([release], moved, release.id)).toEqual([
+      moved,
+      release,
+    ]);
+  });
+
+  it("inserts at the start for a Current sprint group drop zone", () => {
+    const release = { id: "release", position: 2 };
+    const moved = { id: "moved", position: 10 };
+
+    expect(
+      insertStoryAtDropTarget(
+        [release],
+        moved,
+        "drop-zone-group:Current:iter-current",
+      ),
+    ).toEqual([moved, release]);
+  });
+
+  it("supports an empty destination when Current only has Accepted stories", () => {
+    const moved = { id: "moved", position: 10 };
+
+    expect(
+      insertStoryAtDropTarget(
+        [],
+        moved,
+        "drop-zone-group:Current:iter-current",
+      ),
+    ).toEqual([moved]);
   });
 });
 

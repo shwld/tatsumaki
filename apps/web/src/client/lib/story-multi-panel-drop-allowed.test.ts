@@ -115,21 +115,29 @@ describe("isStoryMultiPanelDropAllowed", () => {
     ).toBe(false);
   });
 
-  it("allows cross-panel drop onto Current sprint group header when Current has only Accepted stories", () => {
+  it("allows a Current drop when the sprint only has release and Accepted stories", () => {
     const backlogStory = mkStory({
       id: "backlog-1",
       status: "Unstarted",
       iterationId: null,
     });
+    const release = mkStory({
+      id: "release-1",
+      type: "release",
+      status: "Unstarted",
+      storyPoint: null,
+      storyNumber: 2,
+      iterationId: "iter-current",
+    });
     const accepted = mkStory({
       id: "accepted-1",
       status: "Accepted",
-      storyNumber: 2,
+      storyNumber: 3,
       iterationId: "iter-current",
     });
     const grouped = emptyGrouped();
     grouped.Backlog = [backlogStory];
-    grouped.Current = [accepted];
+    grouped.Current = [release, accepted];
     expect(
       isStoryMultiPanelDropAllowed({
         projectId: "p1",
@@ -137,16 +145,17 @@ describe("isStoryMultiPanelDropAllowed", () => {
         overId: "drop-zone-group:Current:iter-current",
         findPanelByStoryId: (id) => {
           if (id === backlogStory.id) return "Backlog";
+          if (id === release.id) return "Current";
           if (id === accepted.id) return "Current";
           return null;
         },
         shouldCombineCurrentBacklog: false,
         combinedGroupDropZonePrefix: "drop-zone-group:CurrentBacklogCombined:",
         combinedTargetPanelByGroupKey: new Map(),
-        allStories: [backlogStory, accepted],
+        allStories: [backlogStory, release, accepted],
         currentIterationId: "iter-current",
         groupedStories: grouped,
-        currentUnacceptedStories: [],
+        currentUnacceptedStories: [release],
       }),
     ).toBe(true);
   });
