@@ -60,8 +60,10 @@ describe("Cloudflare self-hosting setup", () => {
   it("renders resolved binding IDs into a temporary Wrangler configuration", () => {
     const [plan] = buildEnvironmentPlans("tatsumaki", "production");
     const config = renderWranglerConfig(plan, "d1-id", "kv-id");
+    expect(config).toContain('"$schema" = ');
     expect(config).toContain('name = "tatsumaki"');
     expect(config).toContain('database_id = "d1-id"');
+    expect(config).not.toContain("undefined");
     expect(config).toContain('id = "kv-id"');
     expect(config).toContain('bucket_name = "tatsumaki-user-avatars"');
     expect(config).not.toContain("api-token");
@@ -98,7 +100,7 @@ describe("Cloudflare self-hosting setup", () => {
     const calls: Array<{ url: string; method: string; body?: unknown }> = [];
     const responses = [
       envelope([]),
-      envelope({ id: "d1-id", name: "tatsumaki-db" }),
+      envelope({ uuid: "d1-id", name: "tatsumaki-db" }),
       envelope([]),
       envelope({ id: "kv-id", title: "tatsumaki-oauth-kv" }),
       envelope({ buckets: [] }),
@@ -106,6 +108,7 @@ describe("Cloudflare self-hosting setup", () => {
       envelope({ buckets: [] }),
       envelope({ id: "avatars-r2", name: "tatsumaki-user-avatars" }),
       envelope({ subdomain: "account-subdomain" }),
+      envelope([{ id: "worker-id", name: "tatsumaki" }]),
       envelope([]),
       envelope({ id: "app-id", name: "tatsumaki", aud: "access-aud" }),
       envelope([]),
@@ -150,6 +153,15 @@ describe("Cloudflare self-hosting setup", () => {
         expect.objectContaining({
           url: expect.stringContaining("/access/apps"),
           method: "POST",
+          body: expect.objectContaining({
+            destinations: [
+              { type: "worker", worker_id: "worker-id" },
+              {
+                type: "public",
+                uri: "tatsumaki.account-subdomain.workers.dev",
+              },
+            ],
+          }),
         }),
         expect.objectContaining({
           url: expect.stringContaining("/access/apps/app-id/policies"),
@@ -175,7 +187,7 @@ describe("Cloudflare self-hosting setup", () => {
 
   it("reuses exact-name resources without issuing create requests", async () => {
     const responses = [
-      envelope([{ id: "d1-id", name: "tatsumaki-db" }]),
+      envelope([{ uuid: "d1-id", name: "tatsumaki-db" }]),
       envelope([{ id: "kv-id", title: "tatsumaki-oauth-kv" }]),
       envelope({
         buckets: [
@@ -190,12 +202,13 @@ describe("Cloudflare self-hosting setup", () => {
         ],
       }),
       envelope({ subdomain: "account-subdomain" }),
+      envelope([{ id: "worker-id", name: "tatsumaki" }]),
       envelope([
         {
           id: "app-id",
           name: "tatsumaki",
           aud: "access-aud",
-          destinations: [{ type: "worker", worker_id: "tatsumaki" }],
+          destinations: [{ type: "worker", worker_id: "worker-id" }],
         },
       ]),
       envelope([
@@ -224,14 +237,23 @@ describe("Cloudflare self-hosting setup", () => {
     });
 
     expect(responses).toHaveLength(0);
-    expect(methods).toEqual(["GET", "GET", "GET", "GET", "GET", "GET", "GET"]);
+    expect(methods).toEqual([
+      "GET",
+      "GET",
+      "GET",
+      "GET",
+      "GET",
+      "GET",
+      "GET",
+      "GET",
+    ]);
   });
 
   it("provisions staging-only without touching production resources", async () => {
     const calls: Array<{ url: string; method: string; body?: unknown }> = [];
     const responses = [
       envelope([]),
-      envelope({ id: "staging-d1-id", name: "tatsumaki-staging-db" }),
+      envelope({ uuid: "staging-d1-id", name: "tatsumaki-staging-db" }),
       envelope([]),
       envelope({ id: "staging-kv-id", title: "tatsumaki-staging-oauth-kv" }),
       envelope({ buckets: [] }),
@@ -239,6 +261,7 @@ describe("Cloudflare self-hosting setup", () => {
       envelope({ buckets: [] }),
       envelope({ name: "tatsumaki-staging-user-avatars" }),
       envelope({ subdomain: "account-subdomain" }),
+      envelope([{ id: "staging-worker-id", name: "tatsumaki-staging" }]),
       envelope([]),
       envelope({
         id: "staging-app-id",

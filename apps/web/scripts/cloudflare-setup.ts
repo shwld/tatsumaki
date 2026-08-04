@@ -44,10 +44,11 @@ type ApiEnvelope<T> = {
 };
 
 type NamedId = { id: string; name?: string; title?: string };
+type D1Database = { uuid: string; name?: string };
 type AccessApplication = NamedId & {
   aud: string;
   domain?: string;
-  destinations?: Array<{ type: string; worker_id?: string }>;
+  destinations?: Array<{ type: string; worker_id?: string; uri?: string }>;
 };
 type AccessPolicy = NamedId & { decision?: string; include?: unknown[] };
 
@@ -200,7 +201,7 @@ export async function setupCloudflare(
     const configPath = join(temporaryDirectory, "wrangler.toml");
     const secretPath = join(temporaryDirectory, "secrets.json");
     try {
-      await writeFile(configPath, renderWranglerConfig(plan, d1.id, kv.id), {
+      await writeFile(configPath, renderWranglerConfig(plan, d1.uuid, kv.id), {
         mode: 0o600,
       });
       const wranglerEnv = {
@@ -243,9 +244,11 @@ export async function setupCloudflare(
 
       const workersSubdomain = await client.getWorkersSubdomain();
       const workerDomain = `${plan.workerName}.${workersSubdomain}.workers.dev`;
+      const workerId = await client.getWorkerId(plan.workerName);
       const application = await client.ensureAccessApplication(
         plan,
         workerDomain,
+        workerId,
       );
       await client.ensureAccessPolicy(
         application.id,
@@ -288,7 +291,7 @@ export function renderWranglerConfig(
   kvId: string,
 ): string {
   const toml = (value: string) => JSON.stringify(value);
-  return `$schema = ${toml(join(WEB_DIR, "node_modules/wrangler/config-schema.json"))}
+  return `"$schema" = ${toml(join(WEB_DIR, "node_modules/wrangler/config-schema.json"))}
 name = ${toml(plan.workerName)}
 main = ${toml(join(WEB_DIR, "src/index.ts"))}
 compatibility_date = "2025-03-05"
@@ -337,9 +340,9 @@ class CloudflareClient {
     private readonly fetchImplementation: typeof fetch,
   ) {}
 
-  async ensureD1(name: string): Promise<NamedId> {
+  async ensureD1(name: string): Promise<D1Database> {
     const existing = (
-      await this.listAll<NamedId>(
+      await this.listAll<D1Database>(
         `d1/database?name=${encodeURIComponent(name)}`,
       )
     ).find((database) => database.name === name);
@@ -389,9 +392,19 @@ class CloudflareClient {
     return result.subdomain;
   }
 
+  async getWorkerId(name: string): Promise<string> {
+    const workers = await this.listAll<{ id: string; name?: string }>(
+      "workers/workers?per_page=100",
+    );
+    const worker = workers.find((candidate) => candidate.name === name);
+    if (!worker) throw new Error(`Cloudflare Worker ${name} was not found.`);
+    return worker.id;
+  }
+
   async ensureAccessApplication(
     plan: EnvironmentPlan,
     domain: string,
+    workerId: string,
   ): Promise<AccessApplication> {
     const applications = await this.listAll<AccessApplication>(
       "access/apps?per_page=100",
@@ -402,8 +415,7 @@ class CloudflareClient {
     const matchingDestination = applications.find((application) =>
       application.destinations?.some(
         (destination) =>
-          destination.type === "worker" &&
-          destination.worker_id === plan.workerName,
+          destination.type === "worker" && destination.worker_id === workerId,
       ),
     );
     if (matchingDestination) return matchingDestination;
@@ -419,7 +431,10 @@ class CloudflareClient {
         name: plan.accessName,
         type: "self_hosted",
         domain,
-        destinations: [{ type: "worker", worker_id: plan.workerName }],
+        destinations: [
+          { type: "worker", worker_id: workerId },
+          { type: "public", uri: domain },
+        ],
         session_duration: "24h",
         app_launcher_visible: true,
       },
@@ -459,8 +474,8 @@ class CloudflareClient {
     });
   }
 
-  private async findD1(name: string): Promise<NamedId | undefined> {
-    const databases = await this.listAll<NamedId>(
+  private async findD1(name: string): Promise<D1Database | undefined> {
+    const databases = await this.listAll<D1Database>(
       `d1/database?name=${encodeURIComponent(name)}`,
     );
     return databases.find((database) => database.name === name);
