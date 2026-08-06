@@ -15,7 +15,10 @@ for (const theme of themeVariants) {
 
     await page.goto("/projects/project-1/stories");
     await expect(page.getByTestId("multi-panel-layout")).toBeVisible();
-    await page.getByRole("button", { name: "+ Add Story" }).first().click();
+    await page
+      .getByRole("button", { name: "+ ストーリーを追加" })
+      .first()
+      .click();
     await expect(page.getByPlaceholder("タイトルを入力")).toBeVisible();
     await expect(page).toHaveScreenshot(
       resolveSnapshotName("stories-inline-create.png", theme),
