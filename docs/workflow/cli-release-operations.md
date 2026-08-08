@@ -17,12 +17,18 @@ bun run cli:release:upload -- <tag>
 `scripts/cli-release-upload.sh` が次を実行する。
 
 1. タグ `cli-vX.Y.Z` から `X.Y.Z` を抽出し、CLI/Web のバージョン定義を同期
-2. 変更があれば `Cargo.lock` / OpenAPI を再生成し、`git commit` + `git push`
+2. `Cargo.lock` / OpenAPI を再生成し、生成物を format した後の実差分があれば `git commit` + `git push`
 3. Rust ターゲット追加
 4. 4 ターゲットビルド（host は `cargo build`、その他は `cargo zigbuild`）
 5. アセット生成（`tm-*.tar.gz` と `sha256sums.txt`）
 6. Release が無ければ自動作成
 7. Release assets を `--clobber` で upload
+
+## Troubleshooting
+
+### 同じバージョン同期 commit が繰り返し作成される
+
+OpenAPI 生成直後の未整形差分を version metadata の実差分と誤認すると、pre-commit format が差分を消した後に空 commit が作成される。リリーススクリプトは生成物を先に format してから `git diff` を評価するため、実差分がない場合は commit / push を行わない。
 
 ## Artifact location
 

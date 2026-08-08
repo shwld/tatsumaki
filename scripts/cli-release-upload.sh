@@ -94,6 +94,9 @@ set_version_in_file \
 
 cargo check --manifest-path apps/cli/Cargo.toml
 bun run openapi:generate
+bun x biome format --write --files-ignore-unknown=true \
+  packages/contracts/cli-openapi.json \
+  apps/web/openapi/cli-openapi.json
 
 if ! git diff --quiet -- \
   apps/cli/crates/tm/Cargo.toml \
