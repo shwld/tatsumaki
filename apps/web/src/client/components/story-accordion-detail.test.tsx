@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AuthErrorProvider } from "../contexts/auth-error-context";
 import { ToastProvider } from "../contexts/toast-context";
+import { i18n } from "../i18n/config";
 import type {
   Story,
   StoryTimelineCommentEntry,
@@ -175,6 +176,7 @@ function createStory(): Story {
 
 describe("StoryAccordionDetail", () => {
   afterEach(() => {
+    void i18n.changeLanguage("ja");
     vi.useRealTimers();
     mockedTimeline.splice(0, mockedTimeline.length);
     mockedRefresh.mockReset();
@@ -207,6 +209,63 @@ describe("StoryAccordionDetail", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole("option", { name: "リジェクト" }),
+    ).toBeInTheDocument();
+  });
+
+  it("switches an open accordion detail from Japanese to English", async () => {
+    mockedTimeline.push({
+      __typename: "StoryTimelineActivityEntry",
+      entryType: "activity",
+      id: "activity-1",
+      storyId: "story-1",
+      actorUserId: "github|author",
+      actorName: "Author",
+      action: "field_changed",
+      fieldName: "title",
+      oldValue: "Old",
+      newValue: "New",
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      return baselineFetchResponse(url) ?? new Response("{}", { status: 500 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderDetail();
+
+    expect(screen.getByLabelText("ステータス")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "添付ファイル" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "ブロッカー" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "タイムライン" }),
+    ).toBeInTheDocument();
+
+    await i18n.changeLanguage("en");
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Status")).toBeInTheDocument();
+    });
+    expect(screen.getByRole("option", { name: "Started" })).toBeInTheDocument();
+    expect(screen.getByText("Select labels")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Description" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Attachments" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Blockers" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Timeline" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Changed Title from Old to New"),
     ).toBeInTheDocument();
   });
 

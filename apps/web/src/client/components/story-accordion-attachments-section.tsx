@@ -1,4 +1,5 @@
 import type { FormEvent } from "react";
+import { useTranslation } from "react-i18next";
 import {
   formatAttachmentFileSize,
   isImageAttachmentMime,
@@ -33,13 +34,14 @@ export function StoryAccordionAttachmentsSection({
   deletingAttachmentId,
   onDeleteAttachment,
 }: StoryAccordionAttachmentsSectionProps) {
+  const { t } = useTranslation();
   return (
     <section aria-labelledby={`story-attachments-${storyId}`}>
       <h4
         id={`story-attachments-${storyId}`}
         className="text-xs font-semibold text-gray-700 dark:text-slate-200"
       >
-        添付ファイル
+        {t("storyAccordion.attachments.title")}
       </h4>
       <form
         className="mt-2 rounded border border-gray-200 bg-gray-50 p-2 dark:border-slate-700 dark:bg-slate-900/60"
@@ -60,7 +62,9 @@ export function StoryAccordionAttachmentsSection({
           className="mt-2 rounded bg-blue-600 px-2 py-1 text-xs font-medium text-white disabled:bg-gray-300 dark:bg-blue-500 dark:hover:bg-blue-400 dark:disabled:bg-slate-600"
           disabled={!selectedAttachmentFile || isUploadingAttachment}
         >
-          {isUploadingAttachment ? "アップロード中..." : "アップロード"}
+          {isUploadingAttachment
+            ? t("storyAccordion.attachments.uploading")
+            : t("storyAccordion.attachments.upload")}
         </button>
       </form>
       {attachmentsError ? (
@@ -70,12 +74,12 @@ export function StoryAccordionAttachmentsSection({
       ) : null}
       {isAttachmentsLoading ? (
         <p className="mt-2 text-xs text-gray-500 dark:text-slate-400">
-          読み込み中...
+          {t("storyAccordion.attachments.loading")}
         </p>
       ) : null}
       {!isAttachmentsLoading && attachments.length === 0 ? (
         <p className="mt-2 text-xs text-gray-500 dark:text-slate-400">
-          添付ファイルはまだありません。
+          {t("storyAccordion.attachments.empty")}
         </p>
       ) : null}
       {attachments.length > 0 ? (
@@ -112,7 +116,7 @@ export function StoryAccordionAttachmentsSection({
                     href={`${contentPath}?download=1`}
                     className="text-xs font-medium text-blue-700 hover:underline dark:text-blue-400"
                   >
-                    ダウンロード
+                    {t("storyAccordion.attachments.download")}
                   </a>
                   <button
                     type="button"
@@ -123,8 +127,8 @@ export function StoryAccordionAttachmentsSection({
                     }}
                   >
                     {deletingAttachmentId === attachment.id
-                      ? "削除中..."
-                      : "削除"}
+                      ? t("storyAccordion.attachments.deleting")
+                      : t("storyAccordion.attachments.delete")}
                   </button>
                 </div>
               </li>

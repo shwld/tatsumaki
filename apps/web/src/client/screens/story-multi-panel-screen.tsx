@@ -108,6 +108,17 @@ const INLINE_CREATABLE_STORY_TYPES = STORY_TYPES.filter(
   (t): t is Exclude<StoryType, "release"> => t !== "release",
 );
 
+type InlineCreateError =
+  | {
+      type: "translation";
+      key:
+        | "storyMultiPanelScreen.create.requiredTitle"
+        | "storyMultiPanelScreen.create.currentUnavailable"
+        | "storyMultiPanelScreen.create.invalidResponse"
+        | "storyMultiPanelScreen.create.requestFailed";
+    }
+  | { type: "message"; message: string };
+
 const SHORTCUT_STATUS_KEYS: ReadonlyArray<readonly [string, StoryStatus]> = [
   ["1", "Unstarted"],
   ["2", "Started"],
@@ -222,7 +233,9 @@ export function StoryMultiPanelScreen() {
   const [createStoryType, setCreateStoryType] =
     useState<Exclude<StoryType, "release">>("feature");
   const [createSubmitting, setCreateSubmitting] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
+  const [createError, setCreateError] = useState<InlineCreateError | null>(
+    null,
+  );
 
   // Accordion expand
   const [expandedStoryIds, setExpandedStoryIds] = useState<Set<string>>(
@@ -1345,11 +1358,17 @@ export function StoryMultiPanelScreen() {
     if (!projectId || !createTargetPanel) return;
     const title = createTitle.trim();
     if (!title) {
-      setCreateError(t("storyMultiPanelScreen.create.requiredTitle"));
+      setCreateError({
+        type: "translation",
+        key: "storyMultiPanelScreen.create.requiredTitle",
+      });
       return;
     }
     if (createTargetPanel === "Current" && !currentIteration?.id) {
-      setCreateError(t("storyMultiPanelScreen.create.currentUnavailable"));
+      setCreateError({
+        type: "translation",
+        key: "storyMultiPanelScreen.create.currentUnavailable",
+      });
       return;
     }
     setCreateSubmitting(true);
@@ -1370,13 +1389,19 @@ export function StoryMultiPanelScreen() {
           notifySessionExpired();
           return;
         }
-        setCreateError(await parseErrorMessage(response));
+        setCreateError({
+          type: "message",
+          message: await parseErrorMessage(response),
+        });
         return;
       }
       const payload = (await response.json()) as { story?: Story };
       const createdStory = payload.story;
       if (!createdStory) {
-        setCreateError(t("storyMultiPanelScreen.create.invalidResponse"));
+        setCreateError({
+          type: "translation",
+          key: "storyMultiPanelScreen.create.invalidResponse",
+        });
         return;
       }
       panelQueries.applyStoryUpdate(createdStory);
@@ -1390,7 +1415,10 @@ export function StoryMultiPanelScreen() {
       );
       closeCreateForm();
     } catch {
-      setCreateError(t("storyMultiPanelScreen.create.requestFailed"));
+      setCreateError({
+        type: "translation",
+        key: "storyMultiPanelScreen.create.requestFailed",
+      });
     } finally {
       setCreateSubmitting(false);
     }
@@ -1679,9 +1707,9 @@ export function StoryMultiPanelScreen() {
                         if (createError) setCreateError(null);
                       }}
                     >
-                      {INLINE_CREATABLE_STORY_TYPES.map((t) => (
-                        <option key={t} value={t}>
-                          {t}
+                      {INLINE_CREATABLE_STORY_TYPES.map((storyType) => (
+                        <option key={storyType} value={storyType}>
+                          {t(`storyMultiPanelScreen.create.types.${storyType}`)}
                         </option>
                       ))}
                     </select>
@@ -1726,7 +1754,9 @@ export function StoryMultiPanelScreen() {
                   </div>
                   {createError ? (
                     <span role="alert" className="text-xs text-red-600">
-                      {createError}
+                      {createError.type === "translation"
+                        ? t(createError.key)
+                        : createError.message}
                     </span>
                   ) : null}
                 </form>

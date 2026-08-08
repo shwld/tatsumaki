@@ -15,53 +15,91 @@ const TIMELINE_FIELD_LABELS: Record<StoryTimelineField, string> = {
   story: "ストーリー",
 };
 
+const TIMELINE_FIELD_LABELS_EN: Record<StoryTimelineField, string> = {
+  title: "Title",
+  description: "Description",
+  type: "Type",
+  status: "Status",
+  storyPoint: "Points",
+  labels: "Labels",
+  story: "Story",
+};
+
+const STORY_STATUS_LABELS_EN: Record<StoryStatus, string> = {
+  Unstarted: "Unstarted",
+  Started: "Started",
+  Finished: "Finished",
+  Delivered: "Delivered",
+  Accepted: "Accepted",
+  Rejected: "Rejected",
+};
+
 function formatTimelineValue(
   fieldName: StoryTimelineField,
   value: string | null,
+  english: boolean,
 ): string {
   if (fieldName === "status" && value !== null) {
-    return STORY_STATUS_LABELS[value as StoryStatus];
+    return english
+      ? STORY_STATUS_LABELS_EN[value as StoryStatus]
+      : STORY_STATUS_LABELS[value as StoryStatus];
   }
 
   if (fieldName === "storyPoint") {
-    return value ?? "未設定";
+    return value ?? (english ? "Unset" : "未設定");
   }
 
   if (fieldName === "labels") {
     if (!value) {
-      return "なし";
+      return english ? "None" : "なし";
     }
 
     try {
       const parsed = JSON.parse(value) as unknown;
       if (Array.isArray(parsed)) {
-        return parsed.join(", ") || "なし";
+        return parsed.join(", ") || (english ? "None" : "なし");
       }
     } catch {
       return value;
     }
   }
 
-  return value ?? "未設定";
+  return value ?? (english ? "Unset" : "未設定");
 }
 
-export function formatStoryTimelineSummary(entry: StoryTimelineEntry): string {
+export function formatStoryTimelineSummary(
+  entry: StoryTimelineEntry,
+  locale = "ja-JP",
+): string {
+  const english = locale.startsWith("en");
   if (entry.entryType === "comment") {
-    return "コメントを投稿";
+    return english ? "Posted a comment" : "コメントを投稿";
   }
 
   if (entry.action === "created") {
-    return "ストーリーを作成";
+    return english ? "Created the story" : "ストーリーを作成";
   }
   if (entry.action === "deleted") {
-    return "ストーリーを削除";
+    return english ? "Deleted the story" : "ストーリーを削除";
   }
 
-  const fieldLabel = TIMELINE_FIELD_LABELS[entry.fieldName];
-  const oldValue = formatTimelineValue(entry.fieldName, entry.oldValue);
-  const newValue = formatTimelineValue(entry.fieldName, entry.newValue);
+  const fieldLabel = english
+    ? TIMELINE_FIELD_LABELS_EN[entry.fieldName]
+    : TIMELINE_FIELD_LABELS[entry.fieldName];
+  const oldValue = formatTimelineValue(
+    entry.fieldName,
+    entry.oldValue,
+    english,
+  );
+  const newValue = formatTimelineValue(
+    entry.fieldName,
+    entry.newValue,
+    english,
+  );
 
-  return `${fieldLabel}を${oldValue}から${newValue}に変更`;
+  return english
+    ? `Changed ${fieldLabel} from ${oldValue} to ${newValue}`
+    : `${fieldLabel}を${oldValue}から${newValue}に変更`;
 }
 
 export function formatAttachmentFileSize(bytes: number): string {

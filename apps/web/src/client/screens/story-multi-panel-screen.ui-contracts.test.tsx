@@ -10,6 +10,7 @@ import { PROJECT_ID } from "../test/story-multi-panel/fixtures";
 import { renderStoryMultiPanel } from "../test/story-multi-panel/render-harness";
 import { AuthErrorProvider } from "../contexts/auth-error-context";
 import { ToastProvider } from "../contexts/toast-context";
+import { i18n } from "../i18n/config";
 import { StoryMultiPanelScreen } from "./story-multi-panel-screen";
 
 vi.mock("../components/story-accordion-detail", () => {
@@ -24,6 +25,7 @@ describe("StoryMultiPanelScreen UI contracts", () => {
   beforeEach(() => {
     resetProjectStoryBreadcrumbCacheForTests();
     localStorage.clear();
+    void i18n.changeLanguage("ja");
   });
 
   afterEach(() => {
@@ -49,6 +51,50 @@ describe("StoryMultiPanelScreen UI contracts", () => {
     expect(screen.getByTestId("panel-toggle-Backlog")).toBeChecked();
     expect(screen.getByTestId("panel-toggle-Done")).not.toBeChecked();
     expect(screen.getByTestId("panel-toggle-Icebox")).not.toBeChecked();
+  });
+
+  it("translates every visible inline create field without closing the form", async () => {
+    vi.stubGlobal("fetch", createStoryMultiPanelFetchMock());
+    renderStoryMultiPanel();
+
+    expect(await screen.findByText("Backlog story")).toBeInTheDocument();
+    await userEvent.click(
+      screen.getAllByRole("button", { name: "+ ストーリーを追加" })[0]!,
+    );
+
+    expect(
+      screen.getByRole("dialog", { name: "新規ストーリー作成" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "種別" })).toHaveValue(
+      "feature",
+    );
+    expect(screen.getByRole("option", { name: "機能" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "バグ" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "作業" })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("タイトルを入力")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "キャンセル" }),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "作成" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("タイトルは必須です");
+
+    await i18n.changeLanguage("en");
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("dialog", { name: "Create story" }),
+      ).toBeInTheDocument();
+    });
+    expect(screen.getByRole("combobox", { name: "Type" })).toHaveValue(
+      "feature",
+    );
+    expect(screen.getByRole("option", { name: "Feature" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Bug" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Chore" })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Enter a title")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create" })).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("Title is required");
   });
 
   it("enables Done panel from actions menu", async () => {
@@ -171,7 +217,7 @@ describe("StoryMultiPanelScreen UI contracts", () => {
 
     expect(await screen.findByText("Backlog story")).toBeInTheDocument();
     await userEvent.click(
-      screen.getAllByRole("button", { name: "+ Add Story" })[0]!,
+      screen.getAllByRole("button", { name: "+ ストーリーを追加" })[0]!,
     );
     await userEvent.type(
       screen.getByPlaceholderText("タイトルを入力"),

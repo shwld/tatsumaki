@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Check, Pencil, Trash2, X } from "lucide-react";
 import { useProjectLabelMutations } from "../hooks/use-project-label-mutations";
 import type { ProjectLabel } from "../types/project-label";
@@ -35,6 +36,7 @@ export function LabelMultiSelect({
   disabled,
   onSelectedLabelsChange,
 }: LabelMultiSelectProps) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [editingLabelId, setEditingLabelId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
@@ -119,7 +121,7 @@ export function LabelMultiSelect({
     async (label: ProjectLabel) => {
       if (
         !window.confirm(
-          `「${label.name}」を削除しますか？\n\nこのラベルを使用している他のストーリーには反映されません。`,
+          t("storyAccordion.labels.deleteConfirm", { name: label.name }),
         )
       ) {
         return;
@@ -129,7 +131,7 @@ export function LabelMultiSelect({
         onSelectedLabelsChange(selectedLabels.filter((l) => l !== label.name));
       }
     },
-    [deleteLabel, selectedLabels, onSelectedLabelsChange],
+    [deleteLabel, selectedLabels, onSelectedLabelsChange, t],
   );
 
   const visibleChips = selectedLabels.slice(0, 3);
@@ -144,7 +146,9 @@ export function LabelMultiSelect({
           className="min-h-7 min-w-0 flex-1 rounded border border-gray-200 bg-white px-2 py-0.5 text-left hover:bg-gray-50 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-900 dark:hover:bg-slate-800"
         >
           {selectedLabels.length === 0 ? (
-            <span className="text-xs text-gray-400">ラベルを選択</span>
+            <span className="text-xs text-gray-400">
+              {t("storyAccordion.labels.select")}
+            </span>
           ) : (
             <div className="flex flex-wrap items-center gap-1">
               {visibleChips.map((name) => {
@@ -163,7 +167,7 @@ export function LabelMultiSelect({
                         type="button"
                         className="ml-0.5 opacity-70 hover:opacity-100"
                         onClick={(e) => handleRemoveChip(name, e)}
-                        aria-label={`${name} を削除`}
+                        aria-label={t("storyAccordion.labels.remove", { name })}
                       >
                         <X className="h-2.5 w-2.5" />
                       </button>
@@ -184,7 +188,7 @@ export function LabelMultiSelect({
         <div className="max-h-64 overflow-y-auto">
           {projectLabels.length === 0 && (
             <p className="px-1 py-1 text-xs text-gray-400">
-              ラベルがありません
+              {t("storyAccordion.labels.empty")}
             </p>
           )}
           {projectLabels.map((label) =>
@@ -197,7 +201,7 @@ export function LabelMultiSelect({
                   className="w-full rounded border border-gray-200 px-2 py-0.5 text-xs dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  placeholder="ラベル名"
+                  placeholder={t("storyAccordion.labels.name")}
                   disabled={isSubmitting}
                 />
                 <div className="flex flex-wrap gap-1">
@@ -223,7 +227,7 @@ export function LabelMultiSelect({
                     onClick={() => setEditingLabelId(null)}
                     disabled={isSubmitting}
                   >
-                    キャンセル
+                    {t("storyAccordion.labels.cancel")}
                   </button>
                   <button
                     type="button"
@@ -231,7 +235,7 @@ export function LabelMultiSelect({
                     onClick={() => void handleSaveEdit(label)}
                     disabled={isSubmitting || !editName.trim()}
                   >
-                    保存
+                    {t("storyAccordion.labels.save")}
                   </button>
                 </div>
               </div>
@@ -263,7 +267,9 @@ export function LabelMultiSelect({
                     className="rounded p-0.5 text-gray-400 hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-slate-700"
                     onClick={() => handleStartEdit(label)}
                     disabled={disabled || isSubmitting}
-                    aria-label={`${label.name} を編集`}
+                    aria-label={t("storyAccordion.labels.edit", {
+                      name: label.name,
+                    })}
                   >
                     <Pencil className="h-3 w-3" />
                   </button>
@@ -272,7 +278,9 @@ export function LabelMultiSelect({
                     className="rounded p-0.5 text-gray-400 hover:bg-gray-200 hover:text-red-600 dark:hover:bg-slate-700"
                     onClick={() => void handleDelete(label)}
                     disabled={disabled || isSubmitting}
-                    aria-label={`${label.name} を削除`}
+                    aria-label={t("storyAccordion.labels.delete", {
+                      name: label.name,
+                    })}
                   >
                     <Trash2 className="h-3 w-3" />
                   </button>
@@ -284,7 +292,7 @@ export function LabelMultiSelect({
             <>
               <hr className="my-1 border-gray-100 dark:border-slate-700" />
               <p className="px-1 py-0.5 text-[10px] text-gray-400">
-                未定義のラベル
+                {t("storyAccordion.labels.undefined")}
               </p>
               {unknownLabels.map((name) => (
                 <div
@@ -306,13 +314,13 @@ export function LabelMultiSelect({
 
         <div className="space-y-1.5">
           <p className="text-[10px] font-medium text-gray-500 dark:text-slate-400">
-            新しいラベルを追加
+            {t("storyAccordion.labels.addNew")}
           </p>
           <input
             className="w-full rounded border border-gray-200 px-2 py-1 text-xs dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            placeholder="ラベル名"
+            placeholder={t("storyAccordion.labels.name")}
             disabled={isSubmitting}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
@@ -347,7 +355,9 @@ export function LabelMultiSelect({
             onClick={() => void handleCreate()}
             disabled={isSubmitting || !newName.trim()}
           >
-            {isSubmitting ? "処理中..." : "追加"}
+            {isSubmitting
+              ? t("storyAccordion.labels.processing")
+              : t("storyAccordion.labels.add")}
           </button>
         </div>
       </PopoverContent>

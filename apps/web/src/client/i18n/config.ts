@@ -52,6 +52,10 @@ import {
   storyMultiPanelScreenEn,
   storyMultiPanelScreenJa,
 } from "../screens/story-multi-panel-screen.i18n";
+import {
+  storyAccordionEn,
+  storyAccordionJa,
+} from "../components/story-accordion.i18n";
 
 export const LANGUAGE_STORAGE_KEY = "tatsumaki:language";
 export const DEFAULT_LANGUAGE = "ja";
@@ -86,6 +90,7 @@ i18n.use(initReactI18next).init({
         ...storyDeleteConfirmDialogJa,
         ...releaseMarkerCreateDialogJa,
         ...storyPanelJa,
+        ...storyAccordionJa,
       },
     },
     en: {
@@ -106,6 +111,7 @@ i18n.use(initReactI18next).init({
         ...storyDeleteConfirmDialogEn,
         ...releaseMarkerCreateDialogEn,
         ...storyPanelEn,
+        ...storyAccordionEn,
       },
     },
   },
