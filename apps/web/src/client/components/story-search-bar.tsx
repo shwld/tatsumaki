@@ -3,6 +3,7 @@ import type { StoryType } from "../types/story";
 import type { ProjectLabel } from "../types/project-label";
 import type { ProjectMemberProfile } from "../types/project";
 import { Avatar } from "./avatar";
+import { useTranslation } from "react-i18next";
 
 const STORY_TYPES: StoryType[] = ["feature", "bug", "chore", "release"];
 const STORY_TYPE_LABELS: Record<StoryType, string> = {
@@ -36,6 +37,7 @@ export const StorySearchBar = memo(function StorySearchBar({
   onFiltersChange,
   onSaveSearch,
 }: StorySearchBarProps) {
+  const { t } = useTranslation();
   const [filters, setFilters] = useState<StorySearchFilters>(initialFilters);
   const [queryInput, setQueryInput] = useState(initialFilters.query);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
@@ -152,7 +154,7 @@ export const StorySearchBar = memo(function StorySearchBar({
           <input
             ref={queryInputRef}
             type="text"
-            placeholder="タイトル・説明を検索..."
+            placeholder={t("storyMultiPanelScreen.search.placeholder")}
             value={queryInput}
             className="w-full rounded-md border border-input bg-background py-1.5 pl-8 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             onChange={(e) => handleQueryChange(e.target.value)}
@@ -164,7 +166,7 @@ export const StorySearchBar = memo(function StorySearchBar({
             onClick={clearAll}
             className="shrink-0 text-xs text-muted-foreground hover:text-foreground"
           >
-            クリア
+            {t("storyMultiPanelScreen.search.clear")}
           </button>
         )}
         {onSaveSearch && hasActiveFilters && (
@@ -173,7 +175,7 @@ export const StorySearchBar = memo(function StorySearchBar({
             onClick={() => setShowSaveDialog((v) => !v)}
             className="shrink-0 rounded-md border border-input px-2 py-1 text-xs hover:bg-accent"
           >
-            保存
+            {t("storyMultiPanelScreen.search.save")}
           </button>
         )}
       </div>
@@ -182,7 +184,9 @@ export const StorySearchBar = memo(function StorySearchBar({
       <div className="flex flex-wrap gap-2">
         {/* Story type filter */}
         <div className="flex items-center gap-1">
-          <span className="text-xs text-muted-foreground">タイプ:</span>
+          <span className="text-xs text-muted-foreground">
+            {t("storyMultiPanelScreen.search.type")}
+          </span>
           {STORY_TYPES.map((type) => (
             <button
               key={type}
@@ -207,13 +211,15 @@ export const StorySearchBar = memo(function StorySearchBar({
               updateFilters({ unestimatedOnly: event.target.checked })
             }
           />
-          未見積もりのみ
+          {t("storyMultiPanelScreen.search.unestimatedOnly")}
         </label>
 
         {/* Label filter */}
         {projectLabels.length > 0 && (
           <div className="flex items-center gap-1">
-            <span className="text-xs text-muted-foreground">ラベル:</span>
+            <span className="text-xs text-muted-foreground">
+              {t("storyMultiPanelScreen.search.labels")}
+            </span>
             <div className="flex flex-wrap gap-1">
               {projectLabels.map((pl) => (
                 <button
@@ -236,7 +242,9 @@ export const StorySearchBar = memo(function StorySearchBar({
         {/* Owner filter */}
         {memberOptions.length > 0 && (
           <div className="flex items-center gap-1">
-            <span className="text-xs text-muted-foreground">担当者:</span>
+            <span className="text-xs text-muted-foreground">
+              {t("storyMultiPanelScreen.search.owners")}
+            </span>
             <div className="flex flex-wrap gap-1">
               {memberOptions.map((member) => (
                 <button
@@ -271,7 +279,9 @@ export const StorySearchBar = memo(function StorySearchBar({
         <div className="flex flex-wrap gap-1">
           {filters.query && (
             <span className="flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-xs">
-              検索: {filters.query}
+              {t("storyMultiPanelScreen.search.querySummary", {
+                query: filters.query,
+              })}
               <button
                 type="button"
                 onClick={() => updateFilters({ query: "" })}
@@ -298,7 +308,7 @@ export const StorySearchBar = memo(function StorySearchBar({
           ))}
           {filters.unestimatedOnly && (
             <span className="flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-xs">
-              未見積もりのみ
+              {t("storyMultiPanelScreen.search.unestimatedOnly")}
               <button
                 type="button"
                 onClick={() => updateFilters({ unestimatedOnly: false })}
@@ -331,7 +341,7 @@ export const StorySearchBar = memo(function StorySearchBar({
         <div className="flex items-center gap-2 border-t border-border pt-2">
           <input
             type="text"
-            placeholder="検索条件名を入力..."
+            placeholder={t("storyMultiPanelScreen.search.namePlaceholder")}
             value={saveName}
             onChange={(e) => setSaveName(e.target.value)}
             onKeyDown={(e) => {
@@ -347,14 +357,14 @@ export const StorySearchBar = memo(function StorySearchBar({
             disabled={!saveName.trim()}
             className="rounded-md bg-primary px-3 py-1 text-xs text-primary-foreground disabled:opacity-50"
           >
-            保存
+            {t("storyMultiPanelScreen.search.save")}
           </button>
           <button
             type="button"
             onClick={() => setShowSaveDialog(false)}
             className="text-xs text-muted-foreground hover:text-foreground"
           >
-            キャンセル
+            {t("storyMultiPanelScreen.search.cancel")}
           </button>
         </div>
       )}

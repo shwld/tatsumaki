@@ -222,9 +222,9 @@ describe("groupStoriesByIteration", () => {
     });
 
     expect(result.map((group) => group.label)).toEqual([
-      "開始: 2026-01-01",
-      "開始: 2026-01-21",
-      "開始: 2026-02-04",
+      "2026-01-01",
+      "2026-01-21",
+      "2026-02-04",
     ]);
     expect(result.map((group) => group.totalPoints)).toEqual([2, 10, 2]);
   });
@@ -274,9 +274,9 @@ describe("groupStoriesByIteration", () => {
     });
 
     expect(result).toHaveLength(2);
-    expect(result[0]?.label).toBe("開始: 2026-01-21");
+    expect(result[0]?.label).toBe("2026-01-21");
     expect(result[0]?.totalPoints).toBe(5);
-    expect(result[1]?.label).toBe("開始: 2026-02-04");
+    expect(result[1]?.label).toBe("2026-02-04");
     expect(result[1]?.totalPoints).toBe(5);
   });
 
@@ -331,7 +331,7 @@ describe("groupStoriesByIteration", () => {
     });
 
     expect(result).toHaveLength(1);
-    expect(result[0]?.label).toBe("開始: 2026-02-04");
+    expect(result[0]?.label).toBe("2026-02-04");
     expect(result[0]?.stories.map((story) => story.id)).toEqual([
       "release-1",
       "release-2",

@@ -6,6 +6,7 @@ import {
   useEffect,
   type ReactNode,
 } from "react";
+import { useTranslation } from "react-i18next";
 
 type ToastKind = "success" | "error";
 
@@ -81,6 +82,7 @@ function ToastItem({
   toast: Toast;
   onDismiss: (id: number) => void;
 }) {
+  const { t } = useTranslation();
   useEffect(() => {
     const timer = setTimeout(() => onDismiss(toast.id), TOAST_DURATION_MS);
     return () => clearTimeout(timer);
@@ -104,7 +106,7 @@ function ToastItem({
         type="button"
         className="ml-2 text-current opacity-60 hover:opacity-100"
         onClick={() => onDismiss(toast.id)}
-        aria-label="閉じる"
+        aria-label={t("layout.notifications.close")}
       >
         ×
       </button>

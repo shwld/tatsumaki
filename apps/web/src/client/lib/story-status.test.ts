@@ -30,7 +30,7 @@ describe("getWorkflowActions", () => {
     const actions = getWorkflowActions("Unstarted", null, "feature");
     const startAction = actions.find((a) => a.target === "Started");
     expect(startAction?.disabled).toBe(true);
-    expect(startAction?.disabledReason).toBe("見積もりが必要です");
+    expect(startAction?.disabledReason).toBe("Estimate required");
   });
 });
 

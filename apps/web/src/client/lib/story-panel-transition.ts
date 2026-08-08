@@ -20,7 +20,12 @@ type PanelMovePlanSuccess = {
 
 type PanelMovePlanFailure = {
   ok: false;
-  error: string;
+  errorKey:
+    | "doneUnsupported"
+    | "acceptedLocked"
+    | "currentMissing"
+    | "transitionUnavailable";
+  errorParams?: { from: StoryStatus; to: StoryStatus };
 };
 
 export type PanelMovePlan = PanelMovePlanSuccess | PanelMovePlanFailure;
@@ -62,13 +67,13 @@ export function planStoryMoveToPanel(params: {
   const { story, targetPanel, currentIterationId } = params;
 
   if (targetPanel === "Done") {
-    return { ok: false, error: "Done panel への移動はサポートしていません。" };
+    return { ok: false, errorKey: "doneUnsupported" };
   }
 
   if (story.status === "Accepted") {
     return {
       ok: false,
-      error: "Accepted のストーリーは Done 以外へ移動できません。",
+      errorKey: "acceptedLocked",
     };
   }
 
@@ -80,8 +85,7 @@ export function planStoryMoveToPanel(params: {
     if (!currentIterationId) {
       return {
         ok: false,
-        error:
-          "現在のイテレーションが見つからないため、Current へ移動できません。",
+        errorKey: "currentMissing",
       };
     }
     targetStatus = CURRENT_PANEL_STATUSES.has(story.status)
@@ -103,7 +107,8 @@ export function planStoryMoveToPanel(params: {
   if (!statusPath) {
     return {
       ok: false,
-      error: `ステータスを ${story.status} から ${targetStatus} に変更できません。`,
+      errorKey: "transitionUnavailable",
+      errorParams: { from: story.status, to: targetStatus },
     };
   }
 

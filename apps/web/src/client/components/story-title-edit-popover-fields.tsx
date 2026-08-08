@@ -1,5 +1,6 @@
 import { type RefObject } from "react";
 import { AutoGrowSingleLineTextarea } from "./auto-grow-single-line-textarea";
+import { useTranslation } from "react-i18next";
 
 type StoryTitleEditPopoverFieldsProps = {
   titleDraft: string;
@@ -20,10 +21,13 @@ export function StoryTitleEditPopoverFields({
   onSave,
   onCancel,
 }: StoryTitleEditPopoverFieldsProps) {
+  const { t } = useTranslation();
   const trimmed = titleDraft.trim();
   return (
     <>
-      <p className="mb-2 text-xs font-medium text-gray-600">タイトルを編集</p>
+      <p className="mb-2 text-xs font-medium text-gray-600">
+        {t("storyMultiPanelScreen.editTitle.heading")}
+      </p>
       <div className="flex gap-2">
         <AutoGrowSingleLineTextarea
           ref={inputRef}
@@ -40,7 +44,7 @@ export function StoryTitleEditPopoverFields({
           disabled={!trimmed || trimmed === originalTitle.trim() || isSaving}
           onClick={() => void onSave()}
         >
-          保存
+          {t("storyMultiPanelScreen.editTitle.save")}
         </button>
       </div>
     </>

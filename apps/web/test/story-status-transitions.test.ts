@@ -137,7 +137,7 @@ describe("story status transitions", () => {
           target: "Started",
           variant: "primary",
           disabled: true,
-          disabledReason: "見積もりが必要です",
+          disabledReason: "Estimate required",
         },
       ]);
     });

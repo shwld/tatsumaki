@@ -5,6 +5,7 @@ import {
   fetchSavedFilters,
   deleteSavedFilterApi,
 } from "../lib/saved-filter-api";
+import { useTranslation } from "react-i18next";
 export { persistSavedSearch } from "../lib/saved-filter-api";
 
 type SavedSearchesProps = {
@@ -16,6 +17,7 @@ export const SavedSearches = memo(function SavedSearches({
   projectId,
   onApply,
 }: SavedSearchesProps) {
+  const { t } = useTranslation();
   const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -27,11 +29,15 @@ export const SavedSearches = memo(function SavedSearches({
       const filters = await fetchSavedFilters(projectId);
       setSavedFilters(filters);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "読み込みエラー");
+      setError(
+        e instanceof Error
+          ? e.message
+          : t("storyMultiPanelScreen.search.savedLoadError"),
+      );
     } finally {
       setIsLoading(false);
     }
-  }, [projectId]);
+  }, [projectId, t]);
 
   useEffect(() => {
     loadSavedFilters();
@@ -62,7 +68,11 @@ export const SavedSearches = memo(function SavedSearches({
   );
 
   if (isLoading) {
-    return <div className="text-xs text-muted-foreground">読み込み中...</div>;
+    return (
+      <div className="text-xs text-muted-foreground">
+        {t("storyMultiPanelScreen.search.savedLoading")}
+      </div>
+    );
   }
 
   if (error) {
@@ -72,14 +82,16 @@ export const SavedSearches = memo(function SavedSearches({
   if (savedFilters.length === 0) {
     return (
       <div className="text-xs text-muted-foreground">
-        保存済み検索条件はありません
+        {t("storyMultiPanelScreen.search.savedEmpty")}
       </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-1">
-      <p className="text-xs font-medium text-muted-foreground">保存済み検索</p>
+      <p className="text-xs font-medium text-muted-foreground">
+        {t("storyMultiPanelScreen.search.savedTitle")}
+      </p>
       <ul className="flex flex-col gap-0.5">
         {savedFilters.map((sf) => (
           <li
@@ -97,7 +109,7 @@ export const SavedSearches = memo(function SavedSearches({
               type="button"
               onClick={() => handleDelete(sf.id)}
               className="text-xs text-muted-foreground hover:text-destructive"
-              title="削除"
+              title={t("storyMultiPanelScreen.search.deleteSaved")}
             >
               ×
             </button>

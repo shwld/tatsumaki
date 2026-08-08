@@ -1,10 +1,10 @@
 import { useMutation } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 
 import {
   planStoryMoveToPanel,
   type PanelMovePlan,
 } from "../lib/story-panel-transition";
-import { STORY_STATUS_LABELS } from "../lib/story-status";
 import { isAuthError, isForbiddenError } from "../lib/api-error";
 import { parseErrorMessage } from "../lib/parse-error-message";
 import {
@@ -103,9 +103,15 @@ export function useStoryMutations({
   setError,
   showToast,
 }: UseStoryMutationsInput) {
+  const { t } = useTranslation();
+  const statusLabel = (status: StoryStatus) =>
+    t(`storyMultiPanelScreen.status.${status}`);
   const ensureProjectId = (): string => {
     if (!projectId) {
-      throw new StoryMutationError("REQUEST", "プロジェクトが見つかりません。");
+      throw new StoryMutationError(
+        "REQUEST",
+        t("storyMultiPanelScreen.mutation.projectMissing"),
+      );
     }
     return projectId;
   };
@@ -193,7 +199,7 @@ export function useStoryMutations({
         if (!currentIterationId) {
           throw new StoryMutationError(
             "REQUEST",
-            "現在のイテレーションが見つからないため、進行中ステータスに変更できません。",
+            t("storyMultiPanelScreen.mutation.currentMissing"),
           );
         }
 
@@ -246,7 +252,7 @@ export function useStoryMutations({
       rollbackOnError(
         error,
         context,
-        "ステータスの更新に失敗しました。再度お試しください。",
+        t("storyMultiPanelScreen.mutation.statusFailed"),
       );
     },
     onSuccess: (story, variables) => {
@@ -254,7 +260,10 @@ export function useStoryMutations({
       setError(null);
       showToast(
         "success",
-        `「${variables.story.title}」を${STORY_STATUS_LABELS[variables.nextStatus]}に変更しました`,
+        t("storyMultiPanelScreen.mutation.statusChanged", {
+          title: variables.story.title,
+          status: statusLabel(variables.nextStatus),
+        }),
       );
     },
     onSettled: () => {
@@ -343,18 +352,15 @@ export function useStoryMutations({
       rollbackOnError(
         error,
         context,
-        "パネル移動に失敗しました。再度お試しください。",
+        t("storyMultiPanelScreen.mutation.moveFailed"),
       );
     },
     onSuccess: (story, variables) => {
       panelQueries.applyStoryUpdate(story);
       setError(null);
-      const message =
-        variables.targetPanel === "Current"
-          ? "ストーリーをCurrentに移動しました"
-          : variables.targetPanel === "Backlog"
-            ? "ストーリーをBacklogに移動しました"
-            : "ストーリーをIceboxに移動しました";
+      const message = t("storyMultiPanelScreen.mutation.moved", {
+        panel: variables.targetPanel,
+      });
       showToast("success", message);
     },
     onSettled: () => {
@@ -391,12 +397,17 @@ export function useStoryMutations({
       rollbackOnError(
         error,
         context,
-        "ストーリーの削除に失敗しました。再度お試しください。",
+        t("storyMultiPanelScreen.mutation.deleteFailed"),
       );
     },
     onSuccess: (_data, variables) => {
       setError(null);
-      showToast("success", `「${variables.story.title}」を削除しました`);
+      showToast(
+        "success",
+        t("storyMultiPanelScreen.mutation.deleted", {
+          title: variables.story.title,
+        }),
+      );
     },
     onSettled: () => {
       void panelQueries.invalidatePanels({
@@ -454,7 +465,7 @@ export function useStoryMutations({
       rollbackOnError(
         error,
         context,
-        "一括ステータス更新に失敗しました。再度お試しください。",
+        t("storyMultiPanelScreen.mutation.bulkStatusFailed"),
       );
     },
     onSuccess: (stories, variables) => {
@@ -462,7 +473,10 @@ export function useStoryMutations({
       setError(null);
       showToast(
         "success",
-        `${variables.storyIds.length}件のステータスを${STORY_STATUS_LABELS[variables.status]}に変更しました`,
+        t("storyMultiPanelScreen.mutation.bulkStatusChanged", {
+          count: variables.storyIds.length,
+          status: statusLabel(variables.status),
+        }),
       );
     },
     onSettled: () => {
@@ -515,7 +529,7 @@ export function useStoryMutations({
       rollbackOnError(
         error,
         context,
-        "一括ラベル付与に失敗しました。再度お試しください。",
+        t("storyMultiPanelScreen.mutation.bulkLabelFailed"),
       );
     },
     onSuccess: (stories, variables) => {
@@ -523,7 +537,10 @@ export function useStoryMutations({
       setError(null);
       showToast(
         "success",
-        `${variables.storyIds.length}件にラベル「${variables.labelName}」を追加しました`,
+        t("storyMultiPanelScreen.mutation.bulkLabelAdded", {
+          count: variables.storyIds.length,
+          label: variables.labelName,
+        }),
       );
     },
     onSettled: () => {

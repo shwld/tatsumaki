@@ -4,6 +4,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { storyQueryKeys } from "./story-query-keys";
 import {
   HttpStatusError,
@@ -48,6 +49,7 @@ async function fetchStoryTimelinePage(
   projectId: string,
   storyNumber: string,
   pageParam: string | undefined,
+  timelineErrorMessage: string,
 ): Promise<StoryTimelineResponse> {
   const response = await fetch(
     projectStoryTimelineApiPath(projectId, storyNumber, {
@@ -57,7 +59,7 @@ async function fetchStoryTimelinePage(
   );
 
   if (!response.ok) {
-    throw new Error("タイムラインの取得に失敗しました");
+    throw new Error(timelineErrorMessage);
   }
 
   return (await response.json()) as StoryTimelineResponse;
@@ -66,18 +68,19 @@ async function fetchStoryTimelinePage(
 async function fetchStoryDetail(
   projectId: string,
   storyNumber: string,
+  messages: { sessionExpired: string; notFound: string },
 ): Promise<Story> {
   const response = await fetch(
     `${projectStoriesApiPath(projectId)}/${encodeURIComponent(storyNumber)}`,
   );
   if (isAuthError(response.status)) {
-    throw new HttpStatusError("セッションの有効期限が切れています", 401);
+    throw new HttpStatusError(messages.sessionExpired, 401);
   }
   if (isForbiddenError(response.status)) {
     throw new HttpStatusError(await parseErrorMessage(response), 403);
   }
   if (response.status === 404) {
-    throw new HttpStatusError("ストーリーが見つかりません", 404);
+    throw new HttpStatusError(messages.notFound, 404);
   }
   if (!response.ok) {
     throw new HttpStatusError(
@@ -102,6 +105,7 @@ export function useStoryTimeline(
   hasMore: boolean;
   isLoadingMore: boolean;
 } {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const enabled = Boolean(projectId && storyNumber);
   const query = useInfiniteQuery({
@@ -111,6 +115,7 @@ export function useStoryTimeline(
         projectId,
         storyNumber,
         pageParam as string | undefined,
+        t("storyMultiPanelScreen.detailError.timeline"),
       ),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) =>
@@ -181,10 +186,15 @@ export function useStoryDetail(
   storyNumber: string,
   options: UseStoryDetailOptions = {},
 ): UseStoryDetailResult {
+  const { t } = useTranslation();
   const enabled = options.enabled ?? Boolean(projectId && storyNumber);
   const query = useQuery({
     queryKey: storyQueryKeys.storyDetail(projectId, storyNumber),
-    queryFn: () => fetchStoryDetail(projectId, storyNumber),
+    queryFn: () =>
+      fetchStoryDetail(projectId, storyNumber, {
+        sessionExpired: t("storyMultiPanelScreen.detailError.sessionExpired"),
+        notFound: t("storyMultiPanelScreen.detailError.notFound"),
+      }),
     staleTime: 60_000,
     enabled,
   });

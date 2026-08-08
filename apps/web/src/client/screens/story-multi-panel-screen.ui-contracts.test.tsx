@@ -97,6 +97,28 @@ describe("StoryMultiPanelScreen UI contracts", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Title is required");
   });
 
+  it("renders list headers and reachable list controls in English", async () => {
+    await i18n.changeLanguage("en");
+    vi.stubGlobal("fetch", createStoryMultiPanelFetchMock());
+    renderStoryMultiPanel();
+
+    expect(await screen.findByText("Backlog story")).toBeInTheDocument();
+    expect(screen.getAllByText(/^Start: /).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/^開始:/)).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByTestId("advanced-search-toggle"));
+    expect(
+      screen.getByPlaceholderText("Search titles and descriptions..."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Type:")).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: "?", shiftKey: true });
+    expect(
+      screen.getByRole("dialog", { name: "Keyboard shortcuts" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
+  });
+
   it("enables Done panel from actions menu", async () => {
     vi.stubGlobal("fetch", createStoryMultiPanelFetchMock());
     renderStoryMultiPanel();
