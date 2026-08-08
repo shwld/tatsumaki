@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 type ShortcutItem = {
   keyLabel: string;
   description: string;
@@ -14,6 +16,7 @@ export function ShortcutHelpDialog({
   items,
   onClose,
 }: ShortcutHelpDialogProps) {
+  const { t } = useTranslation();
   if (!open) {
     return null;
   }
@@ -23,7 +26,7 @@ export function ShortcutHelpDialog({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
       role="dialog"
       aria-modal="true"
-      aria-label="ショートカット一覧"
+      aria-label={t("storyMultiPanelScreen.shortcutDialog.label")}
       onClick={onClose}
     >
       <div
@@ -32,14 +35,14 @@ export function ShortcutHelpDialog({
       >
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-base font-semibold text-gray-900">
-            キーボードショートカット
+            {t("storyMultiPanelScreen.shortcutDialog.title")}
           </h2>
           <button
             type="button"
             className="rounded border border-gray-300 px-2 py-1 text-xs text-gray-700 hover:bg-gray-100"
             onClick={onClose}
           >
-            閉じる
+            {t("storyMultiPanelScreen.shortcutDialog.close")}
           </button>
         </div>
         <ul className="space-y-2">

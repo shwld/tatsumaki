@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Avatar } from "./avatar";
 import { UNKNOWN_MEMBER_DISPLAY_NAME } from "../../lib/member-display-name";
 import { useToast } from "../contexts/toast-context";
@@ -37,6 +38,7 @@ export function PlanningPokerPanel({
   onStoryApplied,
 }: Props) {
   const { showToast } = useToast();
+  const { t } = useTranslation();
   const [consensusPoint, setConsensusPoint] = useState(3);
   const [submitting, setSubmitting] = useState(false);
 
@@ -116,7 +118,7 @@ export function PlanningPokerPanel({
       });
       setSession(null);
       onStoryApplied(payload.story);
-      showToast("success", "合意ポイントをストーリーに反映しました");
+      showToast("success", t("storyMultiPanelScreen.poker.applied"));
     } catch (err) {
       showToast(
         "error",
@@ -133,7 +135,7 @@ export function PlanningPokerPanel({
         { method: "POST" },
       );
       setSession(payload.session);
-      showToast("success", "セッションをリセットしました");
+      showToast("success", t("storyMultiPanelScreen.poker.resetDone"));
     } catch (err) {
       showToast(
         "error",
@@ -206,9 +208,11 @@ export function PlanningPokerPanel({
                   >
                     {votedUserIds.has(participantUserId)
                       ? isRevealed
-                        ? `投票済み: ${voteByUserId.get(participantUserId) ?? "-"}`
-                        : "投票済み"
-                      : "未投票"}
+                        ? t("storyMultiPanelScreen.poker.votedWithPoint", {
+                            point: voteByUserId.get(participantUserId) ?? "-",
+                          })
+                        : t("storyMultiPanelScreen.poker.voted")
+                      : t("storyMultiPanelScreen.poker.notVoted")}
                   </span>
                 </div>
               );

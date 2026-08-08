@@ -21,6 +21,7 @@ export const storyPanelJa = {
     retry: "再試行",
     empty: "ストーリーはありません",
     utilization: "稼働率",
+    estimateRequired: "見積もりが必要です",
   },
 } as const;
 
@@ -47,5 +48,6 @@ export const storyPanelEn = {
     retry: "Retry",
     empty: "No stories",
     utilization: "Utilization",
+    estimateRequired: "Estimate required",
   },
 } as const;

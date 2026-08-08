@@ -52,6 +52,7 @@ export function getWorkflowActions(
   status: StoryStatus,
   storyPoint: number | null,
   storyType: StoryType,
+  estimateRequiredLabel = "Estimate required",
 ): WorkflowAction[] {
   const actions = STORY_STATUS_ACTIONS[status];
   return actions.map((action) => {
@@ -63,7 +64,7 @@ export function getWorkflowActions(
     return {
       ...action,
       disabled: needsEstimate,
-      disabledReason: needsEstimate ? "見積もりが必要です" : null,
+      disabledReason: needsEstimate ? estimateRequiredLabel : null,
     };
   });
 }

@@ -374,6 +374,7 @@ const StoryCardStaticMeta = memo(function StoryCardStaticMeta({
     story.status,
     story.storyPoint,
     story.type,
+    t("storyPanel.estimateRequired"),
   );
   const isSelected = selectedStoryIds?.has(story.id) ?? false;
 
@@ -551,6 +552,7 @@ const StoryCardWithInlineEdit = memo(function StoryCardWithInlineEdit({
     story.status,
     story.storyPoint,
     story.type,
+    t("storyPanel.estimateRequired"),
   );
   const isSelected = selectedStoryIds?.has(story.id) ?? false;
 
@@ -1137,6 +1139,9 @@ function StoryPanelComponent({
       currentIterationEndDate,
       currentIterationNumber,
       utilizationOverrideByIterationNumber,
+      formatStartLabel: (date) =>
+        t("storyMultiPanelScreen.iteration.start", { date }),
+      startDateUnsetLabel: t("storyMultiPanelScreen.iteration.startUnset"),
     });
   }, [
     currentIterationNumber,
@@ -1149,6 +1154,7 @@ function StoryPanelComponent({
     sprintDurationDays,
     sortedStories,
     utilizationOverrideByIterationNumber,
+    t,
   ]);
   const [collapsedGroupKeys, setCollapsedGroupKeys] = useState<Set<string>>(
     () => new Set(),

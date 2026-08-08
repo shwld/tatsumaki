@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuthError } from "../contexts/auth-error-context";
 import { useToast } from "../contexts/toast-context";
@@ -29,6 +30,7 @@ export function useStoryPatch(
   const queryClient = useQueryClient();
   const { notifySessionExpired } = useAuthError();
   const { showToast } = useToast();
+  const { t } = useTranslation();
   const [pendingCount, setPendingCount] = useState(0);
   const mutationSequenceRef = useRef(0);
   const latestStoryRef = useRef<Story | null>(null);
@@ -93,7 +95,7 @@ export function useStoryPatch(
           const message = await parseErrorMessage(response);
           showToast(
             "error",
-            `ストーリーの更新に失敗しました: ${message}. 再試行してください。`,
+            t("storyMultiPanelScreen.mutation.updateFailed", { message }),
           );
           void queryClient.invalidateQueries({
             queryKey: storyQueryKeys.storyDetail(projectId, storyNumber),
@@ -110,7 +112,7 @@ export function useStoryPatch(
       } catch {
         showToast(
           "error",
-          "ストーリーの更新に失敗しました: ネットワークを確認して再試行してください。",
+          t("storyMultiPanelScreen.mutation.updateNetworkFailed"),
         );
         void queryClient.invalidateQueries({
           queryKey: storyQueryKeys.storyDetail(projectId, storyNumber),
@@ -131,6 +133,7 @@ export function useStoryPatch(
       queryClient,
       options?.onValidationError,
       options?.getOptimisticBaseStory,
+      t,
     ],
   );
 

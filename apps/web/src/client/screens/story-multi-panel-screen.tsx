@@ -72,7 +72,6 @@ import {
   calculateTotalPoints,
   groupStoriesByIteration,
 } from "../lib/story-panel-grouping";
-import { STORY_STATUS_LABELS } from "../lib/story-status";
 import {
   isStoryMultiPanelDropAllowed,
   panelTypeFromDropZoneGroupId,
@@ -751,6 +750,9 @@ export function StoryMultiPanelScreen() {
       currentIterationEndDate: currentIteration?.endDate ?? null,
       currentIterationNumber: currentIteration?.iterationNumber ?? null,
       utilizationOverrideByIterationNumber,
+      formatStartLabel: (date) =>
+        t("storyMultiPanelScreen.iteration.start", { date }),
+      startDateUnsetLabel: t("storyMultiPanelScreen.iteration.startUnset"),
     });
   }, [
     currentBacklogCombinedStories,
@@ -765,6 +767,7 @@ export function StoryMultiPanelScreen() {
     currentIteration?.iterationNumber,
     utilizationOverrideByIterationNumber,
     useLocalFilteredPoints,
+    t,
   ]);
   const combinedTargetPanelByGroupKey = useMemo(() => {
     const map = new Map<string, PanelType>();
@@ -1021,7 +1024,10 @@ export function StoryMultiPanelScreen() {
       currentIterationId: currentIteration?.id ?? null,
     });
     if (!plan.ok) {
-      showToast("error", plan.error);
+      showToast(
+        "error",
+        t(`storyMultiPanelScreen.moveError.${plan.errorKey}`, plan.errorParams),
+      );
       return null;
     }
 
@@ -2269,7 +2275,7 @@ export function StoryMultiPanelScreen() {
             >
               {STORY_STATUSES.map((status) => (
                 <option key={status} value={status}>
-                  {STORY_STATUS_LABELS[status]}
+                  {t(`storyMultiPanelScreen.status.${status}`)}
                 </option>
               ))}
             </select>

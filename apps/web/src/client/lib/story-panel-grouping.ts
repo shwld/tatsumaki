@@ -110,6 +110,8 @@ type GroupStoriesByIterationOptions = {
   currentIterationNumber?: number | null;
   utilizationOverrideByIterationNumber?: Record<number, number>;
   todayIso?: string;
+  formatStartLabel?: (date: string) => string;
+  startDateUnsetLabel?: string;
 };
 
 function resolveIterationCapacity(
@@ -220,8 +222,9 @@ export function groupStoriesByIteration(
       startDate: matchedIteration?.startDate ?? null,
       endDate: matchedIteration?.endDate ?? null,
       label: matchedIteration?.startDate
-        ? `開始: ${matchedIteration.startDate}`
-        : "開始日未設定",
+        ? (opts.formatStartLabel?.(matchedIteration.startDate) ??
+          matchedIteration.startDate)
+        : (opts.startDateUnsetLabel ?? ""),
       groupType: "iteration",
       stories: [story],
       totalPoints: story.storyPoint ?? 0,
@@ -333,7 +336,7 @@ export function groupStoriesByIteration(
         iterationNumber,
         startDate,
         endDate,
-        label: `開始: ${startDate}`,
+        label: opts.formatStartLabel?.(startDate) ?? startDate,
         groupType: "future-iteration",
         stories: bucketStories,
         totalPoints: bucketStories.reduce(
