@@ -21,14 +21,18 @@ bun run cli:release:upload -- <tag>
 3. Rust ターゲット追加
 4. 4 ターゲットビルド（host は `cargo build`、その他は `cargo zigbuild`）
 5. アセット生成（`tm-*.tar.gz` と `sha256sums.txt`）
-6. Release が無ければ自動作成
-7. Release assets を `--clobber` で upload
+6. Release が無ければ draft として作成し、全 assets を upload
+7. assets の upload 完了後に Release を publish
 
 ## Troubleshooting
 
 ### 同じバージョン同期 commit が繰り返し作成される
 
 OpenAPI 生成直後の未整形差分を version metadata の実差分と誤認すると、pre-commit format が差分を消した後に空 commit が作成される。リリーススクリプトは生成物を先に format してから `git diff` を評価するため、実差分がない場合は commit / push を行わない。
+
+### Release asset の upload が HTTP 422 で失敗する
+
+Immutable releases が有効な repository では、公開済み Release の asset は変更できない。Release を draft として作成し、全 assets を upload してから publish する。公開済み Release の再利用はせず、スクリプトは fail-fast する。
 
 ## Artifact location
 

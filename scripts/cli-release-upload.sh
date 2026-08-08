@@ -173,13 +173,24 @@ fi
 cp scripts/install-tm.sh "${OUTPUT_DIR}/install-tm.sh"
 chmod 0755 "${OUTPUT_DIR}/install-tm.sh"
 
-if ! gh release view "$TAG" >/dev/null 2>&1; then
-  gh release create "$TAG" --title "$TAG" --notes "Automated release creation from local upload script."
-fi
 upload_paths=()
 for asset in "${ASSETS[@]}"; do
   upload_paths+=("${OUTPUT_DIR}/${asset}")
 done
-gh release upload "$TAG" "${upload_paths[@]}" --clobber
+
+if gh release view "$TAG" >/dev/null 2>&1; then
+  if [[ "$(gh release view "$TAG" --json isDraft --jq '.isDraft')" != "true" ]]; then
+    echo "Release ${TAG} is already published and cannot accept assets when immutable releases are enabled." >&2
+    exit 1
+  fi
+  gh release upload "$TAG" "${upload_paths[@]}" --clobber
+else
+  gh release create "$TAG" \
+    --draft \
+    --title "$TAG" \
+    --notes "Automated release creation from local upload script." \
+    "${upload_paths[@]}"
+fi
+gh release edit "$TAG" --draft=false
 
 echo "Uploaded assets to release: $TAG"
