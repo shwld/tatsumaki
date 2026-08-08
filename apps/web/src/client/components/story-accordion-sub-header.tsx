@@ -1,4 +1,5 @@
 import { memo, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { Dice5, Trash2, UserCircle, Users } from "lucide-react";
 import { useStoryPatch } from "../hooks/use-story-patch";
 import type { ProjectMemberProfile } from "../types/project";
@@ -23,6 +24,7 @@ function StoryAccordionSubHeaderComponent({
   onStoryUpdated,
   onOpenPoker,
 }: StoryAccordionSubHeaderProps) {
+  const { t } = useTranslation();
   const { patchStory, isSaving } = useStoryPatch(
     story.projectId,
     String(story.storyNumber),
@@ -57,7 +59,7 @@ function StoryAccordionSubHeaderComponent({
         <PopoverTrigger asChild>
           <button
             type="button"
-            title="担当者を変更"
+            title={t("storyAccordion.subHeader.changeOwners")}
             className="flex items-center gap-1 rounded px-1 py-0.5 hover:bg-gray-100"
           >
             {owners.length > 0 ? (
@@ -84,10 +86,12 @@ function StoryAccordionSubHeaderComponent({
         </PopoverTrigger>
         <PopoverContent className="max-h-56 w-52 overflow-y-auto">
           <p className="mb-2 text-xs font-medium text-gray-600">
-            担当者（Owner）
+            {t("storyAccordion.subHeader.owners")}
           </p>
           {memberOptions.length === 0 ? (
-            <p className="text-xs text-gray-500">候補ユーザーがいません</p>
+            <p className="text-xs text-gray-500">
+              {t("storyAccordion.subHeader.noCandidates")}
+            </p>
           ) : (
             <div className="space-y-1">
               {memberOptions.map((member) => {
@@ -126,7 +130,7 @@ function StoryAccordionSubHeaderComponent({
         <PopoverTrigger asChild>
           <button
             type="button"
-            title="リクエスターを変更"
+            title={t("storyAccordion.subHeader.changeRequester")}
             className="flex items-center gap-1 rounded px-1 py-0.5 hover:bg-gray-100"
           >
             {requester ? (
@@ -142,7 +146,9 @@ function StoryAccordionSubHeaderComponent({
           </button>
         </PopoverTrigger>
         <PopoverContent className="max-h-56 w-52 overflow-y-auto">
-          <p className="mb-2 text-xs font-medium text-gray-600">リクエスター</p>
+          <p className="mb-2 text-xs font-medium text-gray-600">
+            {t("storyAccordion.subHeader.requester")}
+          </p>
           <div className="space-y-1">
             <label className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 text-xs text-gray-700 hover:bg-gray-100">
               <input
@@ -153,7 +159,9 @@ function StoryAccordionSubHeaderComponent({
                 onChange={() => void handleRequesterChange(null)}
                 className="h-3.5 w-3.5"
               />
-              <span className="text-gray-500">未設定</span>
+              <span className="text-gray-500">
+                {t("storyAccordion.subHeader.unset")}
+              </span>
             </label>
             {memberOptions.map((member) => (
               <label
@@ -183,7 +191,7 @@ function StoryAccordionSubHeaderComponent({
 
       <button
         type="button"
-        title="Planning Pokerを開く"
+        title={t("storyAccordion.subHeader.openPlanningPoker")}
         className="rounded p-1 text-gray-400 hover:bg-blue-50 hover:text-blue-600"
         onClick={() => onOpenPoker?.(story.id)}
       >
@@ -194,7 +202,7 @@ function StoryAccordionSubHeaderComponent({
       {onDelete ? (
         <button
           type="button"
-          title="このストーリーを削除"
+          title={t("storyAccordion.subHeader.deleteStory")}
           className="ml-auto rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:text-gray-300"
           disabled={isDeleting}
           onClick={() => onDelete(story)}

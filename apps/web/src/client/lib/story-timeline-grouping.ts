@@ -15,10 +15,10 @@ function toLocalDateKey(iso: string): string {
   return `${y}-${m}-${day}`;
 }
 
-function formatDateLabel(dateKey: string): string {
+function formatDateLabel(dateKey: string, locale: string): string {
   const [y, mo, da] = dateKey.split("-").map(Number);
   const d = new Date(y, mo - 1, da);
-  return d.toLocaleDateString("ja-JP", {
+  return d.toLocaleDateString(locale, {
     year: "numeric",
     month: "long",
     day: "numeric",
@@ -31,6 +31,7 @@ function formatDateLabel(dateKey: string): string {
  */
 export function groupStoryTimelineEntriesByPostDate(
   entries: StoryTimelineEntry[],
+  locale = "ja-JP",
 ): StoryTimelineDateGroup[] {
   const groups: StoryTimelineDateGroup[] = [];
   for (const entry of entries) {
@@ -42,7 +43,7 @@ export function groupStoryTimelineEntriesByPostDate(
     }
     groups.push({
       dateKey,
-      dateLabel: formatDateLabel(dateKey),
+      dateLabel: formatDateLabel(dateKey, locale),
       entries: [entry],
     });
   }

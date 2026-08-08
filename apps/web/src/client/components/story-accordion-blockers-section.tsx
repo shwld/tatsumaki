@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { Story } from "../types/story";
 import {
   Command,
@@ -48,6 +49,7 @@ function BlockerStoryCombobox({
   searchValue: string;
   onSearchValueChange: (value: string) => void;
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const selected = value ? (options.find((s) => s.id === value) ?? null) : null;
 
@@ -66,18 +68,18 @@ function BlockerStoryCombobox({
       <PopoverContent className="w-72 p-0" align="start">
         <Command
           shouldFilter={false}
-          label="タイトルで候補ストーリーを絞り込み"
+          label={t("storyAccordion.blockers.searchLabel")}
         >
           <CommandInput
-            placeholder="タイトルで絞り込み…"
+            placeholder={t("storyAccordion.blockers.searchPlaceholder")}
             value={searchValue}
             onValueChange={onSearchValueChange}
-            title="入力すると API 経由で候補が絞り込まれます（最大 200 件）。空欄は先頭に近い順の一覧です。"
+            title={t("storyAccordion.blockers.searchHint")}
             className="h-8 border-0 text-xs"
           />
           <CommandList>
             <CommandEmpty className="py-2 text-xs">
-              候補がありません
+              {t("storyAccordion.blockers.noCandidates")}
             </CommandEmpty>
             <CommandGroup>
               {options.map((s) => (
@@ -115,18 +117,19 @@ export function StoryAccordionBlockersSection({
   availableBlockedStories,
   onUpdateBlocker,
 }: StoryAccordionBlockersSectionProps) {
+  const { t } = useTranslation();
   return (
     <section aria-labelledby={`story-blockers-${storyId}`}>
       <h4
         id={`story-blockers-${storyId}`}
         className="text-xs font-semibold text-gray-700 dark:text-slate-200"
       >
-        ブロッカー
+        {t("storyAccordion.blockers.title")}
       </h4>
       <div className="mt-1.5 space-y-2 rounded border border-gray-200 bg-gray-50 p-1.5 dark:border-slate-700 dark:bg-slate-900/60">
         <div>
           <p className="text-xs font-medium text-gray-700 dark:text-slate-200">
-            このストーリーをブロックしている
+            {t("storyAccordion.blockers.blockingThisStory")}
           </p>
           {resolvedStory.blockingStories?.length ? (
             <ul className="mt-0.5 space-y-0.5">
@@ -146,7 +149,7 @@ export function StoryAccordionBlockersSection({
                       void onUpdateBlocker("DELETE", "blockedBy", relation.id);
                     }}
                   >
-                    解除
+                    {t("storyAccordion.blockers.remove")}
                   </button>
                 </li>
               ))}
@@ -160,7 +163,7 @@ export function StoryAccordionBlockersSection({
             <div className="min-w-0 flex-1">
               <BlockerStoryCombobox
                 id={`blocking-picker-${storyId}`}
-                placeholder="ブロック元を選択"
+                placeholder={t("storyAccordion.blockers.selectBlocking")}
                 value={selectedBlockingStoryId}
                 options={availableBlockingStories}
                 disabled={isUpdatingBlockers}
@@ -182,14 +185,14 @@ export function StoryAccordionBlockersSection({
                 onSelectedBlockingStoryIdChange("");
               }}
             >
-              追加
+              {t("storyAccordion.blockers.add")}
             </button>
           </div>
         </div>
 
         <div>
           <p className="text-xs font-medium text-gray-700 dark:text-slate-200">
-            このストーリーがブロックしている
+            {t("storyAccordion.blockers.blockedByThisStory")}
           </p>
           {resolvedStory.blockedStories?.length ? (
             <ul className="mt-0.5 space-y-0.5">
@@ -209,7 +212,7 @@ export function StoryAccordionBlockersSection({
                       void onUpdateBlocker("DELETE", "blocks", relation.id);
                     }}
                   >
-                    解除
+                    {t("storyAccordion.blockers.remove")}
                   </button>
                 </li>
               ))}
@@ -223,7 +226,7 @@ export function StoryAccordionBlockersSection({
             <div className="min-w-0 flex-1">
               <BlockerStoryCombobox
                 id={`blocked-picker-${storyId}`}
-                placeholder="ブロック対象を選択"
+                placeholder={t("storyAccordion.blockers.selectBlocked")}
                 value={selectedBlockedStoryId}
                 options={availableBlockedStories}
                 disabled={isUpdatingBlockers}
@@ -241,7 +244,7 @@ export function StoryAccordionBlockersSection({
                 onSelectedBlockedStoryIdChange("");
               }}
             >
-              追加
+              {t("storyAccordion.blockers.add")}
             </button>
           </div>
         </div>

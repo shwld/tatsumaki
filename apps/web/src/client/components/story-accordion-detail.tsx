@@ -14,6 +14,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { useTranslation } from "react-i18next";
 import { useAuthError } from "../contexts/auth-error-context";
 import { useToast } from "../contexts/toast-context";
 import { storyQueryKeys } from "../hooks/story-query-keys";
@@ -32,10 +33,7 @@ import {
   projectStoryCommentApiPath,
   projectStoryCommentsApiPath,
 } from "../lib/story-routes";
-import {
-  STORY_STATUS_LABELS,
-  listSelectableStoryStatuses,
-} from "../lib/story-status";
+import { listSelectableStoryStatuses } from "../lib/story-status";
 import { shouldShowPointEstimation } from "../lib/story-estimation";
 import { groupStoryTimelineEntriesByPostDate } from "../lib/story-timeline-grouping";
 import { formatStoryTimelineSummary } from "../lib/story-timeline-ui";
@@ -87,6 +85,8 @@ function StoryAccordionDetailComponent({
   mentionCandidates = [],
   onStoryUpdated,
 }: StoryAccordionDetailProps) {
+  const { t, i18n } = useTranslation();
+  const locale = i18n.resolvedLanguage === "en" ? "en-US" : "ja-JP";
   const queryClient = useQueryClient();
   const { notifySessionExpired } = useAuthError();
   const { showToast } = useToast();
@@ -206,8 +206,8 @@ function StoryAccordionDetailComponent({
   );
 
   const timelineGroups = useMemo(
-    () => groupStoryTimelineEntriesByPostDate(timeline),
-    [timeline],
+    () => groupStoryTimelineEntriesByPostDate(timeline, locale),
+    [timeline, locale],
   );
 
   useEffect(() => {
@@ -227,7 +227,7 @@ function StoryAccordionDetailComponent({
       );
       if (isAuthError(response.status)) {
         notifySessionExpired();
-        throw new Error("セッションの有効期限が切れています");
+        throw new Error(t("storyAccordion.detail.sessionExpired"));
       }
       if (isForbiddenError(response.status)) {
         throw new Error(await parseErrorMessage(response));
@@ -286,7 +286,10 @@ function StoryAccordionDetailComponent({
         }
         if (!response.ok) {
           const message = await parseErrorMessage(response);
-          showToast("error", message || "画像のアップロードに失敗しました");
+          showToast(
+            "error",
+            message || t("storyAccordion.attachments.imageUploadFailed"),
+          );
           return null;
         }
         const data = (await response.json()) as {
@@ -294,10 +297,13 @@ function StoryAccordionDetailComponent({
         };
         const attachmentId = data.attachment?.id;
         if (!attachmentId) {
-          showToast("error", "画像のアップロードに失敗しました");
+          showToast("error", t("storyAccordion.attachments.imageUploadFailed"));
           return null;
         }
-        showToast("success", "画像をアップロードしました");
+        showToast(
+          "success",
+          t("storyAccordion.attachments.imageUploadSuccess"),
+        );
         invalidateAttachments();
         void refreshTimeline();
         return projectStoryAttachmentContentApiPath(
@@ -306,7 +312,7 @@ function StoryAccordionDetailComponent({
           attachmentId,
         );
       } catch {
-        showToast("error", "画像のアップロードに失敗しました");
+        showToast("error", t("storyAccordion.attachments.imageUploadFailed"));
         return null;
       }
     },
@@ -317,6 +323,7 @@ function StoryAccordionDetailComponent({
       showToast,
       invalidateAttachments,
       refreshTimeline,
+      t,
     ],
   );
 
@@ -357,11 +364,11 @@ function StoryAccordionDetailComponent({
         }
 
         setSelectedAttachmentFile(null);
-        showToast("success", "添付ファイルをアップロードしました");
+        showToast("success", t("storyAccordion.attachments.uploadSuccess"));
         invalidateAttachments();
         void refreshTimeline();
       } catch {
-        showToast("error", "添付ファイルのアップロードに失敗しました");
+        showToast("error", t("storyAccordion.attachments.uploadFailed"));
       } finally {
         setIsUploadingAttachment(false);
       }
@@ -374,6 +381,7 @@ function StoryAccordionDetailComponent({
       showToast,
       story.id,
       story.projectId,
+      t,
     ],
   );
 
@@ -401,11 +409,11 @@ function StoryAccordionDetailComponent({
           return;
         }
 
-        showToast("success", "添付ファイルを削除しました");
+        showToast("success", t("storyAccordion.attachments.deleteSuccess"));
         invalidateAttachments();
         void refreshTimeline();
       } catch {
-        showToast("error", "添付ファイルの削除に失敗しました");
+        showToast("error", t("storyAccordion.attachments.deleteFailed"));
       } finally {
         setDeletingAttachmentId(null);
       }
@@ -417,6 +425,7 @@ function StoryAccordionDetailComponent({
       showToast,
       story.id,
       story.projectId,
+      t,
     ],
   );
 
@@ -520,7 +529,7 @@ function StoryAccordionDetailComponent({
         });
         void refreshTimeline();
       } catch {
-        showToast("error", "ブロッカーの更新に失敗しました");
+        showToast("error", t("storyAccordion.blockers.updateFailed"));
       } finally {
         setIsUpdatingBlockers(false);
       }
@@ -533,6 +542,7 @@ function StoryAccordionDetailComponent({
       story.projectId,
       syncStoryUpdate,
       queryClient,
+      t,
     ],
   );
 
@@ -579,13 +589,13 @@ function StoryAccordionDetailComponent({
           return;
         }
         if (!response.ok) {
-          showToast("error", "コメントの投稿に失敗しました");
+          showToast("error", t("storyAccordion.timeline.postFailed"));
           return;
         }
         setCommentBody("");
         refreshTimeline();
       } catch {
-        showToast("error", "コメントの投稿に失敗しました");
+        showToast("error", t("storyAccordion.timeline.postFailed"));
       } finally {
         setIsSubmittingComment(false);
       }
@@ -598,6 +608,7 @@ function StoryAccordionDetailComponent({
       refreshTimeline,
       notifySessionExpired,
       showToast,
+      t,
     ],
   );
 
@@ -625,12 +636,12 @@ function StoryAccordionDetailComponent({
           return;
         }
         if (!response.ok) {
-          showToast("error", "コメントの更新に失敗しました");
+          showToast("error", t("storyAccordion.timeline.updateFailed"));
           return;
         }
         refreshTimeline();
       } catch {
-        showToast("error", "コメントの更新に失敗しました");
+        showToast("error", t("storyAccordion.timeline.updateFailed"));
       }
     },
     [
@@ -640,6 +651,7 @@ function StoryAccordionDetailComponent({
       refreshTimeline,
       notifySessionExpired,
       showToast,
+      t,
     ],
   );
 
@@ -662,12 +674,12 @@ function StoryAccordionDetailComponent({
           return;
         }
         if (!response.ok) {
-          showToast("error", "コメントの削除に失敗しました");
+          showToast("error", t("storyAccordion.timeline.deleteFailed"));
           return;
         }
         refreshTimeline();
       } catch {
-        showToast("error", "コメントの削除に失敗しました");
+        showToast("error", t("storyAccordion.timeline.deleteFailed"));
       } finally {
         setDeletingCommentId((currentId) => {
           return currentId === commentId ? null : currentId;
@@ -680,6 +692,7 @@ function StoryAccordionDetailComponent({
       refreshTimeline,
       notifySessionExpired,
       showToast,
+      t,
     ],
   );
 
@@ -713,7 +726,7 @@ function StoryAccordionDetailComponent({
           htmlFor={`story-title-${story.id}`}
           className="text-xs font-medium text-gray-500 dark:text-slate-300"
         >
-          タイトル
+          {t("storyAccordion.detail.title")}
         </label>
         <div className="flex items-center gap-2">
           <input
@@ -732,7 +745,7 @@ function StoryAccordionDetailComponent({
             }
             className="rounded bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            保存
+            {t("storyAccordion.detail.save")}
           </button>
         </div>
         {titleError ? (
@@ -747,7 +760,7 @@ function StoryAccordionDetailComponent({
           htmlFor={`story-status-${story.id}`}
           className="shrink-0 text-xs font-medium text-gray-500 dark:text-slate-300"
         >
-          ステータス
+          {t("storyAccordion.detail.status")}
         </label>
         <select
           id={`story-status-${story.id}`}
@@ -762,7 +775,7 @@ function StoryAccordionDetailComponent({
         >
           {selectableStatuses.map((status) => (
             <option key={status} value={status}>
-              {STORY_STATUS_LABELS[status]}
+              {t(`storyAccordion.status.options.${status}`)}
             </option>
           ))}
         </select>
@@ -770,7 +783,7 @@ function StoryAccordionDetailComponent({
 
       <div className="flex min-w-0 items-center gap-2 text-xs">
         <span className="shrink-0 font-medium text-gray-500 dark:text-slate-300">
-          ラベル
+          {t("storyAccordion.detail.labels")}
         </span>
         <LabelMultiSelect
           projectId={story.projectId}
@@ -793,7 +806,7 @@ function StoryAccordionDetailComponent({
             htmlFor={`story-point-${story.id}`}
             className="shrink-0 text-xs font-medium text-gray-500 dark:text-slate-300"
           >
-            ポイント
+            {t("storyAccordion.detail.points")}
           </label>
           <select
             id={`story-point-${story.id}`}
@@ -809,7 +822,7 @@ function StoryAccordionDetailComponent({
               void patchStory({ storyPoint: next });
             }}
           >
-            <option value="">未設定</option>
+            <option value="">{t("storyAccordion.detail.unset")}</option>
             {pointScale.map((point) => (
               <option key={point} value={point}>
                 {point}
@@ -827,18 +840,18 @@ function StoryAccordionDetailComponent({
 
       <div>
         <h4 className="text-xs font-medium text-gray-500 dark:text-slate-300">
-          説明
+          {t("storyAccordion.detail.description")}
         </h4>
         <EditableMarkdown
           value={resolvedStory.description}
           onSave={handleSaveDescription}
           mentionCandidates={memberOptionsResolved}
-          placeholder="説明を追加..."
+          placeholder={t("storyAccordion.detail.descriptionPlaceholder")}
           uploadPastedImage={uploadPastedImageToStory}
         />
         {isStoryDetailLoading ? (
           <p className="mt-1 text-xs text-gray-400 dark:text-slate-400">
-            詳細を読み込み中...
+            {t("storyAccordion.detail.detailLoading")}
           </p>
         ) : null}
       </div>
@@ -878,10 +891,12 @@ function StoryAccordionDetailComponent({
             id={`story-timeline-${story.id}`}
             className="text-xs font-semibold text-gray-700 dark:text-slate-200"
           >
-            タイムライン
+            {t("storyAccordion.timeline.title")}
           </h4>
           {isTimelineLoading && !isTimelineLoadingMore ? (
-            <span className="text-[10px] text-gray-500">更新中...</span>
+            <span className="text-[10px] text-gray-500">
+              {t("storyAccordion.timeline.updating")}
+            </span>
           ) : null}
         </div>
         {hasMoreTimeline ? (
@@ -894,13 +909,15 @@ function StoryAccordionDetailComponent({
                 loadMoreTimeline();
               }}
             >
-              {isTimelineLoadingMore ? "読み込み中..." : "さらに表示"}
+              {isTimelineLoadingMore
+                ? t("storyAccordion.timeline.loading")
+                : t("storyAccordion.timeline.loadMore")}
             </button>
           </div>
         ) : null}
         {timeline.length === 0 && !isTimelineLoading ? (
           <p className="mt-1 text-xs text-gray-500">
-            まだアクティビティもコメントもありません。
+            {t("storyAccordion.timeline.empty")}
           </p>
         ) : null}
         {timelineGroups.length > 0 ? (
@@ -940,14 +957,14 @@ function StoryAccordionDetailComponent({
                           </span>
                           <span className="shrink-0 text-[10px] text-gray-400 dark:text-slate-500">
                             {new Date(entry.createdAt).toLocaleTimeString(
-                              "ja-JP",
+                              locale,
                               { hour: "2-digit", minute: "2-digit" },
                             )}
                           </span>
                         </div>
                         <CollapsibleTimelineContent>
                           <MarkdownPreview
-                            content={formatStoryTimelineSummary(entry)}
+                            content={formatStoryTimelineSummary(entry, locale)}
                             className="prose-p:my-1 prose-headings:my-1"
                           />
                         </CollapsibleTimelineContent>
@@ -994,7 +1011,7 @@ function StoryAccordionDetailComponent({
           <RichTextEditor
             value={commentBody}
             mentionCandidates={memberOptionsResolved}
-            placeholder="コメントを追加..."
+            placeholder={t("storyAccordion.timeline.commentPlaceholder")}
             minHeightClassName="min-h-20"
             onChange={setCommentBody}
             uploadPastedImage={uploadPastedImageToStory}
@@ -1005,7 +1022,9 @@ function StoryAccordionDetailComponent({
               className="rounded bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-700 dark:bg-blue-500 dark:hover:bg-blue-400 dark:disabled:bg-slate-600 dark:disabled:text-slate-200"
               disabled={!commentBody.trim() || isSubmittingComment}
             >
-              {isSubmittingComment ? "投稿中..." : "投稿"}
+              {isSubmittingComment
+                ? t("storyAccordion.timeline.posting")
+                : t("storyAccordion.timeline.post")}
             </button>
           </div>
         </form>
@@ -1015,6 +1034,7 @@ function StoryAccordionDetailComponent({
 }
 
 function CollapsibleTimelineContent({ children }: { children: ReactNode }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   return (
     <div>
@@ -1029,7 +1049,9 @@ function CollapsibleTimelineContent({ children }: { children: ReactNode }) {
         className="mt-1 text-[10px] font-medium text-blue-700 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
         onClick={() => setExpanded((v) => !v)}
       >
-        {expanded ? "折りたたむ" : "展開"}
+        {expanded
+          ? t("storyAccordion.timeline.collapse")
+          : t("storyAccordion.timeline.expand")}
       </button>
     </div>
   );
@@ -1062,6 +1084,8 @@ const CommentItem = memo(function CommentItem({
   onDelete,
   isDeleting,
 }: CommentItemProps) {
+  const { t, i18n } = useTranslation();
+  const locale = i18n.resolvedLanguage === "en" ? "en-US" : "ja-JP";
   const [editing, setEditing] = useState(false);
   const authorProfile =
     actorProfile && userIdsEqual(actorProfile.id, comment.actorUserId)
@@ -1094,7 +1118,7 @@ const CommentItem = memo(function CommentItem({
           {displayName}
         </span>
         <span className="shrink-0 text-[10px] text-gray-400 dark:text-slate-500">
-          {new Date(comment.createdAt).toLocaleTimeString("ja-JP", {
+          {new Date(comment.createdAt).toLocaleTimeString(locale, {
             hour: "2-digit",
             minute: "2-digit",
           })}
@@ -1109,6 +1133,7 @@ const CommentItem = memo(function CommentItem({
           }}
           mentionCandidates={mentionCandidates}
           uploadPastedImage={uploadPastedImage}
+          placeholder={t("storyAccordion.timeline.commentPlaceholder")}
         />
       ) : (
         <MarkdownPreview
@@ -1127,7 +1152,7 @@ const CommentItem = memo(function CommentItem({
               className="text-xs text-gray-600 hover:text-gray-800 dark:text-slate-300 dark:hover:text-slate-100"
               onClick={() => setEditing(false)}
             >
-              閉じる
+              {t("storyAccordion.timeline.close")}
             </button>
           ) : (
             <button
@@ -1135,7 +1160,7 @@ const CommentItem = memo(function CommentItem({
               className="text-xs text-blue-700 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
               onClick={() => setEditing(true)}
             >
-              編集
+              {t("storyAccordion.timeline.edit")}
             </button>
           )}
           <button
@@ -1144,7 +1169,9 @@ const CommentItem = memo(function CommentItem({
             onClick={onDelete}
             disabled={isDeleting}
           >
-            {isDeleting ? "削除中..." : "削除"}
+            {isDeleting
+              ? t("storyAccordion.timeline.deleting")
+              : t("storyAccordion.timeline.delete")}
           </button>
         </div>
       ) : null}
