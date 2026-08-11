@@ -12,7 +12,7 @@ describe("cli route", () => {
   it("returns version compatibility payload", async () => {
     const accessToken = await issueAccessTokenForCliV1();
     const response = await SELF.fetch(
-      "http://localhost/programmatic-api/v1/version",
+      "https://localhost/programmatic-api/v1/version",
       {
         headers: {
           authorization: `Bearer ${accessToken}`,
@@ -30,7 +30,7 @@ describe("cli route", () => {
   it("returns current user on whoami endpoint", async () => {
     const accessToken = await issueAccessTokenForCliV1();
     const response = await SELF.fetch(
-      "http://localhost/programmatic-api/v1/whoami",
+      "https://localhost/programmatic-api/v1/whoami",
       {
         headers: {
           authorization: `Bearer ${accessToken}`,
@@ -52,7 +52,7 @@ describe("cli route", () => {
     const projectId = await createProject();
 
     const createResponse = await SELF.fetch(
-      `http://localhost/programmatic-api/v1/projects/${projectId}/stories`,
+      `https://localhost/programmatic-api/v1/projects/${projectId}/stories`,
       {
         method: "POST",
         headers: {
@@ -72,7 +72,7 @@ describe("cli route", () => {
     };
 
     const updateResponse = await SELF.fetch(
-      `http://localhost/programmatic-api/v1/projects/${projectId}/stories/${created.story.storyNumber}`,
+      `https://localhost/programmatic-api/v1/projects/${projectId}/stories/${created.story.storyNumber}`,
       {
         method: "PATCH",
         headers: {
@@ -89,7 +89,7 @@ describe("cli route", () => {
     expect(updateResponse.status).toBe(200);
 
     const clearStoryPointResponse = await SELF.fetch(
-      `http://localhost/programmatic-api/v1/projects/${projectId}/stories/${created.story.storyNumber}`,
+      `https://localhost/programmatic-api/v1/projects/${projectId}/stories/${created.story.storyNumber}`,
       {
         method: "PATCH",
         headers: {
@@ -111,7 +111,7 @@ describe("cli route", () => {
     );
 
     const commentResponse = await SELF.fetch(
-      `http://localhost/programmatic-api/v1/projects/${projectId}/stories/${created.story.storyNumber}/comments`,
+      `https://localhost/programmatic-api/v1/projects/${projectId}/stories/${created.story.storyNumber}/comments`,
       {
         method: "POST",
         headers: {
@@ -124,7 +124,7 @@ describe("cli route", () => {
     expect(commentResponse.status).toBe(201);
 
     const listResponse = await SELF.fetch(
-      `http://localhost/programmatic-api/v1/projects/${projectId}/stories`,
+      `https://localhost/programmatic-api/v1/projects/${projectId}/stories`,
       {
         headers: {
           authorization: `Bearer ${accessToken}`,
@@ -145,7 +145,7 @@ describe("cli route", () => {
     );
 
     const getResponse = await SELF.fetch(
-      `http://localhost/programmatic-api/v1/projects/${projectId}/stories/${created.story.storyNumber}`,
+      `https://localhost/programmatic-api/v1/projects/${projectId}/stories/${created.story.storyNumber}`,
       {
         headers: {
           authorization: `Bearer ${accessToken}`,
@@ -160,7 +160,7 @@ describe("cli route", () => {
     const projectId = await createProject();
 
     const createResponse = await SELF.fetch(
-      `http://localhost/programmatic-api/v1/projects/${projectId}/stories`,
+      `https://localhost/programmatic-api/v1/projects/${projectId}/stories`,
       {
         method: "POST",
         headers: {
@@ -180,7 +180,7 @@ describe("cli route", () => {
     };
 
     const invalidResponse = await SELF.fetch(
-      `http://localhost/programmatic-api/v1/projects/${projectId}/stories/${created.story.storyNumber}`,
+      `https://localhost/programmatic-api/v1/projects/${projectId}/stories/${created.story.storyNumber}`,
       {
         method: "PATCH",
         headers: {
@@ -206,7 +206,7 @@ describe("cli route", () => {
     const storyIds: string[] = [];
     for (const title of ["A", "B"]) {
       const response = await SELF.fetch(
-        `http://localhost/programmatic-api/v1/projects/${projectId}/stories`,
+        `https://localhost/programmatic-api/v1/projects/${projectId}/stories`,
         {
           method: "POST",
           headers: {
@@ -221,7 +221,7 @@ describe("cli route", () => {
     }
 
     const reorderResponse = await SELF.fetch(
-      `http://localhost/programmatic-api/v1/projects/${projectId}/stories/reorder`,
+      `https://localhost/programmatic-api/v1/projects/${projectId}/stories/reorder`,
       {
         method: "POST",
         headers: {
@@ -234,7 +234,7 @@ describe("cli route", () => {
     expect(reorderResponse.status).toBe(200);
 
     const invalidResponse = await SELF.fetch(
-      `http://localhost/programmatic-api/v1/projects/${projectId}/stories/reorder`,
+      `https://localhost/programmatic-api/v1/projects/${projectId}/stories/reorder`,
       {
         method: "POST",
         headers: {
@@ -249,7 +249,7 @@ describe("cli route", () => {
 });
 
 async function createProject() {
-  const response = await SELF.fetch("http://localhost/api/projects", {
+  const response = await SELF.fetch("https://localhost/api/projects", {
     method: "POST",
     headers: {
       ...(await createAuthHeaders()),
@@ -263,7 +263,7 @@ async function createProject() {
 }
 
 async function issueAccessTokenForCliV1() {
-  const response = await SELF.fetch("http://localhost/oauth/register", {
+  const response = await SELF.fetch("https://localhost/oauth/register", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
@@ -289,7 +289,7 @@ async function issueAccessTokenForCliV1() {
     .replace(/\//g, "_")
     .replace(/=+$/g, "");
 
-  const authorizeUrl = new URL("http://localhost/oauth/authorize");
+  const authorizeUrl = new URL("https://localhost/oauth/authorize");
   authorizeUrl.searchParams.set("response_type", "code");
   authorizeUrl.searchParams.set("client_id", client_id ?? "");
   authorizeUrl.searchParams.set("redirect_uri", "https://tm.example/callback");
@@ -299,7 +299,7 @@ async function issueAccessTokenForCliV1() {
   authorizeUrl.searchParams.set("code_challenge_method", "S256");
   authorizeUrl.searchParams.set(
     "resource",
-    "http://localhost/programmatic-api/v1",
+    "https://localhost/programmatic-api/v1",
   );
 
   const authorizeResponse = await SELF.fetch(authorizeUrl, {
@@ -311,7 +311,7 @@ async function issueAccessTokenForCliV1() {
   const code = redirectUrl.searchParams.get("code");
   expect(code).toBeTruthy();
 
-  const tokenResponse = await SELF.fetch("http://localhost/oauth/token", {
+  const tokenResponse = await SELF.fetch("https://localhost/oauth/token", {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({

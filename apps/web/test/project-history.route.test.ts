@@ -4,7 +4,7 @@ import { createAuthHeaders, setupAccessBindings } from "./helpers/access-jwt";
 import { resetDatabase } from "./helpers/db";
 
 function historyApiPath(projectId: string): string {
-  return `http://localhost/api/projects/${projectId}/history`;
+  return `https://localhost/api/projects/${projectId}/history`;
 }
 
 describe("project history routes", () => {
@@ -27,7 +27,7 @@ describe("project history routes", () => {
   };
 
   const createProject = async () => {
-    const response = await fetchWithAuth("http://localhost/api/projects", {
+    const response = await fetchWithAuth("https://localhost/api/projects", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ name: "Hist Project" }),

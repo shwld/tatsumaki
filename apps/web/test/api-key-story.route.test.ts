@@ -23,7 +23,7 @@ describe("api-key story route", () => {
   };
 
   const createProject = async () => {
-    const response = await fetchWithAuth("http://localhost/api/projects", {
+    const response = await fetchWithAuth("https://localhost/api/projects", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ name: "API Key Story Test" }),
@@ -35,7 +35,7 @@ describe("api-key story route", () => {
 
   const createStory = async (projectId: string) => {
     const response = await fetchWithAuth(
-      `http://localhost/api/projects/${projectId}/stories`,
+      `https://localhost/api/projects/${projectId}/stories`,
       {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -58,7 +58,7 @@ describe("api-key story route", () => {
     scopes: string[] = ["story:write"],
   ) => {
     const response = await fetchWithAuth(
-      `http://localhost/api/projects/${projectId}/api-keys`,
+      `https://localhost/api/projects/${projectId}/api-keys`,
       {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -79,7 +79,7 @@ describe("api-key story route", () => {
     const { rawKey } = await issueApiKey(projectId, ["story:write"]);
 
     const response = await SELF.fetch(
-      `http://localhost/api-key/v1/projects/${projectId}/stories/${story.storyNumber}`,
+      `https://localhost/api-key/v1/projects/${projectId}/stories/${story.storyNumber}`,
       {
         method: "PATCH",
         headers: {
@@ -100,7 +100,7 @@ describe("api-key story route", () => {
     const story = await createStory(projectId);
 
     const response = await SELF.fetch(
-      `http://localhost/api-key/v1/projects/${projectId}/stories/${story.storyNumber}`,
+      `https://localhost/api-key/v1/projects/${projectId}/stories/${story.storyNumber}`,
       {
         method: "PATCH",
         headers: {
@@ -121,12 +121,12 @@ describe("api-key story route", () => {
 
     // Revoke the key
     await fetchWithAuth(
-      `http://localhost/api/projects/${projectId}/api-keys/${apiKey.id}`,
+      `https://localhost/api/projects/${projectId}/api-keys/${apiKey.id}`,
       { method: "DELETE" },
     );
 
     const response = await SELF.fetch(
-      `http://localhost/api-key/v1/projects/${projectId}/stories/${story.storyNumber}`,
+      `https://localhost/api-key/v1/projects/${projectId}/stories/${story.storyNumber}`,
       {
         method: "PATCH",
         headers: {
@@ -146,7 +146,7 @@ describe("api-key story route", () => {
     const { rawKey } = await issueApiKey(projectId, ["story:read"]);
 
     const response = await SELF.fetch(
-      `http://localhost/api-key/v1/projects/${projectId}/stories/${story.storyNumber}`,
+      `https://localhost/api-key/v1/projects/${projectId}/stories/${story.storyNumber}`,
       {
         method: "PATCH",
         headers: {
@@ -167,7 +167,7 @@ describe("api-key story route", () => {
     const { rawKey } = await issueApiKey(projectAId, ["story:write"]);
 
     const response = await SELF.fetch(
-      `http://localhost/api-key/v1/projects/${projectBId}/stories/${storyB.storyNumber}`,
+      `https://localhost/api-key/v1/projects/${projectBId}/stories/${storyB.storyNumber}`,
       {
         method: "PATCH",
         headers: {
@@ -186,7 +186,7 @@ describe("api-key story route", () => {
     const story = await createStory(projectId);
 
     const response = await SELF.fetch(
-      `http://localhost/api-key/v1/projects/${projectId}/stories/${story.storyNumber}`,
+      `https://localhost/api-key/v1/projects/${projectId}/stories/${story.storyNumber}`,
       {
         method: "PATCH",
         headers: { "content-type": "application/json" },

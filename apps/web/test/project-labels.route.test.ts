@@ -8,7 +8,7 @@ import { projectLabelsTable } from "../src/infrastructure/db/schema/project-labe
 import { storiesTable } from "../src/infrastructure/db/schema/stories";
 
 function labelsApiPath(projectId: string): string {
-  return `http://localhost/api/projects/${projectId}/labels`;
+  return `https://localhost/api/projects/${projectId}/labels`;
 }
 
 function labelApiPath(projectId: string, labelId: string): string {
@@ -16,7 +16,7 @@ function labelApiPath(projectId: string, labelId: string): string {
 }
 
 function storiesApiPath(projectId: string): string {
-  return `http://localhost/api/projects/${projectId}/stories`;
+  return `https://localhost/api/projects/${projectId}/stories`;
 }
 
 function storyApiPath(projectId: string, storyNumber: number): string {
@@ -60,7 +60,7 @@ describe("project labels routes", () => {
   };
 
   async function createProject(): Promise<string> {
-    const response = await fetchWithAuth("http://localhost/api/projects", {
+    const response = await fetchWithAuth("https://localhost/api/projects", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ name: "Test Project" }),
@@ -185,7 +185,7 @@ describe("project labels routes", () => {
     expect(response.status).toBe(200);
 
     const storyResponse = await fetchWithAuth(
-      `http://localhost/api/projects/${projectId}/stories/${story.storyNumber}`,
+      `https://localhost/api/projects/${projectId}/stories/${story.storyNumber}`,
     );
     const storyPayload = (await storyResponse.json()) as {
       story: { labels: string[] };
@@ -236,7 +236,7 @@ describe("project labels routes", () => {
     expect(response.status).toBe(204);
 
     const storyResponse = await fetchWithAuth(
-      `http://localhost/api/projects/${projectId}/stories/${story.storyNumber}`,
+      `https://localhost/api/projects/${projectId}/stories/${story.storyNumber}`,
     );
     const storyPayload = (await storyResponse.json()) as {
       story: { labels: string[] };
