@@ -14,14 +14,14 @@ describe("access auth", () => {
   });
 
   it("returns 401 for protected API when unauthenticated", async () => {
-    const response = await SELF.fetch("http://localhost/api/projects");
+    const response = await SELF.fetch("https://localhost/api/projects");
 
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual({ error: "Unauthorized" });
   });
 
   it("returns 401 when audience does not match", async () => {
-    const response = await SELF.fetch("http://localhost/api/projects", {
+    const response = await SELF.fetch("https://localhost/api/projects", {
       headers: await createAuthHeaders({ aud: ["other-audience"] }),
     });
 
@@ -37,7 +37,7 @@ describe("access auth", () => {
       : `${payload.slice(0, -1)}A`;
     const tamperedToken = `${header}.${tamperedPayload}.${signature}`;
 
-    const response = await SELF.fetch("http://localhost/api/projects", {
+    const response = await SELF.fetch("https://localhost/api/projects", {
       headers: {
         "Cf-Access-Jwt-Assertion": tamperedToken,
       },
@@ -48,7 +48,7 @@ describe("access auth", () => {
   });
 
   it("returns 401 when token is expired", async () => {
-    const response = await SELF.fetch("http://localhost/api/projects", {
+    const response = await SELF.fetch("https://localhost/api/projects", {
       headers: await createAuthHeaders({
         exp: Math.floor(Date.now() / 1000) - 60,
       }),
@@ -59,7 +59,7 @@ describe("access auth", () => {
   });
 
   it("redirects browser requests to Access login when unauthenticated", async () => {
-    const response = await SELF.fetch("http://localhost/projects", {
+    const response = await SELF.fetch("https://localhost/projects", {
       redirect: "manual",
     });
 
@@ -73,7 +73,7 @@ describe("access auth", () => {
       email: "first@example.com",
     });
 
-    const createdResponse = await SELF.fetch("http://localhost/api/auth/me", {
+    const createdResponse = await SELF.fetch("https://localhost/api/auth/me", {
       headers: authHeaders,
     });
     expect(createdResponse.status).toBe(200);
@@ -83,7 +83,7 @@ describe("access auth", () => {
       email: "first@example.com",
     });
 
-    const updatedResponse = await SELF.fetch("http://localhost/api/auth/me", {
+    const updatedResponse = await SELF.fetch("https://localhost/api/auth/me", {
       method: "PATCH",
       headers: {
         ...authHeaders,
@@ -101,7 +101,7 @@ describe("access auth", () => {
       email: "updated@example.com",
     });
 
-    const reloadedResponse = await SELF.fetch("http://localhost/api/auth/me", {
+    const reloadedResponse = await SELF.fetch("https://localhost/api/auth/me", {
       headers: await createAuthHeaders({
         sub: "github|account-user",
         email: "access-changed@example.com",
@@ -115,7 +115,7 @@ describe("access auth", () => {
     });
 
     const defaultNotificationResponse = await SELF.fetch(
-      "http://localhost/api/auth/me/notification-settings",
+      "https://localhost/api/auth/me/notification-settings",
       { headers: authHeaders },
     );
     expect(defaultNotificationResponse.status).toBe(200);
@@ -129,7 +129,7 @@ describe("access auth", () => {
     });
 
     const updatedNotificationResponse = await SELF.fetch(
-      "http://localhost/api/auth/me/notification-settings",
+      "https://localhost/api/auth/me/notification-settings",
       {
         method: "PATCH",
         headers: {
@@ -157,7 +157,7 @@ describe("access auth", () => {
   });
 
   it("returns field errors when account input is invalid", async () => {
-    const response = await SELF.fetch("http://localhost/api/auth/me", {
+    const response = await SELF.fetch("https://localhost/api/auth/me", {
       method: "PATCH",
       headers: {
         ...(await createAuthHeaders()),
@@ -180,7 +180,7 @@ describe("access auth", () => {
 
   it("returns field errors when notification setting input is invalid", async () => {
     const response = await SELF.fetch(
-      "http://localhost/api/auth/me/notification-settings",
+      "https://localhost/api/auth/me/notification-settings",
       {
         method: "PATCH",
         headers: {
@@ -213,7 +213,7 @@ describe("access auth", () => {
       email: "member@example.com",
     });
 
-    const projectResponse = await SELF.fetch("http://localhost/api/projects", {
+    const projectResponse = await SELF.fetch("https://localhost/api/projects", {
       method: "POST",
       headers: {
         ...ownerHeaders,
@@ -243,7 +243,7 @@ describe("access auth", () => {
       .run();
 
     const storyCreateResponse = await SELF.fetch(
-      `http://localhost/api/projects/${projectId}/stories`,
+      `https://localhost/api/projects/${projectId}/stories`,
       {
         method: "POST",
         headers: {
@@ -264,7 +264,7 @@ describe("access auth", () => {
     const storyNumber = String(storyCreateJson.story.storyNumber);
 
     const comment1Response = await SELF.fetch(
-      `http://localhost/api/projects/${projectId}/stories/${storyNumber}/comments`,
+      `https://localhost/api/projects/${projectId}/stories/${storyNumber}/comments`,
       {
         method: "POST",
         headers: {
@@ -279,7 +279,7 @@ describe("access auth", () => {
     expect(comment1Response.status).toBe(201);
 
     const patchResponse = await SELF.fetch(
-      `http://localhost/api/projects/${projectId}/stories/${storyNumber}`,
+      `https://localhost/api/projects/${projectId}/stories/${storyNumber}`,
       {
         method: "PATCH",
         headers: {
@@ -294,7 +294,7 @@ describe("access auth", () => {
     expect(patchResponse.status).toBe(200);
 
     const comment2Response = await SELF.fetch(
-      `http://localhost/api/projects/${projectId}/stories/${storyNumber}/comments`,
+      `https://localhost/api/projects/${projectId}/stories/${storyNumber}/comments`,
       {
         method: "POST",
         headers: {
@@ -309,7 +309,7 @@ describe("access auth", () => {
     expect(comment2Response.status).toBe(201);
 
     const page1Response = await SELF.fetch(
-      `http://localhost/api/auth/me/notifications?projectId=${projectId}&kinds=mention&limit=2`,
+      `https://localhost/api/auth/me/notifications?projectId=${projectId}&kinds=mention&limit=2`,
       {
         headers: memberHeaders,
       },
@@ -334,7 +334,7 @@ describe("access auth", () => {
     expect(page1Json.page.nextCursor).toBeTruthy();
 
     const page2Response = await SELF.fetch(
-      `http://localhost/api/auth/me/notifications?projectId=${projectId}&kinds=mention&limit=2&cursor=${encodeURIComponent(page1Json.page.nextCursor ?? "")}`,
+      `https://localhost/api/auth/me/notifications?projectId=${projectId}&kinds=mention&limit=2&cursor=${encodeURIComponent(page1Json.page.nextCursor ?? "")}`,
       {
         headers: memberHeaders,
       },
@@ -351,7 +351,7 @@ describe("access auth", () => {
     expect(page2Json.page.hasNext).toBe(false);
 
     const readResponse = await SELF.fetch(
-      "http://localhost/api/auth/me/notifications/read",
+      "https://localhost/api/auth/me/notifications/read",
       {
         method: "POST",
         headers: {
@@ -367,7 +367,7 @@ describe("access auth", () => {
     expect(await readResponse.json()).toMatchObject({ updatedCount: 2 });
 
     const unreadResponse = await SELF.fetch(
-      `http://localhost/api/auth/me/notifications?projectId=${projectId}&kinds=mention&unreadOnly=true&limit=10`,
+      `https://localhost/api/auth/me/notifications?projectId=${projectId}&kinds=mention&unreadOnly=true&limit=10`,
       {
         headers: memberHeaders,
       },
@@ -390,7 +390,7 @@ describe("access auth", () => {
       email: "member@example.com",
     });
 
-    const projectResponse = await SELF.fetch("http://localhost/api/projects", {
+    const projectResponse = await SELF.fetch("https://localhost/api/projects", {
       method: "POST",
       headers: {
         ...ownerHeaders,
@@ -420,7 +420,7 @@ describe("access auth", () => {
       .run();
 
     const storyCreateResponse = await SELF.fetch(
-      `http://localhost/api/projects/${projectId}/stories`,
+      `https://localhost/api/projects/${projectId}/stories`,
       {
         method: "POST",
         headers: {
@@ -441,7 +441,7 @@ describe("access auth", () => {
     const storyNumber = String(storyCreateJson.story.storyNumber);
 
     const commentResponse = await SELF.fetch(
-      `http://localhost/api/projects/${projectId}/stories/${storyNumber}/comments`,
+      `https://localhost/api/projects/${projectId}/stories/${storyNumber}/comments`,
       {
         method: "POST",
         headers: {
@@ -456,7 +456,7 @@ describe("access auth", () => {
     expect(commentResponse.status).toBe(201);
 
     const memberNotificationsResponse = await SELF.fetch(
-      `http://localhost/api/auth/me/notifications?projectId=${projectId}&kinds=mention&limit=20`,
+      `https://localhost/api/auth/me/notifications?projectId=${projectId}&kinds=mention&limit=20`,
       {
         headers: memberHeaders,
       },
@@ -469,7 +469,7 @@ describe("access auth", () => {
     expect(memberNotificationsJson.notifications).toHaveLength(0);
 
     const ownerNotificationsResponse = await SELF.fetch(
-      `http://localhost/api/auth/me/notifications?projectId=${projectId}&kinds=mention&limit=20`,
+      `https://localhost/api/auth/me/notifications?projectId=${projectId}&kinds=mention&limit=20`,
       {
         headers: ownerHeaders,
       },

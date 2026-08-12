@@ -24,3 +24,4 @@
 - `docs/story-delete-and-timeline-entries.md` | [link](story-delete-and-timeline-entries.md) | 責務: story 削除時の timeline 挙動 | Load when: story 削除や timeline を変更するとき | 更新責任: Web ドメイン実装者
 - `docs/web-e2e-strategy.md` | [link](web-e2e-strategy.md) | 責務: Web E2E 戦略 | Load when: E2E 方針や Playwright tests を変更するとき | 更新責任: Web QA 担当
 - `docs/ui-screenshot-test-guide.md` | [link](ui-screenshot-test-guide.md) | 責務: UI screenshot test 運用 | Load when: screenshot test や baseline を変更するとき | 更新責任: Web QA 担当
+- `docs/investigations/pr-34-oauth-provider-upgrade.md` | [link](investigations/pr-34-oauth-provider-upgrade.md) | 責務: PR #34 OAuth provider 更新の原因・仮説・解決方針 | Load when: OAuth resource metadata または provider 依存を変更するとき | 更新責任: Web 認証実装者

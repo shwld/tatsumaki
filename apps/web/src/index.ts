@@ -191,11 +191,10 @@ function createOAuthProvider(request: Request) {
     scopesSupported: ["mcp"],
     allowPlainPKCE: false,
     resourceMetadata: {
-      resource: mcpApiRoute,
       authorization_servers: [origin],
       scopes_supported: ["mcp"],
       bearer_methods_supported: ["header"],
-      resource_name: "tatsumaki MCP",
+      resource_name: "tatsumaki API",
     },
   });
 }

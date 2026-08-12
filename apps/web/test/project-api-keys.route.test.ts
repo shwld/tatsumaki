@@ -26,7 +26,7 @@ describe("project api keys management routes", () => {
     overrides?: Parameters<typeof createAuthHeaders>[0],
   ) => {
     const response = await fetchWithAuth(
-      "http://localhost/api/projects",
+      "https://localhost/api/projects",
       {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -43,7 +43,7 @@ describe("project api keys management routes", () => {
     const projectId = await createProject();
 
     const response = await fetchWithAuth(
-      `http://localhost/api/projects/${projectId}/api-keys`,
+      `https://localhost/api/projects/${projectId}/api-keys`,
       {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -76,7 +76,7 @@ describe("project api keys management routes", () => {
 
     // Other user (not a member) tries to issue API key
     const response = await fetchWithAuth(
-      `http://localhost/api/projects/${projectId}/api-keys`,
+      `https://localhost/api/projects/${projectId}/api-keys`,
       {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -96,7 +96,7 @@ describe("project api keys management routes", () => {
 
     // Owner invites member by userId
     const inviteResponse = await fetchWithAuth(
-      `http://localhost/api/projects/${projectId}/invitations`,
+      `https://localhost/api/projects/${projectId}/invitations`,
       {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -111,14 +111,14 @@ describe("project api keys management routes", () => {
 
     // Member accepts invitation
     await fetchWithAuth(
-      `http://localhost/api/projects/${projectId}/invitations/${invitePayload.invitation.id}/accept`,
+      `https://localhost/api/projects/${projectId}/invitations/${invitePayload.invitation.id}/accept`,
       { method: "POST" },
       { sub: memberSub },
     );
 
     // Member tries to issue API key
     const response = await fetchWithAuth(
-      `http://localhost/api/projects/${projectId}/api-keys`,
+      `https://localhost/api/projects/${projectId}/api-keys`,
       {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -134,14 +134,17 @@ describe("project api keys management routes", () => {
     const projectId = await createProject();
 
     // Issue a key first
-    await fetchWithAuth(`http://localhost/api/projects/${projectId}/api-keys`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: "Listed Key", scopes: ["story:write"] }),
-    });
+    await fetchWithAuth(
+      `https://localhost/api/projects/${projectId}/api-keys`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "Listed Key", scopes: ["story:write"] }),
+      },
+    );
 
     const response = await fetchWithAuth(
-      `http://localhost/api/projects/${projectId}/api-keys`,
+      `https://localhost/api/projects/${projectId}/api-keys`,
     );
 
     expect(response.status).toBe(200);
@@ -158,7 +161,7 @@ describe("project api keys management routes", () => {
     const projectId = await createProject();
 
     const issueResponse = await fetchWithAuth(
-      `http://localhost/api/projects/${projectId}/api-keys`,
+      `https://localhost/api/projects/${projectId}/api-keys`,
       {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -170,7 +173,7 @@ describe("project api keys management routes", () => {
     };
 
     const revokeResponse = await fetchWithAuth(
-      `http://localhost/api/projects/${projectId}/api-keys/${issueBody.apiKey.id}`,
+      `https://localhost/api/projects/${projectId}/api-keys/${issueBody.apiKey.id}`,
       { method: "DELETE" },
     );
 

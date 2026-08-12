@@ -10,7 +10,7 @@ describe("project routes", () => {
   });
 
   it("creates a project with default sprint duration and owner role", async () => {
-    const response = await SELF.fetch("http://localhost/api/projects", {
+    const response = await SELF.fetch("https://localhost/api/projects", {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -42,7 +42,7 @@ describe("project routes", () => {
   });
 
   it("lists projects only for current member", async () => {
-    const createResponse = await SELF.fetch("http://localhost/api/projects", {
+    const createResponse = await SELF.fetch("https://localhost/api/projects", {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -54,7 +54,7 @@ describe("project routes", () => {
     expect(createResponse.status).toBe(201);
 
     const ownerListResponse = await SELF.fetch(
-      "http://localhost/api/projects",
+      "https://localhost/api/projects",
       {
         headers: await createAuthHeaders(),
       },
@@ -84,7 +84,7 @@ describe("project routes", () => {
     });
 
     const otherUserResponse = await SELF.fetch(
-      "http://localhost/api/projects",
+      "https://localhost/api/projects",
       {
         headers: await createAuthHeaders({
           sub: "github|another-user",
@@ -98,7 +98,7 @@ describe("project routes", () => {
   });
 
   it("invites by email and by user ID", async () => {
-    const createResponse = await SELF.fetch("http://localhost/api/projects", {
+    const createResponse = await SELF.fetch("https://localhost/api/projects", {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -111,7 +111,7 @@ describe("project routes", () => {
     };
 
     const inviteByEmail = await SELF.fetch(
-      `http://localhost/api/projects/${project.id}/invitations`,
+      `https://localhost/api/projects/${project.id}/invitations`,
       {
         method: "POST",
         headers: {
@@ -144,7 +144,7 @@ describe("project routes", () => {
     });
 
     const inviteByUserId = await SELF.fetch(
-      `http://localhost/api/projects/${project.id}/invitations`,
+      `https://localhost/api/projects/${project.id}/invitations`,
       {
         method: "POST",
         headers: {
@@ -202,7 +202,7 @@ describe("project routes", () => {
   });
 
   it("accepts invitation and invited member can access project", async () => {
-    const createResponse = await SELF.fetch("http://localhost/api/projects", {
+    const createResponse = await SELF.fetch("https://localhost/api/projects", {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -215,7 +215,7 @@ describe("project routes", () => {
     };
 
     const inviteResponse = await SELF.fetch(
-      `http://localhost/api/projects/${project.id}/invitations`,
+      `https://localhost/api/projects/${project.id}/invitations`,
       {
         method: "POST",
         headers: {
@@ -234,7 +234,7 @@ describe("project routes", () => {
     };
 
     const acceptResponse = await SELF.fetch(
-      `http://localhost/api/projects/${project.id}/invitations/${invitation.id}/accept`,
+      `https://localhost/api/projects/${project.id}/invitations/${invitation.id}/accept`,
       {
         method: "POST",
         headers: await createAuthHeaders({
@@ -270,7 +270,7 @@ describe("project routes", () => {
       },
     });
 
-    const listResponse = await SELF.fetch("http://localhost/api/projects", {
+    const listResponse = await SELF.fetch("https://localhost/api/projects", {
       headers: await createAuthHeaders({
         sub: "github|invited-user",
         email: "invited@example.com",
@@ -302,7 +302,7 @@ describe("project routes", () => {
   });
 
   it("updates member role by owner", async () => {
-    const createResponse = await SELF.fetch("http://localhost/api/projects", {
+    const createResponse = await SELF.fetch("https://localhost/api/projects", {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -315,7 +315,7 @@ describe("project routes", () => {
     };
 
     const inviteResponse = await SELF.fetch(
-      `http://localhost/api/projects/${project.id}/invitations`,
+      `https://localhost/api/projects/${project.id}/invitations`,
       {
         method: "POST",
         headers: {
@@ -334,7 +334,7 @@ describe("project routes", () => {
     };
 
     await SELF.fetch(
-      `http://localhost/api/projects/${project.id}/invitations/${invitation.id}/accept`,
+      `https://localhost/api/projects/${project.id}/invitations/${invitation.id}/accept`,
       {
         method: "POST",
         headers: await createAuthHeaders({
@@ -345,7 +345,7 @@ describe("project routes", () => {
     );
 
     const updateRoleResponse = await SELF.fetch(
-      `http://localhost/api/projects/${project.id}/members/github|role-target`,
+      `https://localhost/api/projects/${project.id}/members/github|role-target`,
       {
         method: "PATCH",
         headers: {
@@ -370,7 +370,7 @@ describe("project routes", () => {
   });
 
   it("returns duplicate invitation guidance", async () => {
-    const createResponse = await SELF.fetch("http://localhost/api/projects", {
+    const createResponse = await SELF.fetch("https://localhost/api/projects", {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -383,7 +383,7 @@ describe("project routes", () => {
     };
 
     await SELF.fetch(
-      `http://localhost/api/projects/${project.id}/invitations`,
+      `https://localhost/api/projects/${project.id}/invitations`,
       {
         method: "POST",
         headers: {
@@ -395,7 +395,7 @@ describe("project routes", () => {
     );
 
     const duplicateResponse = await SELF.fetch(
-      `http://localhost/api/projects/${project.id}/invitations`,
+      `https://localhost/api/projects/${project.id}/invitations`,
       {
         method: "POST",
         headers: {
@@ -414,7 +414,7 @@ describe("project routes", () => {
   });
 
   it("returns 410 when accepting an expired invitation", async () => {
-    const createResponse = await SELF.fetch("http://localhost/api/projects", {
+    const createResponse = await SELF.fetch("https://localhost/api/projects", {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -427,7 +427,7 @@ describe("project routes", () => {
     };
 
     const inviteResponse = await SELF.fetch(
-      `http://localhost/api/projects/${project.id}/invitations`,
+      `https://localhost/api/projects/${project.id}/invitations`,
       {
         method: "POST",
         headers: {
@@ -450,7 +450,7 @@ describe("project routes", () => {
 
     try {
       const acceptResponse = await SELF.fetch(
-        `http://localhost/api/projects/${project.id}/invitations/${invitation.id}/accept`,
+        `https://localhost/api/projects/${project.id}/invitations/${invitation.id}/accept`,
         {
           method: "POST",
           headers: await createAuthHeaders({
@@ -471,7 +471,7 @@ describe("project routes", () => {
   });
 
   it("returns 403 when non-owner tries to invite", async () => {
-    const createResponse = await SELF.fetch("http://localhost/api/projects", {
+    const createResponse = await SELF.fetch("https://localhost/api/projects", {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -484,7 +484,7 @@ describe("project routes", () => {
     };
 
     const inviteResponse = await SELF.fetch(
-      `http://localhost/api/projects/${project.id}/invitations`,
+      `https://localhost/api/projects/${project.id}/invitations`,
       {
         method: "POST",
         headers: {
@@ -503,7 +503,7 @@ describe("project routes", () => {
     };
 
     await SELF.fetch(
-      `http://localhost/api/projects/${project.id}/invitations/${invitation.id}/accept`,
+      `https://localhost/api/projects/${project.id}/invitations/${invitation.id}/accept`,
       {
         method: "POST",
         headers: await createAuthHeaders({
@@ -514,7 +514,7 @@ describe("project routes", () => {
     );
 
     const nonOwnerInviteResponse = await SELF.fetch(
-      `http://localhost/api/projects/${project.id}/invitations`,
+      `https://localhost/api/projects/${project.id}/invitations`,
       {
         method: "POST",
         headers: {
@@ -536,7 +536,7 @@ describe("project routes", () => {
   });
 
   it("lists invitation notifications for invited user without project membership", async () => {
-    const createResponse = await SELF.fetch("http://localhost/api/projects", {
+    const createResponse = await SELF.fetch("https://localhost/api/projects", {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -552,12 +552,12 @@ describe("project routes", () => {
       sub: "github|invited-target",
       email: "invited-target@example.com",
     });
-    await SELF.fetch("http://localhost/api/auth/me", {
+    await SELF.fetch("https://localhost/api/auth/me", {
       headers: invitedHeaders,
     });
 
     const inviteResponse = await SELF.fetch(
-      `http://localhost/api/projects/${project.id}/invitations`,
+      `https://localhost/api/projects/${project.id}/invitations`,
       {
         method: "POST",
         headers: {
@@ -573,7 +573,7 @@ describe("project routes", () => {
     expect(inviteResponse.status).toBe(201);
 
     const notificationsResponse = await SELF.fetch(
-      "http://localhost/api/auth/me/notifications?limit=20",
+      "https://localhost/api/auth/me/notifications?limit=20",
       {
         headers: invitedHeaders,
       },
@@ -598,7 +598,7 @@ describe("project routes", () => {
   });
 
   it("returns 400 when project name is blank", async () => {
-    const response = await SELF.fetch("http://localhost/api/projects", {
+    const response = await SELF.fetch("https://localhost/api/projects", {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -614,7 +614,7 @@ describe("project routes", () => {
   });
 
   it("returns 400 when project name is missing", async () => {
-    const response = await SELF.fetch("http://localhost/api/projects", {
+    const response = await SELF.fetch("https://localhost/api/projects", {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -630,7 +630,7 @@ describe("project routes", () => {
   });
 
   it("returns 400 when body is invalid JSON", async () => {
-    const response = await SELF.fetch("http://localhost/api/projects", {
+    const response = await SELF.fetch("https://localhost/api/projects", {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -645,7 +645,7 @@ describe("project routes", () => {
 
   describe("delete project", () => {
     async function createProjectAsOwner(name = "Delete Target") {
-      const response = await SELF.fetch("http://localhost/api/projects", {
+      const response = await SELF.fetch("https://localhost/api/projects", {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -661,7 +661,7 @@ describe("project routes", () => {
 
     it("deletes project for owner with matching confirmProjectName", async () => {
       const project = await createProjectAsOwner();
-      await SELF.fetch(`http://localhost/api/projects/${project.id}/stories`, {
+      await SELF.fetch(`https://localhost/api/projects/${project.id}/stories`, {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -678,7 +678,7 @@ describe("project routes", () => {
         .run();
 
       const response = await SELF.fetch(
-        `http://localhost/api/projects/${project.id}`,
+        `https://localhost/api/projects/${project.id}`,
         {
           method: "DELETE",
           headers: {
@@ -692,7 +692,7 @@ describe("project routes", () => {
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({ ok: true });
 
-      const listResponse = await SELF.fetch("http://localhost/api/projects", {
+      const listResponse = await SELF.fetch("https://localhost/api/projects", {
         headers: await createAuthHeaders(),
       });
       const listBody = (await listResponse.json()) as { projects: unknown[] };
@@ -709,7 +709,7 @@ describe("project routes", () => {
     it("returns 400 when confirmProjectName does not match", async () => {
       const project = await createProjectAsOwner();
       const response = await SELF.fetch(
-        `http://localhost/api/projects/${project.id}`,
+        `https://localhost/api/projects/${project.id}`,
         {
           method: "DELETE",
           headers: {
@@ -731,7 +731,7 @@ describe("project routes", () => {
       const project = await createProjectAsOwner();
 
       await SELF.fetch(
-        `http://localhost/api/projects/${project.id}/invitations`,
+        `https://localhost/api/projects/${project.id}/invitations`,
         {
           method: "POST",
           headers: {
@@ -753,7 +753,7 @@ describe("project routes", () => {
         .first();
       expect(acceptMemberInvite).toBeTruthy();
       await SELF.fetch(
-        `http://localhost/api/projects/${project.id}/invitations/${(acceptMemberInvite as { id: string }).id}/accept`,
+        `https://localhost/api/projects/${project.id}/invitations/${(acceptMemberInvite as { id: string }).id}/accept`,
         {
           method: "POST",
           headers: await createAuthHeaders({
@@ -764,7 +764,7 @@ describe("project routes", () => {
       );
 
       const response = await SELF.fetch(
-        `http://localhost/api/projects/${project.id}`,
+        `https://localhost/api/projects/${project.id}`,
         {
           method: "DELETE",
           headers: {
@@ -786,7 +786,7 @@ describe("project routes", () => {
       const authHeaders = await createAuthHeaders();
 
       const first = await SELF.fetch(
-        `http://localhost/api/projects/${project.id}`,
+        `https://localhost/api/projects/${project.id}`,
         {
           method: "DELETE",
           headers: {
@@ -799,7 +799,7 @@ describe("project routes", () => {
       expect(first.status).toBe(200);
 
       const second = await SELF.fetch(
-        `http://localhost/api/projects/${project.id}`,
+        `https://localhost/api/projects/${project.id}`,
         {
           method: "DELETE",
           headers: {
@@ -819,7 +819,7 @@ describe("project routes", () => {
 
   describe("iteration settings", () => {
     async function createProjectAsOwner() {
-      const response = await SELF.fetch("http://localhost/api/projects", {
+      const response = await SELF.fetch("https://localhost/api/projects", {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -837,7 +837,7 @@ describe("project routes", () => {
       const project = await createProjectAsOwner();
 
       const response = await SELF.fetch(
-        `http://localhost/api/projects/${project.id}/settings`,
+        `https://localhost/api/projects/${project.id}/settings`,
         {
           method: "PATCH",
           headers: {
@@ -859,7 +859,7 @@ describe("project routes", () => {
       const project = await createProjectAsOwner();
 
       const response = await SELF.fetch(
-        `http://localhost/api/projects/${project.id}/settings`,
+        `https://localhost/api/projects/${project.id}/settings`,
         {
           method: "PATCH",
           headers: {
@@ -881,7 +881,7 @@ describe("project routes", () => {
       const project = await createProjectAsOwner();
 
       const response = await SELF.fetch(
-        `http://localhost/api/projects/${project.id}/settings`,
+        `https://localhost/api/projects/${project.id}/settings`,
         {
           method: "PATCH",
           headers: {
@@ -907,7 +907,7 @@ describe("project routes", () => {
       const project = await createProjectAsOwner();
 
       const response = await SELF.fetch(
-        `http://localhost/api/projects/${project.id}/settings`,
+        `https://localhost/api/projects/${project.id}/settings`,
         {
           method: "PATCH",
           headers: {
@@ -925,7 +925,7 @@ describe("project routes", () => {
       const project = await createProjectAsOwner();
 
       const response = await SELF.fetch(
-        `http://localhost/api/projects/${project.id}/settings`,
+        `https://localhost/api/projects/${project.id}/settings`,
         {
           method: "PATCH",
           headers: {
@@ -944,7 +944,7 @@ describe("project routes", () => {
       const authHeaders = await createAuthHeaders();
 
       const patchResponse = await SELF.fetch(
-        `http://localhost/api/projects/${project.id}/settings`,
+        `https://localhost/api/projects/${project.id}/settings`,
         {
           method: "PATCH",
           headers: {
@@ -957,7 +957,7 @@ describe("project routes", () => {
       expect(patchResponse.status).toBe(200);
 
       const iterationsResponse = await SELF.fetch(
-        `http://localhost/api/projects/${project.id}/iterations`,
+        `https://localhost/api/projects/${project.id}/iterations`,
         { headers: authHeaders },
       );
       expect(iterationsResponse.status).toBe(200);

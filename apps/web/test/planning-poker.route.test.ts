@@ -6,7 +6,7 @@ import { createAuthHeaders, setupAccessBindings } from "./helpers/access-jwt";
 import { resetDatabase } from "./helpers/db";
 
 function sessionsApiPath(projectId: string): string {
-  return `http://localhost/api/projects/${projectId}/planning-poker/sessions`;
+  return `https://localhost/api/projects/${projectId}/planning-poker/sessions`;
 }
 
 function sessionApiPath(projectId: string, sessionId: string): string {
@@ -56,7 +56,7 @@ describe("planning poker routes", () => {
     overrides?: Parameters<typeof createAuthHeaders>[0],
   ) => {
     const response = await fetchWithAuth(
-      "http://localhost/api/projects",
+      "https://localhost/api/projects",
       {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -74,7 +74,7 @@ describe("planning poker routes", () => {
     overrides?: Parameters<typeof createAuthHeaders>[0],
   ) => {
     const response = await fetchWithAuth(
-      `http://localhost/api/projects/${projectId}/stories`,
+      `https://localhost/api/projects/${projectId}/stories`,
       {
         method: "POST",
         headers: { "content-type": "application/json" },

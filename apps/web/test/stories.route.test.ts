@@ -10,7 +10,7 @@ import { storyTimelineEntriesTable } from "../src/infrastructure/db/schema/story
 import { todayIso } from "../src/shared/date/today-iso";
 
 function storiesApiPath(projectId: string): string {
-  return `http://localhost/api/projects/${projectId}/stories`;
+  return `https://localhost/api/projects/${projectId}/stories`;
 }
 
 function storyApiPath(projectId: string, storyId: string): string {
@@ -78,7 +78,7 @@ describe("story routes", () => {
     email?: string;
   }) => {
     const response = await fetchWithAuth(
-      "http://localhost/api/projects",
+      "https://localhost/api/projects",
       {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -365,7 +365,7 @@ describe("story routes", () => {
     expect(updateResponse.status).toBe(200);
 
     const notificationsResponse = await fetchWithAuth(
-      `http://localhost/api/auth/me/notifications?projectId=${projectId}&kinds=story_activity&limit=10`,
+      `https://localhost/api/auth/me/notifications?projectId=${projectId}&kinds=story_activity&limit=10`,
       {},
       { sub: "github|assignee", email: "assignee@example.com" },
     );
@@ -2386,7 +2386,7 @@ describe("story routes", () => {
 
     // Add another member
     await fetchWithAuth(
-      `http://localhost/api/projects/${projectId}/members`,
+      `https://localhost/api/projects/${projectId}/members`,
       {
         method: "POST",
         headers: { "content-type": "application/json" },

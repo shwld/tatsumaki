@@ -8,7 +8,7 @@ import { createAuthHeaders, setupAccessBindings } from "./helpers/access-jwt";
 import { resetDatabase } from "./helpers/db";
 
 function iterationsApiPath(projectId: string): string {
-  return `http://localhost/api/projects/${projectId}/iterations`;
+  return `https://localhost/api/projects/${projectId}/iterations`;
 }
 
 function iterationOverrideApiPath(
@@ -65,7 +65,7 @@ describe("iteration routes", () => {
   };
 
   const createProject = async () => {
-    const response = await fetchWithAuth("http://localhost/api/projects", {
+    const response = await fetchWithAuth("https://localhost/api/projects", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ name: "Test Project" }),
@@ -99,7 +99,7 @@ describe("iteration routes", () => {
 
   const createStory = async (projectId: string, title: string) => {
     const response = await fetchWithAuth(
-      `http://localhost/api/projects/${projectId}/stories`,
+      `https://localhost/api/projects/${projectId}/stories`,
       {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -276,7 +276,7 @@ describe("iteration routes", () => {
 
     // Verify assignment via stories list
     const storiesResponse = await fetchWithAuth(
-      `http://localhost/api/projects/${projectId}/stories`,
+      `https://localhost/api/projects/${projectId}/stories`,
     );
     const storiesData = (await storiesResponse.json()) as {
       stories: Array<{ id: string; iterationId: string | null }>;
@@ -293,7 +293,7 @@ describe("iteration routes", () => {
 
     // Verify unassignment
     const storiesAfter = await fetchWithAuth(
-      `http://localhost/api/projects/${projectId}/stories`,
+      `https://localhost/api/projects/${projectId}/stories`,
     );
     const storiesAfterData = (await storiesAfter.json()) as {
       stories: Array<{ id: string; iterationId: string | null }>;

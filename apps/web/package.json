@@ -27,7 +27,7 @@
     "openapi:check": "bun --bun src/presentation/openapi/check-cli-openapi.ts"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.19.1",
+    "@cloudflare/vitest-pool-workers": "^0.20.2",
     "@cloudflare/workers-types": "^5.20260726.1",
     "@playwright/test": "^1.58.2",
     "@tailwindcss/vite": "^4.2.1",
@@ -49,7 +49,7 @@
   },
   "dependencies": {
     "@cfworker/json-schema": "^4.1.1",
-    "@cloudflare/workers-oauth-provider": "^0.8.0",
+    "@cloudflare/workers-oauth-provider": "^0.10.1",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",

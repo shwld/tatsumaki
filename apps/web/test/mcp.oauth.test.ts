@@ -24,44 +24,48 @@ describe("MCP OAuth", () => {
 
   it("exposes OAuth metadata and challenges unauthenticated MCP requests", async () => {
     const metadataResponse = await SELF.fetch(
-      "http://localhost/.well-known/oauth-authorization-server",
+      "https://localhost/.well-known/oauth-authorization-server",
     );
 
     expect(metadataResponse.status).toBe(200);
     await expect(metadataResponse.json()).resolves.toMatchObject({
-      issuer: "http://localhost",
-      authorization_endpoint: "http://localhost/oauth/authorize",
-      token_endpoint: "http://localhost/oauth/token",
-      registration_endpoint: "http://localhost/oauth/register",
+      issuer: "https://localhost",
+      authorization_endpoint: "https://localhost/oauth/authorize",
+      token_endpoint: "https://localhost/oauth/token",
+      registration_endpoint: "https://localhost/oauth/register",
       scopes_supported: ["mcp"],
       code_challenge_methods_supported: ["S256"],
     });
 
     const protectedResourceResponse = await SELF.fetch(
-      "http://localhost/.well-known/oauth-protected-resource",
+      "https://localhost/.well-known/oauth-protected-resource/programmatic-api/mcp",
     );
 
     expect(protectedResourceResponse.status).toBe(200);
     await expect(protectedResourceResponse.json()).resolves.toMatchObject({
-      resource: "http://localhost/programmatic-api/mcp",
-      authorization_servers: ["http://localhost"],
+      resource: "https://localhost/programmatic-api/mcp",
+      authorization_servers: ["https://localhost"],
       scopes_supported: ["mcp"],
+      resource_name: "tatsumaki API",
     });
 
-    const response = await SELF.fetch("http://localhost/programmatic-api/mcp", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: "tools",
-        method: "tools/list",
-        params: {},
-      }),
-    });
+    const response = await SELF.fetch(
+      "https://localhost/programmatic-api/mcp",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: "tools",
+          method: "tools/list",
+          params: {},
+        }),
+      },
+    );
 
     expect(response.status).toBe(401);
     expect(response.headers.get("www-authenticate")).toContain(
-      `resource_metadata="http://localhost/.well-known/oauth-protected-resource/programmatic-api/mcp"`,
+      `resource_metadata="https://localhost/.well-known/oauth-protected-resource/programmatic-api/mcp"`,
     );
   });
 
@@ -322,11 +326,11 @@ describe("MCP OAuth", () => {
 
   it("authorizes CLI v1 endpoint with OAuth bearer token", async () => {
     const accessToken = await issueAccessTokenForResource(
-      "http://localhost/programmatic-api/v1",
+      "https://localhost/programmatic-api/v1",
     );
 
     const response = await SELF.fetch(
-      "http://localhost/programmatic-api/v1/version",
+      "https://localhost/programmatic-api/v1/version",
       {
         headers: {
           authorization: `Bearer ${accessToken}`,
@@ -838,7 +842,7 @@ async function createProject(
   name: string,
   overrides?: Parameters<typeof createAuthHeaders>[0],
 ) {
-  const response = await SELF.fetch("http://localhost/api/projects", {
+  const response = await SELF.fetch("https://localhost/api/projects", {
     method: "POST",
     headers: {
       ...(await createAuthHeaders(overrides)),
@@ -863,7 +867,7 @@ async function createStory(
   },
 ) {
   const response = await SELF.fetch(
-    `http://localhost/api/projects/${projectId}/stories`,
+    `https://localhost/api/projects/${projectId}/stories`,
     {
       method: "POST",
       headers: {
@@ -931,7 +935,7 @@ async function assignStoryToIteration(
   storyId: string,
 ) {
   const response = await SELF.fetch(
-    `http://localhost/api/projects/${projectId}/iterations/${iterationId}/stories`,
+    `https://localhost/api/projects/${projectId}/iterations/${iterationId}/stories`,
     {
       method: "POST",
       headers: {
@@ -946,7 +950,7 @@ async function assignStoryToIteration(
 }
 
 async function registerClient() {
-  const response = await SELF.fetch("http://localhost/oauth/register", {
+  const response = await SELF.fetch("https://localhost/oauth/register", {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -968,7 +972,7 @@ async function registerClient() {
 }
 
 async function issueMcpAccessToken() {
-  return issueAccessTokenForResource("http://localhost/programmatic-api/mcp");
+  return issueAccessTokenForResource("https://localhost/programmatic-api/mcp");
 }
 
 async function issueAccessTokenForResource(resource: string) {
@@ -976,7 +980,7 @@ async function issueAccessTokenForResource(resource: string) {
   const verifier = "test-verifier-123456789";
   const challenge = await createCodeChallenge(verifier);
 
-  const authorizeUrl = new URL("http://localhost/oauth/authorize");
+  const authorizeUrl = new URL("https://localhost/oauth/authorize");
   authorizeUrl.searchParams.set("response_type", "code");
   authorizeUrl.searchParams.set("client_id", clientId);
   authorizeUrl.searchParams.set(
@@ -1001,7 +1005,7 @@ async function issueAccessTokenForResource(resource: string) {
   const code = redirectUrl.searchParams.get("code");
   expect(code).toBeTruthy();
 
-  const tokenResponse = await SELF.fetch("http://localhost/oauth/token", {
+  const tokenResponse = await SELF.fetch("https://localhost/oauth/token", {
     method: "POST",
     headers: {
       "content-type": "application/x-www-form-urlencoded",
@@ -1022,7 +1026,7 @@ async function issueAccessTokenForResource(resource: string) {
 }
 
 async function fetchMcp(accessToken: string, body: unknown) {
-  return SELF.fetch("http://localhost/programmatic-api/mcp", {
+  return SELF.fetch("https://localhost/programmatic-api/mcp", {
     method: "POST",
     headers: {
       authorization: `Bearer ${accessToken}`,

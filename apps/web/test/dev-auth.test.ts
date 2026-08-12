@@ -35,7 +35,7 @@ describe("dev auth middleware", () => {
   describe("when DEV_AUTH_EMAIL is set", () => {
     it("injects JWT header when none is present", async () => {
       const app = createApp("dev@localhost");
-      const response = await app.fetch("http://localhost/test");
+      const response = await app.fetch("https://localhost/test");
 
       expect(response.status).toBe(200);
       const body = (await response.json()) as { hasJwt: boolean; jwt: string };
@@ -46,7 +46,7 @@ describe("dev auth middleware", () => {
     it("does not override existing JWT header", async () => {
       const app = createApp("dev@localhost");
       const existingJwt = "existing.jwt.token";
-      const response = await app.fetch("http://localhost/test", {
+      const response = await app.fetch("https://localhost/test", {
         headers: { [JWT_HEADER_NAME]: existingJwt },
       });
 
@@ -59,7 +59,7 @@ describe("dev auth middleware", () => {
   describe("when DEV_AUTH_EMAIL is not set", () => {
     it("does not inject JWT header", async () => {
       const app = createApp(undefined);
-      const response = await app.fetch("http://localhost/test");
+      const response = await app.fetch("https://localhost/test");
 
       expect(response.status).toBe(200);
       const body = (await response.json()) as { hasJwt: boolean; jwt: string };
