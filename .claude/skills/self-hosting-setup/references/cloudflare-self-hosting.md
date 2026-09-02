@@ -56,6 +56,8 @@ CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_ACCESS_TEAM_DOMAIN
 
 `--with-staging` and `--staging-only` are mutually exclusive. Add `--dry-run` first and confirm that staging-only output contains `[staging]` but not `[production]`. The command is restartable: exact-name resources are reused and missing resources are created. After a transient failure or permission correction, rerun the same command.
 
+For a hosted staging environment with a private WorkerEntrypoint RPC backend, add `--staging-control-plane-service <worker-name>`. The generated staging configuration owns a `CONTROL_PLANE` Service Binding so later bootstrap deploys preserve it. This option requires `--with-staging` or `--staging-only`; production-only setup rejects it. Omitting the option keeps the self-hosted unlimited entitlement provider and does not require a private backend.
+
 ## Local Access Verification
 
 Normal local development uses `apps/web/wrangler.dev.toml`, including `DEV_AUTH_EMAIL = "dev@localhost"`.
@@ -70,6 +72,7 @@ Before presenting a deploy command, confirm:
 - Account ID and Access team domain belong to the intended account.
 - At least one Access email or email domain is explicitly allowed.
 - `--dry-run` shows exactly the intended production and/or staging names.
+- A staging Control Plane target, when provided, is the exact intended staging Worker and not a production service.
 - The user understands the bootstrap applies remote D1 migrations and deploys the Worker.
 
 ## References

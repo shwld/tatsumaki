@@ -21,6 +21,7 @@ import { projectHistoryRoute } from "./presentation/routes/project-history";
 import { savedFiltersRoute } from "./presentation/routes/saved-filters";
 import { projectApiKeysRoute } from "./presentation/routes/project-api-keys";
 import { apiKeyRoute } from "./presentation/routes/api-key";
+import { billingRoute } from "./presentation/routes/billing";
 import { PlanningPokerDO } from "./durable-objects/planning-poker-do";
 import { requireAccessAuth } from "./presentation/middleware/access-auth";
 import { devAuth } from "./presentation/middleware/dev-auth";
@@ -30,6 +31,7 @@ import {
   type CurrentUser,
 } from "./presentation/middleware/access-auth";
 import { handleMcpRequest } from "./presentation/routes/mcp";
+import type { ControlPlaneRpc } from "./infrastructure/entitlements/control-plane-entitlement-provider";
 
 export type Bindings = {
   DB: D1Database;
@@ -42,6 +44,8 @@ export type Bindings = {
   ACCESS_JWKS_JSON?: string;
   DEV_AUTH_EMAIL?: string;
   PLANNING_POKER_DO: DurableObjectNamespace;
+  CONTROL_PLANE?: ControlPlaneRpc;
+  ENTITLEMENT_MODE?: string;
 };
 
 export type Env = {
@@ -78,6 +82,7 @@ protectedApi.route("/", projectHistoryRoute);
 protectedApi.route("/", savedFiltersRoute);
 protectedApi.route("/", myWorkRoute);
 protectedApi.route("/", projectApiKeysRoute);
+protectedApi.route("/", billingRoute);
 
 api.route("/", protectedApi);
 

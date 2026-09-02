@@ -19,6 +19,7 @@ const baseOptions: SetupOptions = {
   stagingOnly: false,
   dryRun: false,
   namePrefix: "tatsumaki",
+  stagingControlPlaneService: undefined,
 };
 
 describe("Cloudflare self-hosting setup", () => {
@@ -68,6 +69,21 @@ describe("Cloudflare self-hosting setup", () => {
     expect(config).toContain('bucket_name = "tatsumaki-user-avatars"');
     expect(config).not.toContain("api-token");
     expect(config).not.toContain("account-id");
+    expect(config).not.toContain("CONTROL_PLANE");
+  });
+
+  it("renders a staging-only Control Plane Service Binding", () => {
+    const [plan] = buildEnvironmentPlans("tatsumaki", "staging");
+    const config = renderWranglerConfig(
+      plan,
+      "d1-id",
+      "kv-id",
+      "tatsumaki-control-plane-staging",
+    );
+
+    expect(config).toContain('binding = "CONTROL_PLANE"');
+    expect(config).toContain('service = "tatsumaki-control-plane-staging"');
+    expect(config).toContain('ENTITLEMENT_MODE = "control-plane"');
   });
 
   it("does not contact Cloudflare or run commands in dry-run mode", async () => {
@@ -291,7 +307,11 @@ describe("Cloudflare self-hosting setup", () => {
     let generatedConfig = "";
 
     await setupCloudflare(
-      { ...baseOptions, stagingOnly: true },
+      {
+        ...baseOptions,
+        stagingOnly: true,
+        stagingControlPlaneService: "tatsumaki-control-plane-staging",
+      },
       {
         fetch: fetchMock as typeof fetch,
         runCommand: async (command) => {
@@ -307,6 +327,11 @@ describe("Cloudflare self-hosting setup", () => {
     expect(responses).toHaveLength(0);
     expect(generatedConfig).toContain('name = "tatsumaki-staging"');
     expect(generatedConfig).toContain('database_name = "tatsumaki-staging-db"');
+    expect(generatedConfig).toContain('binding = "CONTROL_PLANE"');
+    expect(generatedConfig).toContain(
+      'service = "tatsumaki-control-plane-staging"',
+    );
+    expect(generatedConfig).toContain('ENTITLEMENT_MODE = "control-plane"');
     expect(generatedConfig).not.toContain('name = "tatsumaki"\n');
     expect(calls.map((call) => JSON.stringify(call)).join("\n")).not.toMatch(
       /tatsumaki-(?:db|oauth-kv|story-attachments|user-avatars)(?:["?}]|$)/,
@@ -347,10 +372,32 @@ describe("Cloudflare self-hosting setup", () => {
 
   it("parses staging-only", () => {
     expect(
-      parseArguments(["--allow-email", "a@example.com", "--staging-only"], {}),
+      parseArguments(
+        [
+          "--allow-email",
+          "a@example.com",
+          "--staging-only",
+          "--staging-control-plane-service",
+          "tatsumaki-control-plane-staging",
+        ],
+        {},
+      ),
     ).toEqual(
-      expect.objectContaining({ withStaging: false, stagingOnly: true }),
+      expect.objectContaining({
+        withStaging: false,
+        stagingOnly: true,
+        stagingControlPlaneService: "tatsumaki-control-plane-staging",
+      }),
     );
+  });
+
+  it("rejects a staging Control Plane binding in production-only mode", () => {
+    expect(() =>
+      validateSetupOptions({
+        ...baseOptions,
+        stagingControlPlaneService: "tatsumaki-control-plane-staging",
+      }),
+    ).toThrow("requires --with-staging or --staging-only");
   });
 
   it("rejects selecting both staging modes", () => {

@@ -15,6 +15,8 @@ Options:
   --allow-domain <domain>  Allow an email domain through Access (repeatable)
   --with-staging           Also create an isolated staging environment
   --staging-only           Create or update only the isolated staging environment
+  --staging-control-plane-service <name>
+                           Bind staging to a Control Plane Worker by service name
   --name-prefix <name>     Resource name prefix (default: tatsumaki)
   --dry-run                Print the plan without contacting Cloudflare
   --help                   Show this help
@@ -35,6 +37,7 @@ export function parseArguments(
     stagingOnly: false,
     dryRun: false,
     namePrefix: "tatsumaki",
+    stagingControlPlaneService: undefined,
   };
 
   for (let index = 0; index < args.length; index += 1) {
@@ -48,6 +51,12 @@ export function parseArguments(
       options.allowDomains.push(requiredValue(args, ++index, argument));
     else if (argument === "--name-prefix")
       options.namePrefix = requiredValue(args, ++index, argument);
+    else if (argument === "--staging-control-plane-service")
+      options.stagingControlPlaneService = requiredValue(
+        args,
+        ++index,
+        argument,
+      );
     else throw new Error(`Unknown option: ${argument}`);
   }
   return options;

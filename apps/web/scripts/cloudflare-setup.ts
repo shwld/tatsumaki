@@ -18,6 +18,7 @@ export type SetupOptions = {
   stagingOnly: boolean;
   dryRun: boolean;
   namePrefix: string;
+  stagingControlPlaneService?: string;
 };
 
 export type EnvironmentPlan = {
@@ -112,6 +113,22 @@ export function validateSetupOptions(options: SetupOptions): void {
       "Specify at least one --allow-email or --allow-domain for Cloudflare Access.",
     );
   }
+  if (options.stagingControlPlaneService) {
+    if (environmentSelection === "production") {
+      throw new Error(
+        "--staging-control-plane-service requires --with-staging or --staging-only.",
+      );
+    }
+    if (
+      !/^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/.test(
+        options.stagingControlPlaneService,
+      )
+    ) {
+      throw new Error(
+        "--staging-control-plane-service must be a valid Worker name.",
+      );
+    }
+  }
   for (const email of options.allowEmails) {
     if (!email.includes("@"))
       throw new Error(`Invalid email address: ${email}`);
@@ -164,6 +181,9 @@ export async function setupCloudflare(
     log(`KV: ${plan.kvName}`);
     log(`R2: ${plan.storyAttachmentsBucket}, ${plan.userAvatarsBucket}`);
     log(`Access: ${plan.accessName}`);
+    if (plan.environment === "staging" && options.stagingControlPlaneService) {
+      log(`Control Plane: ${options.stagingControlPlaneService}`);
+    }
   }
   log(`Allowed emails: ${options.allowEmails.join(", ") || "none"}`);
   log(`Allowed email domains: ${options.allowDomains.join(", ") || "none"}`);
@@ -201,9 +221,18 @@ export async function setupCloudflare(
     const configPath = join(temporaryDirectory, "wrangler.toml");
     const secretPath = join(temporaryDirectory, "secrets.json");
     try {
-      await writeFile(configPath, renderWranglerConfig(plan, d1.uuid, kv.id), {
-        mode: 0o600,
-      });
+      await writeFile(
+        configPath,
+        renderWranglerConfig(
+          plan,
+          d1.uuid,
+          kv.id,
+          plan.environment === "staging"
+            ? options.stagingControlPlaneService
+            : undefined,
+        ),
+        { mode: 0o600 },
+      );
       const wranglerEnv = {
         CLOUDFLARE_API_TOKEN: apiToken,
         CLOUDFLARE_ACCOUNT_ID: accountId,
@@ -289,8 +318,19 @@ export function renderWranglerConfig(
   plan: EnvironmentPlan,
   d1Id: string,
   kvId: string,
+  controlPlaneService?: string,
 ): string {
   const toml = (value: string) => JSON.stringify(value);
+  const controlPlaneBinding = controlPlaneService
+    ? `
+[vars]
+ENTITLEMENT_MODE = "control-plane"
+
+[[services]]
+binding = "CONTROL_PLANE"
+service = ${toml(controlPlaneService)}
+`
+    : "";
   return `"$schema" = ${toml(join(WEB_DIR, "node_modules/wrangler/config-schema.json"))}
 name = ${toml(plan.workerName)}
 main = ${toml(join(WEB_DIR, "src/index.ts"))}
@@ -319,6 +359,7 @@ bucket_name = ${toml(plan.storyAttachmentsBucket)}
 [[r2_buckets]]
 binding = "USER_AVATARS"
 bucket_name = ${toml(plan.userAvatarsBucket)}
+${controlPlaneBinding}
 
 [triggers]
 crons = ["0 * * * *"]

@@ -30,6 +30,7 @@ description: "tatsumaki の初回セットアップ、ローカル起動、Cloud
 6. **Cloudflare bootstrap**
    - ユーザーがremote構築を明示した場合、API token、Account ID、Access team domain、許可identityを確認して `bun apps/web/scripts/setup-cloudflare.ts` を使う。
    - productionのみが既定。productionとstagingを同時構築する場合は `--with-staging`、productionへ触れず既存環境のstagingだけを構築・修復する場合は `--staging-only` を付ける。
+   - hosted stagingをprivate Control Planeへ接続する場合だけ、`--staging-control-plane-service <worker-name>`を追加する。production-onlyでは使わない。
    - 実行前に `--dry-run` でresource planを確認する。
 7. **deploy 前確認**
    - remote deploy 前にtoken権限、Account ID、Access team domain、許可identityを確認する。
@@ -67,3 +68,5 @@ CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_ACCESS_TEAM_DOMAIN
 ```
 
 既存productionへ触れずstagingだけを処理する場合は `--staging-only` を付ける。実行前に同じ引数へ `--dry-run` を追加し、`[staging]` だけが表示されることを確認する。
+
+private Control PlaneへService Binding RPCで接続するhosted stagingは、`--staging-only --staging-control-plane-service <worker-name>`を使う。指定しないself-hosted stagingはlocal unlimited entitlementのまま動作する。
