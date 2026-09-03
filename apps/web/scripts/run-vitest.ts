@@ -3,7 +3,9 @@ import { spawnSync } from "node:child_process";
 const args = process.argv.slice(2);
 const isComponentTarget = args.some((arg) => arg.startsWith("src/client/"));
 const isCloudflareSetupTarget = args.some(
-  (arg) => arg === "test/cloudflare-setup.test.ts",
+  (arg) =>
+    arg === "test/cloudflare-setup.test.ts" ||
+    arg === "test/deploy-config.test.ts",
 );
 
 function runVitest(extraArgs: string[], config?: string): number {

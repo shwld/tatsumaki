@@ -58,6 +58,25 @@ CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_ACCESS_TEAM_DOMAIN
 
 For a hosted staging environment with a private WorkerEntrypoint RPC backend, add `--staging-control-plane-service <worker-name>`. The generated staging configuration owns a `CONTROL_PLANE` Service Binding so later bootstrap deploys preserve it. This option requires `--with-staging` or `--staging-only`; production-only setup rejects it. Omitting the option keeps the self-hosted unlimited entitlement provider and does not require a private backend.
 
+For hosted continuous deployment, use the separate procedure below; do not rerun bootstrap solely to change a Service Binding on an existing installation.
+
+## Hosted Continuous Deployment
+
+The optional non-secret **build/process** variable `CONTROL_PLANE_SERVICE` selects the backend Worker for normal `deploy:worker` and `deploy:upload` commands. It is not a runtime secret, and no Stripe credentials belong in the app's build environment. The deploy wrapper copies the selected base config, preserves resource bindings and paths, adds `CONTROL_PLANE` plus `ENTITLEMENT_MODE=control-plane`, and removes its temporary config on completion or failure. Existing self-hosted config remains unchanged when the variable is omitted.
+
+For official production, select `tatsumaki-control-plane-production`; never select the staging backend. In Cloudflare Workers Builds for the production app, add `CONTROL_PLANE_SERVICE` under **Build variables and secrets**, and keep using the package deploy commands. A direct `wrangler deploy` bypasses this selection. Runtime dashboard Variables alone do not configure the build. Do not enable production build variables for unrelated preview branches.
+
+From the repository root, build and inspect without remote migration or deployment:
+
+```bash
+bun run build:web
+CONTROL_PLANE_SERVICE=tatsumaki-control-plane-production bun apps/web/scripts/deploy-cloudflare.ts deploy --dry-run
+```
+
+After checking the Worker name and every resource binding, run the same command without `--dry-run`. For an existing installation with locally maintained resource IDs, add `--config /absolute/path/to/wrangler.toml` (or a `.json` config). Relative paths in that config are preserved. Do not commit account-specific IDs. Named-environment flags are intentionally not forwarded: supply a base config for the exact deployment target.
+
+Actual deploy applies D1 migrations before publishing; upload only creates a Worker version. Dry-run uses Wrangler's bundle validation for both modes and never migrates or uploads. A failed migration prevents deployment. Preserve the active Worker Version as a rollback reference before production changes, and verify the deployed Service Binding followed by the Access-authenticated `/api/billing/entitlement` response. This integration does not enable Checkout or enforce project quotas.
+
 ## Local Access Verification
 
 Normal local development uses `apps/web/wrangler.dev.toml`, including `DEV_AUTH_EMAIL = "dev@localhost"`.

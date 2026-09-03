@@ -22,7 +22,11 @@ export default defineConfig(async () => {
     ],
     test: {
       include: ["test/**/*.test.ts"],
-      exclude: ["test/ui-screenshot/**", "test/cloudflare-setup.test.ts"],
+      exclude: [
+        "test/ui-screenshot/**",
+        "test/cloudflare-setup.test.ts",
+        "test/deploy-config.test.ts",
+      ],
       testTimeout: 10_000,
       setupFiles: ["./test/helpers/apply-migrations.ts"],
     },

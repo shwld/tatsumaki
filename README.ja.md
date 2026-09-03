@@ -100,6 +100,8 @@ CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_ACCESS_TEAM_DOMAIN
 
 `apps/web/wrangler.toml` は後続の手動deploy用の公開reference設定として残り、account固有IDやsecretを含みません。既存の `bun run deploy:web` はproduction D1 migrationを適用してから公開し、dashboard管理のvariablesを保持します。
 
+公式ホスト環境の継続deployでは、秘密値ではないbuild環境変数 `CONTROL_PLANE_SERVICE` に接続先Worker名を設定します。`deploy:worker` と `deploy:upload` はどちらも `CONTROL_PLANE` Service Bindingと `ENTITLEMENT_MODE=control-plane` を含む一時configを生成します。未指定時は既存self-hosted configを変更しません。事前確認とCloudflare Builds設定は[詳細手順](.claude/skills/self-hosting-setup/references/cloudflare-self-hosting.md#hosted-continuous-deployment)を参照してください。
+
 References:
 
 - [Cloudflare Access applications API](https://developers.cloudflare.com/api/resources/zero_trust/subresources/access/subresources/applications/methods/create/)
