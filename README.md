@@ -100,6 +100,8 @@ The command is restartable. It looks up resources by their exact names and reuse
 
 `apps/web/wrangler.toml` remains the public reference configuration for later manual deploys. It contains no account-specific IDs or secrets. The existing `bun run deploy:web` command applies production D1 migrations before publishing and preserves dashboard-managed variables.
 
+For hosted continuous deployment, set the non-secret build environment variable `CONTROL_PLANE_SERVICE` to the exact backend Worker name. Both `deploy:worker` and `deploy:upload` generate a temporary config with the `CONTROL_PLANE` Service Binding and `ENTITLEMENT_MODE=control-plane`; omitted values keep the base self-hosted config unchanged. See the [deployment reference](.claude/skills/self-hosting-setup/references/cloudflare-self-hosting.md#hosted-continuous-deployment) for preflight and Cloudflare Builds settings.
+
 References:
 
 - [Cloudflare Access applications API](https://developers.cloudflare.com/api/resources/zero_trust/subresources/access/subresources/applications/methods/create/)

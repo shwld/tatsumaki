@@ -3,5 +3,6 @@ dist/
 .wrangler/
 .dev.vars
 wrangler.deploy.toml
+.wrangler-deploy-*.json
 test-results/
 playwright-report/
