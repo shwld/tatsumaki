@@ -94,6 +94,8 @@ CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_ACCESS_TEAM_DOMAIN
 
 `--with-staging` と `--staging-only` は同時指定できません。最初に `--dry-run` も付け、`[staging]` planだけが表示されることを確認してください。
 
+ホスト運営者は、staging Workerだけをprivate WorkerEntrypoint RPC serviceへ任意で接続できます。`--staging-only` または `--with-staging` と一緒に `--staging-control-plane-service <worker-name>` を指定してください。production-only setupでは拒否され、この指定を省略するself-hosted環境は従来どおりlocal unlimited entitlementを使います。
+
 コマンドは再実行可能です。同名resourceを検索して再利用するため、network errorや権限修正後は同じコマンドを再度実行してください。同名resourceは重複作成されません。別のインストールが既定名を使用済みなら `--name-prefix` を指定できます。
 
 `apps/web/wrangler.toml` は後続の手動deploy用の公開reference設定として残り、account固有IDやsecretを含みません。既存の `bun run deploy:web` はproduction D1 migrationを適用してから公開し、dashboard管理のvariablesを保持します。
