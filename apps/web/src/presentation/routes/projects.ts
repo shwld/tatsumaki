@@ -4,6 +4,11 @@ import {
   INVALID_PROJECT_NAME_ERROR,
 } from "../../application/usecases/create-project";
 import {
+  authorizeProjectCreation,
+  ENTITLEMENT_UNAVAILABLE_ERROR,
+  PROJECT_CREATION_DISABLED_ERROR,
+} from "../../application/usecases/authorize-project-creation";
+import {
   deleteProject,
   PROJECT_NAME_CONFIRMATION_MISMATCH_ERROR,
   PROJECT_NOT_FOUND_ERROR,
@@ -35,6 +40,7 @@ import type { Env } from "../../index";
 import { UNKNOWN_MEMBER_DISPLAY_NAME } from "../../lib/member-display-name";
 import { requireProjectMembership } from "./project-membership";
 import { computeGravatarHash } from "../lib/gravatar";
+import { createEntitlementProvider } from "./billing";
 
 export const projectsRoute = new Hono<Env>();
 
@@ -124,6 +130,30 @@ projectsRoute.post("/projects", async (c) => {
 
   const currentUser = c.get("currentUser");
   const repository = new D1ProjectRepository(c.env.DB);
+  const authorizationResult = await authorizeProjectCreation(
+    createEntitlementProvider(c.env),
+    repository,
+    currentUser.id,
+  );
+  if (authorizationResult.isErr()) {
+    if (authorizationResult.error === PROJECT_CREATION_DISABLED_ERROR) {
+      return c.json(
+        {
+          error:
+            "Your plan does not allow project creation. Ask a project owner to invite you.",
+          code: "project_creation_disabled",
+        },
+        403,
+      );
+    }
+    if (authorizationResult.error === ENTITLEMENT_UNAVAILABLE_ERROR) {
+      return c.json({ error: "Entitlement is temporarily unavailable" }, 503);
+    }
+    return c.json(
+      { error: "Failed to check project creation permission" },
+      500,
+    );
+  }
   const result = await createProject(repository, {
     name: body.name,
     ownerUserId: currentUser.id,

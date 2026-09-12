@@ -123,6 +123,23 @@ function toProjectInvitation(row: ProjectInvitationRow): ProjectInvitation {
 }
 
 export class D1ProjectRepository implements ProjectRepository {
+  async countOwnedProjects(
+    userId: string,
+  ): Promise<Result<number, ProjectRepositoryError>> {
+    const count = await this.db
+      .select({ count: sql<number>`count(*)` })
+      .from(projectMembersTable)
+      .where(
+        and(
+          eq(projectMembersTable.userId, userId),
+          eq(projectMembersTable.role, "owner"),
+        ),
+      )
+      .get();
+
+    return ok(count?.count ?? 0);
+  }
+
   private readonly db: DbClient;
 
   constructor(d1: D1Database) {
