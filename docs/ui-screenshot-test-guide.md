@@ -9,20 +9,14 @@ Web E2E 全体の標準方針（accessibility-tree 優先）は `docs/web-e2e-st
 - 差分が「意図した変更」か「意図しない変更」かを先に判定する。
 - 意図した変更ならベースライン更新、意図しない変更ならコード修正を行う。
 
-## 0. 失敗の再現
+## 0. 実行環境
 
-まずローカルで同じテストを再実行して再現させる。
-
-```bash
-bun run playwright:install
-bun run test:ui
-```
+スクリーンショットの生成・比較は Linux CI の `ui-screenshot-diff` ジョブのみで行う。ローカルでの `bun run test:ui` / `bun run test:ui:update` は運用手順に含めない。
 
 ## 1. 差分の確認
 
 失敗時は以下を確認する。
 
-- ローカル: `apps/web/test-results/` の `actual / expected / diff`
 - CI: `ui-screenshot-diff` artifact（`test-results/` と `playwright-report/`）
 
 判定基準:
@@ -32,10 +26,7 @@ bun run test:ui
 
 ## 2-A. 意図した変更の場合（ベースライン更新）
 
-```bash
-bun run test:ui:update
-bun run test:ui
-```
+CI artifact の actual 画像を目視確認して該当する Linux ベースラインへ反映し、再実行した CI で検証する。
 
 対応内容:
 
@@ -54,30 +45,15 @@ bun run test:ui
 - 画面描画前に十分待てているか（見出し・主要要素の表示確認）
 - 変更がスクリーンショット対象外の画面にも影響していないか
 
-修正後に実行:
+修正後に CI の `ui-screenshot-diff` を再実行する。通過後に必要なコードのみコミットする。
 
-```bash
-bun run test:ui
-```
-
-`test:ui` が通るまで繰り返す。通過後に必要なコードのみコミットする。
-
-## 3. PR前チェック
+## 3. PR 完了前チェック
 
 以下をすべて満たすこと:
 
-- `bun run test:ui` がローカルで成功
 - CIの `ui-screenshot-diff` が成功
 - 画像更新がある場合、変更意図をPRに記載
 - テスト削除や`skip`で回避していない
-
-## 補足コマンド
-
-特定テストのみ再実行:
-
-```bash
-bun run test:ui -- -g "project list screen"
-```
 
 ## ファイル配置ルールと命名規則
 

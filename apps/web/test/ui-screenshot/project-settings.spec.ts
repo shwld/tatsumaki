@@ -134,4 +134,27 @@ for (const theme of themeVariants) {
       resolveSnapshotName("project-invitation-accept.png", theme),
     );
   });
+
+  test(`single-use invitation accept screen (${theme})`, async ({ page }) => {
+    await setThemeMode(page, theme);
+    await mockAuthMe(page);
+    await page.route("**/api/invitation-links/accept", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ projectId: "project-1" }),
+      });
+    });
+
+    await page.goto("/invite#test-invitation-token");
+    await expect(
+      page.getByRole("heading", { name: "プロジェクト招待" }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("招待を承認しました。プロジェクトに参加しました。"),
+    ).toBeVisible();
+    await expect(page).toHaveScreenshot(
+      resolveSnapshotName("single-use-invitation-accept.png", theme),
+    );
+  });
 }

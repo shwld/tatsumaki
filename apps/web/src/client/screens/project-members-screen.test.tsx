@@ -146,6 +146,85 @@ describe("ProjectMembersScreen", () => {
     ).toBeInTheDocument();
   });
 
+  it("creates, copies, and revokes a one-time invitation link", async () => {
+    const fetchMock = vi.mocked(fetch);
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    fetchMock.mockImplementation(async (input, init) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (!init?.method) {
+        return buildJsonResponse({
+          currentMemberRole: "owner",
+          members: [],
+          invitations: [],
+        });
+      }
+      if (init.method === "POST" && url.endsWith("/invitation-links")) {
+        return buildJsonResponse(
+          {
+            invitation: {
+              id: "link-1",
+              projectId: "project-1",
+              inviterUserId: "github|owner",
+              targetUserId: null,
+              targetEmail: null,
+              invitationType: "single_use",
+              role: "member",
+              status: "pending",
+              expiresAt: "2026-01-08T00:00:00.000Z",
+              acceptedByUserId: null,
+              acceptedAt: null,
+              createdAt: "2026-01-01T00:00:00.000Z",
+              updatedAt: "2026-01-01T00:00:00.000Z",
+            },
+            url: "https://example.com/invite#secret-token",
+          },
+          201,
+        );
+      }
+      if (init.method === "DELETE" && url.endsWith("/link-1")) {
+        return buildJsonResponse({ invitation: { status: "cancelled" } });
+      }
+      return buildJsonResponse({ error: "unexpected" }, 500);
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/projects/project-1/members"]}>
+        <AuthErrorProvider>
+          <Routes>
+            <Route
+              path="/projects/:projectId/members"
+              element={<ProjectMembersScreen />}
+            />
+          </Routes>
+        </AuthErrorProvider>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "1回限りの招待リンクを作成",
+      }),
+    );
+    const linkInput = await screen.findByLabelText("作成した招待リンク");
+    expect(linkInput).toHaveValue("https://example.com/invite#secret-token");
+
+    fireEvent.click(screen.getByRole("button", { name: "コピー" }));
+    expect(writeText).toHaveBeenCalledWith(
+      "https://example.com/invite#secret-token",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "リンクを無効化" }));
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("button", { name: "リンクを無効化" }),
+      ).toBeNull();
+    });
+  });
+
   it("disables role management for non-owner and shows permission guidance", async () => {
     const fetchMock = vi.mocked(fetch);
     fetchMock.mockImplementation(async (_input, init) => {

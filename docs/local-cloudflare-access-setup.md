@@ -69,8 +69,10 @@ ingress:
 1. **Access → Applications → Add an application**
 2. **Self-hosted** を選択
 3. **Application domain** にステップ 3 で設定した `<hostname>` を入力
-4. **Policy** でログインを許可するユーザー/グループを設定（例: GitHub IdP でメールアドレス一致）
+4. **Policy** は、利用予定者がメールOTPで本人確認できる範囲を `Include: Emails` または許可対象ドメインで設定する
 5. 作成後、Application の **Audience (AUD) tag** を控える
+
+Cloudflare Access は本人確認だけを担当し、tatsumaki の利用可否はアプリ内の単回利用招待で判定する。したがって、特定ユーザーを Access Policy に事前登録して招待を表現しない。Access をインターネット全体へ無条件公開するのではなく、メールOTPを必須にし、必要に応じてメールドメインなどで認証可能な母集団を制限する。
 
 ---
 
@@ -111,8 +113,9 @@ ACCESS_TEAM_DOMAIN=<your-team>.cloudflareaccess.com
 1. ブラウザで `https://<hostname>` にアクセス
 2. Cloudflare Access のログイン画面が表示される
 3. IdP（GitHub 等）で認証する
-4. アプリのトップ画面に遷移する
-5. `https://<hostname>/api/auth/me` にアクセスし、`{"email":"your@email.com"}` が返ることを確認
+4. Owner が発行した `https://<hostname>/invite#<token>` を開く
+5. 招待の受諾後にアプリのトップ画面へ遷移する
+6. `https://<hostname>/api/auth/me` にアクセスし、`{"email":"your@email.com"}` が返ることを確認
 
 ---
 
@@ -122,6 +125,7 @@ ACCESS_TEAM_DOMAIN=<your-team>.cloudflareaccess.com
 
 - **AUD 不一致**: `.dev.vars` の `ACCESS_AUD` が Access Application の Audience tag と一致しているか確認
 - **TEAM_DOMAIN 不一致**: `ACCESS_TEAM_DOMAIN` が Zero Trust ダッシュボードのチーム名と一致しているか確認
+- **`INVITATION_REQUIRED`**: Access の認証は成功しているが、tatsumaki の招待をまだ受諾していない。Owner に単回利用招待リンクの再発行を依頼する
 
 ### JWT 検証エラー
 

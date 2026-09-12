@@ -20,6 +20,12 @@ export const projectMembersScreenJa = {
       role: "ロール",
       inviting: "招待中...",
       send: "招待を送信",
+      linkDescription:
+        "宛先を指定せず、最初に開いた1人だけが使える招待リンクを作成します。",
+      creatingLink: "リンクを作成中...",
+      createLink: "1回限りの招待リンクを作成",
+      createdLink: "作成した招待リンク",
+      copyLink: "コピー",
     },
     members: {
       title: "メンバー",
@@ -32,6 +38,8 @@ export const projectMembersScreenJa = {
       target: "対象: {{target}}",
       metadata: "ロール: {{role}} / ステータス: {{status}}",
       expires: "有効期限: {{date}}",
+      singleUse: "1回限りのリンク",
+      revoke: "リンクを無効化",
     },
   },
 } as const;
@@ -56,6 +64,12 @@ export const projectMembersScreenEn = {
       role: "Role",
       inviting: "Inviting...",
       send: "Send invitation",
+      linkDescription:
+        "Create a link that can be used by the first person who opens it.",
+      creatingLink: "Creating link...",
+      createLink: "Create one-time invite link",
+      createdLink: "Created invitation link",
+      copyLink: "Copy",
     },
     members: {
       title: "Members",
@@ -68,6 +82,8 @@ export const projectMembersScreenEn = {
       target: "Target: {{target}}",
       metadata: "Role: {{role}} / Status: {{status}}",
       expires: "Expires: {{date}}",
+      singleUse: "One-time link",
+      revoke: "Revoke link",
     },
   },
 } as const;
