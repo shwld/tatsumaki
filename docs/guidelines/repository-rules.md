@@ -15,7 +15,8 @@
 
 - ターミナルでは、すでに目的のカレントディレクトリにいるときは `cd` しない。それ以外も不要な `cd` は避ける。リポジトリ内スクリプトは **カレントディレクトリ起点の相対パス** で指定し、ホームからの絶対パスは使わない。`apps/web` のビルド・テスト等は **repo root** の `bun run <script>` で委譲する（例に `bun run --cwd apps/web …` を載けない。必要なスクリプトはルート `package.json` にエイリアスを足す）
 - 依存導入は必ず **repo root** で `bun install` を実行する（`apps/*` 直下での個別 `bun install` は行わない）
-- 日常コマンドは原則 repo root から実行する。テスト系は `bun run test` / `bun run test:components` / `bun run test:ui` / `bun run test:ui:update` / `bun run typecheck` を優先し、アプリ配下のスクリプトを直接叩く場合は例外として扱う
+- 日常コマンドは原則 repo root から実行する。テスト系は `bun run test` / `bun run test:components` / `bun run typecheck` を優先し、アプリ配下のスクリプトを直接叩く場合は例外として扱う
+- UI スクリーンショットの生成・比較は Linux CI のみで行い、ローカル実行を前提にしない（詳細は [UI screenshot test 運用](../ui-screenshot-test-guide.md)）。
 - 仕様不明点は「実装か提案か」「完成度」「制約」を先に確認する
 - 変更は最小スコープで行い、無関係なリファクタを混ぜない
 - 既存ルールを変更する場合は、対象ドキュメントと理由を同一PRで更新する

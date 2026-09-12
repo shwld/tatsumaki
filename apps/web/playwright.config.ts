@@ -3,10 +3,7 @@ import { defineConfig, devices } from "@playwright/test";
 export default defineConfig({
   testDir: "./test",
   testMatch: "**/ui-screenshot/*.spec.ts",
-  snapshotPathTemplate:
-    process.platform === "darwin"
-      ? "{testDir}/{testFilePath}-snapshots/darwin/{arg}{ext}"
-      : "{testDir}/{testFilePath}-snapshots/{arg}{ext}",
+  snapshotPathTemplate: "{testDir}/{testFilePath}-snapshots/{arg}{ext}",
   expect: {
     toHaveScreenshot: {
       fullPage: true,
