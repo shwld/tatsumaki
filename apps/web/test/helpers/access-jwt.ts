@@ -1,3 +1,7 @@
+import { env } from "cloudflare:test";
+import { createDb } from "../../src/infrastructure/db/client";
+import { usersTable } from "../../src/infrastructure/db/schema/users";
+
 const TEST_KEY_ID = "test-access-key";
 
 const encoder = new TextEncoder();
@@ -78,6 +82,20 @@ export const createAccessJwt = async (overrides: JwtOverrides = {}) => {
 };
 
 export const createAuthHeaders = async (overrides: JwtOverrides = {}) => {
+  const userId = overrides.sub ?? "github|test-user";
+  const email = overrides.email ?? "tester@example.com";
+  await createDb(env.DB)
+    .insert(usersTable)
+    .values({
+      id: userId,
+      displayName: email.split("@")[0] || userId,
+      email,
+      accessStatus: "allowed",
+    })
+    .onConflictDoUpdate({
+      target: usersTable.id,
+      set: { accessStatus: "allowed" },
+    });
   return {
     "Cf-Access-Jwt-Assertion": await createAccessJwt(overrides),
   };

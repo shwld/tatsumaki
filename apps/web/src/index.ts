@@ -22,8 +22,13 @@ import { savedFiltersRoute } from "./presentation/routes/saved-filters";
 import { projectApiKeysRoute } from "./presentation/routes/project-api-keys";
 import { apiKeyRoute } from "./presentation/routes/api-key";
 import { billingRoute } from "./presentation/routes/billing";
+import { invitationLinksRoute } from "./presentation/routes/invitation-links";
 import { PlanningPokerDO } from "./durable-objects/planning-poker-do";
 import { requireAccessAuth } from "./presentation/middleware/access-auth";
+import {
+  isAppEntitled,
+  requireAppEntitlement,
+} from "./presentation/middleware/app-entitlement";
 import { devAuth } from "./presentation/middleware/dev-auth";
 import { ACCESS_LOGIN_PATH } from "./presentation/cloudflare-access";
 import {
@@ -65,12 +70,26 @@ type OAuthUserProps = {
 const app = new Hono<Env>();
 const PROGRAMMATIC_API_BASE_PATH = "/programmatic-api";
 
+app.use("/invite", async (c, next) => {
+  c.header("Referrer-Policy", "no-referrer");
+  await next();
+});
+
 const api = new Hono<Env>();
 api.route("/", healthRoute);
 
 const protectedApi = new Hono<Env>();
 protectedApi.use("*", devAuth());
 protectedApi.use("*", requireAccessAuth());
+protectedApi.route("/", invitationLinksRoute);
+protectedApi.use("*", async (c, next) => {
+  if (
+    /^(?:\/api)?\/projects\/[^/]+\/invitations\/[^/]+\/accept$/.test(c.req.path)
+  ) {
+    return next();
+  }
+  return requireAppEntitlement()(c, next);
+});
 protectedApi.route("/", authRoute);
 protectedApi.route("/", projectsRoute);
 protectedApi.route("/", storiesRoute);
@@ -92,6 +111,7 @@ app.route("/api-key", apiKeyRoute);
 const programmaticApi = new Hono<Env>();
 programmaticApi.use("*", devAuth());
 programmaticApi.use("*", requireAccessAuth());
+programmaticApi.use("*", requireAppEntitlement());
 programmaticApi.route("/", mcpRoute);
 programmaticApi.route("/", cliRoute);
 
@@ -105,13 +125,22 @@ app.get(
   "*",
   devAuth(),
   requireAccessAuth({ redirectOnFailure: true }),
+  async (c, next) => {
+    if (
+      c.req.path === "/invite" ||
+      /^\/projects\/[^/]+\/invitations\/[^/]+\/accept$/.test(c.req.path)
+    ) {
+      return next();
+    }
+    return requireAppEntitlement()(c, next);
+  },
   async (c) => {
     return c.env.ASSETS.fetch(new Request(new URL("/index.html", c.req.url)));
   },
 );
 
 class McpOAuthApiHandler extends WorkerEntrypoint<OAuthBindings> {
-  fetch(request: Request) {
+  async fetch(request: Request) {
     const props = this.ctx.props as OAuthUserProps | undefined;
     if (!props?.id) {
       return new Response("Unauthorized", { status: 401 });
@@ -121,6 +150,10 @@ class McpOAuthApiHandler extends WorkerEntrypoint<OAuthBindings> {
       id: props.id,
       email: props.email,
     };
+
+    if (!(await isAppEntitled(this.env.DB, currentUser.id))) {
+      return new Response("Invitation required", { status: 403 });
+    }
 
     const url = new URL(request.url);
     if (url.pathname.startsWith(`${PROGRAMMATIC_API_BASE_PATH}/mcp`)) {
@@ -158,6 +191,9 @@ const oauthDefaultHandler = {
       const currentUser = await getCurrentUserFromAccessRequest(request, env);
       if (!currentUser) {
         return Response.redirect(new URL(ACCESS_LOGIN_PATH, request.url), 302);
+      }
+      if (!(await isAppEntitled(env.DB, currentUser.id))) {
+        return new Response("Invitation required", { status: 403 });
       }
 
       const authRequest = await env.OAUTH_PROVIDER.parseAuthRequest(request);

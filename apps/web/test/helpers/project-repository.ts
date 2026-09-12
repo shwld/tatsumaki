@@ -57,6 +57,7 @@ function buildProjectInvitation(
     inviterUserId: "github|test-user",
     targetUserId: "github|invited-user",
     targetEmail: null,
+    invitationType: "targeted",
     role: "member",
     status: "pending",
     expiresAt: "2026-03-20T00:00:00.000Z",
@@ -95,6 +96,23 @@ export function createProjectRepositoryMock(
     findInvitation: async () => ok(buildProjectInvitation()),
     findPendingInvitationByTarget: async () => ok(null),
     createInvitation: async () => ok(buildProjectInvitation()),
+    createSingleUseInvitation: async () =>
+      ok(buildProjectInvitation({ invitationType: "single_use" })),
+    revokeInvitation: async () =>
+      ok(
+        buildProjectInvitation({
+          invitationType: "single_use",
+          status: "cancelled",
+        }),
+      ),
+    acceptSingleUseInvitation: async () =>
+      ok({
+        invitation: buildProjectInvitation({
+          invitationType: "single_use",
+          status: "accepted",
+        }),
+        member: buildProjectMember(),
+      }),
     acceptInvitation: async () =>
       ok(buildProjectInvitation({ status: "accepted" })),
     upsertMember: async () => ok(buildProjectMember()),

@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { err, ok, type Result } from "neverthrow";
 import { ulid } from "ulid";
 import {
@@ -21,6 +21,7 @@ import {
 import type {
   CreateProjectInput,
   CreateProjectInvitationInput,
+  CreateSingleUseInvitationInput,
   UpdateProjectSettingsInput,
   ProjectRepository,
   ProjectRepositoryError,
@@ -112,6 +113,7 @@ function toProjectInvitation(row: ProjectInvitationRow): ProjectInvitation {
     inviterUserId: row.inviterUserId,
     targetUserId: row.targetUserId,
     targetEmail: row.targetEmail,
+    invitationType: row.tokenHash ? "single_use" : "targeted",
     role: isProjectMemberRole(row.role) ? row.role : "viewer",
     status: isProjectInvitationStatus(row.status) ? row.status : "pending",
     expiresAt: row.expiresAt,
@@ -124,8 +126,10 @@ function toProjectInvitation(row: ProjectInvitationRow): ProjectInvitation {
 
 export class D1ProjectRepository implements ProjectRepository {
   private readonly db: DbClient;
+  private readonly d1: D1Database;
 
   constructor(d1: D1Database) {
+    this.d1 = d1;
     this.db = createDb(d1);
   }
 
@@ -429,6 +433,119 @@ export class D1ProjectRepository implements ProjectRepository {
     }
 
     return ok(toProjectInvitation(created));
+  }
+
+  async createSingleUseInvitation(
+    input: CreateSingleUseInvitationInput,
+  ): Promise<Result<ProjectInvitation, ProjectRepositoryError>> {
+    const invitationId = ulid();
+    try {
+      const [created] = await this.db
+        .insert(projectInvitationsTable)
+        .values({
+          id: invitationId,
+          projectId: input.projectId,
+          inviterUserId: input.inviterUserId,
+          targetUserId: null,
+          targetEmail: null,
+          tokenHash: input.tokenHash,
+          role: input.role,
+          status: "pending",
+          expiresAt: input.expiresAt,
+        })
+        .returning();
+      return created
+        ? ok(toProjectInvitation(created))
+        : err(PROJECT_REPOSITORY_ERROR);
+    } catch {
+      return err(PROJECT_REPOSITORY_ERROR);
+    }
+  }
+
+  async revokeInvitation(
+    projectId: string,
+    invitationId: string,
+  ): Promise<Result<ProjectInvitation | null, ProjectRepositoryError>> {
+    const [updated] = await this.db
+      .update(projectInvitationsTable)
+      .set({ status: "cancelled", updatedAt: sql`CURRENT_TIMESTAMP` })
+      .where(
+        and(
+          eq(projectInvitationsTable.projectId, projectId),
+          eq(projectInvitationsTable.id, invitationId),
+          eq(projectInvitationsTable.status, "pending"),
+          isNotNull(projectInvitationsTable.tokenHash),
+        ),
+      )
+      .returning();
+    return ok(updated ? toProjectInvitation(updated) : null);
+  }
+
+  async acceptSingleUseInvitation(input: {
+    tokenHash: string;
+    userId: string;
+    email: string;
+    displayName: string;
+  }): Promise<
+    Result<
+      { invitation: ProjectInvitation; member: ProjectMember } | null,
+      ProjectRepositoryError
+    >
+  > {
+    try {
+      const valid = `token_hash = ? AND status = 'pending' AND datetime(expires_at) > CURRENT_TIMESTAMP`;
+      const results = await this.d1.batch([
+        this.d1
+          .prepare(
+            `INSERT INTO users (id, display_name, email, access_status)
+             SELECT ?, ?, ?, 'allowed' FROM project_invitations WHERE ${valid}
+             ON CONFLICT(id) DO UPDATE SET access_status = 'allowed', updated_at = CURRENT_TIMESTAMP`,
+          )
+          .bind(input.userId, input.displayName, input.email, input.tokenHash),
+        this.d1
+          .prepare(
+            `INSERT INTO project_members (project_id, user_id, role)
+             SELECT project_id, ?, role FROM project_invitations WHERE ${valid}
+             ON CONFLICT(project_id, user_id) DO NOTHING`,
+          )
+          .bind(input.userId, input.tokenHash),
+        this.d1
+          .prepare(
+            `UPDATE project_invitations
+             SET status = 'accepted', accepted_by_user_id = ?, accepted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+             WHERE ${valid}`,
+          )
+          .bind(input.userId, input.tokenHash),
+      ]);
+
+      if ((results[2]?.meta.changes ?? 0) !== 1) return ok(null);
+
+      const invitationRow = await this.db
+        .select()
+        .from(projectInvitationsTable)
+        .where(eq(projectInvitationsTable.tokenHash, input.tokenHash))
+        .get();
+      if (!invitationRow) return err(PROJECT_REPOSITORY_ERROR);
+
+      const memberRow = await this.db
+        .select()
+        .from(projectMembersTable)
+        .where(
+          and(
+            eq(projectMembersTable.projectId, invitationRow.projectId),
+            eq(projectMembersTable.userId, input.userId),
+          ),
+        )
+        .get();
+      if (!memberRow) return err(PROJECT_REPOSITORY_ERROR);
+
+      return ok({
+        invitation: toProjectInvitation(invitationRow),
+        member: toProjectMember(memberRow),
+      });
+    } catch {
+      return err(PROJECT_REPOSITORY_ERROR);
+    }
   }
 
   async acceptInvitation(

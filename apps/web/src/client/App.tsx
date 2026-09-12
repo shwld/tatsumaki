@@ -18,6 +18,7 @@ import { StoryMultiPanelScreen } from "./screens/story-multi-panel-screen";
 import { AccountScreen } from "./screens/account-screen";
 import { ProjectHistoryScreen } from "./screens/project-history-screen";
 import { ProjectInvitationAcceptScreen } from "./screens/project-invitation-accept-screen";
+import { SingleUseInvitationAcceptScreen } from "./screens/single-use-invitation-accept-screen";
 
 function ReturnToRedirect() {
   const navigate = useNavigate();
@@ -52,6 +53,10 @@ export function App() {
               <ReturnToRedirect />
               <Layout>
                 <Routes>
+                  <Route
+                    path="/invite"
+                    element={<SingleUseInvitationAcceptScreen />}
+                  />
                   <Route
                     path="/projects/new"
                     element={<ProjectCreateScreen />}
