@@ -23,7 +23,7 @@ function setup() {
   for (const id of ["first", "second", "unrelated"]) {
     Object.defineProperties(screen.getByTestId(id), {
       scrollHeight: { value: 1000 },
-      clientHeight: { value: 200 },
+      clientHeight: { value: 200, configurable: true },
     });
   }
   return screen.getByTestId("app-header-container");
@@ -94,5 +94,18 @@ it("also follows document scrolling", () => {
   expect(header).toHaveAttribute("data-hidden", "true");
   position.mockReturnValue(70);
   fireEvent.scroll(window);
+  expect(header).toHaveAttribute("data-hidden", "false");
+});
+
+it("does not treat bottom clamping from a larger viewport as upward scrolling", () => {
+  const header = setup();
+  scroll("first", 800);
+  expect(header).toHaveAttribute("data-hidden", "true");
+  Object.defineProperty(screen.getByTestId("first"), "clientHeight", {
+    value: 250,
+  });
+  scroll("first", 750);
+  expect(header).toHaveAttribute("data-hidden", "true");
+  scroll("first", 720);
   expect(header).toHaveAttribute("data-hidden", "false");
 });
