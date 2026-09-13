@@ -5,8 +5,7 @@ export const projectCreateScreenJa = {
     },
     requestError: "プロジェクトの作成に失敗しました",
     permission: {
-      nextAction:
-        "プロジェクト作成権限を申請するか、管理者に作成の代行または権限付与を依頼してください。",
+      nextAction: "プロジェクトOwnerに招待を依頼してください。",
       retryHint: "入力中のプロジェクト名を保持したまま再試行できます。",
       retry: "入力内容を保持して再試行",
     },
@@ -24,8 +23,7 @@ export const projectCreateScreenEn = {
     },
     requestError: "Failed to create project",
     permission: {
-      nextAction:
-        "Request permission to create projects, or ask an administrator to create one or grant access.",
+      nextAction: "Ask a project owner to invite you.",
       retryHint: "You can retry while keeping the project name you entered.",
       retry: "Retry with current input",
     },

@@ -50,6 +50,9 @@ export const PROJECT_REPOSITORY_ERROR = "PROJECT_REPOSITORY_ERROR" as const;
 export type ProjectRepositoryError = typeof PROJECT_REPOSITORY_ERROR;
 
 export interface ProjectRepository {
+  countOwnedProjects(
+    userId: string,
+  ): Promise<Result<number, ProjectRepositoryError>>;
   listSoleOwnerProjectIds(
     userId: string,
   ): Promise<Result<string[], ProjectRepositoryError>>;

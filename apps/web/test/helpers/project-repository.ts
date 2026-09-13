@@ -73,6 +73,7 @@ export function createProjectRepositoryMock(
   options?: RepositoryMockOptions,
 ): ProjectRepository {
   return {
+    countOwnedProjects: async () => ok(0),
     listSoleOwnerProjectIds: async () => ok([]),
     listSoleOwnerProjects: async () => ok([]),
     listAll: async () => ok([]),
