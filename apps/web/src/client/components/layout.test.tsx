@@ -16,7 +16,7 @@ describe("Layout", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders app title and children", () => {
+  it("renders an icon home link and children", () => {
     vi.mocked(fetch).mockResolvedValue(
       new Response(JSON.stringify(null), { status: 401 }),
     );
@@ -29,7 +29,11 @@ describe("Layout", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByText("tatsumaki")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "tatsumaki" })).toHaveAttribute(
+      "href",
+      "/projects",
+    );
+    expect(screen.queryByText("tatsumaki")).not.toBeInTheDocument();
     expect(screen.getByText("content")).toBeInTheDocument();
   });
 
