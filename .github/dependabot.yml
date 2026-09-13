@@ -30,6 +30,9 @@ updates:
       time: "10:00"
       timezone: "Asia/Tokyo"
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "vitest"
+        versions: [">=5.0.0"]
     groups:
       web-npm-dependencies:
         patterns:

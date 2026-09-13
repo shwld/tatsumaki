@@ -25,3 +25,4 @@
 - `docs/web-e2e-strategy.md` | [link](web-e2e-strategy.md) | 責務: Web E2E 戦略 | Load when: E2E 方針や Playwright tests を変更するとき | 更新責任: Web QA 担当
 - `docs/ui-screenshot-test-guide.md` | [link](ui-screenshot-test-guide.md) | 責務: Linux CI を基準とする UI screenshot test 運用 | Load when: screenshot test や baseline を変更するとき | 更新責任: Web QA 担当
 - `docs/investigations/pr-34-oauth-provider-upgrade.md` | [link](investigations/pr-34-oauth-provider-upgrade.md) | 責務: PR #34 OAuth provider 更新の原因・仮説・解決方針 | Load when: OAuth resource metadata または provider 依存を変更するとき | 更新責任: Web 認証実装者
+- `docs/investigations/pr-44-vitest-compatibility.md` | [link](investigations/pr-44-vitest-compatibility.md) | 責務: PR #44 の Vitest 互換性調査と更新制約 | Load when: Vitest の major を更新するとき | 更新責任: Web QA 担当 | 最終更新日: 2026-09-13
