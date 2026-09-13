@@ -85,3 +85,14 @@ it("reveals the header after navigation", () => {
   fireEvent.click(screen.getByRole("link", { name: "Toolbar navigation" }));
   expect(header).toHaveAttribute("data-hidden", "false");
 });
+
+it("also follows document scrolling", () => {
+  const header = setup();
+  const position = vi.spyOn(window, "scrollY", "get");
+  position.mockReturnValue(100);
+  fireEvent.scroll(window);
+  expect(header).toHaveAttribute("data-hidden", "true");
+  position.mockReturnValue(70);
+  fireEvent.scroll(window);
+  expect(header).toHaveAttribute("data-hidden", "false");
+});

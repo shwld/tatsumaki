@@ -14,19 +14,22 @@ for (const theme of themeVariants) {
       await setThemeMode(page, theme);
       await mockAuthMe(page);
       await mockStoriesList(page);
-      await page.route("**/api/projects/project-1/stories", async (route) => {
-        await route.fulfill({
-          json: {
-            stories: Array.from({ length: 60 }, (_, index) => ({
-              ...mockStoriesResponse.stories[0],
-              id: `header-story-${index}`,
-              storyNumber: index + 1,
-              title: `Header scroll story ${index + 1}`,
-              position: index,
-            })),
-          },
-        });
-      });
+      await page.route(
+        "**/api/projects/project-1/stories?**",
+        async (route) => {
+          await route.fulfill({
+            json: {
+              stories: Array.from({ length: 60 }, (_, index) => ({
+                ...mockStoriesResponse.stories[0],
+                id: `header-story-${index}`,
+                storyNumber: index + 1,
+                title: `Header scroll story ${index + 1}`,
+                position: index,
+              })),
+            },
+          });
+        },
+      );
       await page.goto("/projects/project-1/stories");
       const header = page.getByTestId("app-header-container");
       const panel = page.getByTestId("panel-scroll-Current");
