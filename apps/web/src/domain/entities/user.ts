@@ -4,6 +4,7 @@ export type User = {
   displayName: string;
   email: string;
   avatarUrl: string | null;
+  accessStatus: "allowed" | "pending";
   createdAt: string;
   updatedAt: string;
 };

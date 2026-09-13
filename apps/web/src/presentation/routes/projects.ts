@@ -4,6 +4,11 @@ import {
   INVALID_PROJECT_NAME_ERROR,
 } from "../../application/usecases/create-project";
 import {
+  authorizeProjectCreation,
+  ENTITLEMENT_UNAVAILABLE_ERROR,
+  PROJECT_CREATION_DISABLED_ERROR,
+} from "../../application/usecases/authorize-project-creation";
+import {
   deleteProject,
   PROJECT_NAME_CONFIRMATION_MISMATCH_ERROR,
   PROJECT_NOT_FOUND_ERROR,
@@ -31,10 +36,16 @@ import { D1ProjectRepository } from "../../infrastructure/db/repositories/d1-pro
 import { D1StoryRepository } from "../../infrastructure/db/repositories/d1-story-repository";
 import { D1UserRepository } from "../../infrastructure/db/repositories/d1-user-repository";
 import { createInvitationNotification } from "../../application/usecases/create-invitation-notifications";
+import { getOrCreateCurrentUser } from "../../application/usecases/get-or-create-current-user";
+import {
+  createInvitationLinkToken,
+  hashInvitationLinkToken,
+} from "../../application/usecases/invitation-link-crypto";
 import type { Env } from "../../index";
 import { UNKNOWN_MEMBER_DISPLAY_NAME } from "../../lib/member-display-name";
 import { requireProjectMembership } from "./project-membership";
 import { computeGravatarHash } from "../lib/gravatar";
+import { createEntitlementProvider } from "./billing";
 
 export const projectsRoute = new Hono<Env>();
 
@@ -46,6 +57,7 @@ type InvitationResponse = {
   inviterUserId: string;
   targetUserId: string | null;
   targetEmail: string | null;
+  invitationType?: "single_use";
   role: ProjectMemberRole;
   status: ProjectInvitationStatus;
   expiresAt: string;
@@ -87,6 +99,9 @@ const toInvitationResponse = (
     inviterUserId: invitation.inviterUserId,
     targetUserId: invitation.targetUserId,
     targetEmail: invitation.targetEmail,
+    ...(invitation.invitationType === "single_use"
+      ? { invitationType: "single_use" as const }
+      : {}),
     role: invitation.role,
     status: normalizeInvitationStatus(invitation),
     expiresAt: invitation.expiresAt,
@@ -124,6 +139,30 @@ projectsRoute.post("/projects", async (c) => {
 
   const currentUser = c.get("currentUser");
   const repository = new D1ProjectRepository(c.env.DB);
+  const authorizationResult = await authorizeProjectCreation(
+    createEntitlementProvider(c.env),
+    repository,
+    currentUser.id,
+  );
+  if (authorizationResult.isErr()) {
+    if (authorizationResult.error === PROJECT_CREATION_DISABLED_ERROR) {
+      return c.json(
+        {
+          error:
+            "Your plan does not allow project creation. Ask a project owner to invite you.",
+          code: "project_creation_disabled",
+        },
+        403,
+      );
+    }
+    if (authorizationResult.error === ENTITLEMENT_UNAVAILABLE_ERROR) {
+      return c.json({ error: "Entitlement is temporarily unavailable" }, 503);
+    }
+    return c.json(
+      { error: "Failed to check project creation permission" },
+      500,
+    );
+  }
   const result = await createProject(repository, {
     name: body.name,
     ownerUserId: currentUser.id,
@@ -308,6 +347,76 @@ projectsRoute.post("/projects/:projectId/invitations", async (c) => {
   return c.json({ invitation: toInvitationResponse(invitation) }, 201);
 });
 
+projectsRoute.post("/projects/:projectId/invitation-links", async (c) => {
+  const projectId = c.req.param("projectId");
+  const membership = await requireProjectMembership(c, projectId);
+  if (!membership.ok) return membership.response;
+  if (membership.member.role !== "owner") {
+    return c.json(
+      { error: "Only project owners can create invite links." },
+      403,
+    );
+  }
+
+  let body: { role?: unknown };
+  try {
+    body = await c.req.json<{ role?: unknown }>();
+  } catch {
+    return c.json({ error: "Invalid JSON body" }, 400);
+  }
+  const role = typeof body.role === "string" ? body.role.trim() : "";
+  if (!isProjectMemberRole(role)) {
+    return c.json({ error: "Role must be owner, member, or viewer" }, 400);
+  }
+
+  const token = createInvitationLinkToken();
+  const expiresAt = new Date(
+    Date.now() + INVITATION_TTL_DAYS * 24 * 60 * 60 * 1000,
+  ).toISOString();
+  const result = await membership.repository.createSingleUseInvitation({
+    projectId,
+    inviterUserId: c.get("currentUser").id,
+    tokenHash: await hashInvitationLinkToken(token),
+    role,
+    expiresAt,
+  });
+  if (result.isErr()) {
+    return c.json({ error: "Failed to create invitation link" }, 500);
+  }
+
+  return c.json(
+    {
+      invitation: toInvitationResponse(result.value),
+      url: `${new URL(c.req.url).origin}/invite#${token}`,
+    },
+    201,
+  );
+});
+
+projectsRoute.delete(
+  "/projects/:projectId/invitation-links/:invitationId",
+  async (c) => {
+    const projectId = c.req.param("projectId");
+    const membership = await requireProjectMembership(c, projectId);
+    if (!membership.ok) return membership.response;
+    if (membership.member.role !== "owner") {
+      return c.json(
+        { error: "Only project owners can revoke invite links." },
+        403,
+      );
+    }
+    const result = await membership.repository.revokeInvitation(
+      projectId,
+      c.req.param("invitationId"),
+    );
+    if (result.isErr()) return c.json({ error: "Failed to revoke link" }, 500);
+    if (!result.value || result.value.invitationType !== "single_use") {
+      return c.json({ error: "Active invitation link not found" }, 404);
+    }
+    return c.json({ invitation: toInvitationResponse(result.value) });
+  },
+);
+
 projectsRoute.post(
   "/projects/:projectId/invitations/:invitationId/accept",
   async (c) => {
@@ -372,6 +481,19 @@ projectsRoute.post(
     );
     if (acceptedResult.isErr()) {
       return c.json({ error: "Failed to accept invitation" }, 500);
+    }
+
+    const userRepository = new D1UserRepository(c.env.DB);
+    const userResult = await getOrCreateCurrentUser(userRepository, {
+      id: currentUser.id,
+      accessEmail: currentUser.email,
+    });
+    if (userResult.isErr()) {
+      return c.json({ error: "Failed to create invited user" }, 500);
+    }
+    const allowResult = await userRepository.allowAccess(currentUser.id);
+    if (allowResult.isErr() || !allowResult.value) {
+      return c.json({ error: "Failed to authorize invited user" }, 500);
     }
 
     return c.json({

@@ -222,7 +222,7 @@ Web E2E tests should prioritize the **accessibility tree with role/name selector
 
 The `ui-screenshot-diff` job in `.github/workflows/ci.yml` runs on every PR and compares key screen screenshots against baseline images. When a diff exists, the job fails and uploads the comparison output as a `ui-screenshot-diff` artifact containing actual, expected, and diff images.
 
-CI does not update screenshot baselines automatically. For intentional UI changes, update the baselines locally and commit the generated images.
+CI does not update screenshot baselines automatically. Linux CI is the sole screenshot generation and comparison environment; local execution and macOS baselines are not part of this workflow. For intentional UI changes, review the CI artifact's actual images, update the Linux baselines, and rerun CI.
 
 Use the [UI screenshot test operations guide](docs/ui-screenshot-test-guide.md) for the standard failure triage process.
 
@@ -233,21 +233,9 @@ Use the [UI screenshot test operations guide](docs/ui-screenshot-test-guide.md) 
 - New UI screenshot tests must follow this setting and compare full pages.
 - Do not resolve screenshot diff failures by deleting or skipping tests. Always isolate and fix the cause.
 
-### Local Execution
-
-```bash
-bun run playwright:install
-bun run test:ui
-```
-
 ### Baseline Update Procedure
 
-When a UI change is intentional, update snapshots with the following commands and commit the generated images:
-
-```bash
-bun run playwright:install
-bun run test:ui:update
-```
+When a UI change is intentional, inspect the `ui-screenshot-diff` CI artifact, use its reviewed actual images as the updated baselines, commit them, and verify by rerunning CI.
 
 ## Sustainability
 

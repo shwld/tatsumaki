@@ -23,6 +23,7 @@ export interface UserRepository {
   findByEmail(email: string): Promise<Result<User | null, UserRepositoryError>>;
   findByIds(ids: string[]): Promise<Result<User[], UserRepositoryError>>;
   create(input: CreateUserInput): Promise<Result<User, UserRepositoryError>>;
+  allowAccess(id: string): Promise<Result<User | null, UserRepositoryError>>;
   update(
     input: UpdateUserInput,
   ): Promise<Result<User | null, UserRepositoryError>>;

@@ -28,6 +28,7 @@ export type ProjectInvitation = {
   inviterUserId: string;
   targetUserId: string | null;
   targetEmail: string | null;
+  invitationType: "targeted" | "single_use";
   role: ProjectMemberRole;
   status: ProjectInvitationStatus;
   expiresAt: string;

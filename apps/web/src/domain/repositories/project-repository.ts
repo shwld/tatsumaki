@@ -37,11 +37,22 @@ export type CreateProjectInvitationInput = {
   expiresAt: string;
 };
 
+export type CreateSingleUseInvitationInput = {
+  projectId: string;
+  inviterUserId: string;
+  tokenHash: string;
+  role: ProjectMemberRole;
+  expiresAt: string;
+};
+
 export const PROJECT_REPOSITORY_ERROR = "PROJECT_REPOSITORY_ERROR" as const;
 
 export type ProjectRepositoryError = typeof PROJECT_REPOSITORY_ERROR;
 
 export interface ProjectRepository {
+  countOwnedProjects(
+    userId: string,
+  ): Promise<Result<number, ProjectRepositoryError>>;
   listSoleOwnerProjectIds(
     userId: string,
   ): Promise<Result<string[], ProjectRepositoryError>>;
@@ -77,6 +88,24 @@ export interface ProjectRepository {
   createInvitation(
     input: CreateProjectInvitationInput,
   ): Promise<Result<ProjectInvitation, ProjectRepositoryError>>;
+  createSingleUseInvitation(
+    input: CreateSingleUseInvitationInput,
+  ): Promise<Result<ProjectInvitation, ProjectRepositoryError>>;
+  revokeInvitation(
+    projectId: string,
+    invitationId: string,
+  ): Promise<Result<ProjectInvitation | null, ProjectRepositoryError>>;
+  acceptSingleUseInvitation(input: {
+    tokenHash: string;
+    userId: string;
+    email: string;
+    displayName: string;
+  }): Promise<
+    Result<
+      { invitation: ProjectInvitation; member: ProjectMember } | null,
+      ProjectRepositoryError
+    >
+  >;
   acceptInvitation(
     invitationId: string,
     acceptedByUserId: string,

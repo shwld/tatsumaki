@@ -37,6 +37,8 @@ export function ProjectMembersScreen() {
   const [requestError, setRequestError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCreatingLink, setIsCreatingLink] = useState(false);
+  const [createdLink, setCreatedLink] = useState<string | null>(null);
 
   useEffect(() => {
     if (!projectId) {
@@ -216,6 +218,56 @@ export function ProjectMembersScreen() {
     }
   };
 
+  const handleCreateLink = async () => {
+    if (!projectId) return;
+    setRequestError(null);
+    setCreatedLink(null);
+    setIsCreatingLink(true);
+    try {
+      const response = await fetch(
+        `/api/projects/${projectId}/invitation-links`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ role: inviteRole }),
+        },
+      );
+      if (!response.ok) {
+        setRequestError(await parseErrorMessage(response));
+        return;
+      }
+      const data = (await response.json()) as {
+        invitation: ProjectInvitation;
+        url: string;
+      };
+      setInvitations((current) => [...current, data.invitation]);
+      setCreatedLink(data.url);
+    } catch {
+      setRequestError(t("projectMembersScreen.invitationError"));
+    } finally {
+      setIsCreatingLink(false);
+    }
+  };
+
+  const handleRevokeLink = async (invitationId: string) => {
+    if (!projectId) return;
+    const response = await fetch(
+      `/api/projects/${projectId}/invitation-links/${invitationId}`,
+      { method: "DELETE" },
+    );
+    if (!response.ok) {
+      setRequestError(await parseErrorMessage(response));
+      return;
+    }
+    setInvitations((current) =>
+      current.map((invitation) =>
+        invitation.id === invitationId
+          ? { ...invitation, status: "cancelled" }
+          : invitation,
+      ),
+    );
+  };
+
   if (forbidden) {
     return <PermissionDenied message={forbidden} />;
   }
@@ -331,6 +383,38 @@ export function ProjectMembersScreen() {
                     : t("projectMembersScreen.invite.send")}
                 </button>
               </form>
+              <div className="mt-5 border-t border-gray-200 pt-4">
+                <p className="text-sm text-gray-600">
+                  {t("projectMembersScreen.invite.linkDescription")}
+                </p>
+                <button
+                  type="button"
+                  className="mt-3 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 disabled:opacity-50"
+                  disabled={isCreatingLink || !canManageRoles}
+                  onClick={handleCreateLink}
+                >
+                  {isCreatingLink
+                    ? t("projectMembersScreen.invite.creatingLink")
+                    : t("projectMembersScreen.invite.createLink")}
+                </button>
+                {createdLink ? (
+                  <div className="mt-3 flex gap-2">
+                    <input
+                      className="min-w-0 flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm"
+                      aria-label={t("projectMembersScreen.invite.createdLink")}
+                      readOnly
+                      value={createdLink}
+                    />
+                    <button
+                      type="button"
+                      className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white"
+                      onClick={() => navigator.clipboard.writeText(createdLink)}
+                    >
+                      {t("projectMembersScreen.invite.copyLink")}
+                    </button>
+                  </div>
+                ) : null}
+              </div>
             </section>
 
             <section className="mt-6 rounded-md border border-gray-200 p-4">
@@ -402,7 +486,9 @@ export function ProjectMembersScreen() {
                           target:
                             invitation.targetUserId ??
                             invitation.targetEmail ??
-                            "-",
+                            (invitation.invitationType === "single_use"
+                              ? t("projectMembersScreen.invitations.singleUse")
+                              : "-"),
                         })}
                       </p>
                       <p className="text-xs text-gray-600">
@@ -416,6 +502,17 @@ export function ProjectMembersScreen() {
                           date: new Date(invitation.expiresAt).toLocaleString(),
                         })}
                       </p>
+                      {invitation.invitationType === "single_use" &&
+                      invitation.status === "pending" &&
+                      canManageRoles ? (
+                        <button
+                          type="button"
+                          className="mt-2 text-xs font-semibold text-red-700 hover:underline"
+                          onClick={() => handleRevokeLink(invitation.id)}
+                        >
+                          {t("projectMembersScreen.invitations.revoke")}
+                        </button>
+                      ) : null}
                     </li>
                   ))}
                 </ul>

@@ -222,7 +222,7 @@ Web E2E の標準は **accessibility-tree（role/name）優先 + スクリーン
 
 PRごとに `.github/workflows/ci.yml` の `ui-screenshot-diff` ジョブが実行され、主要画面のスクリーンショットをベースライン画像と比較します。差分がある場合はジョブが失敗し、`ui-screenshot-diff` artifact に比較結果（actual / expected / diff）が出力されます。
 
-CI はスクリーンショットベースラインを自動更新しません。意図した UI 変更では、開発者がローカルでベースラインを更新してコミットします。
+CI はスクリーンショットベースラインを自動更新しません。画像の生成・比較環境は Linux CI のみとし、ローカル実行や macOS 用ベースラインは運用対象外です。意図した UI 変更では、CI artifact の actual 画像を確認して Linux ベースラインを更新し、CI を再実行します。
 
 失敗時の標準手順は [UIスクリーンショットテスト運用ガイド](docs/ui-screenshot-test-guide.md) を参照してください。
 
@@ -233,21 +233,9 @@ CI はスクリーンショットベースラインを自動更新しません�
 - 新しいUIスクリーンショットテストを追加する際は、この設定に従って全画面で比較する。
 - スクリーンショット差分エラーを「テスト削除・skip」で解消してはいけない。必ず原因を切り分けて修正する。
 
-### ローカルでの実行
-
-```bash
-bun run playwright:install
-bun run test:ui
-```
-
 ### ベースライン更新手順
 
-UI変更を意図している場合は、次を実行してスナップショットを更新し、生成された画像をコミットしてください。
-
-```bash
-bun run playwright:install
-bun run test:ui:update
-```
+UI変更を意図している場合は、`ui-screenshot-diff` の CI artifact にある actual 画像を確認してベースラインへ反映し、コミット後に CI の再実行で検証します。
 
 ## Sustainability
 
