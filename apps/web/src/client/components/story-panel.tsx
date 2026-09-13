@@ -1300,6 +1300,7 @@ function StoryPanelComponent({
         ref={setDropRef}
         className="min-h-0 flex-1 overflow-y-auto px-2 pb-2"
         data-testid={`panel-scroll-${panelIdForTest}`}
+        data-header-scroll
       >
         {error ? (
           <div className="rounded-md border border-red-200 bg-red-50 p-3">

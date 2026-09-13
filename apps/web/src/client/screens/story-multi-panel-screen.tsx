@@ -1,3 +1,4 @@
+import { HeaderToolbar } from "../components/header-toolbar";
 import {
   DndContext,
   type DragEndEvent,
@@ -1998,115 +1999,121 @@ export function StoryMultiPanelScreen() {
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         {/* Toolbar (desktop/tablet only) */}
         {breakpoint !== "sm" ? (
-          <header className="flex flex-wrap items-center gap-3 border-b border-gray-200 bg-white px-4 py-2">
-            <>
-              {projectId ? (
-                <Link
-                  className="text-sm font-medium text-blue-700"
-                  to={projectVelocityDashboardPath(projectId)}
-                >
-                  {t("storyMultiPanelScreen.nav.velocity")}
-                </Link>
-              ) : null}
-              {projectId ? (
-                <Link
-                  className="text-sm font-medium text-blue-700"
-                  to={projectHistoryPath(projectId)}
-                >
-                  {t("storyMultiPanelScreen.nav.history")}
-                </Link>
-              ) : null}
-              {projectId ? (
-                <Link
-                  className="text-sm font-medium text-blue-700"
-                  to={projectMembersPath(projectId)}
-                >
-                  {t("storyMultiPanelScreen.nav.members")}
-                </Link>
-              ) : null}
-              {projectId ? (
-                <Link
-                  className="text-sm font-medium text-blue-700"
-                  to={projectSettingsPath(projectId)}
-                >
-                  {t("storyMultiPanelScreen.nav.settings")}
-                </Link>
-              ) : null}
-
-              <div className="ml-auto">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      type="button"
-                      aria-label={t(
-                        "storyMultiPanelScreen.panelMenu.settingsLabel",
-                      )}
-                      title={t("storyMultiPanelScreen.panelMenu.settingsLabel")}
-                      className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300"
-                      data-testid="panel-actions-toggle"
-                    >
-                      <LayoutPanelLeft className="size-4" aria-hidden />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent
-                    align="end"
-                    className="min-w-56"
-                    data-testid="panel-actions-menu"
+          <HeaderToolbar>
+            <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+              <>
+                {projectId ? (
+                  <Link
+                    className="text-sm font-medium text-blue-700"
+                    to={projectVelocityDashboardPath(projectId)}
                   >
-                    <DropdownMenuLabel className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                      {t("storyMultiPanelScreen.panelMenu.panels")}
-                    </DropdownMenuLabel>
-                    {PANEL_TYPES.map((panel) => (
-                      <DropdownMenuCheckboxItem
-                        key={panel}
-                        checked={visibility[panel]}
-                        className="text-xs"
-                        onCheckedChange={(checked) => {
-                          const on = checked === true;
-                          if (on !== visibility[panel]) togglePanel(panel);
-                        }}
-                        data-testid={`panel-toggle-${panel}`}
-                      >
-                        {PANEL_LABELS[panel]}
-                      </DropdownMenuCheckboxItem>
-                    ))}
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      className="text-xs"
-                      onSelect={() => {
-                        toggleCurrentBacklogMode();
-                      }}
-                    >
-                      {currentBacklogViewMode === "split"
-                        ? t(
-                            "storyMultiPanelScreen.panelMenu.combineCurrentBacklog",
-                          )
-                        : t(
-                            "storyMultiPanelScreen.panelMenu.splitCurrentBacklog",
-                          )}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
+                    {t("storyMultiPanelScreen.nav.velocity")}
+                  </Link>
+                ) : null}
+                {projectId ? (
+                  <Link
+                    className="text-sm font-medium text-blue-700"
+                    to={projectHistoryPath(projectId)}
+                  >
+                    {t("storyMultiPanelScreen.nav.history")}
+                  </Link>
+                ) : null}
+                {projectId ? (
+                  <Link
+                    className="text-sm font-medium text-blue-700"
+                    to={projectMembersPath(projectId)}
+                  >
+                    {t("storyMultiPanelScreen.nav.members")}
+                  </Link>
+                ) : null}
+                {projectId ? (
+                  <Link
+                    className="text-sm font-medium text-blue-700"
+                    to={projectSettingsPath(projectId)}
+                  >
+                    {t("storyMultiPanelScreen.nav.settings")}
+                  </Link>
+                ) : null}
 
-              {/* Advanced search toggle */}
-              <button
-                type="button"
-                aria-label={t("storyMultiPanelScreen.panelMenu.advancedSearch")}
-                title={t("storyMultiPanelScreen.panelMenu.advancedSearch")}
-                aria-pressed={showSearchBar}
-                data-testid="advanced-search-toggle"
-                className={`inline-flex size-8 shrink-0 items-center justify-center rounded-full transition-colors ${
-                  showSearchBar
-                    ? "bg-blue-700 text-white"
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                }`}
-                onClick={() => setShowSearchBar((v) => !v)}
-              >
-                <Search className="size-4" aria-hidden />
-              </button>
-            </>
-          </header>
+                <div className="ml-auto">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        aria-label={t(
+                          "storyMultiPanelScreen.panelMenu.settingsLabel",
+                        )}
+                        title={t(
+                          "storyMultiPanelScreen.panelMenu.settingsLabel",
+                        )}
+                        className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300"
+                        data-testid="panel-actions-toggle"
+                      >
+                        <LayoutPanelLeft className="size-4" aria-hidden />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="end"
+                      className="min-w-56"
+                      data-testid="panel-actions-menu"
+                    >
+                      <DropdownMenuLabel className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                        {t("storyMultiPanelScreen.panelMenu.panels")}
+                      </DropdownMenuLabel>
+                      {PANEL_TYPES.map((panel) => (
+                        <DropdownMenuCheckboxItem
+                          key={panel}
+                          checked={visibility[panel]}
+                          className="text-xs"
+                          onCheckedChange={(checked) => {
+                            const on = checked === true;
+                            if (on !== visibility[panel]) togglePanel(panel);
+                          }}
+                          data-testid={`panel-toggle-${panel}`}
+                        >
+                          {PANEL_LABELS[panel]}
+                        </DropdownMenuCheckboxItem>
+                      ))}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        className="text-xs"
+                        onSelect={() => {
+                          toggleCurrentBacklogMode();
+                        }}
+                      >
+                        {currentBacklogViewMode === "split"
+                          ? t(
+                              "storyMultiPanelScreen.panelMenu.combineCurrentBacklog",
+                            )
+                          : t(
+                              "storyMultiPanelScreen.panelMenu.splitCurrentBacklog",
+                            )}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+
+                {/* Advanced search toggle */}
+                <button
+                  type="button"
+                  aria-label={t(
+                    "storyMultiPanelScreen.panelMenu.advancedSearch",
+                  )}
+                  title={t("storyMultiPanelScreen.panelMenu.advancedSearch")}
+                  aria-pressed={showSearchBar}
+                  data-testid="advanced-search-toggle"
+                  className={`inline-flex size-8 shrink-0 items-center justify-center rounded-full transition-colors ${
+                    showSearchBar
+                      ? "bg-blue-700 text-white"
+                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  }`}
+                  onClick={() => setShowSearchBar((v) => !v)}
+                >
+                  <Search className="size-4" aria-hidden />
+                </button>
+              </>
+            </div>
+          </HeaderToolbar>
         ) : null}
 
         {/* Advanced search bar & saved searches */}
