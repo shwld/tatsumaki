@@ -15,7 +15,7 @@ toml = "1.1"
 url = "2"
 dirs = "7"
 tokio = { version = "1", features = ["macros", "rt"] }
-progenitor = "0.14"
+progenitor = "0.15"
 keyring = { version = "3.6", features = ["apple-native", "linux-native", "windows-native"] }
 rand = "0.10"
 sha2 = "0.11"
