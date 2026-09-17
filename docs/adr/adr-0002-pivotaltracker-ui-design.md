@@ -26,3 +26,7 @@ Adopt PivotalTracker as the sole reference for all UI/UX design decisions:
 - Smaller codebase: eliminated redundant view variants and dedicated filter pages
 - Constraint: features with no PivotalTracker equivalent require an explicit decision (new ADR or amendment) before implementation
 - Onboarding benefit: contributors familiar with PivotalTracker can navigate the codebase intuitively
+
+## Amendment: compact application header (story #307, 2026-09-13)
+
+At the user's explicit request, combine the application controls and story toolbar into one header: icon-only home link on the left, notification and account controls on the right. Hide the header while scrolling down and reveal it while scrolling up or returning to the top. Preserve keyboard access and keep it visible while its controls are in use. This exception changes header chrome only; panel structure and story workflows continue to follow the existing decision.
