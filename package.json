@@ -8,7 +8,7 @@
     "seed:scroll": "bun run --cwd apps/web seed:scroll",
     "agent-skills:sync": "bash scripts/sync-agent-skill-links.sh",
     "agent-integrations:sync-skills": "bash scripts/sync-agent-integration-skills.sh",
-    "postinstall": "bun install --cwd apps/web && bash scripts/sync-agent-skill-links.sh",
+    "postinstall": "bun install --cwd apps/web --frozen-lockfile && bash scripts/sync-agent-skill-links.sh",
     "build:web": "bun run --cwd apps/web build:client",
     "format": "biome format --write --files-ignore-unknown=true .",
     "format:staged": "biome format --write --staged --files-ignore-unknown=true --no-errors-on-unmatched",
