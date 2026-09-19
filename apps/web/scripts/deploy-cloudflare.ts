@@ -28,10 +28,11 @@ try {
   const base = configPath.endsWith(".json")
     ? JSON.parse(source)
     : TOML.parse(source);
-  const config = createDeploymentConfig(
-    base,
-    process.env.CONTROL_PLANE_SERVICE,
-  );
+  const config = createDeploymentConfig(base, {
+    controlPlaneService: process.env.CONTROL_PLANE_SERVICE,
+    d1DatabaseId: process.env.CLOUDFLARE_D1_DATABASE_ID,
+    oauthKvNamespaceId: process.env.CLOUDFLARE_OAUTH_KV_NAMESPACE_ID,
+  });
   const generatedPath = join(
     dirname(configPath),
     `.wrangler-deploy-${randomUUID()}.json`,

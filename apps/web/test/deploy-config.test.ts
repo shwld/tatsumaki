@@ -10,6 +10,7 @@ describe("deployment configuration", () => {
     main: "src/index.ts",
     vars: { EXISTING: "value" },
     d1_databases: [{ binding: "DB", database_id: "existing" }],
+    kv_namespaces: [{ binding: "OAUTH_KV", id: "existing" }],
   };
 
   it("preserves self-hosted configuration when no service is selected", () => {
@@ -18,7 +19,9 @@ describe("deployment configuration", () => {
   });
 
   it("adds only the selected service and mode without mutating base resources", () => {
-    const result = createDeploymentConfig(base, "control-plane-production");
+    const result = createDeploymentConfig(base, {
+      controlPlaneService: "control-plane-production",
+    });
     expect(result).toEqual({
       ...base,
       vars: { ...base.vars, ENTITLEMENT_MODE: "control-plane" },
@@ -38,7 +41,7 @@ describe("deployment configuration", () => {
           { binding: "CONTROL_PLANE", service: "old" },
         ],
       },
-      "new-control-plane",
+      { controlPlaneService: "new-control-plane" },
     );
     expect(result.services).toEqual([
       { binding: "OTHER", service: "other" },
@@ -53,9 +56,71 @@ describe("deployment configuration", () => {
     "bad\nname",
     "a".repeat(64),
   ])("rejects invalid service %j", (service) => {
-    expect(() => createDeploymentConfig(base, service)).toThrow(
-      "valid Worker name",
+    expect(() =>
+      createDeploymentConfig(base, { controlPlaneService: service }),
+    ).toThrow("valid Worker name");
+  });
+
+  it("injects hosted resource IDs without changing binding metadata", () => {
+    const result = createDeploymentConfig(
+      {
+        ...base,
+        d1_databases: [{ binding: "DB", database_name: "tatsumaki-db" }],
+        kv_namespaces: [{ binding: "OAUTH_KV" }],
+      },
+      {
+        controlPlaneService: "control-plane-production",
+        d1DatabaseId: "9f39c036-f69c-48f9-aaa6-dbf2911100c3",
+        oauthKvNamespaceId: "37131785b54e42dd9be1231462dd84bc",
+      },
     );
+    expect(result.d1_databases).toEqual([
+      {
+        binding: "DB",
+        database_name: "tatsumaki-db",
+        database_id: "9f39c036-f69c-48f9-aaa6-dbf2911100c3",
+      },
+    ]);
+    expect(result.kv_namespaces).toEqual([
+      {
+        binding: "OAUTH_KV",
+        id: "37131785b54e42dd9be1231462dd84bc",
+      },
+    ]);
+  });
+
+  it("requires hosted resource IDs when the public config omits them", () => {
+    const publicConfig = {
+      ...base,
+      d1_databases: [{ binding: "DB", database_name: "tatsumaki-db" }],
+      kv_namespaces: [{ binding: "OAUTH_KV" }],
+    };
+    expect(() =>
+      createDeploymentConfig(publicConfig, {
+        controlPlaneService: "control-plane-production",
+      }),
+    ).toThrow("CLOUDFLARE_D1_DATABASE_ID");
+    expect(() =>
+      createDeploymentConfig(publicConfig, {
+        controlPlaneService: "control-plane-production",
+        d1DatabaseId: "9f39c036-f69c-48f9-aaa6-dbf2911100c3",
+      }),
+    ).toThrow("CLOUDFLARE_OAUTH_KV_NAMESPACE_ID");
+  });
+
+  it("rejects malformed hosted resource IDs", () => {
+    expect(() =>
+      createDeploymentConfig(base, {
+        controlPlaneService: "control-plane-production",
+        d1DatabaseId: "not-a-uuid",
+      }),
+    ).toThrow();
+    expect(() =>
+      createDeploymentConfig(base, {
+        controlPlaneService: "control-plane-production",
+        oauthKvNamespaceId: "not-a-namespace-id",
+      }),
+    ).toThrow();
   });
 
   it.each([

@@ -62,15 +62,18 @@ For hosted continuous deployment, use the separate procedure below; do not rerun
 
 ## Hosted Continuous Deployment
 
-The optional non-secret **build/process** variable `CONTROL_PLANE_SERVICE` selects the backend Worker for normal `deploy:worker` and `deploy:upload` commands. It is not a runtime secret, and no Stripe credentials belong in the app's build environment. The deploy wrapper copies the selected base config, preserves resource bindings and paths, adds `CONTROL_PLANE` plus `ENTITLEMENT_MODE=control-plane`, and removes its temporary config on completion or failure. Existing self-hosted config remains unchanged when the variable is omitted.
+The non-secret **build/process** variables `CONTROL_PLANE_SERVICE`, `CLOUDFLARE_D1_DATABASE_ID`, and `CLOUDFLARE_OAUTH_KV_NAMESPACE_ID` select the hosted backend and existing account resources for normal `deploy:worker` and `deploy:upload` commands. They are not runtime secrets, and no Stripe credentials belong in the app's build environment. The deploy wrapper copies the selected base config, preserves resource bindings and paths, fills the existing `DB` and `OAUTH_KV` binding IDs, adds `CONTROL_PLANE` plus `ENTITLEMENT_MODE=control-plane`, and removes its temporary config on completion or failure. Existing self-hosted config remains unchanged when the hosted variables are omitted.
 
-For official production, select `tatsumaki-control-plane-production`; never select the staging backend. In Cloudflare Workers Builds for the production app, add `CONTROL_PLANE_SERVICE` under **Build variables and secrets**, and keep using the package deploy commands. A direct `wrangler deploy` bypasses this selection. Runtime dashboard Variables alone do not configure the build. Do not enable production build variables for unrelated preview branches.
+For official production, select `tatsumaki-control-plane-production`; never select the staging backend. In Cloudflare Workers Builds for the production app, add all three variables under **Build variables and secrets**, using the IDs of the existing production D1 database and OAuth KV namespace. Keep using the package deploy commands. A direct `wrangler deploy` bypasses this selection. Runtime dashboard Variables alone do not configure the build. Do not enable production build variables for unrelated preview branches. Never commit these account-specific IDs.
 
 From the repository root, build and inspect without remote migration or deployment:
 
 ```bash
 bun run build:web
-CONTROL_PLANE_SERVICE=tatsumaki-control-plane-production bun apps/web/scripts/deploy-cloudflare.ts deploy --dry-run
+CLOUDFLARE_D1_DATABASE_ID=<production-d1-id> \
+CLOUDFLARE_OAUTH_KV_NAMESPACE_ID=<production-kv-id> \
+CONTROL_PLANE_SERVICE=tatsumaki-control-plane-production \
+bun apps/web/scripts/deploy-cloudflare.ts deploy --dry-run
 ```
 
 After checking the Worker name and every resource binding, run the same command without `--dry-run`. For an existing installation with locally maintained resource IDs, add `--config /absolute/path/to/wrangler.toml` (or a `.json` config). Relative paths in that config are preserved. Do not commit account-specific IDs. Named-environment flags are intentionally not forwarded: supply a base config for the exact deployment target.
