@@ -44,7 +44,7 @@ const StoryListQuerySchema = z.object({
     }),
 });
 
-const StorySchema = z
+const StorySummarySchema = z
   .object({
     id: z.string().openapi({ example: "01KNCFJZJ0Z74X92QPCE0D9MK8" }),
     storyNumber: z.number().openapi({ example: 95 }),
@@ -52,17 +52,69 @@ const StorySchema = z
     status: z.string().openapi({ example: "Started" }),
     type: z.string().openapi({ example: "feature" }),
   })
-  .openapi("Story");
+  .openapi("StorySummary");
+
+const StoryRelationSchema = z
+  .object({ id: z.string(), title: z.string() })
+  .openapi("StoryRelation");
+
+export const StoryDetailSchema = StorySummarySchema.extend({
+  projectId: z.string(),
+  description: z.string().openapi({ example: "## Plan\n..." }),
+  statusChangedAt: z.string(),
+  completedAt: z.string().nullable(),
+  storyPoint: z.number().int().nullable(),
+  labels: z.array(z.string()),
+  epicId: z.string().nullable(),
+  iterationId: z.string().nullable(),
+  isIcebox: z.boolean(),
+  ownerIds: z.array(z.string()),
+  requesterId: z.string().nullable(),
+  releaseDate: z.string().nullable(),
+  position: z.number(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  isBlocked: z.boolean().optional(),
+  isBlocking: z.boolean().optional(),
+  blockingStories: z.array(StoryRelationSchema).optional(),
+  blockedStories: z.array(StoryRelationSchema).optional(),
+}).openapi("Story");
+
+const storyDetailExample = (
+  overrides: Partial<z.infer<typeof StoryDetailSchema>> = {},
+): z.infer<typeof StoryDetailSchema> => ({
+  id: "01KNCFJZJ0Z74X92QPCE0D9MK8",
+  storyNumber: 95,
+  title: "CLIを用意する",
+  status: "Started",
+  type: "feature",
+  projectId: "project-123",
+  description: "details",
+  statusChangedAt: "2026-01-01 00:00:00",
+  completedAt: null,
+  storyPoint: null,
+  labels: [],
+  epicId: null,
+  iterationId: null,
+  isIcebox: false,
+  ownerIds: [],
+  requesterId: null,
+  releaseDate: null,
+  position: 1,
+  createdAt: "2026-01-01 00:00:00",
+  updatedAt: "2026-01-01 00:00:00",
+  ...overrides,
+});
 
 const StoryGetResponseSchema = z
   .object({
-    story: StorySchema,
+    story: StoryDetailSchema,
   })
   .openapi("StoryGetResponse");
 
 const StoryListResponseSchema = z
   .object({
-    stories: z.array(StorySchema),
+    stories: z.array(StorySummarySchema),
   })
   .openapi("StoryListResponse");
 const StoryCreateBodySchema = z.object({
@@ -148,15 +200,7 @@ export function buildCliOpenApiDoc() {
   });
 
   app.openapi(getStoryByNumberRoute, (c) =>
-    c.json({
-      story: {
-        id: "01KNCFJZJ0Z74X92QPCE0D9MK8",
-        storyNumber: 95,
-        title: "CLIを用意する",
-        status: "Started",
-        type: "feature",
-      },
-    }),
+    c.json({ story: storyDetailExample() }),
   );
 
   const listStoriesRoute = createRoute({
@@ -228,13 +272,12 @@ export function buildCliOpenApiDoc() {
   app.openapi(createStoryRoute, (c) =>
     c.json(
       {
-        story: {
+        story: storyDetailExample({
           id: "01",
           storyNumber: 1,
           title: "x",
           status: "Unstarted",
-          type: "feature",
-        },
+        }),
       },
       201,
     ),
@@ -286,13 +329,7 @@ export function buildCliOpenApiDoc() {
   });
   app.openapi(updateStoryRoute, (c) =>
     c.json({
-      story: {
-        id: "01",
-        storyNumber: 1,
-        title: "x",
-        status: "Started",
-        type: "feature",
-      },
+      story: storyDetailExample({ id: "01", storyNumber: 1, title: "x" }),
     }),
   );
 
