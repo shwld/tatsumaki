@@ -16,6 +16,123 @@
         "required": ["story"]
       },
       "Story": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/StorySummary"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "projectId": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string",
+                "example": "## Plan\n..."
+              },
+              "statusChangedAt": {
+                "type": "string"
+              },
+              "completedAt": {
+                "type": "string",
+                "nullable": true
+              },
+              "storyPoint": {
+                "type": "integer",
+                "nullable": true
+              },
+              "labels": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "epicId": {
+                "type": "string",
+                "nullable": true
+              },
+              "iterationId": {
+                "type": "string",
+                "nullable": true
+              },
+              "isIcebox": {
+                "type": "boolean"
+              },
+              "ownerIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "requesterId": {
+                "type": "string",
+                "nullable": true
+              },
+              "releaseDate": {
+                "type": "string",
+                "nullable": true
+              },
+              "position": {
+                "type": "number"
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "updatedAt": {
+                "type": "string"
+              },
+              "isBlocked": {
+                "type": "boolean"
+              },
+              "isBlocking": {
+                "type": "boolean"
+              },
+              "blockingStories": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/StoryRelation"
+                }
+              },
+              "blockedStories": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/StoryRelation"
+                }
+              }
+            },
+            "required": [
+              "projectId",
+              "description",
+              "statusChangedAt",
+              "completedAt",
+              "storyPoint",
+              "labels",
+              "epicId",
+              "iterationId",
+              "isIcebox",
+              "ownerIds",
+              "requesterId",
+              "releaseDate",
+              "position",
+              "createdAt",
+              "updatedAt"
+            ]
+          }
+        ]
+      },
+      "StoryRelation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "title"]
+      },
+      "StorySummary": {
         "type": "object",
         "properties": {
           "id": {
@@ -47,7 +164,7 @@
           "stories": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Story"
+              "$ref": "#/components/schemas/StorySummary"
             }
           }
         },

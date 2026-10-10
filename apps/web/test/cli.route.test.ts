@@ -1,5 +1,6 @@
 import { SELF, env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
+import { StoryDetailSchema } from "../src/presentation/openapi/cli-openapi";
 import { createAuthHeaders, setupAccessBindings } from "./helpers/access-jwt";
 import { resetDatabase } from "./helpers/db";
 
@@ -70,6 +71,17 @@ describe("cli route", () => {
     const created = (await createResponse.json()) as {
       story: { id: string; storyNumber: number };
     };
+
+    const detailResponse = await SELF.fetch(
+      `https://localhost/programmatic-api/v1/projects/${projectId}/stories/${created.story.storyNumber}`,
+      { headers: { authorization: `Bearer ${accessToken}` } },
+    );
+    expect(detailResponse.status).toBe(200);
+    const fetched = (await detailResponse.json()) as { story: unknown };
+    expect(StoryDetailSchema.safeParse(fetched.story).success).toBe(true);
+    expect(fetched.story).toEqual(
+      expect.objectContaining({ description: "created from cli route test" }),
+    );
 
     const updateResponse = await SELF.fetch(
       `https://localhost/programmatic-api/v1/projects/${projectId}/stories/${created.story.storyNumber}`,
