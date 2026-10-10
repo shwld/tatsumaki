@@ -42,6 +42,49 @@ for (const theme of themeVariants) {
     );
   });
 
+  test(`story panels on a medium screen with one visible panel (${theme})`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 800, height: 900 });
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        "tatsumaki:panel-visibility",
+        JSON.stringify({
+          Done: false,
+          Current: true,
+          Backlog: false,
+          Icebox: false,
+        }),
+      );
+    });
+    await setThemeMode(page, theme);
+    await mockAuthMe(page);
+    await mockStoriesList(page);
+
+    await page.goto("/projects/project-1/stories");
+    await expect(page.getByTestId("panel-Current")).toBeVisible();
+    await expect(page.getByTestId("panel-Backlog")).toHaveCount(0);
+    await expect(page).toHaveScreenshot(
+      resolveSnapshotName("stories-panels-medium-single.png", theme),
+    );
+  });
+
+  test(`story panels on a medium screen with two visible panels (${theme})`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 800, height: 900 });
+    await setThemeMode(page, theme);
+    await mockAuthMe(page);
+    await mockStoriesList(page);
+
+    await page.goto("/projects/project-1/stories");
+    await expect(page.getByTestId("panel-Current")).toBeVisible();
+    await expect(page.getByTestId("panel-Backlog")).toBeVisible();
+    await expect(page).toHaveScreenshot(
+      resolveSnapshotName("stories-panels-medium-double.png", theme),
+    );
+  });
+
   test(`story edit screen (${theme})`, async ({ page }) => {
     await setThemeMode(page, theme);
     await mockAuthMe(page);

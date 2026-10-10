@@ -43,6 +43,59 @@ describe("StoryMultiPanelScreen layout contracts", () => {
     expect(screen.queryByText("Project History")).not.toBeInTheDocument();
   });
 
+  describe("medium screens", () => {
+    const setWidth = (value: number) => {
+      Object.defineProperty(window, "innerWidth", {
+        value,
+        writable: true,
+        configurable: true,
+      });
+      window.dispatchEvent(new Event("resize"));
+    };
+
+    const mediumPanelGrid = async () => {
+      vi.stubGlobal("fetch", createStoryMultiPanelFetchMock());
+      setWidth(800);
+      renderStoryMultiPanel();
+      await screen.findByTestId("panel-Current");
+      return screen.getByTestId("panel-container").firstElementChild;
+    };
+
+    it("uses a single column when only one panel is visible", async () => {
+      localStorage.setItem(
+        "tatsumaki:panel-visibility",
+        JSON.stringify({
+          Done: false,
+          Current: true,
+          Backlog: false,
+          Icebox: false,
+        }),
+      );
+
+      const grid = await mediumPanelGrid();
+
+      expect(grid?.className).toContain("grid-cols-1");
+      expect(grid?.className).not.toContain("grid-cols-2");
+    });
+
+    it("keeps two columns when two panels are visible", async () => {
+      localStorage.setItem(
+        "tatsumaki:panel-visibility",
+        JSON.stringify({
+          Done: false,
+          Current: true,
+          Backlog: true,
+          Icebox: false,
+        }),
+      );
+      localStorage.setItem("tatsumaki:current-backlog-view-mode", "split");
+
+      const grid = await mediumPanelGrid();
+
+      expect(grid?.className).toContain("grid-cols-2");
+    });
+  });
+
   it("keeps local panel scroll constraints", async () => {
     vi.stubGlobal("fetch", createStoryMultiPanelFetchMock());
     renderStoryMultiPanel();
