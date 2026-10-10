@@ -85,3 +85,18 @@ curl -fsSL https://github.com/shwld/tatsumaki/releases/latest/download/install-t
 ```bash
 curl -fsSL https://github.com/shwld/tatsumaki/releases/download/cli-v0.0.2/install-tm.sh | bash -s -- cli-v0.0.2
 ```
+
+## Update
+
+インストール済みの `tm` は自己更新できる。
+
+```bash
+tm update            # 最新の cli-v* Release に更新
+tm update --check    # 新しいバージョンがあるか確認のみ
+tm update --version cli-v0.0.9   # 特定のバージョンを指定
+```
+
+- 最新版は GitHub Releases の `cli-v*` タグを semver で比較して決める（`releases/latest` は desktop-v* を指しうるため使わない）
+- `sha256sums.txt` で検証してから実行中のバイナリを置換する
+- 書き込み権限が無い場合（例: root 所有の `/usr/local/bin/tm`）は `sudo tm update` を案内して終了する
+- 配布アセットがある環境のみ対象（現状 `tm-aarch64-apple-darwin.tar.gz` のみ）
