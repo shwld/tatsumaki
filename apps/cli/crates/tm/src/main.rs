@@ -3,6 +3,7 @@ mod application;
 mod desktop_ipc_client;
 mod desktop_ipc_command;
 mod infrastructure;
+mod update;
 
 use crate::application::ports::{
     StoryCommentInput, StoryCreateInput, StoryListFilter, StoryPointUpdate, StoryReorderInput,
@@ -65,6 +66,15 @@ enum Commands {
     Story(StoryCommand),
     Project(ProjectCommand),
     Desktop(DesktopCommand),
+    Update(UpdateCommand),
+}
+
+#[derive(Args, Debug)]
+struct UpdateCommand {
+    #[arg(long, help = "Only check whether a newer version is available")]
+    check: bool,
+    #[arg(long, value_name = "TAG", help = "Install a specific release tag (cli-vX.Y.Z)")]
+    version: Option<String>,
 }
 
 #[derive(Args, Debug)]
@@ -316,6 +326,21 @@ async fn run() -> Result<(), (CliError, i32)> {
                 eprintln!("{warning}");
             }
             println!("Login successful");
+            Ok(())
+        }
+        Commands::Update(update_cmd) => {
+            let outcome = update::run(update_cmd.check, update_cmd.version.as_deref())
+                .await
+                .map_err(|e| (e, EXIT_GENERAL))?;
+            match outcome {
+                update::Outcome::UpToDate(version) => println!("tm {version} is up to date"),
+                update::Outcome::Available(target) => {
+                    println!("Update available: {} ({})", target.version, target.tag)
+                }
+                update::Outcome::Updated { from, to } => {
+                    println!("Updated tm {from} -> {}", to.version)
+                }
+            }
             Ok(())
         }
         Commands::Logout => {
