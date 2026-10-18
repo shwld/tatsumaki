@@ -1,3 +1,4 @@
+import { err, ok, type Result } from "neverthrow";
 import { PRESET_POINT_SCALES } from "./project";
 
 export const STORY_TYPES = ["feature", "bug", "chore", "release"] as const;
@@ -72,6 +73,44 @@ export function canTransitionStoryStatus(
   }
 
   return STORY_STATUS_TRANSITIONS[from].includes(to);
+}
+
+export const INVALID_STORY_IS_ICEBOX_ERROR =
+  "INVALID_STORY_IS_ICEBOX_ERROR" as const;
+
+/**
+ * Domain invariant: isIcebox=true requires status=Unstarted and iterationId=null.
+ *
+ * - An explicit isIcebox=true that contradicts the resulting state is rejected.
+ * - When the story is already in the Icebox and its status leaves Unstarted
+ *   without an explicit isIcebox, it is taken out of the Icebox (starting work
+ *   on a story schedules it) instead of rejecting the status change.
+ *
+ * Returns undefined when isIcebox should stay as it is.
+ */
+export function resolveStoryIsIcebox(input: {
+  requested: boolean | undefined;
+  current: { isIcebox: boolean; iterationId: string | null } | null;
+  nextStatus: string;
+}): Result<boolean | undefined, typeof INVALID_STORY_IS_ICEBOX_ERROR> {
+  if (input.requested === true) {
+    if (
+      input.nextStatus !== "Unstarted" ||
+      (input.current?.iterationId ?? null) !== null
+    ) {
+      return err(INVALID_STORY_IS_ICEBOX_ERROR);
+    }
+    return ok(true);
+  }
+
+  if (input.requested === false) {
+    return ok(false);
+  }
+
+  if (input.current?.isIcebox && input.nextStatus !== "Unstarted") {
+    return ok(false);
+  }
+  return ok(undefined);
 }
 
 export type Story = {

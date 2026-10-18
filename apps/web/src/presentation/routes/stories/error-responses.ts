@@ -21,7 +21,6 @@ import {
   STORY_REQUESTER_NOT_PROJECT_MEMBER_ERROR,
 } from "../../../domain/repositories/story-repository";
 import {
-  INVALID_STORY_IS_ICEBOX_ERROR,
   INVALID_STORY_LABELS_ERROR,
   INVALID_STORY_OWNER_IDS_ERROR,
   INVALID_STORY_POINT_ERROR,
@@ -31,7 +30,10 @@ import {
   INVALID_STORY_TYPE_ERROR,
 } from "../../../application/usecases/story-input";
 import { NOTIFICATION_REPOSITORY_ERROR } from "../../../domain/repositories/notification-repository";
-import { STORY_TYPES } from "../../../domain/entities/story";
+import {
+  INVALID_STORY_IS_ICEBOX_ERROR,
+  STORY_TYPES,
+} from "../../../domain/entities/story";
 
 type ErrorResponse = {
   message: string;
