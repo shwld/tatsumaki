@@ -794,6 +794,30 @@ describe("artifact API", () => {
       expect(response.status).toBe(404);
     });
 
+    it("answers 404 for a key of another project whatever its scopes", async () => {
+      const other = await call("POST", "", {
+        root: "https://localhost/api/projects",
+        body: { name: "Other" },
+      });
+      const otherId = (await json<{ project: { id: string } }>(other)).project
+        .id;
+      const readKey = await issueKey(["artifact:read"], otherId);
+      const writeKey = await issueKey(["artifact:write"], otherId);
+
+      const writeWithReadKey = await call("POST", "/artifact-uploads", {
+        root: keyBase,
+        headers: { "X-Api-Key": readKey, "Idempotency-Key": nextKey() },
+        body: { ...(await buildManifest(SITE)), title: "x" },
+      });
+      const readWithWriteKey = await call("GET", "/artifacts", {
+        root: keyBase,
+        headers: { "X-Api-Key": writeKey },
+      });
+
+      expect(writeWithReadKey.status).toBe(404);
+      expect(readWithWriteKey.status).toBe(404);
+    });
+
     it("denies writes once the key owner was demoted to viewer", async () => {
       const rawKey = await issueKey(["artifact:read", "artifact:write"]);
       await new D1ProjectRepository(env.DB).upsertMember({

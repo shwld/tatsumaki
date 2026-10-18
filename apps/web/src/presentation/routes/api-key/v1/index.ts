@@ -4,6 +4,7 @@ import {
   requireApiKeyAuth,
   requireApiKeyScope,
 } from "../../../middleware/api-key-auth";
+import { requireApiKeyForProject } from "../../artifacts/access";
 import { createArtifactRoutes } from "../../artifacts/routes";
 import { apiKeyV1StoriesRoute } from "./stories";
 
@@ -14,7 +15,13 @@ apiKeyV1Route.route("/projects", apiKeyV1StoriesRoute);
 apiKeyV1Route.route(
   "/projects",
   createArtifactRoutes({
-    readMiddleware: [requireApiKeyScope("artifact:read")],
-    writeMiddleware: [requireApiKeyScope("artifact:write")],
+    readMiddleware: [
+      requireApiKeyForProject(),
+      requireApiKeyScope("artifact:read"),
+    ],
+    writeMiddleware: [
+      requireApiKeyForProject(),
+      requireApiKeyScope("artifact:write"),
+    ],
   }),
 );

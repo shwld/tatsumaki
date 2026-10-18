@@ -1,4 +1,4 @@
-import type { Context } from "hono";
+import type { Context, MiddlewareHandler } from "hono";
 import type { Env } from "../../../index";
 import type { ProjectMember } from "../../../domain/entities/project-member";
 import { D1ProjectRepository } from "../../../infrastructure/db/repositories/d1-project-repository";
@@ -48,4 +48,17 @@ export async function requireArtifactAccess(
     };
   }
   return { ok: true, member: member.value, userId };
+}
+
+/**
+ * Runs before any API key scope check so that a key issued to another project
+ * is answered with the same 404 whatever scopes it has.
+ */
+export function requireApiKeyForProject(): MiddlewareHandler<Env> {
+  return async (c, next) => {
+    if (c.get("apiKeyProjectId") !== c.req.param("projectId")) {
+      return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
+    }
+    await next();
+  };
 }

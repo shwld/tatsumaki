@@ -292,18 +292,6 @@
           "updatedAt"
         ]
       },
-      "ArtifactError": {
-        "type": "object",
-        "properties": {
-          "error": {
-            "type": "string"
-          },
-          "code": {
-            "type": "string"
-          }
-        },
-        "required": ["error", "code"]
-      },
       "ArtifactDetailResponse": {
         "type": "object",
         "properties": {
@@ -431,21 +419,15 @@
         },
         "required": ["version", "files"]
       },
-      "ArtifactUploadNoop": {
-        "type": "object",
-        "properties": {
-          "noop": {
-            "type": "boolean",
-            "enum": [true]
+      "ArtifactUploadCreateResponse": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/ArtifactUploadSession"
           },
-          "artifactId": {
-            "type": "string"
-          },
-          "version": {
-            "type": "integer"
+          {
+            "$ref": "#/components/schemas/ArtifactUploadNoop"
           }
-        },
-        "required": ["noop", "artifactId", "version"]
+        ]
       },
       "ArtifactUploadSession": {
         "type": "object",
@@ -488,19 +470,35 @@
           "uploadedPaths"
         ]
       },
-      "ArtifactUploadCreateBody": {
+      "ArtifactUploadNoop": {
         "type": "object",
         "properties": {
+          "noop": {
+            "type": "boolean",
+            "enum": [true]
+          },
           "artifactId": {
             "type": "string"
           },
-          "title": {
-            "type": "string"
+          "version": {
+            "type": "integer"
+          }
+        },
+        "required": ["noop", "artifactId", "version"]
+      },
+      "ArtifactUploadCreateBody": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/ArtifactUploadNewBody"
           },
-          "baseVersion": {
-            "type": "integer",
-            "minimum": 1
-          },
+          {
+            "$ref": "#/components/schemas/ArtifactUploadUpdateBody"
+          }
+        ]
+      },
+      "ArtifactUploadNewBody": {
+        "type": "object",
+        "properties": {
           "entrypoint": {
             "type": "string"
           },
@@ -525,9 +523,56 @@
               },
               "required": ["path", "size", "sha256"]
             }
+          },
+          "title": {
+            "type": "string"
           }
         },
-        "required": ["entrypoint", "treeDigest", "files"]
+        "required": ["entrypoint", "treeDigest", "files", "title"]
+      },
+      "ArtifactUploadUpdateBody": {
+        "type": "object",
+        "properties": {
+          "entrypoint": {
+            "type": "string"
+          },
+          "treeDigest": {
+            "type": "string"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "size": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "sha256": {
+                  "type": "string"
+                }
+              },
+              "required": ["path", "size", "sha256"]
+            }
+          },
+          "artifactId": {
+            "type": "string"
+          },
+          "baseVersion": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "entrypoint",
+          "treeDigest",
+          "files",
+          "artifactId",
+          "baseVersion"
+        ]
       },
       "ArtifactFinalizeResponse": {
         "type": "object",
@@ -1048,14 +1093,7 @@
             "description": "Unauthorized"
           },
           "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ArtifactError"
-                }
-              }
-            }
+            "description": "Not found"
           }
         }
       }
@@ -1098,14 +1136,7 @@
             "description": "Unauthorized"
           },
           "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ArtifactError"
-                }
-              }
-            }
+            "description": "Not found"
           }
         }
       },
@@ -1158,37 +1189,16 @@
             }
           },
           "400": {
-            "description": "Invalid request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ArtifactError"
-                }
-              }
-            }
+            "description": "Invalid request"
           },
           "401": {
             "description": "Unauthorized"
           },
           "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ArtifactError"
-                }
-              }
-            }
+            "description": "Forbidden"
           },
           "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ArtifactError"
-                }
-              }
-            }
+            "description": "Not found"
           }
         }
       }
@@ -1231,24 +1241,10 @@
             "description": "Unauthorized"
           },
           "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ArtifactError"
-                }
-              }
-            }
+            "description": "Forbidden"
           },
           "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ArtifactError"
-                }
-              }
-            }
+            "description": "Not found"
           }
         }
       }
@@ -1291,24 +1287,10 @@
             "description": "Unauthorized"
           },
           "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ArtifactError"
-                }
-              }
-            }
+            "description": "Forbidden"
           },
           "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ArtifactError"
-                }
-              }
-            }
+            "description": "Not found"
           }
         }
       }
@@ -1351,14 +1333,7 @@
             "description": "Unauthorized"
           },
           "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ArtifactError"
-                }
-              }
-            }
+            "description": "Not found"
           }
         }
       }
@@ -1411,14 +1386,7 @@
             "description": "Unauthorized"
           },
           "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ArtifactError"
-                }
-              }
-            }
+            "description": "Not found"
           }
         }
       }
@@ -1483,14 +1451,7 @@
             "description": "Unauthorized"
           },
           "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ArtifactError"
-                }
-              }
-            }
+            "description": "Not found"
           }
         }
       }
@@ -1531,97 +1492,48 @@
         },
         "responses": {
           "200": {
-            "description": "The tree equals the latest version; nothing was created",
+            "description": "The tree equals the latest version (noop: true); nothing was created",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ArtifactUploadNoop"
+                  "$ref": "#/components/schemas/ArtifactUploadCreateResponse"
                 }
               }
             }
           },
           "201": {
-            "description": "Upload session created or replayed for the same Idempotency-Key",
+            "description": "Upload session created, or replayed for the same Idempotency-Key",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ArtifactUploadSession"
+                  "$ref": "#/components/schemas/ArtifactUploadCreateResponse"
                 }
               }
             }
           },
           "400": {
-            "description": "Invalid request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ArtifactError"
-                }
-              }
-            }
+            "description": "Invalid request"
           },
           "401": {
             "description": "Unauthorized"
           },
           "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ArtifactError"
-                }
-              }
-            }
+            "description": "Forbidden"
           },
           "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ArtifactError"
-                }
-              }
-            }
+            "description": "Not found"
           },
           "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ArtifactError"
-                }
-              }
-            }
+            "description": "Conflict"
           },
           "413": {
-            "description": "Payload too large",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ArtifactError"
-                }
-              }
-            }
+            "description": "Payload too large"
           },
           "415": {
-            "description": "Unsupported media type",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ArtifactError"
-                }
-              }
-            }
+            "description": "Unsupported media type"
           },
           "422": {
-            "description": "Unprocessable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ArtifactError"
-                }
-              }
-            }
+            "description": "Unprocessable"
           }
         }
       }
@@ -1694,54 +1606,19 @@
             "description": "Unauthorized"
           },
           "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ArtifactError"
-                }
-              }
-            }
+            "description": "Forbidden"
           },
           "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ArtifactError"
-                }
-              }
-            }
+            "description": "Not found"
           },
           "410": {
-            "description": "Upload session expired",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ArtifactError"
-                }
-              }
-            }
+            "description": "Upload session expired"
           },
           "413": {
-            "description": "Payload too large",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ArtifactError"
-                }
-              }
-            }
+            "description": "Payload too large"
           },
           "422": {
-            "description": "Unprocessable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ArtifactError"
-                }
-              }
-            }
+            "description": "Unprocessable"
           }
         }
       }
@@ -1784,44 +1661,16 @@
             "description": "Unauthorized"
           },
           "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ArtifactError"
-                }
-              }
-            }
+            "description": "Forbidden"
           },
           "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ArtifactError"
-                }
-              }
-            }
+            "description": "Not found"
           },
           "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ArtifactError"
-                }
-              }
-            }
+            "description": "Conflict"
           },
           "410": {
-            "description": "Upload session expired",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ArtifactError"
-                }
-              }
-            }
+            "description": "Upload session expired"
           }
         }
       }

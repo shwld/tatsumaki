@@ -230,6 +230,14 @@ describe("isSensitiveArtifactPath", () => {
     ".npmrc",
     ".netrc",
     ".envrc",
+    ".pypirc",
+    ".docker/config.json",
+    "home/.DOCKER/config.json",
+    ".aws/config",
+    ".ssh/config",
+    ".ssh/id_ed25519",
+    ".kube/config",
+    ".gnupg/pubring.kbx",
   ])("flags %s", (path) => {
     expect(isSensitiveArtifactPath(path)).toBe(true);
   });

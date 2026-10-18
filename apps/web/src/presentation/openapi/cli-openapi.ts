@@ -172,9 +172,6 @@ const ArtifactFileSchema = z
     contentType: z.string(),
   })
   .openapi("ArtifactFile");
-const ArtifactErrorSchema = z
-  .object({ error: z.string(), code: z.string() })
-  .openapi("ArtifactError");
 const ArtifactResponseSchema = z
   .object({ artifact: ArtifactSchema })
   .openapi("ArtifactResponse");
@@ -198,21 +195,26 @@ const ArtifactVersionDetailResponseSchema = z
     files: z.array(ArtifactFileSchema),
   })
   .openapi("ArtifactVersionDetailResponse");
+const ArtifactUploadTreeSchema = z.object({
+  entrypoint: z.string(),
+  treeDigest: z.string(),
+  files: z.array(
+    z.object({
+      path: z.string(),
+      size: z.number().int().min(0),
+      sha256: z.string(),
+    }),
+  ),
+});
+const ArtifactUploadNewBodySchema = ArtifactUploadTreeSchema.extend({
+  title: z.string(),
+}).openapi("ArtifactUploadNewBody");
+const ArtifactUploadUpdateBodySchema = ArtifactUploadTreeSchema.extend({
+  artifactId: z.string(),
+  baseVersion: z.number().int().min(1),
+}).openapi("ArtifactUploadUpdateBody");
 const ArtifactUploadCreateBodySchema = z
-  .object({
-    artifactId: z.string().optional(),
-    title: z.string().optional(),
-    baseVersion: z.number().int().min(1).optional(),
-    entrypoint: z.string(),
-    treeDigest: z.string(),
-    files: z.array(
-      z.object({
-        path: z.string(),
-        size: z.number().int().min(0),
-        sha256: z.string(),
-      }),
-    ),
-  })
+  .union([ArtifactUploadNewBodySchema, ArtifactUploadUpdateBodySchema])
   .openapi("ArtifactUploadCreateBody");
 const ArtifactUploadSessionSchema = z
   .object({
@@ -232,6 +234,9 @@ const ArtifactUploadNoopSchema = z
     version: z.number().int(),
   })
   .openapi("ArtifactUploadNoop");
+const ArtifactUploadCreateResponseSchema = z
+  .union([ArtifactUploadSessionSchema, ArtifactUploadNoopSchema])
+  .openapi("ArtifactUploadCreateResponse");
 const ArtifactFinalizeResponseSchema = z
   .object({
     noop: z.literal(false),
@@ -600,7 +605,6 @@ export function buildCliOpenApiDoc() {
       401: { description: "Unauthorized" },
       404: {
         description: "Not found",
-        content: { "application/json": { schema: ArtifactErrorSchema } },
       },
     },
   });
@@ -623,7 +627,6 @@ export function buildCliOpenApiDoc() {
       401: { description: "Unauthorized" },
       404: {
         description: "Not found",
-        content: { "application/json": { schema: ArtifactErrorSchema } },
       },
     },
   });
@@ -661,15 +664,12 @@ export function buildCliOpenApiDoc() {
       401: { description: "Unauthorized" },
       400: {
         description: "Invalid request",
-        content: { "application/json": { schema: ArtifactErrorSchema } },
       },
       403: {
         description: "Forbidden",
-        content: { "application/json": { schema: ArtifactErrorSchema } },
       },
       404: {
         description: "Not found",
-        content: { "application/json": { schema: ArtifactErrorSchema } },
       },
     },
   });
@@ -703,11 +703,9 @@ export function buildCliOpenApiDoc() {
       401: { description: "Unauthorized" },
       403: {
         description: "Forbidden",
-        content: { "application/json": { schema: ArtifactErrorSchema } },
       },
       404: {
         description: "Not found",
-        content: { "application/json": { schema: ArtifactErrorSchema } },
       },
     },
   });
@@ -741,11 +739,9 @@ export function buildCliOpenApiDoc() {
       401: { description: "Unauthorized" },
       403: {
         description: "Forbidden",
-        content: { "application/json": { schema: ArtifactErrorSchema } },
       },
       404: {
         description: "Not found",
-        content: { "application/json": { schema: ArtifactErrorSchema } },
       },
     },
   });
@@ -781,7 +777,6 @@ export function buildCliOpenApiDoc() {
       401: { description: "Unauthorized" },
       404: {
         description: "Not found",
-        content: { "application/json": { schema: ArtifactErrorSchema } },
       },
     },
   });
@@ -804,7 +799,6 @@ export function buildCliOpenApiDoc() {
       401: { description: "Unauthorized" },
       404: {
         description: "Not found",
-        content: { "application/json": { schema: ArtifactErrorSchema } },
       },
     },
   });
@@ -843,7 +837,6 @@ export function buildCliOpenApiDoc() {
       401: { description: "Unauthorized" },
       404: {
         description: "Not found",
-        content: { "application/json": { schema: ArtifactErrorSchema } },
       },
     },
   });
@@ -865,43 +858,39 @@ export function buildCliOpenApiDoc() {
     responses: {
       201: {
         description:
-          "Upload session created or replayed for the same Idempotency-Key",
+          "Upload session created, or replayed for the same Idempotency-Key",
         content: {
-          "application/json": { schema: ArtifactUploadSessionSchema },
+          "application/json": { schema: ArtifactUploadCreateResponseSchema },
         },
       },
       200: {
-        description: "The tree equals the latest version; nothing was created",
-        content: { "application/json": { schema: ArtifactUploadNoopSchema } },
+        description:
+          "The tree equals the latest version (noop: true); nothing was created",
+        content: {
+          "application/json": { schema: ArtifactUploadCreateResponseSchema },
+        },
       },
       401: { description: "Unauthorized" },
       400: {
         description: "Invalid request",
-        content: { "application/json": { schema: ArtifactErrorSchema } },
       },
       403: {
         description: "Forbidden",
-        content: { "application/json": { schema: ArtifactErrorSchema } },
       },
       404: {
         description: "Not found",
-        content: { "application/json": { schema: ArtifactErrorSchema } },
       },
       409: {
         description: "Conflict",
-        content: { "application/json": { schema: ArtifactErrorSchema } },
       },
       413: {
         description: "Payload too large",
-        content: { "application/json": { schema: ArtifactErrorSchema } },
       },
       415: {
         description: "Unsupported media type",
-        content: { "application/json": { schema: ArtifactErrorSchema } },
       },
       422: {
         description: "Unprocessable",
-        content: { "application/json": { schema: ArtifactErrorSchema } },
       },
     },
   });
@@ -950,23 +939,18 @@ export function buildCliOpenApiDoc() {
       401: { description: "Unauthorized" },
       403: {
         description: "Forbidden",
-        content: { "application/json": { schema: ArtifactErrorSchema } },
       },
       404: {
         description: "Not found",
-        content: { "application/json": { schema: ArtifactErrorSchema } },
       },
       410: {
         description: "Upload session expired",
-        content: { "application/json": { schema: ArtifactErrorSchema } },
       },
       413: {
         description: "Payload too large",
-        content: { "application/json": { schema: ArtifactErrorSchema } },
       },
       422: {
         description: "Unprocessable",
-        content: { "application/json": { schema: ArtifactErrorSchema } },
       },
     },
   });
@@ -992,19 +976,15 @@ export function buildCliOpenApiDoc() {
       401: { description: "Unauthorized" },
       403: {
         description: "Forbidden",
-        content: { "application/json": { schema: ArtifactErrorSchema } },
       },
       404: {
         description: "Not found",
-        content: { "application/json": { schema: ArtifactErrorSchema } },
       },
       409: {
         description: "Conflict",
-        content: { "application/json": { schema: ArtifactErrorSchema } },
       },
       410: {
         description: "Upload session expired",
-        content: { "application/json": { schema: ArtifactErrorSchema } },
       },
     },
   });
