@@ -19,6 +19,7 @@ describe("ARTIFACTS bucket access", () => {
     expect(referencing.sort()).toEqual([
       "index.ts",
       "presentation/routes/artifacts/routes.ts",
+      "presentation/scheduled/cleanup-artifacts.ts",
     ]);
   });
 
