@@ -1,5 +1,6 @@
 import type { Result } from "neverthrow";
 import type {
+  INVALID_STORY_IS_ICEBOX_ERROR,
   Story,
   StoryPoint,
   StoryPriorityHistory,
@@ -102,7 +103,8 @@ export type StoryRepositoryError =
   | typeof STORY_REPOSITORY_ERROR
   | typeof STORY_OWNER_NOT_PROJECT_MEMBER_ERROR
   | typeof STORY_REQUESTER_NOT_PROJECT_MEMBER_ERROR
-  | typeof STORY_EPIC_NOT_FOUND_ERROR;
+  | typeof STORY_EPIC_NOT_FOUND_ERROR
+  | typeof INVALID_STORY_IS_ICEBOX_ERROR;
 
 export interface StoryRepository {
   create(input: CreateStoryInput): Promise<Result<Story, StoryRepositoryError>>;

@@ -1,7 +1,9 @@
 import { err, ok, type Result } from "neverthrow";
 import { ulid } from "ulid";
 import {
+  INVALID_STORY_IS_ICEBOX_ERROR,
   requiresEstimateForTransition,
+  resolveStoryIsIcebox,
   type Story,
   type StoryStatus,
 } from "../../domain/entities/story";
@@ -14,7 +16,6 @@ import {
   INVALID_STORY_POINT_ERROR,
   INVALID_STORY_OWNER_IDS_ERROR,
   INVALID_STORY_EPIC_ID_ERROR,
-  INVALID_STORY_IS_ICEBOX_ERROR,
   INVALID_STORY_REQUESTER_ID_ERROR,
   INVALID_STORY_STATUS_ERROR,
   INVALID_STORY_TITLE_ERROR,
@@ -24,7 +25,6 @@ import {
   normalizeStoryPoint,
   normalizeStoryOwnerIds,
   normalizeStoryEpicId,
-  normalizeStoryIsIcebox,
   normalizeStoryRequesterId,
   normalizeStoryStatus,
   normalizeStoryTitle,
@@ -265,17 +265,15 @@ export async function updateStory(
     return err(normalizedEpicId.error);
   }
 
-  const normalizedIsIcebox =
-    input.isIcebox !== undefined
-      ? normalizeStoryIsIcebox(input.isIcebox, {
-          iterationId: currentResult.value.iterationId,
-          status: normalizedStatus?.isOk()
-            ? normalizedStatus.value
-            : currentResult.value.status,
-        })
-      : undefined;
-  if (normalizedIsIcebox?.isErr()) {
-    return err(normalizedIsIcebox.error);
+  const resolvedIsIcebox = resolveStoryIsIcebox({
+    requested: input.isIcebox,
+    current: currentResult.value,
+    nextStatus: normalizedStatus?.isOk()
+      ? normalizedStatus.value
+      : currentResult.value.status,
+  });
+  if (resolvedIsIcebox.isErr()) {
+    return err(resolvedIsIcebox.error);
   }
 
   const result = await repository.update({
@@ -295,8 +293,8 @@ export async function updateStory(
       ? { ownerIds: normalizedOwnerIds.value }
       : {}),
     ...(normalizedEpicId?.isOk() ? { epicId: normalizedEpicId.value } : {}),
-    ...(normalizedIsIcebox?.isOk()
-      ? { isIcebox: normalizedIsIcebox.value }
+    ...(resolvedIsIcebox.value !== undefined
+      ? { isIcebox: resolvedIsIcebox.value }
       : {}),
     ...(normalizedRequesterId?.isOk()
       ? { requesterId: normalizedRequesterId.value }

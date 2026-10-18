@@ -4,8 +4,8 @@ node_modules/
 .worktree
 !.config
 .dev.vars
-artifacts/
-artifacts/cli-release/
+/artifacts/
+/artifacts/cli-release/
 dev-logs/*.log
 .playwright-mcp/
 lefthook-local.yml

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  INVALID_STORY_IS_ICEBOX_ERROR,
   INVALID_STORY_LABELS_ERROR,
   INVALID_STORY_OWNER_IDS_ERROR,
   INVALID_STORY_POINT_ERROR,
@@ -9,7 +8,6 @@ import {
   INVALID_STORY_TITLE_ERROR,
   INVALID_STORY_TYPE_ERROR,
   normalizeStoryDescription,
-  normalizeStoryIsIcebox,
   normalizeStoryLabels,
   normalizeStoryPoint,
   normalizeStoryOwnerIds,
@@ -162,53 +160,5 @@ describe("story input normalization", () => {
     if (result.isErr()) {
       expect(result.error).toBe(INVALID_STORY_REQUESTER_ID_ERROR);
     }
-  });
-
-  // --- isIcebox domain invariant ---
-
-  it("allows isIcebox=true when no iterationId and not Accepted", () => {
-    const result = normalizeStoryIsIcebox(true, {
-      iterationId: null,
-      status: "Unstarted",
-    });
-    expect(result.isOk()).toBe(true);
-    expect(result._unsafeUnwrap()).toBe(true);
-  });
-
-  it("allows isIcebox=false regardless of context", () => {
-    const result = normalizeStoryIsIcebox(false, {
-      iterationId: "iter-1",
-      status: "Accepted",
-    });
-    expect(result.isOk()).toBe(true);
-    expect(result._unsafeUnwrap()).toBe(false);
-  });
-
-  it("rejects isIcebox=true when story has iterationId", () => {
-    const result = normalizeStoryIsIcebox(true, {
-      iterationId: "iter-1",
-      status: "Unstarted",
-    });
-    expect(result.isErr()).toBe(true);
-    if (result.isErr()) {
-      expect(result.error).toBe(INVALID_STORY_IS_ICEBOX_ERROR);
-    }
-  });
-
-  it("rejects isIcebox=true when story is Accepted", () => {
-    const result = normalizeStoryIsIcebox(true, {
-      iterationId: null,
-      status: "Accepted",
-    });
-    expect(result.isErr()).toBe(true);
-    if (result.isErr()) {
-      expect(result.error).toBe(INVALID_STORY_IS_ICEBOX_ERROR);
-    }
-  });
-
-  it("allows isIcebox=true without context (backward compat)", () => {
-    const result = normalizeStoryIsIcebox(true);
-    expect(result.isOk()).toBe(true);
-    expect(result._unsafeUnwrap()).toBe(true);
   });
 });

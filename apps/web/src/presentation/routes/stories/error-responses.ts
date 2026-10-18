@@ -30,7 +30,10 @@ import {
   INVALID_STORY_TYPE_ERROR,
 } from "../../../application/usecases/story-input";
 import { NOTIFICATION_REPOSITORY_ERROR } from "../../../domain/repositories/notification-repository";
-import { STORY_TYPES } from "../../../domain/entities/story";
+import {
+  INVALID_STORY_IS_ICEBOX_ERROR,
+  STORY_TYPES,
+} from "../../../domain/entities/story";
 
 type ErrorResponse = {
   message: string;
@@ -85,6 +88,14 @@ export function toCreateStoryErrorResponse(
 
   if (error === INVALID_STORY_REQUESTER_ID_ERROR) {
     return { message: "Requester must be a valid user ID", status: 400 };
+  }
+
+  if (error === INVALID_STORY_IS_ICEBOX_ERROR) {
+    return {
+      message:
+        "Only an Unstarted story without an iteration can be in the Icebox",
+      status: 400,
+    };
   }
 
   if (error === STORY_OWNER_NOT_PROJECT_MEMBER_ERROR) {
@@ -194,6 +205,14 @@ export function toUpdateStoryErrorResponse(
 
   if (error === INVALID_STORY_REQUESTER_ID_ERROR) {
     return { message: "Requester must be a valid user ID", status: 400 };
+  }
+
+  if (error === INVALID_STORY_IS_ICEBOX_ERROR) {
+    return {
+      message:
+        "Only an Unstarted story without an iteration can be in the Icebox",
+      status: 400,
+    };
   }
 
   if (error === STORY_OWNER_NOT_PROJECT_MEMBER_ERROR) {

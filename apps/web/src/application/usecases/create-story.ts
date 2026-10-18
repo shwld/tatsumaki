@@ -1,6 +1,10 @@
 import { err, ok, type Result } from "neverthrow";
 import { ulid } from "ulid";
-import { DEFAULT_STORY_POINTS } from "../../domain/entities/story";
+import {
+  DEFAULT_STORY_POINTS,
+  INVALID_STORY_IS_ICEBOX_ERROR,
+  resolveStoryIsIcebox,
+} from "../../domain/entities/story";
 import type { Story } from "../../domain/entities/story";
 import type {
   StoryRepository,
@@ -15,7 +19,6 @@ import {
   INVALID_STORY_POINT_ERROR,
   INVALID_STORY_OWNER_IDS_ERROR,
   INVALID_STORY_EPIC_ID_ERROR,
-  INVALID_STORY_IS_ICEBOX_ERROR,
   INVALID_STORY_REQUESTER_ID_ERROR,
   INVALID_STORY_STATUS_ERROR,
   INVALID_STORY_TITLE_ERROR,
@@ -25,7 +28,6 @@ import {
   normalizeStoryPoint,
   normalizeStoryOwnerIds,
   normalizeStoryEpicId,
-  normalizeStoryIsIcebox,
   normalizeStoryRequesterId,
   normalizeStoryStatus,
   normalizeStoryTitle,
@@ -122,7 +124,11 @@ export async function createStory(
     return err(epicIdResult.error);
   }
 
-  const isIceboxResult = normalizeStoryIsIcebox(input.isIcebox ?? false);
+  const isIceboxResult = resolveStoryIsIcebox({
+    requested: input.isIcebox ?? false,
+    current: null,
+    nextStatus: statusResult.value,
+  });
   if (isIceboxResult.isErr()) {
     return err(isIceboxResult.error);
   }
@@ -136,7 +142,7 @@ export async function createStory(
     storyPoint: storyPointResult.value,
     labels: labelsResult.value,
     epicId: epicIdResult.value,
-    isIcebox: isIceboxResult.value,
+    isIcebox: isIceboxResult.value ?? false,
     ownerIds: ownerIdsResult.value,
     requesterId: requesterIdResult.value,
     releaseDate: input.releaseDate ?? null,

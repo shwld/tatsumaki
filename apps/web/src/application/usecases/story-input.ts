@@ -1,5 +1,6 @@
 import { err, ok, type Result } from "neverthrow";
 import {
+  INVALID_STORY_IS_ICEBOX_ERROR,
   STORY_STATUSES,
   STORY_TYPES,
   type StoryPoint,
@@ -18,8 +19,6 @@ export const INVALID_STORY_REQUESTER_ID_ERROR =
   "INVALID_STORY_REQUESTER_ID_ERROR" as const;
 export const INVALID_STORY_EPIC_ID_ERROR =
   "INVALID_STORY_EPIC_ID_ERROR" as const;
-export const INVALID_STORY_IS_ICEBOX_ERROR =
-  "INVALID_STORY_IS_ICEBOX_ERROR" as const;
 
 export type StoryInputValidationError =
   | typeof INVALID_STORY_TITLE_ERROR
@@ -135,25 +134,6 @@ export function normalizeStoryRequesterId(
   }
 
   return ok(normalized);
-}
-
-/**
- * Domain invariant: isIcebox=true requires iterationId=null and status!=Accepted.
- * A story in the Icebox cannot be assigned to an iteration or already accepted.
- */
-export function normalizeStoryIsIcebox(
-  isIcebox: boolean,
-  context?: { iterationId: string | null; status: string },
-): Result<boolean, typeof INVALID_STORY_IS_ICEBOX_ERROR> {
-  if (isIcebox && context) {
-    if (context.iterationId != null) {
-      return err(INVALID_STORY_IS_ICEBOX_ERROR);
-    }
-    if (context.status === "Accepted") {
-      return err(INVALID_STORY_IS_ICEBOX_ERROR);
-    }
-  }
-  return ok(isIcebox);
 }
 
 export function normalizeStoryEpicId(
