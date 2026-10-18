@@ -21,6 +21,7 @@ import {
   STORY_REQUESTER_NOT_PROJECT_MEMBER_ERROR,
 } from "../../../domain/repositories/story-repository";
 import {
+  INVALID_STORY_IS_ICEBOX_ERROR,
   INVALID_STORY_LABELS_ERROR,
   INVALID_STORY_OWNER_IDS_ERROR,
   INVALID_STORY_POINT_ERROR,
@@ -85,6 +86,14 @@ export function toCreateStoryErrorResponse(
 
   if (error === INVALID_STORY_REQUESTER_ID_ERROR) {
     return { message: "Requester must be a valid user ID", status: 400 };
+  }
+
+  if (error === INVALID_STORY_IS_ICEBOX_ERROR) {
+    return {
+      message:
+        "Only an Unstarted story without an iteration can be in the Icebox",
+      status: 400,
+    };
   }
 
   if (error === STORY_OWNER_NOT_PROJECT_MEMBER_ERROR) {
@@ -194,6 +203,14 @@ export function toUpdateStoryErrorResponse(
 
   if (error === INVALID_STORY_REQUESTER_ID_ERROR) {
     return { message: "Requester must be a valid user ID", status: 400 };
+  }
+
+  if (error === INVALID_STORY_IS_ICEBOX_ERROR) {
+    return {
+      message:
+        "Only an Unstarted story without an iteration can be in the Icebox",
+      status: 400,
+    };
   }
 
   if (error === STORY_OWNER_NOT_PROJECT_MEMBER_ERROR) {

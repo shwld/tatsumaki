@@ -2450,4 +2450,188 @@ describe("story routes", () => {
     );
     expect(deleteRes.status).toBe(403);
   });
+
+  describe("Icebox invariant (isIcebox => Unstarted without iteration)", () => {
+    type StoryPayload = {
+      story: {
+        id: string;
+        storyNumber: number;
+        status: string;
+        isIcebox: boolean;
+        iterationId: string | null;
+      };
+    };
+
+    const createIceboxStory = async (projectId: string, title: string) => {
+      const response = await fetchWithAuth(storiesApiPath(projectId), {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          title,
+          description: "",
+          storyPoint: 3,
+          isIcebox: true,
+        }),
+      });
+      expect(response.status).toBe(201);
+      return ((await response.json()) as StoryPayload).story;
+    };
+
+    const patchStory = (
+      projectId: string,
+      story: { storyNumber: number },
+      body: Record<string, unknown>,
+    ) =>
+      fetchWithAuth(storyApiPath(projectId, String(story.storyNumber)), {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    it.each([
+      "Started",
+      "Finished",
+      "Delivered",
+    ])("takes an Icebox story out of the Icebox when only status is set to %s", async (status) => {
+      const projectId = await createProject();
+      const currentIterationId = await ensureCurrentIterationForTest(projectId);
+      const story = await createIceboxStory(projectId, "Icebox story");
+
+      // Walk the allowed transitions so only the final status is under test.
+      const path = ["Started", "Finished", "Delivered"];
+      let latest: StoryPayload["story"] = story;
+      for (const next of path.slice(0, path.indexOf(status) + 1)) {
+        const response = await patchStory(projectId, story, {
+          status: next,
+        });
+        expect(response.status).toBe(200);
+        latest = ((await response.json()) as StoryPayload).story;
+      }
+
+      expect(latest.status).toBe(status);
+      expect(latest.isIcebox).toBe(false);
+      expect(latest.iterationId).toBe(currentIterationId);
+    });
+
+    it("keeps an Icebox story in the Icebox while it stays Unstarted", async () => {
+      const projectId = await createProject();
+      const story = await createIceboxStory(projectId, "Stay in icebox");
+
+      const response = await patchStory(projectId, story, {
+        title: "Renamed",
+      });
+
+      expect(response.status).toBe(200);
+      const payload = (await response.json()) as StoryPayload;
+      expect(payload.story.isIcebox).toBe(true);
+      expect(payload.story.status).toBe("Unstarted");
+    });
+
+    it("takes every Icebox story out of the Icebox on bulk status update", async () => {
+      const projectId = await createProject();
+      const first = await createIceboxStory(projectId, "Bulk one");
+      const second = await createIceboxStory(projectId, "Bulk two");
+
+      const response = await fetchWithAuth(storyBulkStatusApiPath(projectId), {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          storyIds: [first.id, second.id],
+          status: "Started",
+        }),
+      });
+
+      expect(response.status).toBe(200);
+      const payload = (await response.json()) as {
+        stories: Array<{ isIcebox: boolean; status: string }>;
+      };
+      expect(payload.stories).toHaveLength(2);
+      for (const story of payload.stories) {
+        expect(story).toMatchObject({ isIcebox: false, status: "Started" });
+      }
+    });
+
+    it("rejects an explicit isIcebox=true that contradicts the resulting status", async () => {
+      const projectId = await createProject();
+      const story = await createIceboxStory(projectId, "Contradiction");
+
+      const response = await patchStory(projectId, story, {
+        status: "Started",
+        isIcebox: true,
+      });
+
+      expect(response.status).toBeGreaterThanOrEqual(400);
+      expect(response.status).toBeLessThan(500);
+      const stored = await createDb(env.DB)
+        .select()
+        .from(storiesTable)
+        .where(eq(storiesTable.id, story.id))
+        .get();
+      expect(stored).toMatchObject({ isIcebox: 1, status: "Unstarted" });
+    });
+
+    it("rejects moving an already started story to the Icebox without resetting its status", async () => {
+      const projectId = await createProject();
+      const created = await fetchWithAuth(storiesApiPath(projectId), {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          title: "Started story",
+          description: "",
+          storyPoint: 3,
+        }),
+      });
+      const story = ((await created.json()) as StoryPayload).story;
+      await patchStory(projectId, story, { status: "Started" });
+
+      const response = await patchStory(projectId, story, { isIcebox: true });
+
+      expect(response.status).toBeGreaterThanOrEqual(400);
+      expect(response.status).toBeLessThan(500);
+    });
+
+    it("rejects creating an Icebox story that is not Unstarted", async () => {
+      const projectId = await createProject();
+
+      const response = await fetchWithAuth(storiesApiPath(projectId), {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          title: "Bad create",
+          description: "",
+          storyPoint: 3,
+          status: "Started",
+          isIcebox: true,
+        }),
+      });
+
+      expect(response.status).toBeGreaterThanOrEqual(400);
+      expect(response.status).toBeLessThan(500);
+    });
+
+    it("lets a story move back to the Icebox in the order the UI sends", async () => {
+      const projectId = await createProject();
+      const currentIterationId = await ensureCurrentIterationForTest(projectId);
+      const story = await createIceboxStory(projectId, "Round trip");
+      const started = await patchStory(projectId, story, { status: "Started" });
+      expect(((await started.json()) as StoryPayload).story.iterationId).toBe(
+        currentIterationId,
+      );
+
+      await patchStory(projectId, story, { status: "Unstarted" });
+      await createDb(env.DB)
+        .update(storiesTable)
+        .set({ iterationId: null })
+        .where(eq(storiesTable.id, story.id));
+      const response = await patchStory(projectId, story, { isIcebox: true });
+
+      expect(response.status).toBe(200);
+      const payload = (await response.json()) as StoryPayload;
+      expect(payload.story).toMatchObject({
+        isIcebox: true,
+        status: "Unstarted",
+        iterationId: null,
+      });
+    });
+  });
 });

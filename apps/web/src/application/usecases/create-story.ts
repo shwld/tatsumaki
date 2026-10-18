@@ -25,7 +25,7 @@ import {
   normalizeStoryPoint,
   normalizeStoryOwnerIds,
   normalizeStoryEpicId,
-  normalizeStoryIsIcebox,
+  resolveStoryIsIcebox,
   normalizeStoryRequesterId,
   normalizeStoryStatus,
   normalizeStoryTitle,
@@ -122,7 +122,11 @@ export async function createStory(
     return err(epicIdResult.error);
   }
 
-  const isIceboxResult = normalizeStoryIsIcebox(input.isIcebox ?? false);
+  const isIceboxResult = resolveStoryIsIcebox({
+    requested: input.isIcebox ?? false,
+    current: null,
+    nextStatus: statusResult.value,
+  });
   if (isIceboxResult.isErr()) {
     return err(isIceboxResult.error);
   }
@@ -136,7 +140,7 @@ export async function createStory(
     storyPoint: storyPointResult.value,
     labels: labelsResult.value,
     epicId: epicIdResult.value,
-    isIcebox: isIceboxResult.value,
+    isIcebox: isIceboxResult.value ?? false,
     ownerIds: ownerIdsResult.value,
     requesterId: requesterIdResult.value,
     releaseDate: input.releaseDate ?? null,

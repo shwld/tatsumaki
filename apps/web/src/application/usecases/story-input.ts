@@ -138,22 +138,38 @@ export function normalizeStoryRequesterId(
 }
 
 /**
- * Domain invariant: isIcebox=true requires iterationId=null and status!=Accepted.
- * A story in the Icebox cannot be assigned to an iteration or already accepted.
+ * Domain invariant: isIcebox=true requires status=Unstarted and iterationId=null.
+ *
+ * - An explicit isIcebox=true that contradicts the resulting state is rejected.
+ * - When the story is already in the Icebox and its status leaves Unstarted
+ *   without an explicit isIcebox, it is taken out of the Icebox (starting work
+ *   on a story schedules it) instead of rejecting the status change.
+ *
+ * Returns undefined when isIcebox should stay as it is.
  */
-export function normalizeStoryIsIcebox(
-  isIcebox: boolean,
-  context?: { iterationId: string | null; status: string },
-): Result<boolean, typeof INVALID_STORY_IS_ICEBOX_ERROR> {
-  if (isIcebox && context) {
-    if (context.iterationId != null) {
+export function resolveStoryIsIcebox(input: {
+  requested: boolean | undefined;
+  current: { isIcebox: boolean; iterationId: string | null } | null;
+  nextStatus: string;
+}): Result<boolean | undefined, typeof INVALID_STORY_IS_ICEBOX_ERROR> {
+  if (input.requested === true) {
+    if (
+      input.nextStatus !== "Unstarted" ||
+      (input.current?.iterationId ?? null) !== null
+    ) {
       return err(INVALID_STORY_IS_ICEBOX_ERROR);
     }
-    if (context.status === "Accepted") {
-      return err(INVALID_STORY_IS_ICEBOX_ERROR);
-    }
+    return ok(true);
   }
-  return ok(isIcebox);
+
+  if (input.requested === false) {
+    return ok(false);
+  }
+
+  if (input.current?.isIcebox && input.nextStatus !== "Unstarted") {
+    return ok(false);
+  }
+  return ok(undefined);
 }
 
 export function normalizeStoryEpicId(
