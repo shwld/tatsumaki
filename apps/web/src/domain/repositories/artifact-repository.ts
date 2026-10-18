@@ -109,6 +109,12 @@ export interface ArtifactRepository {
     createdBy: string,
   ): Promise<Result<ArtifactUploadSession | null, ArtifactRepositoryError>>;
 
+  findUploadSessionByIdempotencyKey(
+    projectId: string,
+    createdBy: string,
+    idempotencyKey: string,
+  ): Promise<Result<ArtifactUploadSession | null, ArtifactRepositoryError>>;
+
   recordUploadedFile(
     sessionId: string,
     path: string,

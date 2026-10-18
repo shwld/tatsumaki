@@ -326,6 +326,29 @@ export class D1ArtifactRepository implements ArtifactRepository {
     }
   }
 
+  async findUploadSessionByIdempotencyKey(
+    projectId: string,
+    createdBy: string,
+    idempotencyKey: string,
+  ): Promise<Result<ArtifactUploadSession | null, ArtifactRepositoryError>> {
+    try {
+      const row = await this.db
+        .select()
+        .from(artifactUploadSessionsTable)
+        .where(
+          and(
+            eq(artifactUploadSessionsTable.projectId, projectId),
+            eq(artifactUploadSessionsTable.createdBy, createdBy),
+            eq(artifactUploadSessionsTable.idempotencyKey, idempotencyKey),
+          ),
+        )
+        .get();
+      return ok(row ? toUploadSession(row) : null);
+    } catch {
+      return err(ARTIFACT_REPOSITORY_ERROR);
+    }
+  }
+
   async recordUploadedFile(
     sessionId: string,
     path: string,

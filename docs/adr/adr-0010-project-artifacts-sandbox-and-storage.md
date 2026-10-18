@@ -131,6 +131,18 @@ README の R2 bucket 記述、setup script（3 つ目の bucket、`ARTIFACT_CONT
 - `artifact_upload_sessions.request_hash`（`NOT NULL`）を追加する。client 指定の artifact_id（新規は空）・base_version・tree_digest の sha256 とし、同一 `Idempotency-Key` で値が異なれば 422 とする。`status` は `pending | published | expired` の CHECK、`expires_at` / `manifest_json` は `NOT NULL`。同一 key の既存 session は status を問わずそのまま返す。
 - `created_by` は users への FK を張らず、`story_attachments.uploaded_by` と同じ監査用途として user 削除後も残す。`artifact_upload_sessions.created_by` は IDOR 照合に使うが、未使用 session は期限切れ cleanup で消えるため user 削除後に残っても無害。delete-account の cascade 契約は変更しない。
 
+### 2026-10-18 (story #311)
+
+- **Tree digest**: `sha256` over `"{path}\0{size}\0{sha256}\n"` for every file, ordered by the **UTF-8 bytes** of the path (not UTF-16 code units). `sha256` is lower-case hex, `size` a decimal integer. The CLI must compute the same value; `apps/web/test/fixtures/artifact-tree-digest.json` is the shared fixture (it includes non-ASCII and non-BMP paths).
+- **Path handling**: a path in a JSON body is validated as-is (never percent-decoded, must already be NFC); only a path taken from a URL is percent-decoded once and NFC-normalized. Both are then validated by the same rules (§6).
+- **Session columns**: `artifact_upload_sessions` also stores `title` and `entrypoint` (migration 0052) because finalize builds `artifacts` / `artifact_versions` from the session alone. Each `manifest_json` entry carries the server-decided `contentType`, so `artifact_files` can still be written with the single `json_each` statement. `contentType` is not part of the tree digest or `request_hash`. `request_hash` is `sha256(JSON [clientArtifactId, baseVersion, treeDigest, entrypoint, title])`. `artifact_versions.session_id` (nullable) records which session created a version.
+- **Atomic publish**: every statement in the finalize batch is guarded by the same predicate (session id, project, creator, `pending`, not expired) and a version insert additionally requires `artifacts.latest_version IS base_version`. A session that no longer qualifies therefore changes nothing; the final `UPDATE ... SET status='published'` only matches when the version row created *by this session* is the artifact's latest, and its affected-row count is the commit marker. After a failure the session is re-read: `published` is a successful retry, expired is 410, anything else is 409. Re-publishing a `published` session returns the same result without writing.
+- **Create evaluation order**: membership guard (non-member 404, regardless of input) -> input validation -> role (viewer 403) -> replay of an existing `Idempotency-Key` session (returned as-is whatever its status; a different `request_hash` is 422) -> `baseVersion` mismatch 409 -> unchanged tree (same digest and entrypoint as latest) is a no-op. A rollback to an older tree is a new version. Publishing to an archived artifact is allowed.
+- **Error responses** carry a machine-readable `code`. 413/415/422 are used for limits, MIME and digest/size mismatches respectively.
+- **Allowlist**: `.svg` (`image/svg+xml`) is allowed in addition to the types in §2, because bundled apps routinely ship SVG icons and the content route sandboxes it. XML/XHTML/XSLT/PDF remain excluded.
+- **API key route**: a key issued to another project answers 404 on the Artifact routes (the story routes answer 403). Scopes `artifact:read` / `artifact:write` match exactly; issuing them from the project settings UI is tracked in story #317.
+- **Download** responses (authenticated API origin) carry `nosniff`, `Content-Security-Policy: sandbox`, `Cache-Control: private, no-store` and an `attachment` disposition.
+
 ## References
 
 - https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/iframe

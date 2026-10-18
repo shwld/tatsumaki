@@ -139,6 +139,150 @@ const StoryCommentBodySchema = z.object({
   body: z.string().min(1),
 });
 
+const ArtifactSchema = z
+  .object({
+    id: z.string().openapi({ example: "01KNCFJZJ0Z74X92QPCE0D9MK8" }),
+    projectId: z.string(),
+    title: z.string(),
+    archivedAt: z.string().nullable(),
+    latestVersion: z.number().int().nullable(),
+    createdBy: z.string(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+  })
+  .openapi("Artifact");
+const ArtifactVersionSchema = z
+  .object({
+    artifactId: z.string(),
+    version: z.number().int(),
+    entrypoint: z.string(),
+    treeDigest: z.string(),
+    fileCount: z.number().int(),
+    totalBytes: z.number().int(),
+    sessionId: z.string().nullable(),
+    createdBy: z.string(),
+    createdAt: z.string(),
+  })
+  .openapi("ArtifactVersion");
+const ArtifactFileSchema = z
+  .object({
+    path: z.string(),
+    size: z.number().int(),
+    sha256: z.string(),
+    contentType: z.string(),
+  })
+  .openapi("ArtifactFile");
+const ArtifactErrorSchema = z
+  .object({ error: z.string(), code: z.string() })
+  .openapi("ArtifactError");
+const ArtifactResponseSchema = z
+  .object({ artifact: ArtifactSchema })
+  .openapi("ArtifactResponse");
+const ArtifactListResponseSchema = z
+  .object({ artifacts: z.array(ArtifactSchema) })
+  .openapi("ArtifactListResponse");
+const ArtifactDetailResponseSchema = z
+  .object({
+    artifact: ArtifactSchema,
+    latestVersion: ArtifactVersionSchema.extend({
+      files: z.array(ArtifactFileSchema),
+    }).nullable(),
+  })
+  .openapi("ArtifactDetailResponse");
+const ArtifactVersionListResponseSchema = z
+  .object({ versions: z.array(ArtifactVersionSchema) })
+  .openapi("ArtifactVersionListResponse");
+const ArtifactVersionDetailResponseSchema = z
+  .object({
+    version: ArtifactVersionSchema,
+    files: z.array(ArtifactFileSchema),
+  })
+  .openapi("ArtifactVersionDetailResponse");
+const ArtifactUploadCreateBodySchema = z
+  .object({
+    artifactId: z.string().optional(),
+    title: z.string().optional(),
+    baseVersion: z.number().int().min(1).optional(),
+    entrypoint: z.string(),
+    treeDigest: z.string(),
+    files: z.array(
+      z.object({
+        path: z.string(),
+        size: z.number().int().min(0),
+        sha256: z.string(),
+      }),
+    ),
+  })
+  .openapi("ArtifactUploadCreateBody");
+const ArtifactUploadSessionSchema = z
+  .object({
+    noop: z.literal(false),
+    sessionId: z.string(),
+    artifactId: z.string(),
+    baseVersion: z.number().int().nullable(),
+    status: z.enum(["pending", "published", "expired"]),
+    expiresAt: z.string(),
+    uploadedPaths: z.array(z.string()),
+  })
+  .openapi("ArtifactUploadSession");
+const ArtifactUploadNoopSchema = z
+  .object({
+    noop: z.literal(true),
+    artifactId: z.string(),
+    version: z.number().int(),
+  })
+  .openapi("ArtifactUploadNoop");
+const ArtifactFinalizeResponseSchema = z
+  .object({
+    noop: z.literal(false),
+    artifactId: z.string(),
+    version: z.number().int(),
+  })
+  .openapi("ArtifactFinalizeResponse");
+const ArtifactParamsSchema = ProjectIdParamSchema.extend({
+  artifactId: z.string().openapi({ param: { name: "artifactId", in: "path" } }),
+});
+const ArtifactVersionParamsSchema = ArtifactParamsSchema.extend({
+  version: z
+    .string()
+    .regex(/^[1-9][0-9]*$/)
+    .openapi({ param: { name: "version", in: "path" }, example: "1" }),
+});
+const ArtifactVersionFileParamsSchema = ArtifactVersionParamsSchema.extend({
+  path: z.string().openapi({
+    param: { name: "path", in: "path" },
+    description: "File path inside the version; may contain slashes",
+    example: "assets/app.js",
+  }),
+});
+const ArtifactUploadSessionParamsSchema = ProjectIdParamSchema.extend({
+  sessionId: z.string().openapi({ param: { name: "sessionId", in: "path" } }),
+});
+const ArtifactUploadFileParamsSchema = ArtifactUploadSessionParamsSchema.extend(
+  {
+    path: z.string().openapi({
+      param: { name: "path", in: "path" },
+      description: "File path in the manifest; may contain slashes",
+    }),
+  },
+);
+const ArtifactListQuerySchema = z.object({
+  archived: z
+    .enum(["true", "false"])
+    .optional()
+    .openapi({ param: { name: "archived", in: "query" } }),
+});
+const ArtifactUploadHeadersSchema = z.object({
+  "Idempotency-Key": z
+    .string()
+    .min(1)
+    .max(255)
+    .openapi({
+      param: { name: "Idempotency-Key", in: "header" },
+    }),
+});
+const ArtifactTitleBodySchema = z.object({ title: z.string() });
+
 const ProjectSchema = z
   .object({
     id: z.string().openapi({ example: "01KN9P32R248P2PK1413DKQQG5" }),
@@ -438,6 +582,434 @@ export function buildCliOpenApiDoc() {
       email: "user@example.com",
       displayName: "Taro",
     }),
+  );
+
+  const listArtifactsRoute = createRoute({
+    operationId: "listArtifacts",
+    method: "get",
+    path: "/programmatic-api/v1/projects/{projectId}/artifacts",
+    request: {
+      params: ProjectIdParamSchema,
+      query: ArtifactListQuerySchema,
+    },
+    responses: {
+      200: {
+        description: "Artifacts",
+        content: { "application/json": { schema: ArtifactListResponseSchema } },
+      },
+      401: { description: "Unauthorized" },
+      404: {
+        description: "Not found",
+        content: { "application/json": { schema: ArtifactErrorSchema } },
+      },
+    },
+  });
+  app.openapi(listArtifactsRoute, (c) => c.json({ artifacts: [] }));
+
+  const getArtifactRoute = createRoute({
+    operationId: "getArtifact",
+    method: "get",
+    path: "/programmatic-api/v1/projects/{projectId}/artifacts/{artifactId}",
+    request: {
+      params: ArtifactParamsSchema,
+    },
+    responses: {
+      200: {
+        description: "Artifact with its latest version",
+        content: {
+          "application/json": { schema: ArtifactDetailResponseSchema },
+        },
+      },
+      401: { description: "Unauthorized" },
+      404: {
+        description: "Not found",
+        content: { "application/json": { schema: ArtifactErrorSchema } },
+      },
+    },
+  });
+  app.openapi(getArtifactRoute, (c) =>
+    c.json({
+      artifact: {
+        id: "01",
+        projectId: "p",
+        title: "x",
+        archivedAt: null,
+        latestVersion: 1,
+        createdBy: "u",
+        createdAt: "t",
+        updatedAt: "t",
+      },
+      latestVersion: null,
+    }),
+  );
+
+  const updateArtifactRoute = createRoute({
+    operationId: "updateArtifact",
+    method: "patch",
+    path: "/programmatic-api/v1/projects/{projectId}/artifacts/{artifactId}",
+    request: {
+      params: ArtifactParamsSchema,
+      body: {
+        content: { "application/json": { schema: ArtifactTitleBodySchema } },
+      },
+    },
+    responses: {
+      200: {
+        description: "Artifact updated; no new version is created",
+        content: { "application/json": { schema: ArtifactResponseSchema } },
+      },
+      401: { description: "Unauthorized" },
+      400: {
+        description: "Invalid request",
+        content: { "application/json": { schema: ArtifactErrorSchema } },
+      },
+      403: {
+        description: "Forbidden",
+        content: { "application/json": { schema: ArtifactErrorSchema } },
+      },
+      404: {
+        description: "Not found",
+        content: { "application/json": { schema: ArtifactErrorSchema } },
+      },
+    },
+  });
+  app.openapi(updateArtifactRoute, (c) =>
+    c.json({
+      artifact: {
+        id: "01",
+        projectId: "p",
+        title: "x",
+        archivedAt: null,
+        latestVersion: 1,
+        createdBy: "u",
+        createdAt: "t",
+        updatedAt: "t",
+      },
+    }),
+  );
+
+  const archiveArtifactRoute = createRoute({
+    operationId: "archiveArtifact",
+    method: "post",
+    path: "/programmatic-api/v1/projects/{projectId}/artifacts/{artifactId}/archive",
+    request: {
+      params: ArtifactParamsSchema,
+    },
+    responses: {
+      200: {
+        description: "Artifact archived",
+        content: { "application/json": { schema: ArtifactResponseSchema } },
+      },
+      401: { description: "Unauthorized" },
+      403: {
+        description: "Forbidden",
+        content: { "application/json": { schema: ArtifactErrorSchema } },
+      },
+      404: {
+        description: "Not found",
+        content: { "application/json": { schema: ArtifactErrorSchema } },
+      },
+    },
+  });
+  app.openapi(archiveArtifactRoute, (c) =>
+    c.json({
+      artifact: {
+        id: "01",
+        projectId: "p",
+        title: "x",
+        archivedAt: null,
+        latestVersion: 1,
+        createdBy: "u",
+        createdAt: "t",
+        updatedAt: "t",
+      },
+    }),
+  );
+
+  const unarchiveArtifactRoute = createRoute({
+    operationId: "unarchiveArtifact",
+    method: "post",
+    path: "/programmatic-api/v1/projects/{projectId}/artifacts/{artifactId}/unarchive",
+    request: {
+      params: ArtifactParamsSchema,
+    },
+    responses: {
+      200: {
+        description: "Artifact unarchived",
+        content: { "application/json": { schema: ArtifactResponseSchema } },
+      },
+      401: { description: "Unauthorized" },
+      403: {
+        description: "Forbidden",
+        content: { "application/json": { schema: ArtifactErrorSchema } },
+      },
+      404: {
+        description: "Not found",
+        content: { "application/json": { schema: ArtifactErrorSchema } },
+      },
+    },
+  });
+  app.openapi(unarchiveArtifactRoute, (c) =>
+    c.json({
+      artifact: {
+        id: "01",
+        projectId: "p",
+        title: "x",
+        archivedAt: null,
+        latestVersion: 1,
+        createdBy: "u",
+        createdAt: "t",
+        updatedAt: "t",
+      },
+    }),
+  );
+
+  const listArtifactVersionsRoute = createRoute({
+    operationId: "listArtifactVersions",
+    method: "get",
+    path: "/programmatic-api/v1/projects/{projectId}/artifacts/{artifactId}/versions",
+    request: {
+      params: ArtifactParamsSchema,
+    },
+    responses: {
+      200: {
+        description: "Versions, newest first",
+        content: {
+          "application/json": { schema: ArtifactVersionListResponseSchema },
+        },
+      },
+      401: { description: "Unauthorized" },
+      404: {
+        description: "Not found",
+        content: { "application/json": { schema: ArtifactErrorSchema } },
+      },
+    },
+  });
+  app.openapi(listArtifactVersionsRoute, (c) => c.json({ versions: [] }));
+
+  const getArtifactVersionRoute = createRoute({
+    operationId: "getArtifactVersion",
+    method: "get",
+    path: "/programmatic-api/v1/projects/{projectId}/artifacts/{artifactId}/versions/{version}",
+    request: {
+      params: ArtifactVersionParamsSchema,
+    },
+    responses: {
+      200: {
+        description: "Version with its file manifest",
+        content: {
+          "application/json": { schema: ArtifactVersionDetailResponseSchema },
+        },
+      },
+      401: { description: "Unauthorized" },
+      404: {
+        description: "Not found",
+        content: { "application/json": { schema: ArtifactErrorSchema } },
+      },
+    },
+  });
+  app.openapi(getArtifactVersionRoute, (c) =>
+    c.json({
+      version: {
+        artifactId: "01",
+        version: 1,
+        entrypoint: "index.html",
+        treeDigest: "d",
+        fileCount: 1,
+        totalBytes: 1,
+        sessionId: null,
+        createdBy: "u",
+        createdAt: "t",
+      },
+      files: [],
+    }),
+  );
+
+  const downloadArtifactFileRoute = createRoute({
+    operationId: "downloadArtifactFile",
+    method: "get",
+    path: "/programmatic-api/v1/projects/{projectId}/artifacts/{artifactId}/versions/{version}/files/{path}",
+    request: { params: ArtifactVersionFileParamsSchema },
+    responses: {
+      200: {
+        description:
+          "File bytes with the server-decided Content-Type, nosniff and a sandbox CSP",
+        content: {
+          "application/octet-stream": {
+            schema: z.string().openapi({ format: "binary" }),
+          },
+        },
+      },
+      401: { description: "Unauthorized" },
+      404: {
+        description: "Not found",
+        content: { "application/json": { schema: ArtifactErrorSchema } },
+      },
+    },
+  });
+  app.openapi(downloadArtifactFileRoute, (c) => c.body("", 200));
+
+  const createArtifactUploadRoute = createRoute({
+    operationId: "createArtifactUpload",
+    method: "post",
+    path: "/programmatic-api/v1/projects/{projectId}/artifact-uploads",
+    request: {
+      params: ProjectIdParamSchema,
+      headers: ArtifactUploadHeadersSchema,
+      body: {
+        content: {
+          "application/json": { schema: ArtifactUploadCreateBodySchema },
+        },
+      },
+    },
+    responses: {
+      201: {
+        description:
+          "Upload session created or replayed for the same Idempotency-Key",
+        content: {
+          "application/json": { schema: ArtifactUploadSessionSchema },
+        },
+      },
+      200: {
+        description: "The tree equals the latest version; nothing was created",
+        content: { "application/json": { schema: ArtifactUploadNoopSchema } },
+      },
+      401: { description: "Unauthorized" },
+      400: {
+        description: "Invalid request",
+        content: { "application/json": { schema: ArtifactErrorSchema } },
+      },
+      403: {
+        description: "Forbidden",
+        content: { "application/json": { schema: ArtifactErrorSchema } },
+      },
+      404: {
+        description: "Not found",
+        content: { "application/json": { schema: ArtifactErrorSchema } },
+      },
+      409: {
+        description: "Conflict",
+        content: { "application/json": { schema: ArtifactErrorSchema } },
+      },
+      413: {
+        description: "Payload too large",
+        content: { "application/json": { schema: ArtifactErrorSchema } },
+      },
+      415: {
+        description: "Unsupported media type",
+        content: { "application/json": { schema: ArtifactErrorSchema } },
+      },
+      422: {
+        description: "Unprocessable",
+        content: { "application/json": { schema: ArtifactErrorSchema } },
+      },
+    },
+  });
+  app.openapi(createArtifactUploadRoute, (c) =>
+    c.json(
+      {
+        noop: false as const,
+        sessionId: "s",
+        artifactId: "a",
+        baseVersion: null,
+        status: "pending" as const,
+        expiresAt: "t",
+        uploadedPaths: [],
+      },
+      201,
+    ),
+  );
+
+  const uploadArtifactFileRoute = createRoute({
+    operationId: "uploadArtifactFile",
+    method: "put",
+    path: "/programmatic-api/v1/projects/{projectId}/artifact-uploads/{sessionId}/files/{path}",
+    request: {
+      params: ArtifactUploadFileParamsSchema,
+      body: {
+        required: true,
+        content: {
+          "application/octet-stream": {
+            schema: z.string().openapi({ format: "binary" }),
+          },
+        },
+      },
+    },
+    responses: {
+      200: {
+        description: "File stored",
+        content: {
+          "application/json": {
+            schema: z.object({
+              path: z.string(),
+              uploadedCount: z.number().int(),
+            }),
+          },
+        },
+      },
+      401: { description: "Unauthorized" },
+      403: {
+        description: "Forbidden",
+        content: { "application/json": { schema: ArtifactErrorSchema } },
+      },
+      404: {
+        description: "Not found",
+        content: { "application/json": { schema: ArtifactErrorSchema } },
+      },
+      410: {
+        description: "Upload session expired",
+        content: { "application/json": { schema: ArtifactErrorSchema } },
+      },
+      413: {
+        description: "Payload too large",
+        content: { "application/json": { schema: ArtifactErrorSchema } },
+      },
+      422: {
+        description: "Unprocessable",
+        content: { "application/json": { schema: ArtifactErrorSchema } },
+      },
+    },
+  });
+  app.openapi(uploadArtifactFileRoute, (c) =>
+    c.json({ path: "x", uploadedCount: 1 }),
+  );
+
+  const finalizeArtifactUploadRoute = createRoute({
+    operationId: "finalizeArtifactUpload",
+    method: "post",
+    path: "/programmatic-api/v1/projects/{projectId}/artifact-uploads/{sessionId}/finalize",
+    request: {
+      params: ArtifactUploadSessionParamsSchema,
+    },
+    responses: {
+      200: {
+        description:
+          "Version published; repeating the call returns the same result",
+        content: {
+          "application/json": { schema: ArtifactFinalizeResponseSchema },
+        },
+      },
+      401: { description: "Unauthorized" },
+      403: {
+        description: "Forbidden",
+        content: { "application/json": { schema: ArtifactErrorSchema } },
+      },
+      404: {
+        description: "Not found",
+        content: { "application/json": { schema: ArtifactErrorSchema } },
+      },
+      409: {
+        description: "Conflict",
+        content: { "application/json": { schema: ArtifactErrorSchema } },
+      },
+      410: {
+        description: "Upload session expired",
+        content: { "application/json": { schema: ArtifactErrorSchema } },
+      },
+    },
+  });
+  app.openapi(finalizeArtifactUploadRoute, (c) =>
+    c.json({ noop: false as const, artifactId: "a", version: 1 }),
   );
 
   return app.getOpenAPI31Document({
