@@ -9,24 +9,22 @@ export type ArtifactPathError =
   | "FORBIDDEN_CHARACTER"
   | "ABSOLUTE_PATH"
   | "EMPTY_SEGMENT"
-  | "DOT_SEGMENT";
+  | "DOT_SEGMENT"
+  | "NOT_NFC";
 
 const FORBIDDEN_CHARACTERS = /[\\\u0000-\u001f\u007f]/;
 const textEncoder = new TextEncoder();
 
-export function canonicalizeArtifactPath(
-  rawPath: string,
+/**
+ * Validates a path that is already a plain string (e.g. from a JSON body).
+ * It is never percent-decoded and must already be NFC, so the client and the
+ * server agree on the exact bytes that enter the tree digest.
+ */
+export function validateArtifactPath(
+  path: string,
 ): Result<string, ArtifactPathError> {
-  let decoded: string;
-  try {
-    decoded = decodeURIComponent(rawPath);
-  } catch {
-    return err("INVALID_PERCENT_ENCODING");
-  }
-
-  const path = decoded.normalize("NFC");
-
   if (path.length === 0) return err("EMPTY_PATH");
+  if (path.normalize("NFC") !== path) return err("NOT_NFC");
   if (FORBIDDEN_CHARACTERS.test(path)) return err("FORBIDDEN_CHARACTER");
   if (path.startsWith("/")) return err("ABSOLUTE_PATH");
   if (textEncoder.encode(path).length > ARTIFACT_MAX_PATH_BYTES) {
@@ -39,6 +37,20 @@ export function canonicalizeArtifactPath(
   }
 
   return ok(path);
+}
+
+/** Canonicalizes a path taken from a URL: percent-decode once, then NFC. */
+export function canonicalizeArtifactPath(
+  rawPath: string,
+): Result<string, ArtifactPathError> {
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(rawPath);
+  } catch {
+    return err("INVALID_PERCENT_ENCODING");
+  }
+
+  return validateArtifactPath(decoded.normalize("NFC"));
 }
 
 /** Returns canonical paths that collide when compared case-insensitively. */
