@@ -1,5 +1,6 @@
 import type {
   ArtifactObjectListPage,
+  ArtifactObjectPrefixPage,
   ArtifactObjectStore,
   StoredArtifactObject,
 } from "../../application/ports/artifact-object-store";
@@ -53,6 +54,36 @@ export class InMemoryArtifactObjectStore implements ArtifactObjectStore {
     return {
       keys,
       cursor: matching.length > limit ? (keys[keys.length - 1] ?? null) : null,
+    };
+  }
+
+  async deleteMany(keys: string[]): Promise<void> {
+    for (const key of keys) this.objects.delete(key);
+  }
+
+  async listPrefixes(options: {
+    prefix: string;
+    cursor?: string;
+    limit?: number;
+  }): Promise<ArtifactObjectPrefixPage> {
+    const limit = options.limit ?? DEFAULT_LIST_LIMIT;
+    const prefixes = new Set<string>();
+    for (const key of this.objects.keys()) {
+      if (!key.startsWith(options.prefix)) continue;
+      const rest = key.slice(options.prefix.length);
+      const slash = rest.indexOf("/");
+      if (slash >= 0)
+        prefixes.add(`${options.prefix}${rest.slice(0, slash + 1)}`);
+    }
+    const sorted = [...prefixes]
+      .sort()
+      .filter(
+        (prefix) => options.cursor === undefined || prefix > options.cursor,
+      );
+    const page = sorted.slice(0, limit);
+    return {
+      prefixes: page,
+      cursor: sorted.length > limit ? (page[page.length - 1] ?? null) : null,
     };
   }
 }

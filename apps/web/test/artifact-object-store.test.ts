@@ -69,4 +69,57 @@ describe.each(factories)("ArtifactObjectStore (%s)", (_name, create) => {
       `${prefix}list/k3`,
     ]);
   });
+
+  it("deletes many keys at once and ignores missing ones", async () => {
+    for (const name of ["m1", "m2", "m3"]) {
+      await store.put(`${prefix}many/${name}`, bytesOf(name), {
+        contentType: "text/plain",
+      });
+    }
+
+    await store.deleteMany([
+      `${prefix}many/m1`,
+      `${prefix}many/m2`,
+      `${prefix}many/never-existed`,
+    ]);
+
+    expect((await store.list({ prefix: `${prefix}many/` })).keys).toEqual([
+      `${prefix}many/m3`,
+    ]);
+    await store.deleteMany([]);
+  });
+
+  it("lists first-level prefixes with pagination", async () => {
+    for (const project of ["p1", "p2", "p3"]) {
+      await store.put(`${prefix}tree/${project}/blobs/x`, bytesOf("x"), {
+        contentType: "text/plain",
+      });
+    }
+    await store.put(`${prefix}tree/loose`, bytesOf("x"), {
+      contentType: "text/plain",
+    });
+
+    // `limit` counts objects and prefixes together, so a page can hold fewer
+    // prefixes than the limit; follow the cursor to the end.
+    const collected: string[] = [];
+    let cursor: string | undefined;
+    let pages = 0;
+    do {
+      const page = await store.listPrefixes({
+        prefix: `${prefix}tree/`,
+        limit: 2,
+        cursor,
+      });
+      collected.push(...page.prefixes);
+      cursor = page.cursor ?? undefined;
+      pages += 1;
+    } while (cursor !== undefined && pages < 10);
+
+    expect(collected.sort()).toEqual([
+      `${prefix}tree/p1/`,
+      `${prefix}tree/p2/`,
+      `${prefix}tree/p3/`,
+    ]);
+    expect(pages).toBeGreaterThan(1);
+  });
 });

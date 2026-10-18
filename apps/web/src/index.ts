@@ -5,6 +5,7 @@ import {
 } from "@cloudflare/workers-oauth-provider";
 import { Hono } from "hono";
 import { recordBurndownSnapshotsAllActiveIterations } from "./application/usecases/burndown-chart";
+import { cleanupArtifactsScheduled } from "./presentation/scheduled/cleanup-artifacts";
 import { ensureIterationsForAllProjects } from "./presentation/scheduled/ensure-iterations";
 import { healthRoute } from "./presentation/routes/health";
 import { projectsRoute } from "./presentation/routes/projects";
@@ -276,6 +277,8 @@ export default {
         }
       })(),
     );
+    // Independent of the iteration work above: neither can fail the other.
+    ctx.waitUntil(cleanupArtifactsScheduled(env));
   },
 };
 
