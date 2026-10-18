@@ -20,6 +20,10 @@ migrations_dir = "migrations"
 binding = "OAUTH_KV"
 id = "<unique-ID-for-your-oauth-kv>"
 
+[[r2_buckets]]
+binding = "ARTIFACTS"
+bucket_name = "tatsumaki-artifacts-test"
+
 [[durable_objects.bindings]]
 name = "PLANNING_POKER_DO"
 class_name = "PlanningPokerDO"

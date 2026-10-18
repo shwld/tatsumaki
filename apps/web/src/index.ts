@@ -43,6 +43,7 @@ export type Bindings = {
   ASSETS: Fetcher;
   STORY_ATTACHMENTS?: R2Bucket;
   USER_AVATARS?: R2Bucket;
+  ARTIFACTS?: R2Bucket;
   OAUTH_KV?: KVNamespace;
   ACCESS_AUD?: string;
   ACCESS_TEAM_DOMAIN?: string;

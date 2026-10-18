@@ -1,0 +1,30 @@
+{
+  "valid": [
+    { "input": "index.html", "canonical": "index.html" },
+    { "input": "assets/app.js", "canonical": "assets/app.js" },
+    { "input": "a%20b/c.txt", "canonical": "a b/c.txt" },
+    { "input": "%E3%81%82/index.html", "canonical": "あ/index.html" },
+    { "input": "é.txt", "canonical": "é.txt" },
+    { "input": "%252e/a", "canonical": "%2e/a" },
+    { "input": ".hidden/file", "canonical": ".hidden/file" },
+    { "input": "a..b/c", "canonical": "a..b/c" }
+  ],
+  "invalid": [
+    { "input": "", "error": "EMPTY_PATH" },
+    { "input": "%E0%A4%A", "error": "INVALID_PERCENT_ENCODING" },
+    { "input": "a\\b", "error": "FORBIDDEN_CHARACTER" },
+    { "input": "a%5Cb", "error": "FORBIDDEN_CHARACTER" },
+    { "input": "a%00b", "error": "FORBIDDEN_CHARACTER" },
+    { "input": "a%0Ab", "error": "FORBIDDEN_CHARACTER" },
+    { "input": "a%7Fb", "error": "FORBIDDEN_CHARACTER" },
+    { "input": "/abs/index.html", "error": "ABSOLUTE_PATH" },
+    { "input": "%2Fabs", "error": "ABSOLUTE_PATH" },
+    { "input": "a//b", "error": "EMPTY_SEGMENT" },
+    { "input": "a%2F%2Fb", "error": "EMPTY_SEGMENT" },
+    { "input": "dir/", "error": "EMPTY_SEGMENT" },
+    { "input": ".", "error": "DOT_SEGMENT" },
+    { "input": "a/./b", "error": "DOT_SEGMENT" },
+    { "input": "../x", "error": "DOT_SEGMENT" },
+    { "input": "a/%2e%2e/b", "error": "DOT_SEGMENT" }
+  ]
+}

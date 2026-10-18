@@ -25,6 +25,10 @@ bucket_name = "tatsumaki-story-attachments"
 binding = "USER_AVATARS"
 bucket_name = "tatsumaki-user-avatars"
 
+[[r2_buckets]]
+binding = "ARTIFACTS"
+bucket_name = "tatsumaki-artifacts"
+
 [triggers]
 crons = ["0 * * * *"]
 
