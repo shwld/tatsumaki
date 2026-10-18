@@ -1,5 +1,7 @@
 mod adapters;
 mod application;
+mod artifact;
+mod artifact_cli;
 mod desktop_ipc_client;
 mod desktop_ipc_command;
 mod infrastructure;
@@ -29,6 +31,7 @@ pub const EXIT_AUTH: i32 = 3;
 pub const EXIT_NOT_FOUND: i32 = 4;
 pub const EXIT_CONFIG: i32 = 5;
 pub const EXIT_DESKTOP_IPC: i32 = 6;
+pub const EXIT_CONFLICT: i32 = 7;
 
 #[derive(Debug, thiserror::Error)]
 pub enum CliError {
@@ -42,6 +45,15 @@ pub enum CliError {
     Json(#[from] serde_json::Error),
     #[error("Invalid config file: {0}")]
     Toml(#[from] toml::de::Error),
+    /// An error answered by the artifact API; `code` is the server's
+    /// machine-readable error code.
+    #[error("{message}")]
+    Api {
+        status: u16,
+        code: String,
+        message: String,
+        retry_after_secs: Option<u64>,
+    },
 }
 
 #[derive(Parser, Debug)]
@@ -64,6 +76,7 @@ enum Commands {
     Logout,
     Whoami,
     Story(StoryCommand),
+    Artifact(artifact_cli::ArtifactCommand),
     Project(ProjectCommand),
     Desktop(DesktopCommand),
     Update(UpdateCommand),
@@ -291,6 +304,9 @@ pub fn is_unauthorized(error: &CliError) -> bool {
 }
 
 pub fn exit_code_for_error(error: &CliError) -> i32 {
+    if let CliError::Api { status, code, .. } = error {
+        return exit_code_for_api_error(*status, code);
+    }
     let msg = error.to_string();
     if msg.contains("Unauthorized") {
         EXIT_AUTH
@@ -304,6 +320,28 @@ pub fn exit_code_for_error(error: &CliError) -> i32 {
         EXIT_NOT_FOUND
     } else {
         EXIT_GENERAL
+    }
+}
+
+/// Exit code for an artifact API error. The server's `code` decides; the
+/// message text is never inspected (it can contain words like "required").
+pub fn exit_code_for_api_error(status: u16, code: &str) -> i32 {
+    match code {
+        "UNAUTHORIZED" | "FORBIDDEN" => EXIT_AUTH,
+        "BASE_VERSION_CONFLICT" | "PUBLISH_CONFLICT" => EXIT_CONFLICT,
+        "NOT_FOUND" | "ARTIFACT_NOT_FOUND" | "VERSION_NOT_FOUND" | "FILE_NOT_FOUND"
+        | "SESSION_NOT_FOUND" => EXIT_NOT_FOUND,
+        "INVALID_REQUEST" | "EMPTY_MANIFEST" | "INVALID_PATH" | "DUPLICATE_PATH"
+        | "SENSITIVE_FILE" | "INVALID_SIZE" | "INVALID_SHA256" | "INVALID_ENTRYPOINT"
+        | "TOO_MANY_FILES" | "FILE_TOO_LARGE" | "TOTAL_TOO_LARGE"
+        | "UNSUPPORTED_MEDIA_TYPE" | "IDEMPOTENCY_KEY_REUSED" | "TREE_DIGEST_MISMATCH"
+        | "FILE_NOT_IN_MANIFEST" | "FILE_SIZE_MISMATCH" | "FILE_DIGEST_MISMATCH" => {
+            EXIT_INVALID_ARGUMENT
+        }
+        _ if status == 401 => EXIT_AUTH,
+        _ if status == 403 => EXIT_AUTH,
+        _ if status == 404 => EXIT_NOT_FOUND,
+        _ => EXIT_GENERAL,
     }
 }
 
@@ -374,6 +412,17 @@ async fn run() -> Result<(), (CliError, i32)> {
                 }
             }
             Ok(())
+        }
+        Commands::Artifact(artifact_cmd) => {
+            let base_url = resolve_base_url(&config_store, cli.base_url.clone())?;
+            let service = build_service(base_url.clone());
+            if let Some(warning) = service
+                .check_version_compatibility(&base_url, env!("CARGO_PKG_VERSION"))
+                .await
+            {
+                eprintln!("{warning}");
+            }
+            artifact_cli::run_artifact(artifact_cmd, &base_url, &service, cli.json).await
         }
         Commands::Story(story_cmd) => {
             let base_url = resolve_base_url(&config_store, cli.base_url.clone())?;
@@ -856,5 +905,117 @@ mod tests {
         ]);
 
         assert!(result.is_err());
+    }
+
+    // --- tm artifact ---
+
+    use crate::artifact_cli::{ArtifactCommand, ArtifactSubcommand};
+
+    fn parse_artifact(args: &[&str]) -> Result<ArtifactSubcommand, clap::Error> {
+        let mut argv = vec!["tm", "artifact"];
+        argv.extend_from_slice(args);
+        let cli = Cli::try_parse_from(argv)?;
+        let Commands::Artifact(ArtifactCommand { command }) = cli.command else {
+            panic!("expected an artifact command");
+        };
+        Ok(command)
+    }
+
+    #[test]
+    fn artifact_create_needs_project_title_and_path() {
+        assert!(parse_artifact(&["create", "--project", "p", "--title", "T", "--path", "dist"]).is_ok());
+        assert!(parse_artifact(&["create", "--title", "T", "--path", "dist"]).is_err());
+        assert!(parse_artifact(&["create", "--project", "p", "--path", "dist"]).is_err());
+        assert!(parse_artifact(&["create", "--project", "p", "--title", "T"]).is_err());
+    }
+
+    #[test]
+    fn artifact_update_needs_a_base_version_exactly_when_a_directory_is_given() {
+        assert!(parse_artifact(&["update", "--project", "p", "A1", "--title", "New"]).is_ok());
+        assert!(parse_artifact(&["update", "--project", "p", "A1", "--path", "dist", "--base-version", "2"]).is_ok());
+        assert!(parse_artifact(&["update", "--project", "p", "A1", "--path", "dist"]).is_err());
+        assert!(parse_artifact(&["update", "--project", "p", "A1", "--base-version", "2"]).is_err());
+        assert!(
+            parse_artifact(&["update", "--project", "p", "A1", "--title", "T", "--path", "dist", "--base-version", "2"])
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn artifact_download_needs_an_output_directory_and_takes_an_optional_version() {
+        assert!(parse_artifact(&["download", "--project", "p", "A1"]).is_err());
+        let ArtifactSubcommand::Download { version, .. } =
+            parse_artifact(&["download", "--project", "p", "A1", "--out", "site", "--version", "3"]).unwrap()
+        else {
+            panic!("expected download");
+        };
+        assert_eq!(version, Some(3));
+        let ArtifactSubcommand::Download { version, .. } =
+            parse_artifact(&["download", "--project", "p", "A1", "--out", "site"]).unwrap()
+        else {
+            panic!("expected download");
+        };
+        assert_eq!(version, None);
+    }
+
+    #[test]
+    fn artifact_list_get_versions_archive_and_unarchive_parse() {
+        let ArtifactSubcommand::List { archived, .. } =
+            parse_artifact(&["list", "--project", "p", "--archived"]).unwrap()
+        else {
+            panic!("expected list");
+        };
+        assert!(archived);
+        let ArtifactSubcommand::Get { files, .. } =
+            parse_artifact(&["get", "--project", "p", "A1", "--files"]).unwrap()
+        else {
+            panic!("expected get");
+        };
+        assert!(files);
+        for name in ["versions", "archive", "unarchive"] {
+            assert!(parse_artifact(&[name, "--project", "p", "A1"]).is_ok(), "{name}");
+        }
+    }
+
+    #[test]
+    fn artifact_commands_honour_the_global_json_flag() {
+        let cli = Cli::try_parse_from(["tm", "--json", "artifact", "list", "--project", "p"]).unwrap();
+        assert!(cli.json);
+    }
+
+    #[test]
+    fn every_server_error_code_maps_to_the_documented_exit_code() {
+        let fixture = crate::artifact::read_fixture("artifact-error-codes.json");
+        let table = fixture["statusByCode"].as_object().unwrap();
+        assert!(table.len() >= 25, "the fixture should list every server code");
+        for (code, status) in table {
+            let status = status.as_u64().unwrap() as u16;
+            let expected = match (status, code.as_str()) {
+                (_, "BASE_VERSION_CONFLICT" | "PUBLISH_CONFLICT") => EXIT_CONFLICT,
+                (403, _) => EXIT_AUTH,
+                (404, _) => EXIT_NOT_FOUND,
+                (400 | 413 | 415 | 422, _) => EXIT_INVALID_ARGUMENT,
+                _ => EXIT_GENERAL,
+            };
+            assert_eq!(exit_code_for_api_error(status, code), expected, "{code} ({status})");
+        }
+    }
+
+    #[test]
+    fn an_api_error_is_classified_by_its_code_not_by_its_message() {
+        let error = CliError::Api {
+            status: 500,
+            code: "INTERNAL_ERROR".to_string(),
+            message: "Idempotency-Key header is required".to_string(),
+            retry_after_secs: None,
+        };
+        assert_eq!(exit_code_for_error(&error), EXIT_GENERAL);
+        let conflict = CliError::Api {
+            status: 409,
+            code: "BASE_VERSION_CONFLICT".to_string(),
+            message: "baseVersion 1 is not the latest version".to_string(),
+            retry_after_secs: None,
+        };
+        assert_eq!(exit_code_for_error(&conflict), EXIT_CONFLICT);
     }
 }

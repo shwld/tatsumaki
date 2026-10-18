@@ -1,0 +1,38 @@
+{
+  "sensitive": [
+    ".env",
+    ".env.production",
+    "config/.ENV",
+    ".git/config",
+    "a/.git/HEAD",
+    "key.pem",
+    "certs/site.CRT",
+    "id.key",
+    "x.p12",
+    "x.pfx",
+    "aws/credentials",
+    "my-secret.json",
+    "api-token.txt",
+    ".npmrc",
+    ".netrc",
+    ".envrc",
+    ".pypirc",
+    ".docker/config.json",
+    "home/.DOCKER/config.json",
+    ".aws/config",
+    ".ssh/config",
+    ".ssh/id_ed25519",
+    ".kube/config",
+    ".gnupg/pubring.kbx"
+  ],
+  "allowed": [
+    "index.html",
+    "assets/app.js",
+    "environment.js",
+    "gitignore.txt",
+    "docker/config.json",
+    "docs/ssh-guide.html",
+    ".envfoo",
+    "keyboard.js"
+  ]
+}
