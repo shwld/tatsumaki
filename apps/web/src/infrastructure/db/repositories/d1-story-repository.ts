@@ -1,4 +1,14 @@
-import { and, asc, desc, eq, inArray, or, sql, type SQL } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  inArray,
+  isNull,
+  or,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 import { err, ok, type Result } from "neverthrow";
 import { ulid } from "ulid";
 import type {
@@ -8,7 +18,11 @@ import type {
   StoryStatus,
   StoryType,
 } from "../../../domain/entities/story";
-import { STORY_STATUSES } from "../../../domain/entities/story";
+import {
+  INVALID_STORY_IS_ICEBOX_ERROR,
+  resolveStoryIsIcebox,
+  STORY_STATUSES,
+} from "../../../domain/entities/story";
 import type {
   AcceptedStoryIterationAnchor,
   CreateStoryInput,
@@ -804,8 +818,20 @@ export class D1StoryRepository implements StoryRepository {
     const shouldUpdateStatusTimestamp =
       input.status !== undefined && input.status !== current.status;
     const nextStatus = (input.status ?? current.status) as StoryStatus;
-    const nextIsIcebox =
-      input.isIcebox !== undefined ? input.isIcebox : current.isIcebox === 1;
+    // Re-resolve against the row just read so a concurrent writer cannot make
+    // the use case's earlier snapshot produce an invalid Icebox/status pair.
+    const resolvedIsIcebox = resolveStoryIsIcebox({
+      requested: input.isIcebox,
+      current: {
+        isIcebox: current.isIcebox === 1,
+        iterationId: current.iterationId,
+      },
+      nextStatus,
+    });
+    if (resolvedIsIcebox.isErr()) {
+      return err(INVALID_STORY_IS_ICEBOX_ERROR);
+    }
+    const nextIsIcebox = resolvedIsIcebox.value ?? current.isIcebox === 1;
 
     const prevStatus = current.status as StoryStatus;
     const setCompletedAtNow =
@@ -862,7 +888,7 @@ export class D1StoryRepository implements StoryRepository {
       shouldClearIterationId = !assignedCurrentIteration;
     }
 
-    await this.db
+    const updatedRows = await this.db
       .update(storiesTable)
       .set({
         ...(input.title !== undefined ? { title: input.title } : {}),
@@ -883,8 +909,8 @@ export class D1StoryRepository implements StoryRepository {
         ...(input.releaseDate !== undefined
           ? { releaseDate: input.releaseDate }
           : {}),
-        ...(input.isIcebox !== undefined
-          ? { isIcebox: input.isIcebox ? 1 : 0 }
+        ...(resolvedIsIcebox.value !== undefined
+          ? { isIcebox: resolvedIsIcebox.value ? 1 : 0 }
           : {}),
         ...(autoAssignedIterationId !== null
           ? { iterationId: autoAssignedIterationId }
@@ -901,8 +927,19 @@ export class D1StoryRepository implements StoryRepository {
         and(
           eq(storiesTable.projectId, input.projectId),
           eq(storiesTable.id, input.id),
+          // Optimistic guard on the columns the Icebox invariant depends on.
+          eq(storiesTable.status, current.status),
+          eq(storiesTable.isIcebox, current.isIcebox),
+          current.iterationId === null
+            ? isNull(storiesTable.iterationId)
+            : eq(storiesTable.iterationId, current.iterationId),
         ),
-      );
+      )
+      .returning({ id: storiesTable.id });
+
+    if (updatedRows.length === 0) {
+      return err(STORY_REPOSITORY_ERROR);
+    }
 
     if (input.ownerIds !== undefined) {
       await this.db
