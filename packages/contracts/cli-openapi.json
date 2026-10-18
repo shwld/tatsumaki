@@ -237,6 +237,358 @@
           }
         },
         "required": ["id", "email", "displayName"]
+      },
+      "ArtifactListResponse": {
+        "type": "object",
+        "properties": {
+          "artifacts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Artifact"
+            }
+          }
+        },
+        "required": ["artifacts"]
+      },
+      "Artifact": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "01KNCFJZJ0Z74X92QPCE0D9MK8"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "archivedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "latestVersion": {
+            "type": "integer",
+            "nullable": true
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "projectId",
+          "title",
+          "archivedAt",
+          "latestVersion",
+          "createdBy",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "ArtifactDetailResponse": {
+        "type": "object",
+        "properties": {
+          "artifact": {
+            "$ref": "#/components/schemas/Artifact"
+          },
+          "latestVersion": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ArtifactVersion"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/ArtifactFile"
+                    }
+                  }
+                },
+                "required": ["files"],
+                "nullable": true
+              }
+            ]
+          }
+        },
+        "required": ["artifact", "latestVersion"]
+      },
+      "ArtifactFile": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "contentType": {
+            "type": "string"
+          }
+        },
+        "required": ["path", "size", "sha256", "contentType"]
+      },
+      "ArtifactVersion": {
+        "type": "object",
+        "properties": {
+          "artifactId": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "entrypoint": {
+            "type": "string"
+          },
+          "treeDigest": {
+            "type": "string"
+          },
+          "fileCount": {
+            "type": "integer"
+          },
+          "totalBytes": {
+            "type": "integer"
+          },
+          "sessionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "artifactId",
+          "version",
+          "entrypoint",
+          "treeDigest",
+          "fileCount",
+          "totalBytes",
+          "sessionId",
+          "createdBy",
+          "createdAt"
+        ]
+      },
+      "ArtifactResponse": {
+        "type": "object",
+        "properties": {
+          "artifact": {
+            "$ref": "#/components/schemas/Artifact"
+          }
+        },
+        "required": ["artifact"]
+      },
+      "ArtifactVersionListResponse": {
+        "type": "object",
+        "properties": {
+          "versions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArtifactVersion"
+            }
+          }
+        },
+        "required": ["versions"]
+      },
+      "ArtifactVersionDetailResponse": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "$ref": "#/components/schemas/ArtifactVersion"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArtifactFile"
+            }
+          }
+        },
+        "required": ["version", "files"]
+      },
+      "ArtifactUploadCreateResponse": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/ArtifactUploadSession"
+          },
+          {
+            "$ref": "#/components/schemas/ArtifactUploadNoop"
+          }
+        ]
+      },
+      "ArtifactUploadSession": {
+        "type": "object",
+        "properties": {
+          "noop": {
+            "type": "boolean",
+            "enum": [false]
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "artifactId": {
+            "type": "string"
+          },
+          "baseVersion": {
+            "type": "integer",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "published", "expired"]
+          },
+          "expiresAt": {
+            "type": "string"
+          },
+          "uploadedPaths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "noop",
+          "sessionId",
+          "artifactId",
+          "baseVersion",
+          "status",
+          "expiresAt",
+          "uploadedPaths"
+        ]
+      },
+      "ArtifactUploadNoop": {
+        "type": "object",
+        "properties": {
+          "noop": {
+            "type": "boolean",
+            "enum": [true]
+          },
+          "artifactId": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          }
+        },
+        "required": ["noop", "artifactId", "version"]
+      },
+      "ArtifactUploadCreateBody": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/ArtifactUploadNewBody"
+          },
+          {
+            "$ref": "#/components/schemas/ArtifactUploadUpdateBody"
+          }
+        ]
+      },
+      "ArtifactUploadNewBody": {
+        "type": "object",
+        "properties": {
+          "entrypoint": {
+            "type": "string"
+          },
+          "treeDigest": {
+            "type": "string"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "size": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "sha256": {
+                  "type": "string"
+                }
+              },
+              "required": ["path", "size", "sha256"]
+            }
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": ["entrypoint", "treeDigest", "files", "title"]
+      },
+      "ArtifactUploadUpdateBody": {
+        "type": "object",
+        "properties": {
+          "entrypoint": {
+            "type": "string"
+          },
+          "treeDigest": {
+            "type": "string"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "size": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "sha256": {
+                  "type": "string"
+                }
+              },
+              "required": ["path", "size", "sha256"]
+            }
+          },
+          "artifactId": {
+            "type": "string"
+          },
+          "baseVersion": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "entrypoint",
+          "treeDigest",
+          "files",
+          "artifactId",
+          "baseVersion"
+        ]
+      },
+      "ArtifactFinalizeResponse": {
+        "type": "object",
+        "properties": {
+          "noop": {
+            "type": "boolean",
+            "enum": [false]
+          },
+          "artifactId": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          }
+        },
+        "required": ["noop", "artifactId", "version"]
       }
     },
     "parameters": {}
@@ -698,6 +1050,627 @@
           },
           "401": {
             "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/programmatic-api/v1/projects/{projectId}/artifacts": {
+      "get": {
+        "operationId": "listArtifacts",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "example": "project-123"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": ["true", "false"]
+            },
+            "required": false,
+            "name": "archived",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Artifacts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/programmatic-api/v1/projects/{projectId}/artifacts/{artifactId}": {
+      "get": {
+        "operationId": "getArtifact",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "example": "project-123"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "artifactId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Artifact with its latest version",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactDetailResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateArtifact",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "example": "project-123"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "artifactId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  }
+                },
+                "required": ["title"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Artifact updated; no new version is created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/programmatic-api/v1/projects/{projectId}/artifacts/{artifactId}/archive": {
+      "post": {
+        "operationId": "archiveArtifact",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "example": "project-123"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "artifactId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Artifact archived",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/programmatic-api/v1/projects/{projectId}/artifacts/{artifactId}/unarchive": {
+      "post": {
+        "operationId": "unarchiveArtifact",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "example": "project-123"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "artifactId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Artifact unarchived",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/programmatic-api/v1/projects/{projectId}/artifacts/{artifactId}/versions": {
+      "get": {
+        "operationId": "listArtifactVersions",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "example": "project-123"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "artifactId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versions, newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactVersionListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/programmatic-api/v1/projects/{projectId}/artifacts/{artifactId}/versions/{version}": {
+      "get": {
+        "operationId": "getArtifactVersion",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "example": "project-123"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "artifactId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$",
+              "example": "1"
+            },
+            "required": true,
+            "name": "version",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Version with its file manifest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactVersionDetailResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/programmatic-api/v1/projects/{projectId}/artifacts/{artifactId}/versions/{version}/files/{path}": {
+      "get": {
+        "operationId": "downloadArtifactFile",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "example": "project-123"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "artifactId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$",
+              "example": "1"
+            },
+            "required": true,
+            "name": "version",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "File path inside the version; may contain slashes",
+              "example": "assets/app.js"
+            },
+            "required": true,
+            "description": "File path inside the version; may contain slashes",
+            "name": "path",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File bytes with the server-decided Content-Type, nosniff and a sandbox CSP",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/programmatic-api/v1/projects/{projectId}/artifact-uploads": {
+      "post": {
+        "operationId": "createArtifactUpload",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "example": "project-123"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "required": true,
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ArtifactUploadCreateBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The tree equals the latest version (noop: true); nothing was created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactUploadCreateResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Upload session created, or replayed for the same Idempotency-Key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactUploadCreateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "413": {
+            "description": "Payload too large"
+          },
+          "415": {
+            "description": "Unsupported media type"
+          },
+          "422": {
+            "description": "Unprocessable"
+          }
+        }
+      }
+    },
+    "/programmatic-api/v1/projects/{projectId}/artifact-uploads/{sessionId}/files/{path}": {
+      "put": {
+        "operationId": "uploadArtifactFile",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "example": "project-123"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "sessionId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "File path in the manifest; may contain slashes"
+            },
+            "required": true,
+            "description": "File path in the manifest; may contain slashes",
+            "name": "path",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "File stored",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "uploadedCount": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": ["path", "uploadedCount"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "410": {
+            "description": "Upload session expired"
+          },
+          "413": {
+            "description": "Payload too large"
+          },
+          "422": {
+            "description": "Unprocessable"
+          }
+        }
+      }
+    },
+    "/programmatic-api/v1/projects/{projectId}/artifact-uploads/{sessionId}/finalize": {
+      "post": {
+        "operationId": "finalizeArtifactUpload",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "example": "project-123"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "sessionId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Version published; repeating the call returns the same result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactFinalizeResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "410": {
+            "description": "Upload session expired"
           }
         }
       }

@@ -11,12 +11,15 @@ describe("ARTIFACTS bucket access", () => {
     });
   }
 
-  it("is referenced only by the Env binding type", () => {
+  it("is referenced only by the Env binding type and the artifact routes that build the object store", () => {
     const srcRoot = path.resolve(__dirname, "../src");
     const referencing = listSourceFiles(srcRoot)
       .filter((file) => /\bARTIFACTS\b/.test(readFileSync(file, "utf8")))
       .map((file) => path.relative(srcRoot, file));
-    expect(referencing).toEqual(["index.ts"]);
+    expect(referencing.sort()).toEqual([
+      "index.ts",
+      "presentation/routes/artifacts/routes.ts",
+    ]);
   });
 
   it("keeps R2Bucket out of the application and domain layers", () => {

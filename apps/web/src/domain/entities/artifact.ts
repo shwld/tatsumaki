@@ -44,6 +44,7 @@ export type ArtifactManifestEntry = {
   path: string;
   size: number;
   sha256: string;
+  contentType: string;
 };
 
 export type ArtifactUploadSession = {
@@ -52,6 +53,8 @@ export type ArtifactUploadSession = {
   projectId: string;
   artifactId: string;
   baseVersion: number | null;
+  title: string;
+  entrypoint: string;
   treeDigest: string;
   manifest: ArtifactManifestEntry[];
   requestHash: string;

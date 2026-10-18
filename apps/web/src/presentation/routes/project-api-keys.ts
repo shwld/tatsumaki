@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type { Env } from "../../index";
+import { API_KEY_SCOPES } from "../../domain/entities/project-api-key";
 import { D1ProjectApiKeyRepository } from "../../infrastructure/db/repositories/d1-project-api-key-repository";
 import { issueProjectApiKey } from "../../application/usecases/issue-project-api-key";
 import {
@@ -85,7 +86,7 @@ projectApiKeysRoute.post("/projects/:projectId/api-keys", async (c) => {
     }
     if (result.error === API_KEY_INVALID_SCOPE_ERROR) {
       return c.json(
-        { error: "Invalid scope. Valid scopes: story:write, story:read" },
+        { error: `Invalid scope. Valid scopes: ${API_KEY_SCOPES.join(", ")}` },
         400,
       );
     }

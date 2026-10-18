@@ -52,8 +52,17 @@ function sessionInput(
     projectId: PROJECT_A,
     artifactId: ARTIFACT_ID,
     baseVersion: null,
+    title: "Demo",
+    entrypoint: "index.html",
     treeDigest: SHA,
-    manifest: [{ path: "index.html", size: 10, sha256: SHA }],
+    manifest: [
+      {
+        path: "index.html",
+        size: 10,
+        sha256: SHA,
+        contentType: "text/html; charset=utf-8",
+      },
+    ],
     requestHash: "hash-1",
     idempotencyKey: "key-1",
     expiresAt: "2099-01-01T00:00:00.000Z",

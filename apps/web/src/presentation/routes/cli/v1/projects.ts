@@ -2,10 +2,15 @@ import { Hono } from "hono";
 import { getProject } from "../../../../application/usecases/get-project";
 import type { Env } from "../../../../index";
 import { requireProjectMembership } from "../../project-membership";
+import { createArtifactRoutes } from "../../artifacts/routes";
 import { cliV1StoriesRoute } from "./stories";
 
 export const cliV1ProjectsRoute = new Hono<Env>();
 cliV1ProjectsRoute.route("/", cliV1StoriesRoute);
+cliV1ProjectsRoute.route(
+  "/",
+  createArtifactRoutes({ readMiddleware: [], writeMiddleware: [] }),
+);
 
 cliV1ProjectsRoute.get("/:projectId", async (c) => {
   const projectId = c.req.param("projectId");

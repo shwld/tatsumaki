@@ -1,4 +1,9 @@
-export const API_KEY_SCOPES = ["story:write", "story:read"] as const;
+export const API_KEY_SCOPES = [
+  "story:write",
+  "story:read",
+  "artifact:write",
+  "artifact:read",
+] as const;
 
 export type ApiKeyScope = (typeof API_KEY_SCOPES)[number];
 
