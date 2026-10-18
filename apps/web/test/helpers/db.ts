@@ -15,6 +15,13 @@ import { storyBlockersTable } from "../../src/infrastructure/db/schema/story-blo
 import { iterationDailySnapshotsTable } from "../../src/infrastructure/db/schema/iteration-daily-snapshots";
 import { iterationsTable } from "../../src/infrastructure/db/schema/iterations";
 import { storyTimelineEntriesTable } from "../../src/infrastructure/db/schema/story-timeline";
+import {
+  artifactFilesTable,
+  artifactUploadSessionFilesTable,
+  artifactUploadSessionsTable,
+  artifactVersionsTable,
+  artifactsTable,
+} from "../../src/infrastructure/db/schema/artifacts";
 import { usersTable } from "../../src/infrastructure/db/schema/users";
 
 /**
@@ -27,6 +34,11 @@ import { usersTable } from "../../src/infrastructure/db/schema/users";
  */
 export async function resetDatabase(db: D1Database): Promise<void> {
   const client = createDb(db);
+  await client.delete(artifactUploadSessionFilesTable);
+  await client.delete(artifactUploadSessionsTable);
+  await client.delete(artifactFilesTable);
+  await client.delete(artifactVersionsTable);
+  await client.delete(artifactsTable);
   await client.delete(projectInvitationsTable);
   await client.delete(projectMembersTable);
   await client.delete(projectApiKeysTable);

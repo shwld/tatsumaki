@@ -123,6 +123,14 @@ README の R2 bucket 記述、setup script（3 つ目の bucket、`ARTIFACT_CONT
 - Access bypass を採る場合、`/artifact-content/*` の認可は capability token のみになる
 - `ARTIFACTS` bucket と signing key の追加で self-hosting 手順・`wrangler*.toml` の更新が必要
 
+## Amendments
+
+### 2026-10-18 (story #310)
+
+- `artifact_upload_sessions.artifact_id` は `NOT NULL` とし、新規作成でも session 作成時に server が ULID を採番する。blob key（§6）が `artifact` を含み PUT が finalize 前に行われるため。`artifacts` への FK は張らない（行は finalize で INSERT される）。新規か更新かは `base_version IS NULL` で区別する。孤立 session は project 削除の cascade と §6 の cleanup で回収する。
+- `artifact_upload_sessions.request_hash`（`NOT NULL`）を追加する。client 指定の artifact_id（新規は空）・base_version・tree_digest の sha256 とし、同一 `Idempotency-Key` で値が異なれば 422 とする。`status` は `pending | published | expired` の CHECK、`expires_at` / `manifest_json` は `NOT NULL`。同一 key の既存 session は status を問わずそのまま返す。
+- `created_by` は users への FK を張らず、`story_attachments.uploaded_by` と同じ監査用途として user 削除後も残す。`artifact_upload_sessions.created_by` は IDOR 照合に使うが、未使用 session は期限切れ cleanup で消えるため user 削除後に残っても無害。delete-account の cascade 契約は変更しない。
+
 ## References
 
 - https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/iframe

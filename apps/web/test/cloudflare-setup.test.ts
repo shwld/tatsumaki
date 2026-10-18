@@ -67,6 +67,8 @@ describe("Cloudflare self-hosting setup", () => {
     expect(config).not.toContain("undefined");
     expect(config).toContain('id = "kv-id"');
     expect(config).toContain('bucket_name = "tatsumaki-user-avatars"');
+    expect(config).toContain('binding = "ARTIFACTS"');
+    expect(config).toContain('bucket_name = "tatsumaki-artifacts"');
     expect(config).not.toContain("api-token");
     expect(config).not.toContain("account-id");
     expect(config).not.toContain("CONTROL_PLANE");
@@ -123,6 +125,8 @@ describe("Cloudflare self-hosting setup", () => {
       envelope({ id: "story-r2", name: "tatsumaki-story-attachments" }),
       envelope({ buckets: [] }),
       envelope({ id: "avatars-r2", name: "tatsumaki-user-avatars" }),
+      envelope({ buckets: [] }),
+      envelope({ id: "artifacts-r2", name: "tatsumaki-artifacts" }),
       envelope({ subdomain: "account-subdomain" }),
       envelope([{ id: "worker-id", name: "tatsumaki" }]),
       envelope([]),
@@ -209,12 +213,21 @@ describe("Cloudflare self-hosting setup", () => {
         buckets: [
           { name: "tatsumaki-story-attachments" },
           { name: "tatsumaki-user-avatars" },
+          { name: "tatsumaki-artifacts" },
         ],
       }),
       envelope({
         buckets: [
           { name: "tatsumaki-story-attachments" },
           { name: "tatsumaki-user-avatars" },
+          { name: "tatsumaki-artifacts" },
+        ],
+      }),
+      envelope({
+        buckets: [
+          { name: "tatsumaki-story-attachments" },
+          { name: "tatsumaki-user-avatars" },
+          { name: "tatsumaki-artifacts" },
         ],
       }),
       envelope({ subdomain: "account-subdomain" }),
@@ -262,6 +275,7 @@ describe("Cloudflare self-hosting setup", () => {
       "GET",
       "GET",
       "GET",
+      "GET",
     ]);
   });
 
@@ -276,6 +290,8 @@ describe("Cloudflare self-hosting setup", () => {
       envelope({ name: "tatsumaki-staging-story-attachments" }),
       envelope({ buckets: [] }),
       envelope({ name: "tatsumaki-staging-user-avatars" }),
+      envelope({ buckets: [] }),
+      envelope({ name: "tatsumaki-staging-artifacts" }),
       envelope({ subdomain: "account-subdomain" }),
       envelope([{ id: "staging-worker-id", name: "tatsumaki-staging" }]),
       envelope([]),
@@ -334,7 +350,7 @@ describe("Cloudflare self-hosting setup", () => {
     expect(generatedConfig).toContain('ENTITLEMENT_MODE = "control-plane"');
     expect(generatedConfig).not.toContain('name = "tatsumaki"\n');
     expect(calls.map((call) => JSON.stringify(call)).join("\n")).not.toMatch(
-      /tatsumaki-(?:db|oauth-kv|story-attachments|user-avatars)(?:["?}]|$)/,
+      /tatsumaki-(?:db|oauth-kv|story-attachments|user-avatars|artifacts)(?:["?}]|$)/,
     );
     expect(commands.map((command) => command.join(" "))).toEqual([
       "bun run build:client",

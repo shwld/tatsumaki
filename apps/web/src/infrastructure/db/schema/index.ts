@@ -17,3 +17,10 @@ export { savedFiltersTable } from "./saved-filters";
 export { notificationSettingsTable } from "./notification-settings";
 export { notificationsTable } from "./notifications";
 export { projectApiKeysTable } from "./project-api-keys";
+export {
+  artifactsTable,
+  artifactVersionsTable,
+  artifactFilesTable,
+  artifactUploadSessionsTable,
+  artifactUploadSessionFilesTable,
+} from "./artifacts";

@@ -28,6 +28,7 @@ export type EnvironmentPlan = {
   kvName: string;
   storyAttachmentsBucket: string;
   userAvatarsBucket: string;
+  artifactsBucket: string;
   accessName: string;
   accessPolicyName: string;
 };
@@ -76,6 +77,7 @@ export function buildEnvironmentPlans(
       kvName: `${base}-oauth-kv`,
       storyAttachmentsBucket: `${base}-story-attachments`,
       userAvatarsBucket: `${base}-user-avatars`,
+      artifactsBucket: `${base}-artifacts`,
       accessName: base,
       accessPolicyName: `${base} allowed users`,
     };
@@ -147,6 +149,7 @@ export function validateSetupOptions(options: SetupOptions): void {
       plan.kvName,
       plan.storyAttachmentsBucket,
       plan.userAvatarsBucket,
+      plan.artifactsBucket,
     ]) {
       if (name.length > 63)
         throw new Error(
@@ -179,7 +182,9 @@ export async function setupCloudflare(
     log(`Worker: ${plan.workerName}`);
     log(`D1: ${plan.d1Name}`);
     log(`KV: ${plan.kvName}`);
-    log(`R2: ${plan.storyAttachmentsBucket}, ${plan.userAvatarsBucket}`);
+    log(
+      `R2: ${plan.storyAttachmentsBucket}, ${plan.userAvatarsBucket}, ${plan.artifactsBucket}`,
+    );
     log(`Access: ${plan.accessName}`);
     if (plan.environment === "staging" && options.stagingControlPlaneService) {
       log(`Control Plane: ${options.stagingControlPlaneService}`);
@@ -214,6 +219,7 @@ export async function setupCloudflare(
     const kv = await client.ensureKv(plan.kvName);
     await client.ensureR2(plan.storyAttachmentsBucket);
     await client.ensureR2(plan.userAvatarsBucket);
+    await client.ensureR2(plan.artifactsBucket);
 
     const temporaryDirectory = await mkdtemp(
       join(tmpdir(), "tatsumaki-cloudflare-"),
@@ -359,6 +365,10 @@ bucket_name = ${toml(plan.storyAttachmentsBucket)}
 [[r2_buckets]]
 binding = "USER_AVATARS"
 bucket_name = ${toml(plan.userAvatarsBucket)}
+
+[[r2_buckets]]
+binding = "ARTIFACTS"
+bucket_name = ${toml(plan.artifactsBucket)}
 ${controlPlaneBinding}
 
 [triggers]

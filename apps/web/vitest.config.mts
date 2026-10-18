@@ -26,6 +26,7 @@ export default defineConfig(async () => {
         "test/ui-screenshot/**",
         "test/cloudflare-setup.test.ts",
         "test/deploy-config.test.ts",
+        "test/artifact-r2-access.test.ts",
       ],
       testTimeout: 10_000,
       setupFiles: ["./test/helpers/apply-migrations.ts"],
