@@ -141,10 +141,14 @@ const StoryCommentBodySchema = z.object({
   body: z.string().min(1),
 });
 
-const ARTIFACT_ERROR_CODES = Object.keys(STATUS_BY_CODE) as [
-  ArtifactErrorCode,
-  ...ArtifactErrorCode[],
-];
+/**
+ * Codes the artifact routes answer with: the use case errors plus NOT_FOUND
+ * from the access guard, which hides whether a project exists.
+ */
+const ARTIFACT_ERROR_CODES: [string, ...string[]] = [
+  ...(Object.keys(STATUS_BY_CODE) as ArtifactErrorCode[]),
+  "NOT_FOUND",
+] as unknown as [string, ...string[]];
 const ArtifactErrorSchema = z
   .object({
     error: z.string(),
@@ -152,15 +156,13 @@ const ArtifactErrorSchema = z
   })
   .openapi("ArtifactError");
 
-/** A non-2xx answer of an artifact route, listing the codes it can carry. */
-function artifactErrorResponse(status: number, summary: string) {
-  const codes = ARTIFACT_ERROR_CODES.filter(
-    (code) => STATUS_BY_CODE[code] === status,
-  );
-  return {
-    description: `${summary}. code: ${codes.join(", ")}`,
-    content: { "application/json": { schema: ArtifactErrorSchema } },
-  };
+/**
+ * The body is described, not typed per operation: the generated Rust client
+ * accepts only one distinct response body type per operation, and which codes
+ * an operation can return depends on its use case (see ArtifactError).
+ */
+function artifactErrorResponse(_status: number, summary: string) {
+  return { description: `${summary}. Body: ArtifactError` };
 }
 
 const ArtifactSchema = z
@@ -959,6 +961,8 @@ export function buildCliOpenApiDoc() {
   app.openapi(finalizeArtifactUploadRoute, (c) =>
     c.json({ noop: false as const, artifactId: "a", version: 1 }),
   );
+
+  app.openAPIRegistry.register("ArtifactError", ArtifactErrorSchema);
 
   return app.getOpenAPI31Document({
     openapi: "3.1.0",
