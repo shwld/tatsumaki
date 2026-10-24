@@ -124,7 +124,7 @@ async function exists(store: ArtifactObjectStore, key: string) {
 async function publishVersion(hashes: string[]) {
   const session = await createSession({
     hashes,
-    expiresAt: new Date(NOW.getTime() + 3_600_000).toISOString(),
+    expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
   });
   (
     await artifacts().publishUploadSession({
