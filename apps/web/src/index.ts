@@ -26,6 +26,7 @@ import { billingRoute } from "./presentation/routes/billing";
 import { invitationLinksRoute } from "./presentation/routes/invitation-links";
 import { artifactContentRoute } from "./presentation/routes/artifact-content/routes";
 import { artifactPreviewTokenRoute } from "./presentation/routes/artifacts/preview-token";
+import { createArtifactReadRoutes } from "./presentation/routes/artifacts/routes";
 import { spaIndexHeaders } from "./presentation/spa-headers";
 import { PlanningPokerDO } from "./durable-objects/planning-poker-do";
 import { requireAccessAuth } from "./presentation/middleware/access-auth";
@@ -110,6 +111,12 @@ protectedApi.route("/", myWorkRoute);
 protectedApi.route("/", projectApiKeysRoute);
 protectedApi.route("/", billingRoute);
 protectedApi.route("/", artifactPreviewTokenRoute);
+// Read-only on purpose: the Web shows artifacts but never creates, edits or
+// downloads them (ADR-0010 §7); those stay on the CLI / API key routes.
+protectedApi.route(
+  "/projects",
+  createArtifactReadRoutes({ readMiddleware: [] }),
+);
 
 api.route("/", protectedApi);
 
