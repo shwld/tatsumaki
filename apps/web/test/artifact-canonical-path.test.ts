@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
+import bodyFixtures from "./fixtures/artifact-body-paths.json";
 import fixtures from "./fixtures/artifact-paths.json";
 import {
   ARTIFACT_MAX_PATH_BYTES,
   canonicalizeArtifactPath,
   findCaseInsensitiveDuplicates,
+  validateArtifactPath,
 } from "../src/domain/artifacts/canonical-path";
 
 describe("canonicalizeArtifactPath", () => {
@@ -49,5 +51,29 @@ describe("findCaseInsensitiveDuplicates", () => {
 
   it("returns nothing for distinct paths", () => {
     expect(findCaseInsensitiveDuplicates(["a", "b"])).toEqual([]);
+  });
+});
+
+describe("validateArtifactPath (shared body-path fixture)", () => {
+  it.each(bodyFixtures.valid)("accepts %j", (input) => {
+    expect(validateArtifactPath(input)._unsafeUnwrap()).toBe(input);
+  });
+
+  it.each(bodyFixtures.invalid)("rejects %j", ({ input, error }) => {
+    expect(validateArtifactPath(input)._unsafeUnwrapErr()).toBe(error);
+  });
+
+  it.each(
+    bodyFixtures.validC1Control,
+  )("does not treat the C1 control character in %j as forbidden", (input) => {
+    expect(validateArtifactPath(input).isOk()).toBe(true);
+  });
+
+  it("limits the path to the shared UTF-8 byte length", () => {
+    const atLimit = "a".repeat(bodyFixtures.maxBytes);
+    expect(validateArtifactPath(atLimit).isOk()).toBe(true);
+    expect(validateArtifactPath(`${atLimit}a`)._unsafeUnwrapErr()).toBe(
+      "PATH_TOO_LONG",
+    );
   });
 });

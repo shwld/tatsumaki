@@ -176,3 +176,183 @@ pub trait UserGateway {
 pub trait VersionGateway {
     async fn get_version(&self, bearer_token: &str) -> Result<CliVersionResponse, CliError>;
 }
+
+/// Server view of an artifact. Only the fields the CLI prints are kept, so
+/// the CLI output does not change when the server adds fields.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactInfo {
+    pub id: String,
+    pub project_id: String,
+    pub title: String,
+    pub archived_at: Option<String>,
+    pub latest_version: Option<i64>,
+    pub created_by: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactVersionInfo {
+    pub version: i64,
+    pub entrypoint: String,
+    pub tree_digest: String,
+    pub file_count: i64,
+    pub total_bytes: i64,
+    pub created_by: String,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactFileInfo {
+    pub path: String,
+    pub size: u64,
+    pub sha256: String,
+    pub content_type: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactDetailBody {
+    pub artifact: ArtifactInfo,
+    pub latest_version: Option<ArtifactVersionDetailBody>,
+}
+
+/// A version together with its file manifest.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactVersionDetailBody {
+    #[serde(flatten)]
+    pub version: ArtifactVersionInfo,
+    #[serde(default)]
+    pub files: Vec<ArtifactFileInfo>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ArtifactVersionFilesBody {
+    pub version: ArtifactVersionInfo,
+    pub files: Vec<ArtifactFileInfo>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct UploadFileEntry {
+    pub path: String,
+    pub size: u64,
+    pub sha256: String,
+}
+
+/// Request body of `POST .../artifact-uploads`. `artifact_id` and
+/// `base_version` are set together for an update; `title` for a new artifact.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateUploadInput {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub artifact_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub base_version: Option<i64>,
+    pub entrypoint: String,
+    pub tree_digest: String,
+    pub files: Vec<UploadFileEntry>,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct UploadSession {
+    pub session_id: String,
+    pub artifact_id: String,
+    pub status: String,
+    #[serde(default)]
+    pub uploaded_paths: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum CreateUploadOutcome {
+    Session(UploadSession),
+    /// The tree equals the latest version; nothing was created.
+    Noop { artifact_id: String, version: i64 },
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct FinalizeBody {
+    pub artifact_id: String,
+    pub version: i64,
+}
+
+#[async_trait::async_trait]
+pub trait ArtifactGateway {
+    async fn list_artifacts(
+        &self,
+        project: &str,
+        archived: bool,
+        bearer_token: &str,
+    ) -> Result<Vec<ArtifactInfo>, CliError>;
+    async fn get_artifact(
+        &self,
+        project: &str,
+        artifact_id: &str,
+        bearer_token: &str,
+    ) -> Result<ArtifactDetailBody, CliError>;
+    async fn update_artifact_title(
+        &self,
+        project: &str,
+        artifact_id: &str,
+        title: &str,
+        bearer_token: &str,
+    ) -> Result<ArtifactInfo, CliError>;
+    async fn set_artifact_archived(
+        &self,
+        project: &str,
+        artifact_id: &str,
+        archived: bool,
+        bearer_token: &str,
+    ) -> Result<ArtifactInfo, CliError>;
+    async fn list_artifact_versions(
+        &self,
+        project: &str,
+        artifact_id: &str,
+        bearer_token: &str,
+    ) -> Result<Vec<ArtifactVersionInfo>, CliError>;
+    async fn get_artifact_version(
+        &self,
+        project: &str,
+        artifact_id: &str,
+        version: i64,
+        bearer_token: &str,
+    ) -> Result<ArtifactVersionFilesBody, CliError>;
+    async fn create_upload(
+        &self,
+        project: &str,
+        input: &CreateUploadInput,
+        idempotency_key: &str,
+        bearer_token: &str,
+    ) -> Result<CreateUploadOutcome, CliError>;
+    async fn put_upload_file(
+        &self,
+        project: &str,
+        session_id: &str,
+        path: &str,
+        bytes: Vec<u8>,
+        bearer_token: &str,
+    ) -> Result<(), CliError>;
+    async fn finalize_upload(
+        &self,
+        project: &str,
+        session_id: &str,
+        bearer_token: &str,
+    ) -> Result<FinalizeBody, CliError>;
+    /// Downloads one file; reads at most `max_bytes` and fails beyond that.
+    async fn download_file(
+        &self,
+        project: &str,
+        artifact_id: &str,
+        version: i64,
+        path: &str,
+        max_bytes: u64,
+        bearer_token: &str,
+    ) -> Result<Vec<u8>, CliError>;
+}

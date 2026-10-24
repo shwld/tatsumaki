@@ -144,6 +144,57 @@ tm project get <project-id>
 tm --json project get <project-id>
 ```
 
+## Artifacts
+
+An artifact is a built directory (HTML, CSS, JavaScript, images, fonts) stored in a project. Every upload creates an immutable version; the web app shows the latest or a pinned version in a sandboxed preview.
+
+```bash
+tm artifact create --project <project-id> --title "My app" --path ./dist
+tm artifact update --project <project-id> <artifact-id> --path ./dist --base-version 3
+tm artifact update --project <project-id> <artifact-id> --title "New title"
+tm artifact get --project <project-id> <artifact-id> [--files]
+tm artifact list --project <project-id> [--archived]
+tm artifact versions --project <project-id> <artifact-id>
+tm artifact download --project <project-id> <artifact-id> [--version 2] --out ./restored
+tm artifact archive --project <project-id> <artifact-id>
+tm artifact unarchive --project <project-id> <artifact-id>
+```
+
+`create` and `update` print the artifact id, the version, the latest URL and the pinned URL of that version. `--json` prints the same data with a stable shape.
+
+### The directory and `tatsumaki-artifact.json`
+
+The directory must contain `tatsumaki-artifact.json` at its root:
+
+```json
+{
+  "schemaVersion": 1,
+  "entrypoint": "index.html",
+  "exclude": ["**/*.map", ".DS_Store"]
+}
+```
+
+- `entrypoint` is an `.html` file inside the directory. Unknown fields are rejected.
+- `exclude` globs are matched against the path relative to the directory, with `/` separators and case-sensitively. `*` and `?` do not cross `/`, `**` does. A pattern **without a slash only matches at the top level** (`node_modules` does not match `a/node_modules`; use `**/node_modules/**`). `!` negation is not supported. The manifest itself and the entrypoint cannot be excluded.
+- Nothing is skipped silently. The command fails and lists every problem if the directory contains a symbolic link, a socket or pipe, a secret-looking file (`.env*`, `*secret*`, `*credential*`, `*token*`, `*.pem`, `*.key`, `.git/`, `.ssh/`, ...), a file type that is not allowed, or a name that Windows cannot hold. Exclude such files or remove them.
+- Allowed file types: `html css js mjs json txt svg png jpg jpeg gif webp avif ico woff woff2 ttf otf mp3 wav ogg mp4 webm`. Source maps (`.map`), `.md`, `.xml`, `.pdf` and extensionless files are not allowed, so most projects want `"exclude": ["**/*.map", ".DS_Store"]`.
+- Limits per version: 1,000 files, 25 MiB per file, 50 MiB in total, 512 bytes per path. Paths are normalized to Unicode NFC.
+- The artifact runs in a sandbox with no network, cookies or storage: use hash routing (`#/route`) instead of `history.pushState`, and bundle data instead of calling `fetch`.
+
+### Updating and conflicts
+
+`update --path` needs `--base-version`, the version you built from. If someone published a newer version, the command fails with exit code 7 and nothing changes; there is no force option. To go back to an old version, `download` it and `update` from that directory. Uploading a directory identical to the latest version succeeds and reports `noop` without creating a version.
+
+If both `--path` and `--title` are given, the files are published first. If the title change then fails, the new version is already published, the output says so, and you can retry with only `--title`.
+
+### Download
+
+`download` writes into a directory that does not exist or is empty and never overwrites a file. The manifest from the server is validated first (paths, sizes, case collisions, Windows-incompatible names, tree digest), every file is checked against its sha256, and the files are written to a hidden `.tm-artifact-download-*` directory next to the target and moved into place only when everything is intact. If the process is killed, such a leftover directory can be deleted safely.
+
+### Retries and exit codes
+
+Requests are retried up to three times with backoff on network errors, `429` and `5xx`; uploads are idempotent. Large artifacts are uploaded file by file, one at a time (a few hundred files take seconds; 1,000 files of 50 MiB in total depends on your connection). Exit code `7` means a conflict (a newer version exists); the other codes are the same as for `tm story`.
+
 ## Desktop refetch
 
 `tm desktop refetch` sends a local IPC request to a running desktop process.

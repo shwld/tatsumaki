@@ -12,7 +12,7 @@ import type {
 } from "../../../domain/entities/artifact";
 import type { Env } from "../../../index";
 
-const STATUS_BY_CODE: Record<ArtifactErrorCode, ContentfulStatusCode> = {
+export const STATUS_BY_CODE: Record<ArtifactErrorCode, ContentfulStatusCode> = {
   INVALID_REQUEST: 400,
   EMPTY_MANIFEST: 400,
   INVALID_PATH: 400,

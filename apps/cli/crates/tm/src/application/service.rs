@@ -358,6 +358,28 @@ fn code_challenge(verifier: &str) -> String {
     URL_SAFE_NO_PAD.encode(digest)
 }
 
+#[async_trait::async_trait]
+impl<TS, CS, AG, SG, UG, VG, PG> super::artifact_flow::TokenProvider
+    for CliService<TS, CS, AG, SG, UG, VG, PG>
+where
+    TS: TokenStore + Sync,
+    CS: ConfigStore + Sync,
+    AG: AuthGateway + Sync,
+    SG: StoryGateway + Sync,
+    UG: UserGateway + Sync,
+    VG: VersionGateway + Sync,
+    PG: ProjectGateway + Sync,
+{
+    async fn access_token(&self, base_url: &str) -> Result<String, (CliError, i32)> {
+        self.ensure_access_token(base_url).await
+    }
+
+    async fn refresh_access_token(&self, base_url: &str) -> Result<String, (CliError, i32)> {
+        let mut cache = self.token_store.load().map_err(|e| (e, EXIT_AUTH))?;
+        CliService::refresh_access_token(self, base_url, &mut cache).await
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{compatibility_warning, CliVersionResponse};
