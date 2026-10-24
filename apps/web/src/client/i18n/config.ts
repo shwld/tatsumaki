@@ -31,6 +31,10 @@ import {
   projectStoryBreadcrumbEn,
   projectStoryBreadcrumbJa,
 } from "../components/project-story-breadcrumb.i18n";
+import {
+  artifactScreensEn,
+  artifactScreensJa,
+} from "../screens/artifact-screens.i18n";
 import { loginScreenEn, loginScreenJa } from "../screens/login-screen.i18n";
 import {
   projectCreateScreenEn,
@@ -91,6 +95,7 @@ i18n.use(initReactI18next).init({
         ...releaseMarkerCreateDialogJa,
         ...storyPanelJa,
         ...storyAccordionJa,
+        ...artifactScreensJa,
       },
     },
     en: {
@@ -112,6 +117,7 @@ i18n.use(initReactI18next).init({
         ...releaseMarkerCreateDialogEn,
         ...storyPanelEn,
         ...storyAccordionEn,
+        ...artifactScreensEn,
       },
     },
   },

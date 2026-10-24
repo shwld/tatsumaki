@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 import { Project } from "../types/project";
+import { projectArtifactsPath } from "../lib/artifact-routes";
 import {
   projectStoriesPath,
   projectVelocityDashboardPath,
@@ -58,6 +59,12 @@ export function ProjectListItem({ project }: ProjectListItemProps) {
           to={projectVelocityDashboardPath(project.id)}
         >
           {t("projectListItem.velocity")}
+        </Link>
+        <Link
+          className="text-sm font-medium text-blue-700"
+          to={projectArtifactsPath(project.id)}
+        >
+          {t("projectListItem.artifacts")}
         </Link>
       </div>
     </li>

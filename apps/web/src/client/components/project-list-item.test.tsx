@@ -43,6 +43,10 @@ describe("ProjectListItem", () => {
     expect(screen.getByText("設定")).toBeInTheDocument();
     expect(screen.getByText("ストーリー")).toBeInTheDocument();
     expect(screen.getByText("ベロシティ")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Artifacts" })).toHaveAttribute(
+      "href",
+      "/projects/p1/artifacts",
+    );
   });
 
   it("shows user role when present", () => {
