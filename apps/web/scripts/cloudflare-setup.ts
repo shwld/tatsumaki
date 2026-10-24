@@ -291,10 +291,19 @@ export async function setupCloudflare(
         options.allowEmails,
         options.allowDomains,
       );
+      await client.ensureArtifactContentBypass(plan, workerDomain);
 
       await writeFile(
         secretPath,
-        `${JSON.stringify({ ACCESS_AUD: application.aud, ACCESS_TEAM_DOMAIN: teamDomain }, null, 2)}\n`,
+        `${JSON.stringify(
+          {
+            ACCESS_AUD: application.aud,
+            ACCESS_TEAM_DOMAIN: teamDomain,
+            ARTIFACT_CONTENT_SIGNING_KEY: generateSigningKey(),
+          },
+          null,
+          2,
+        )}\n`,
         { mode: 0o600 },
       );
       await runCommand(
@@ -318,6 +327,12 @@ export async function setupCloudflare(
       await rm(temporaryDirectory, { recursive: true, force: true });
     }
   }
+}
+
+/** Regenerated on every run: preview tokens live for 10 minutes only. */
+function generateSigningKey(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return Buffer.from(bytes).toString("base64url");
 }
 
 export function renderWranglerConfig(
@@ -347,6 +362,7 @@ keep_vars = true
 [assets]
 directory = ${toml(join(WEB_DIR, "dist/client"))}
 binding = "ASSETS"
+run_worker_first = ["/", "/index.html"]
 
 [[d1_databases]]
 binding = "DB"
@@ -488,8 +504,57 @@ class CloudflareClient {
         ],
         session_duration: "24h",
         app_launcher_visible: true,
+        same_site_cookie_attribute: "lax",
+        http_only_cookie_attribute: true,
       },
     });
+  }
+
+  /**
+   * Artifact content is authorized by its capability token alone (ADR-0010
+   * §4), so its path is exempted from the Access login. The application has
+   * no worker destination, which keeps ensureAccessApplication from ever
+   * mistaking it for the main application.
+   */
+  async ensureArtifactContentBypass(
+    plan: EnvironmentPlan,
+    domain: string,
+  ): Promise<AccessApplication> {
+    const name = `${plan.accessName} artifact content`;
+    const uri = `${domain}/artifact-content/*`;
+    const applications = await this.listAll<AccessApplication>(
+      "access/apps?per_page=100",
+    );
+    const application =
+      applications.find((candidate) => candidate.name === name) ??
+      (await this.request<AccessApplication>("access/apps", {
+        method: "POST",
+        body: {
+          name,
+          type: "self_hosted",
+          domain: uri,
+          destinations: [{ type: "public", uri }],
+          session_duration: "24h",
+          app_launcher_visible: false,
+        },
+      }));
+
+    const policyName = `${name} bypass`;
+    const policies = await this.listAll<AccessPolicy>(
+      `access/apps/${application.id}/policies?per_page=100`,
+    );
+    if (!policies.some((policy) => policy.name === policyName)) {
+      await this.request(`access/apps/${application.id}/policies`, {
+        method: "POST",
+        body: {
+          name: policyName,
+          decision: "bypass",
+          include: [{ everyone: {} }],
+          precedence: 1,
+        },
+      });
+    }
+    return application;
   }
 
   async ensureAccessPolicy(

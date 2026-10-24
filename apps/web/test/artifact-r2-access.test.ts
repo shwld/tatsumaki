@@ -18,6 +18,7 @@ describe("ARTIFACTS bucket access", () => {
       .map((file) => path.relative(srcRoot, file));
     expect(referencing.sort()).toEqual([
       "index.ts",
+      "presentation/routes/artifact-content/routes.ts",
       "presentation/routes/artifacts/routes.ts",
       "presentation/scheduled/cleanup-artifacts.ts",
     ]);

@@ -3,3 +3,9 @@
 # Set them manually only for local testing against a real Cloudflare Access application.
 ACCESS_AUD=
 ACCESS_TEAM_DOMAIN=
+
+# HMAC key for artifact preview tokens (any long random string).
+# The self-hosting setup command generates and stores this as a Worker secret.
+ARTIFACT_CONTENT_SIGNING_KEY=
+# Optional: the previous key, kept only while rotating ARTIFACT_CONTENT_SIGNING_KEY.
+ARTIFACT_CONTENT_SIGNING_KEY_PREVIOUS=

@@ -16,7 +16,11 @@ export default defineConfig(async () => {
       cloudflareTest({
         wrangler: { configPath: "./wrangler.test.toml" },
         miniflare: {
-          bindings: { TEST_MIGRATIONS: migrations },
+          bindings: {
+            TEST_MIGRATIONS: migrations,
+            ARTIFACT_CONTENT_SIGNING_KEY:
+              "test-artifact-content-signing-key-0123456789",
+          },
         },
       }),
     ],
