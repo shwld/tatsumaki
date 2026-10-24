@@ -70,14 +70,17 @@ function contentDispositionFor(path: string): string {
   return `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(fileName)}`;
 }
 
+type ReadOptions = Pick<ArtifactRouteOptions, "readMiddleware">;
+type WriteOptions = Pick<ArtifactRouteOptions, "writeMiddleware">;
+
 /**
- * Artifact API shared by the OAuth/Access route (/programmatic-api/v1) and the
- * API key route (/api-key/v1). Mounted under ".../projects".
+ * Listing, details, versions and a version's file manifest. No file contents
+ * and no mutation, so this is also the only part the web app's session routes
+ * (/api) mount: the Web has no create, edit or download UI (ADR-0010 §7).
  */
-export function createArtifactRoutes(options: ArtifactRouteOptions) {
+export function createArtifactReadRoutes(options: ReadOptions) {
   const app = new Hono<Env>();
   const readMw = composeMiddleware(options.readMiddleware);
-  const writeMw = composeMiddleware(options.writeMiddleware);
 
   app.get("/:projectId/artifacts", readMw, async (c) => {
     const projectId = c.req.param("projectId");
@@ -112,51 +115,6 @@ export function createArtifactRoutes(options: ArtifactRouteOptions) {
         : null,
     });
   });
-
-  app.patch("/:projectId/artifacts/:artifactId", writeMw, async (c) => {
-    const projectId = c.req.param("projectId");
-    const access = await requireArtifactAccess(c, projectId, { write: true });
-    if (!access.ok) return access.response;
-
-    const body = await c.req.json().catch(() => null);
-    if (!body || typeof body !== "object" || typeof body.title !== "string") {
-      return artifactErrorResponse(
-        c,
-        artifactError("INVALID_REQUEST", "title is required"),
-      );
-    }
-
-    const result = await updateArtifactMetadata(
-      new D1ArtifactRepository(c.env.DB),
-      { projectId, artifactId: c.req.param("artifactId"), title: body.title },
-    );
-    if (result.isErr()) return artifactErrorResponse(c, result.error);
-    return c.json({ artifact: toArtifactResponse(result.value) });
-  });
-
-  for (const [action, archived] of [
-    ["archive", true],
-    ["unarchive", false],
-  ] as const) {
-    app.post(
-      `/:projectId/artifacts/:artifactId/${action}`,
-      writeMw,
-      async (c) => {
-        const projectId = c.req.param("projectId");
-        const access = await requireArtifactAccess(c, projectId, {
-          write: true,
-        });
-        if (!access.ok) return access.response;
-
-        const result = await updateArtifactMetadata(
-          new D1ArtifactRepository(c.env.DB),
-          { projectId, artifactId: c.req.param("artifactId"), archived },
-        );
-        if (result.isErr()) return artifactErrorResponse(c, result.error);
-        return c.json({ artifact: toArtifactResponse(result.value) });
-      },
-    );
-  }
 
   app.get("/:projectId/artifacts/:artifactId/versions", readMw, async (c) => {
     const projectId = c.req.param("projectId");
@@ -204,6 +162,14 @@ export function createArtifactRoutes(options: ArtifactRouteOptions) {
       });
     },
   );
+
+  return app;
+}
+
+/** Downloading a version's files (CLI and API key access only). */
+export function createArtifactFileRoutes(options: ReadOptions) {
+  const app = new Hono<Env>();
+  const readMw = composeMiddleware(options.readMiddleware);
 
   app.get(
     "/:projectId/artifacts/:artifactId/versions/:version/files/*",
@@ -264,6 +230,59 @@ export function createArtifactRoutes(options: ArtifactRouteOptions) {
       });
     },
   );
+
+  return app;
+}
+
+/** Title and archive changes, and the upload / publish protocol. */
+export function createArtifactWriteRoutes(options: WriteOptions) {
+  const app = new Hono<Env>();
+  const writeMw = composeMiddleware(options.writeMiddleware);
+
+  app.patch("/:projectId/artifacts/:artifactId", writeMw, async (c) => {
+    const projectId = c.req.param("projectId");
+    const access = await requireArtifactAccess(c, projectId, { write: true });
+    if (!access.ok) return access.response;
+
+    const body = await c.req.json().catch(() => null);
+    if (!body || typeof body !== "object" || typeof body.title !== "string") {
+      return artifactErrorResponse(
+        c,
+        artifactError("INVALID_REQUEST", "title is required"),
+      );
+    }
+
+    const result = await updateArtifactMetadata(
+      new D1ArtifactRepository(c.env.DB),
+      { projectId, artifactId: c.req.param("artifactId"), title: body.title },
+    );
+    if (result.isErr()) return artifactErrorResponse(c, result.error);
+    return c.json({ artifact: toArtifactResponse(result.value) });
+  });
+
+  for (const [action, archived] of [
+    ["archive", true],
+    ["unarchive", false],
+  ] as const) {
+    app.post(
+      `/:projectId/artifacts/:artifactId/${action}`,
+      writeMw,
+      async (c) => {
+        const projectId = c.req.param("projectId");
+        const access = await requireArtifactAccess(c, projectId, {
+          write: true,
+        });
+        if (!access.ok) return access.response;
+
+        const result = await updateArtifactMetadata(
+          new D1ArtifactRepository(c.env.DB),
+          { projectId, artifactId: c.req.param("artifactId"), archived },
+        );
+        if (result.isErr()) return artifactErrorResponse(c, result.error);
+        return c.json({ artifact: toArtifactResponse(result.value) });
+      },
+    );
+  }
 
   app.post("/:projectId/artifact-uploads", writeMw, async (c) => {
     const projectId = c.req.param("projectId");
@@ -409,5 +428,17 @@ export function createArtifactRoutes(options: ArtifactRouteOptions) {
     },
   );
 
+  return app;
+}
+
+/**
+ * Artifact API shared by the OAuth/Access route (/programmatic-api/v1) and the
+ * API key route (/api-key/v1). Mounted under ".../projects".
+ */
+export function createArtifactRoutes(options: ArtifactRouteOptions) {
+  const app = new Hono<Env>();
+  app.route("/", createArtifactReadRoutes(options));
+  app.route("/", createArtifactFileRoutes(options));
+  app.route("/", createArtifactWriteRoutes(options));
   return app;
 }
