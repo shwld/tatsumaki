@@ -133,6 +133,10 @@ describe("Cloudflare self-hosting setup", () => {
       envelope({ id: "app-id", name: "tatsumaki", aud: "access-aud" }),
       envelope([]),
       envelope({ id: "policy-id", name: "tatsumaki allowed users" }),
+      envelope([]),
+      envelope({ id: "bypass-app-id", name: "tatsumaki artifact content" }),
+      envelope([]),
+      envelope({ id: "bypass-policy-id" }),
     ];
     const fetchMock = vi.fn(
       async (input: string | URL | Request, init?: RequestInit) => {
@@ -181,6 +185,29 @@ describe("Cloudflare self-hosting setup", () => {
                 uri: "tatsumaki.account-subdomain.workers.dev",
               },
             ],
+            same_site_cookie_attribute: "lax",
+            http_only_cookie_attribute: true,
+          }),
+        }),
+        expect.objectContaining({
+          url: expect.stringContaining("/access/apps"),
+          method: "POST",
+          body: expect.objectContaining({
+            name: "tatsumaki artifact content",
+            destinations: [
+              {
+                type: "public",
+                uri: "tatsumaki.account-subdomain.workers.dev/artifact-content/*",
+              },
+            ],
+          }),
+        }),
+        expect.objectContaining({
+          url: expect.stringContaining("/access/apps/bypass-app-id/policies"),
+          method: "POST",
+          body: expect.objectContaining({
+            decision: "bypass",
+            include: [{ everyone: {} }],
           }),
         }),
         expect.objectContaining({
@@ -202,7 +229,11 @@ describe("Cloudflare self-hosting setup", () => {
     expect(JSON.parse(generatedSecrets)).toEqual({
       ACCESS_AUD: "access-aud",
       ACCESS_TEAM_DOMAIN: "team.cloudflareaccess.com",
+      ARTIFACT_CONTENT_SIGNING_KEY: expect.stringMatching(/^[\w-]{43}$/),
     });
+    expect(generatedConfig).toContain(
+      'run_worker_first = ["/", "/index.html"]',
+    );
   });
 
   it("reuses exact-name resources without issuing create requests", async () => {
@@ -248,6 +279,10 @@ describe("Cloudflare self-hosting setup", () => {
           include: [{ email: { email: "owner@example.com" } }],
         },
       ]),
+      envelope([{ id: "bypass-app-id", name: "tatsumaki artifact content" }]),
+      envelope([
+        { id: "bypass-policy-id", name: "tatsumaki artifact content bypass" },
+      ]),
     ];
     const methods: string[] = [];
     const fetchMock = vi.fn(
@@ -267,6 +302,8 @@ describe("Cloudflare self-hosting setup", () => {
 
     expect(responses).toHaveLength(0);
     expect(methods).toEqual([
+      "GET",
+      "GET",
       "GET",
       "GET",
       "GET",
@@ -305,6 +342,13 @@ describe("Cloudflare self-hosting setup", () => {
         id: "staging-policy-id",
         name: "tatsumaki-staging allowed users",
       }),
+      envelope([]),
+      envelope({
+        id: "bypass-app-id",
+        name: "tatsumaki-staging artifact content",
+      }),
+      envelope([]),
+      envelope({ id: "bypass-policy-id" }),
     ];
     const fetchMock = vi.fn(
       async (input: string | URL | Request, init?: RequestInit) => {

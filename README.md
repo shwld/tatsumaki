@@ -58,7 +58,7 @@ For an agent-guided setup from local first run through Cloudflare self-hosting r
 
 ## Deployment Configuration
 
-The bootstrap command creates or reuses the Worker, D1 database, KV namespace, two R2 buckets, Durable Object migration, Cloudflare Access application and allow policy, applies D1 migrations, deploys the Worker, and sets its Access values. Production is the default:
+The bootstrap command creates or reuses the Worker, D1 database, KV namespace, three R2 buckets (story attachments, user avatars, artifacts), Durable Object migration, Cloudflare Access application and allow policy, a second Access application with a bypass policy for `/artifact-content/*`, applies D1 migrations, deploys the Worker, and sets its Access values and a freshly generated `ARTIFACT_CONTENT_SIGNING_KEY`. Production is the default:
 
 ```bash
 CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_ACCESS_TEAM_DOMAIN=your-team.cloudflareaccess.com bun apps/web/scripts/setup-cloudflare.ts --allow-email you@example.com
@@ -85,6 +85,8 @@ CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_ACCESS_TEAM_DOMAIN
 ```
 
 Staging uses its own `tatsumaki-staging` Worker, D1 database, KV namespace, R2 buckets, Durable Object storage, Access application, and Access policy. It does not share production data.
+
+Artifact previews are served from `/artifact-content/<token>/...`, which is exempted from the Access login and authorized only by a 10-minute signed token. The setup command regenerates `ARTIFACT_CONTENT_SIGNING_KEY` on every run, so previews that are already open must be reloaded afterwards. To rotate the key by hand, set the old value as `ARTIFACT_CONTENT_SIGNING_KEY_PREVIOUS` while the new one rolls out.
 
 For an existing installation, use `--staging-only` to create, repair, or redeploy staging without looking up, migrating, deploying, or changing any production resource:
 

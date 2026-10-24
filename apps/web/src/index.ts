@@ -3,7 +3,7 @@ import {
   OAuthProvider,
   type OAuthHelpers,
 } from "@cloudflare/workers-oauth-provider";
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { recordBurndownSnapshotsAllActiveIterations } from "./application/usecases/burndown-chart";
 import { cleanupArtifactsScheduled } from "./presentation/scheduled/cleanup-artifacts";
 import { ensureIterationsForAllProjects } from "./presentation/scheduled/ensure-iterations";
@@ -24,6 +24,9 @@ import { projectApiKeysRoute } from "./presentation/routes/project-api-keys";
 import { apiKeyRoute } from "./presentation/routes/api-key";
 import { billingRoute } from "./presentation/routes/billing";
 import { invitationLinksRoute } from "./presentation/routes/invitation-links";
+import { artifactContentRoute } from "./presentation/routes/artifact-content/routes";
+import { artifactPreviewTokenRoute } from "./presentation/routes/artifacts/preview-token";
+import { spaIndexHeaders } from "./presentation/spa-headers";
 import { PlanningPokerDO } from "./durable-objects/planning-poker-do";
 import { requireAccessAuth } from "./presentation/middleware/access-auth";
 import {
@@ -45,6 +48,8 @@ export type Bindings = {
   STORY_ATTACHMENTS?: R2Bucket;
   USER_AVATARS?: R2Bucket;
   ARTIFACTS?: R2Bucket;
+  ARTIFACT_CONTENT_SIGNING_KEY?: string;
+  ARTIFACT_CONTENT_SIGNING_KEY_PREVIOUS?: string;
   OAUTH_KV?: KVNamespace;
   ACCESS_AUD?: string;
   ACCESS_TEAM_DOMAIN?: string;
@@ -104,6 +109,7 @@ protectedApi.route("/", savedFiltersRoute);
 protectedApi.route("/", myWorkRoute);
 protectedApi.route("/", projectApiKeysRoute);
 protectedApi.route("/", billingRoute);
+protectedApi.route("/", artifactPreviewTokenRoute);
 
 api.route("/", protectedApi);
 
@@ -119,9 +125,23 @@ programmaticApi.route("/", cliRoute);
 
 app.route(PROGRAMMATIC_API_BASE_PATH, programmaticApi);
 
-app.get("/login", async (c) => {
-  return c.env.ASSETS.fetch(new Request(new URL("/index.html", c.req.url)));
-});
+// Authorized by capability token only; must stay ahead of the SPA fallback.
+app.route("/", artifactContentRoute);
+
+async function serveSpaIndex(c: Context<Env>) {
+  const response = await c.env.ASSETS.fetch(
+    new Request(new URL("/index.html", c.req.url)),
+  );
+  return new Response(response.body, {
+    status: response.status,
+    headers: {
+      ...Object.fromEntries(response.headers),
+      ...spaIndexHeaders(new URL(c.req.url).origin),
+    },
+  });
+}
+
+app.get("/login", serveSpaIndex);
 
 app.get(
   "*",
@@ -136,9 +156,7 @@ app.get(
     }
     return requireAppEntitlement()(c, next);
   },
-  async (c) => {
-    return c.env.ASSETS.fetch(new Request(new URL("/index.html", c.req.url)));
-  },
+  serveSpaIndex,
 );
 
 class McpOAuthApiHandler extends WorkerEntrypoint<OAuthBindings> {
