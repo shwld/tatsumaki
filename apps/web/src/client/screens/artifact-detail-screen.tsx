@@ -220,13 +220,6 @@ export function ArtifactDetailScreen() {
         </p>
       ) : null}
 
-      <p
-        role="note"
-        className="mt-4 rounded border border-l-4 border-gray-300 border-l-yellow-500 bg-gray-50 p-3 text-sm text-gray-900"
-      >
-        {t("artifactScreens.detail.untrustedNotice")}
-      </p>
-
       <section className="mt-4">
         {!shown ? (
           <p role="status" className="text-sm text-gray-700">
