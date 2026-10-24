@@ -60,3 +60,11 @@
 
 - Harness Engineering Best Practices 2026
   - https://nyosegawa.com/posts/harness-engineering-best-practices-2026/
+
+## Artifact sandbox の実 browser テスト
+
+`apps/web/test/artifact-sandbox/` は、実際の Worker（`wrangler dev`）と実 Chromium で Artifact の隔離を検証する。スクリーンショットのスイート（Vite preview + API モック）では、サーバーが実際に返す CSP / Fetch Metadata / CORS が見えないため、別の Playwright 設定（`playwright.artifact-sandbox.config.ts`）と CI job（`artifact-sandbox`）に分けている。
+
+- 隔離の各項目は、同じプローブを隔離なしでも実行する「正の対照」を持ち、拒否は例外ではなく CSP 違反イベントやネットワーク未到達で確認する
+- `Sec-Fetch-*` は Playwright の request API では見えないため CDP の `Network.requestWillBeSentExtraInfo` で観測する
+- 結果と判断は ADR-0010 の Amendment（story #314）に記録する

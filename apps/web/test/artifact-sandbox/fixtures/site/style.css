@@ -1,0 +1,11 @@
+@font-face {
+  font-family: "ProbeFont";
+  src: url("probe.woff2") format("woff2");
+}
+body {
+  font-family: "ProbeFont", sans-serif;
+  background: rgb(250, 250, 240);
+}
+#styled {
+  color: rgb(1, 2, 3);
+}

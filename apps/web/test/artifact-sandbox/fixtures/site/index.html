@@ -1,0 +1,25 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>probe site</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="classic.js"></script>
+  <script type="module" src="module.js"></script>
+</head>
+<body>
+  <p id="styled">version one</p>
+  <img id="pixel" src="pixel.png" alt="pixel" />
+  <script>
+    window.addEventListener("load", () => {
+      const img = document.getElementById("pixel");
+      const color = getComputedStyle(document.getElementById("styled")).color;
+      document.documentElement.dataset.image = String(img.naturalWidth);
+      document.documentElement.dataset.styled = color;
+      document.fonts.load('16px "ProbeFont"').finally(() => {
+        document.documentElement.dataset.fontRequested = "done";
+      });
+    });
+  </script>
+</body>
+</html>

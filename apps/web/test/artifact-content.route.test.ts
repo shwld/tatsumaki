@@ -376,10 +376,23 @@ describe("artifact content serving", () => {
       const csp =
         spaIndexHeaders("https://localhost")["Content-Security-Policy"] ?? "";
       expect(csp).toContain("script-src https://localhost/assets/");
-      const scriptSrc = csp.split(";")[0] ?? "";
+      const scriptSrc =
+        csp.split(";").find((part) => part.trim().startsWith("script-src")) ??
+        "";
       expect(scriptSrc).not.toContain("'self'");
-      expect(csp).not.toContain("artifact-content");
+      expect(scriptSrc).not.toContain("artifact-content");
       expect(csp).not.toContain("'unsafe-inline'");
+    });
+
+    it("limits frames, and their later navigations, to /artifact-content/", () => {
+      const csp =
+        spaIndexHeaders("https://localhost")["Content-Security-Policy"] ?? "";
+      const frameSrc =
+        csp.split(";").find((part) => part.trim().startsWith("frame-src")) ??
+        "";
+      expect(frameSrc.trim()).toBe(
+        "frame-src https://localhost/artifact-content/",
+      );
     });
   });
 });
