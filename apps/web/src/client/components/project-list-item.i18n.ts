@@ -7,6 +7,7 @@ export const projectListItemJa = {
     settings: "設定",
     stories: "ストーリー",
     velocity: "ベロシティ",
+    artifacts: "Artifacts",
   },
 } as const;
 
@@ -19,5 +20,6 @@ export const projectListItemEn = {
     settings: "Settings",
     stories: "Stories",
     velocity: "Velocity",
+    artifacts: "Artifacts",
   },
 } as const;

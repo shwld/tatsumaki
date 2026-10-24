@@ -10,6 +10,8 @@ import { ProjectCreateScreen } from "./screens/project-create-screen";
 import { ProjectListScreen } from "./screens/project-list-screen";
 import { ProjectMembersScreen } from "./screens/project-members-screen";
 import { ProjectApiKeysScreen } from "./screens/project-api-keys-screen";
+import { ArtifactDetailScreen } from "./screens/artifact-detail-screen";
+import { ArtifactListScreen } from "./screens/artifact-list-screen";
 import { StoryEditScreen } from "./screens/story-edit-screen";
 import { ProjectSettingsScreen } from "./screens/project-settings-screen";
 import { ProjectVelocityScreen } from "./screens/project-velocity-screen";
@@ -85,6 +87,18 @@ export function App() {
                   <Route
                     path="/projects/:projectId/history"
                     element={<ProjectHistoryScreen />}
+                  />
+                  <Route
+                    path="/projects/:projectId/artifacts"
+                    element={<ArtifactListScreen />}
+                  />
+                  <Route
+                    path="/projects/:projectId/artifacts/:artifactId"
+                    element={<ArtifactDetailScreen />}
+                  />
+                  <Route
+                    path="/projects/:projectId/artifacts/:artifactId/versions/:version"
+                    element={<ArtifactDetailScreen />}
                   />
                   <Route path="/account" element={<AccountScreen />} />
                   <Route

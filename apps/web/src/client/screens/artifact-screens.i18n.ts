@@ -1,0 +1,87 @@
+export const artifactScreensJa = {
+  artifactScreens: {
+    breadcrumb: "Artifacts",
+    list: {
+      title: "Artifacts",
+      loading: "Artifacts を読み込み中...",
+      empty: "このプロジェクトにはまだ Artifact がありません。",
+      loadError: "Artifacts の読み込みに失敗しました",
+      latestVersion: "最新: v{{version}}",
+      noVersion: "版なし",
+      updatedAt: "更新: {{date}}",
+    },
+    detail: {
+      loading: "Artifact を読み込み中...",
+      notFound: "Artifact が見つかりません。",
+      loadError: "Artifact の読み込みに失敗しました",
+      retry: "再試行",
+      id: "ID",
+      versionLabel: "バージョン",
+      versionOption: "v{{version}}",
+      createdBy: "作成者",
+      createdAt: "作成日時",
+      fileCount: "ファイル数",
+      totalSize: "合計サイズ",
+      archived: "アーカイブ済み",
+      notLatest: "最新版ではありません。",
+      openLatest: "最新版を開く (v{{version}})",
+      noVersion: "この Artifact にはまだ公開された版がありません。",
+      brokenEntrypoint:
+        "この版は表示できません（入口ファイルが見つかりません）。",
+      untrustedNotice:
+        "信頼されていないコンテンツです。この Artifact は隔離された領域で実行されます。内容を信用せず、パスワードなどの機密情報を入力しないでください。",
+    },
+    preview: {
+      title: "{{title}} のプレビュー（v{{version}}）",
+      loading: "プレビューを準備中...",
+      expired: "プレビューの有効期限が切れました。",
+      reload: "プレビューを再読み込み",
+      error: "プレビューを開始できませんでした。",
+      unavailable: "この版はプレビューできません。",
+    },
+  },
+} as const;
+
+export const artifactScreensEn = {
+  artifactScreens: {
+    breadcrumb: "Artifacts",
+    list: {
+      title: "Artifacts",
+      loading: "Loading artifacts...",
+      empty: "This project has no artifacts yet.",
+      loadError: "Failed to load artifacts",
+      latestVersion: "Latest: v{{version}}",
+      noVersion: "No version",
+      updatedAt: "Updated: {{date}}",
+    },
+    detail: {
+      loading: "Loading artifact...",
+      notFound: "Artifact not found.",
+      loadError: "Failed to load the artifact",
+      retry: "Retry",
+      id: "ID",
+      versionLabel: "Version",
+      versionOption: "v{{version}}",
+      createdBy: "Created by",
+      createdAt: "Created",
+      fileCount: "Files",
+      totalSize: "Total size",
+      archived: "Archived",
+      notLatest: "This is not the latest version.",
+      openLatest: "Open the latest version (v{{version}})",
+      noVersion: "This artifact has no published version yet.",
+      brokenEntrypoint:
+        "This version cannot be shown (its entry file is missing).",
+      untrustedNotice:
+        "Untrusted content. This artifact runs in an isolated sandbox. Do not trust it, and do not enter passwords or other secrets.",
+    },
+    preview: {
+      title: "Preview of {{title}} (v{{version}})",
+      loading: "Preparing the preview...",
+      expired: "The preview has expired.",
+      reload: "Reload preview",
+      error: "Could not start the preview.",
+      unavailable: "This version cannot be previewed.",
+    },
+  },
+} as const;
