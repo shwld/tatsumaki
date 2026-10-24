@@ -25,6 +25,14 @@ type: project
 - StoryForm uses `validationError: string | null` (single banner), ProjectCreateForm uses `fieldErrors: Record<string, string>` (field-level)
 - Validation: client-side required check + server 400 error parsing
 
+## Cross-cutting infra conventions (checked 2026-10-11, ADR-0010 review)
+
+- Object stores: per-aggregate ports in `application/ports/*-object-store.ts` (put/get/delete only, no list/copy); R2 + in-memory adapters in `infrastructure/storage/`; R2 bindings are optional and presentation factories fall back to in-memory
+- Whole worker hostname sits behind Cloudflare Access (setup script `apps/web/scripts/cloudflare-setup.ts`); any token-only route needs an Access bypass
+- API key scopes are exact-match (`requireApiKeyScope`), no implication; CLI uses OAuth (`/programmatic-api/v1`, scope "mcp"), not API keys
+- Non-member guard `requireProjectMembership` returns 403, not 404
+- D1 atomic conditional writes: repeat the guard WHERE in every batched statement (see `acceptSingleUseInvitation`)
+
 ## Server-side Patterns
 
 - Use cases return `Result<T, ErrorType>` (neverthrow)
