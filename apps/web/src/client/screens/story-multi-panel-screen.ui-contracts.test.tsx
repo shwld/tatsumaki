@@ -131,6 +131,23 @@ describe("StoryMultiPanelScreen UI contracts", () => {
     expect(await screen.findByText("Done story")).toBeInTheDocument();
   });
 
+  it("links to the project's artifacts from the toolbar on wide screens", async () => {
+    vi.stubGlobal("fetch", createStoryMultiPanelFetchMock());
+    Object.defineProperty(window, "innerWidth", {
+      value: 1440,
+      writable: true,
+      configurable: true,
+    });
+    window.dispatchEvent(new Event("resize"));
+    renderStoryMultiPanel();
+
+    expect(await screen.findByText("Backlog story")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Artifacts" })).toHaveAttribute(
+      "href",
+      expect.stringMatching(/^\/projects\/[^/]+\/artifacts$/),
+    );
+  });
+
   it("uses hamburger menu on small screens with accessible expanded state", async () => {
     vi.stubGlobal("fetch", createStoryMultiPanelFetchMock());
     Object.defineProperty(window, "innerWidth", {
@@ -152,6 +169,10 @@ describe("StoryMultiPanelScreen UI contracts", () => {
     expect(
       screen.getByRole("menuitem", { name: "Project History" }),
     ).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Artifacts" })).toHaveAttribute(
+      "href",
+      expect.stringMatching(/^\/projects\/[^/]+\/artifacts$/),
+    );
 
     await userEvent.click(
       screen.getByRole("menuitem", { name: "高度な検索を開く" }),
