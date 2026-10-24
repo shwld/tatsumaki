@@ -58,7 +58,7 @@ bun run dev
 
 ## Deployment Configuration
 
-セットアップコマンドは、Worker、D1 database、KV namespace、2個のR2 bucket、Durable Object migration、Cloudflare Access applicationと許可policyを作成または再利用し、D1 migration、Worker deploy、Access値の設定まで行います。既定はproductionだけです。
+セットアップコマンドは、Worker、D1 database、KV namespace、3個のR2 bucket（story添付、user avatar、artifacts）、Durable Object migration、Cloudflare Access applicationと許可policy、`/artifact-content/*` だけをbypassする2つ目のAccess applicationを作成または再利用し、D1 migration、Worker deploy、Access値と新しく生成した `ARTIFACT_CONTENT_SIGNING_KEY` の設定まで行います。既定はproductionだけです。
 
 ```bash
 CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_ACCESS_TEAM_DOMAIN=your-team.cloudflareaccess.com bun apps/web/scripts/setup-cloudflare.ts --allow-email you@example.com
@@ -86,6 +86,8 @@ CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_ACCESS_TEAM_DOMAIN
 
 stagingは専用の `tatsumaki-staging` Worker、D1 database、KV namespace、R2 buckets、Durable Object storage、Access application、Access policyを使い、production dataを共有しません。
 
+Artifactのpreviewは `/artifact-content/<token>/...` から配信されます。このpathはAccessのloginを免除され、10分間有効な署名付きtokenだけで認可されます。setupコマンドは実行のたびに `ARTIFACT_CONTENT_SIGNING_KEY` を再生成するため、すでに開いているpreviewは再読み込みが必要です。鍵を手動でrotateするときは、新しい値を展開している間、古い値を `ARTIFACT_CONTENT_SIGNING_KEY_PREVIOUS` に設定します。
+
 既存環境でproductionへ触れずにstagingの作成・修復・再deployだけを行う場合は、`--staging-only` を使います。production resourceの検索、migration、deploy、変更は行いません。
 
 ```bash
@@ -109,6 +111,28 @@ References:
 - [Cloudflare KV namespaces API](https://developers.cloudflare.com/api/resources/kv/subresources/namespaces/methods/create/)
 - [Cloudflare R2 buckets API](https://developers.cloudflare.com/api/resources/r2/subresources/buckets/methods/create/)
 - [Cloudflare Wrangler configuration](https://developers.cloudflare.com/workers/wrangler/configuration/)
+
+## Artifacts
+
+Artifact は、build 済みの静的サイト（HTML、CSS、JavaScript、画像、font）を project 単位で保存し、project member が tatsumaki 上で開けるようにするものです。公開は CLI だけで行い、Web は一覧と読み取り専用の preview を提供します。
+
+build directory に `tatsumaki-artifact.json` を置きます。
+
+```json
+{ "schemaVersion": 1, "entrypoint": "index.html", "exclude": ["**/*.map"] }
+```
+
+```bash
+tm artifact create --project <project> --title "Release report" --path ./dist
+tm artifact update <artifact-id> --project <project> --path ./dist --base-version 1
+tm artifact download <artifact-id> --project <project> --version 1 --out ./restored
+```
+
+- 更新のたびに不変の version ができ、固定 URL（`/projects/<project>/artifacts/<id>/versions/<n>`）と latest URL で開けます。同一内容の再送は no-op で、title 変更と archive は version を増やしません。
+- 更新には `--base-version` が必要です。より新しい version があるときは上書きせず conflict で失敗します。force option と rollback command はありません（古い version を download して、そこから update します）。
+- 機密性のある file（`.git`、`.env*`、鍵、証明書、credential 系）、symlink、安全でない path があると、CLI は一部をスキップせず全体を拒否します。上限は合計 50 MiB、1 file 25 MiB、1,000 files です。
+- ページは信頼されないコンテンツとして、外部 network（`connect-src none`）、cookie、storage、popup、download、clipboard のない隔離された sandbox で動きます。version は署名付き token の path 配下で配信されるため、asset は相対 path、routing は hash routing（`#/route`）にしてください。外部 CDN、リモート画像、Web font は読み込まれません。
+- owner と member は公開でき、viewer は閲覧と download ができます。project API key は `artifact:read` と `artifact:write` の scope を使います。
 
 ## ターゲット
 

@@ -1,5 +1,7 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 import { STORY_STATUSES, STORY_TYPES } from "../../domain/entities/story";
+import type { ArtifactErrorCode } from "../../application/usecases/artifacts/errors";
+import { STATUS_BY_CODE } from "../routes/artifacts/responses";
 import { getCliVersionCompatibility } from "../../application/usecases/get-cli-version-compatibility";
 
 const StoryStatusEnumSchema = z
@@ -138,6 +140,28 @@ const StoryUpdateBodySchema = z.object({
 const StoryCommentBodySchema = z.object({
   body: z.string().min(1),
 });
+
+const ARTIFACT_ERROR_CODES = Object.keys(STATUS_BY_CODE) as [
+  ArtifactErrorCode,
+  ...ArtifactErrorCode[],
+];
+const ArtifactErrorSchema = z
+  .object({
+    error: z.string(),
+    code: z.enum(ARTIFACT_ERROR_CODES),
+  })
+  .openapi("ArtifactError");
+
+/** A non-2xx answer of an artifact route, listing the codes it can carry. */
+function artifactErrorResponse(status: number, summary: string) {
+  const codes = ARTIFACT_ERROR_CODES.filter(
+    (code) => STATUS_BY_CODE[code] === status,
+  );
+  return {
+    description: `${summary}. code: ${codes.join(", ")}`,
+    content: { "application/json": { schema: ArtifactErrorSchema } },
+  };
+}
 
 const ArtifactSchema = z
   .object({
@@ -603,9 +627,7 @@ export function buildCliOpenApiDoc() {
         content: { "application/json": { schema: ArtifactListResponseSchema } },
       },
       401: { description: "Unauthorized" },
-      404: {
-        description: "Not found",
-      },
+      404: artifactErrorResponse(404, "Not found"),
     },
   });
   app.openapi(listArtifactsRoute, (c) => c.json({ artifacts: [] }));
@@ -625,9 +647,7 @@ export function buildCliOpenApiDoc() {
         },
       },
       401: { description: "Unauthorized" },
-      404: {
-        description: "Not found",
-      },
+      404: artifactErrorResponse(404, "Not found"),
     },
   });
   app.openapi(getArtifactRoute, (c) =>
@@ -662,15 +682,9 @@ export function buildCliOpenApiDoc() {
         content: { "application/json": { schema: ArtifactResponseSchema } },
       },
       401: { description: "Unauthorized" },
-      400: {
-        description: "Invalid request",
-      },
-      403: {
-        description: "Forbidden",
-      },
-      404: {
-        description: "Not found",
-      },
+      400: artifactErrorResponse(400, "Invalid request"),
+      403: artifactErrorResponse(403, "Forbidden"),
+      404: artifactErrorResponse(404, "Not found"),
     },
   });
   app.openapi(updateArtifactRoute, (c) =>
@@ -701,12 +715,8 @@ export function buildCliOpenApiDoc() {
         content: { "application/json": { schema: ArtifactResponseSchema } },
       },
       401: { description: "Unauthorized" },
-      403: {
-        description: "Forbidden",
-      },
-      404: {
-        description: "Not found",
-      },
+      403: artifactErrorResponse(403, "Forbidden"),
+      404: artifactErrorResponse(404, "Not found"),
     },
   });
   app.openapi(archiveArtifactRoute, (c) =>
@@ -737,12 +747,8 @@ export function buildCliOpenApiDoc() {
         content: { "application/json": { schema: ArtifactResponseSchema } },
       },
       401: { description: "Unauthorized" },
-      403: {
-        description: "Forbidden",
-      },
-      404: {
-        description: "Not found",
-      },
+      403: artifactErrorResponse(403, "Forbidden"),
+      404: artifactErrorResponse(404, "Not found"),
     },
   });
   app.openapi(unarchiveArtifactRoute, (c) =>
@@ -775,9 +781,7 @@ export function buildCliOpenApiDoc() {
         },
       },
       401: { description: "Unauthorized" },
-      404: {
-        description: "Not found",
-      },
+      404: artifactErrorResponse(404, "Not found"),
     },
   });
   app.openapi(listArtifactVersionsRoute, (c) => c.json({ versions: [] }));
@@ -797,9 +801,7 @@ export function buildCliOpenApiDoc() {
         },
       },
       401: { description: "Unauthorized" },
-      404: {
-        description: "Not found",
-      },
+      404: artifactErrorResponse(404, "Not found"),
     },
   });
   app.openapi(getArtifactVersionRoute, (c) =>
@@ -835,9 +837,7 @@ export function buildCliOpenApiDoc() {
         },
       },
       401: { description: "Unauthorized" },
-      404: {
-        description: "Not found",
-      },
+      404: artifactErrorResponse(404, "Not found"),
     },
   });
   app.openapi(downloadArtifactFileRoute, (c) => c.body("", 200));
@@ -871,27 +871,13 @@ export function buildCliOpenApiDoc() {
         },
       },
       401: { description: "Unauthorized" },
-      400: {
-        description: "Invalid request",
-      },
-      403: {
-        description: "Forbidden",
-      },
-      404: {
-        description: "Not found",
-      },
-      409: {
-        description: "Conflict",
-      },
-      413: {
-        description: "Payload too large",
-      },
-      415: {
-        description: "Unsupported media type",
-      },
-      422: {
-        description: "Unprocessable",
-      },
+      400: artifactErrorResponse(400, "Invalid request"),
+      403: artifactErrorResponse(403, "Forbidden"),
+      404: artifactErrorResponse(404, "Not found"),
+      409: artifactErrorResponse(409, "Conflict"),
+      413: artifactErrorResponse(413, "Payload too large"),
+      415: artifactErrorResponse(415, "Unsupported media type"),
+      422: artifactErrorResponse(422, "Unprocessable"),
     },
   });
   app.openapi(createArtifactUploadRoute, (c) =>
@@ -937,21 +923,11 @@ export function buildCliOpenApiDoc() {
         },
       },
       401: { description: "Unauthorized" },
-      403: {
-        description: "Forbidden",
-      },
-      404: {
-        description: "Not found",
-      },
-      410: {
-        description: "Upload session expired",
-      },
-      413: {
-        description: "Payload too large",
-      },
-      422: {
-        description: "Unprocessable",
-      },
+      403: artifactErrorResponse(403, "Forbidden"),
+      404: artifactErrorResponse(404, "Not found"),
+      410: artifactErrorResponse(410, "Upload session expired"),
+      413: artifactErrorResponse(413, "Payload too large"),
+      422: artifactErrorResponse(422, "Unprocessable"),
     },
   });
   app.openapi(uploadArtifactFileRoute, (c) =>
@@ -974,18 +950,10 @@ export function buildCliOpenApiDoc() {
         },
       },
       401: { description: "Unauthorized" },
-      403: {
-        description: "Forbidden",
-      },
-      404: {
-        description: "Not found",
-      },
-      409: {
-        description: "Conflict",
-      },
-      410: {
-        description: "Upload session expired",
-      },
+      403: artifactErrorResponse(403, "Forbidden"),
+      404: artifactErrorResponse(404, "Not found"),
+      409: artifactErrorResponse(409, "Conflict"),
+      410: artifactErrorResponse(410, "Upload session expired"),
     },
   });
   app.openapi(finalizeArtifactUploadRoute, (c) =>
