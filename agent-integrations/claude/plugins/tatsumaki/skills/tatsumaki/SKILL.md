@@ -1,6 +1,6 @@
 ---
 name: tatsumaki
-description: Use when the user asks an agent to inspect, plan, or update tatsumaki stories, projects, work-items, or related tm CLI workflows. Prefer this skill for tatsumaki operations, story triage, work-item status checks, and safe agent use of tm.
+description: Use when the user asks an agent to inspect, plan, or update tatsumaki stories, projects, work-items, project artifacts (built static sites published with tm artifact), or related tm CLI workflows. Prefer this skill for tatsumaki operations, story triage, work-item status checks, and safe agent use of tm.
 ---
 
 # tatsumaki
@@ -60,6 +60,40 @@ curl -fsSL https://github.com/shwld/tatsumaki/releases/latest/download/install-t
 2. Ask for confirmation before running the write command.
 3. Run the smallest `tm` command that performs the requested change.
 4. Re-read with `tm --json` where possible and report the resulting state.
+
+## Artifacts
+
+An artifact is a project-scoped snapshot of a built static site that members view in tatsumaki. Only the CLI creates or changes one; the Web is read-only. Publishing is a write operation: confirm with the user first (see Write Workflow).
+
+Build the site first; `tm` never builds or installs anything. The directory must contain `tatsumaki-artifact.json`:
+
+```json
+{ "schemaVersion": 1, "entrypoint": "index.html", "exclude": ["**/*.map"] }
+```
+
+- `entrypoint` is a `.html` file inside the directory and must not be excluded. `exclude` is optional globs.
+- The CLI refuses the whole upload (it never skips silently) for `.git`, `.env*`, keys, certificates, credential-like files, symlinks, absolute or parent paths. Limits: 50 MiB in total, 25 MiB per file, 1,000 files.
+- The page runs in an isolated sandbox: no network (`connect-src none`), cookies, storage, popups, downloads or clipboard. Use relative asset paths and hash routing (`#/route`) because each version is served under a token path; use no CDN, remote image or web font.
+
+Commands (add `--json` for machine-readable output):
+
+```bash
+tm --json artifact create --project <project> --title "Release report" --path ./dist
+tm --json artifact update <artifact-id> --project <project> --path ./dist --base-version <n>
+tm --json artifact update <artifact-id> --project <project> --title "New title"
+tm --json artifact get <artifact-id> --project <project> [--files]
+tm --json artifact list --project <project> [--archived]
+tm --json artifact versions <artifact-id> --project <project>
+tm --json artifact download <artifact-id> --project <project> [--version <n>] --out ./empty-dir
+tm --json artifact archive <artifact-id> --project <project>
+tm --json artifact unarchive <artifact-id> --project <project>
+```
+
+- `create` returns the artifact ID, version and URLs. Share the fixed URL (it always shows the same content) or the latest URL.
+- Re-sending an identical tree is a successful no-op that returns the existing latest version. Changing the title or archiving never creates a version.
+- Updating a directory needs `--base-version`. If someone published first the command fails with a conflict; do not retry blindly. Download the latest, merge the change, and update again with the new base version. There is no force option and no rollback command: download the old version and update from it.
+- `download` writes only into a directory that does not exist or is empty, and never overwrites files.
+- API keys use the `artifact:read` and `artifact:write` scopes; a project member who is a viewer can read and download but not change.
 
 ## Boundary
 

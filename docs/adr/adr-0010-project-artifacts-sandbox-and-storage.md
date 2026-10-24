@@ -24,7 +24,7 @@ story #302 は、CLI で登録した build 済み directory を project 配下�
 | 脅威 | 対策 |
 | --- | --- |
 | Artifact JS が parent DOM / cookie / storage / API にアクセス | opaque origin 化（§4）。session credential を Artifact に渡さない |
-| 外部通信・データ持ち出し | CSP で subresource / fetch / form を制限する。**iframe 自身の navigation（`location=`、meta refresh）と、iframe 内に描画した偽フォームによるフィッシングは防げないため受容する**。iframe 周辺に「信頼されていないコンテンツ」を常時表示して緩和する。持ち出し可能なのは当該 version の内容と、利用者が iframe 内に入力した値に限る |
+| 外部通信・データ持ち出し | CSP で subresource / fetch / form を制限する。**iframe 自身の navigation（`location=`、meta refresh）と、iframe 内に描画した偽フォームによるフィッシングは防げないため受容する**（iframe の別サイトへの遷移は、アプリ本体の CSP `frame-src` で閉じた。Amendment 2026-10-24 story #314 browser verification）。iframe 周辺に「信頼されていないコンテンツ」を常時表示して緩和する。持ち出し可能なのは当該 version の内容と、利用者が iframe 内に入力した値に限る |
 | content URL を直接 tab で開き sandbox 外実行 | content response に `Content-Security-Policy: sandbox allow-scripts` を付与（enforce。Report-Only は不可）し、test で固定する |
 | 本体 app への script 差し込み（`<script src="/artifact-content/...">`） | content route は `Sec-Fetch-Dest` が `iframe` / `document` 以外の request を拒否し、`Cross-Origin-Resource-Policy` は付けない。本体 app の CSP `script-src` は build asset パスに限定し `/artifact-content/` を含めない |
 | Artifact から tatsumaki の `/api/...` への認証付き GET | Artifact CSP の source は `'self'` を使わず `https://<origin>/artifact-content/<token>/` の path 付きに限定する。session cookie は `HttpOnly; Secure; SameSite=Lax` 以上を必須とし、test で固定する |
@@ -65,7 +65,7 @@ story #302 は、CLI で登録した build 済み directory を project 配下�
 
 **別 origin を採用しない理由**: self-hosting で追加の custom domain / DNS / 証明書が必須になり、setup 難度が上がる。
 
-**残余リスク（受容）**: main thread の tight loop が sandboxed iframe と同一 process で親 tab を固める可能性がある。実証された場合は別 origin 方式を別 ADR で採用する。
+**残余リスク（受容）**: main thread の tight loop が sandboxed iframe と同一 process で親 tab を固める可能性がある。実証された場合は別 origin 方式を別 ADR で採用する。 実測の結果は Amendment 2026-10-24 story #314 browser verification を参照（固まることを確認したうえで受容し、別 origin 方式は story #319 で扱う）。
 
 **Cloudflare Access（決定）**: `apps/web/scripts/cloudflare-setup.ts` は Worker のホスト名全体を Access で保護している。opaque origin の iframe からの subresource request は cross-site となり `CF_Authorization` cookie が送られない可能性が高い。content route を token のみで認可するため、`/artifact-content/*` を Access の bypass 対象とし、setup script が bypass application を作成する方針を **採用する**（2026-10-11 deciders 承認）。bypass 後の認可は capability token のみとなる。route は `protectedApi` と SPA fallback（`devAuth` / `requireAccessAuth` / `requireAppEntitlement`）の外、かつ SPA fallback より前に mount する。
 
@@ -158,14 +158,6 @@ README の R2 bucket 記述、setup script（3 つ目の bucket、`ARTIFACT_CONT
 - **Access bypass**: a second Access application `<name> artifact content` covers `<worker domain>/artifact-content/*` with a `bypass` policy for everyone. It has a public destination only (no worker destination), so `ensureAccessApplication` cannot mistake it for the main application. That the more specific path takes precedence over the main application must be confirmed in the manual smoke of story #315 against a real account.
 - The signing key is regenerated on each setup run; open previews need a reload.
 
-## References
-
-- https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/iframe
-- https://developer.mozilla.org/en-US/docs/Web/Security/Defenses/Same-origin_policy
-- https://developers.cloudflare.com/workers/platform/limits/
-- https://developers.cloudflare.com/r2/platform/limits/
-- https://developers.cloudflare.com/workers/examples/security-headers/
-
 ### 2026-10-24 (story #314: browser verification)
 
 `apps/web/test/artifact-sandbox/` (CI job `artifact-sandbox`) drives a real Chromium against the real Worker (`wrangler dev` with local D1 / R2), because CSP, Fetch Metadata and CORS depend on the headers the Worker actually sends. **Verified with Chromium 145 (headless) only.** Other browsers, and Cloudflare Access in front of the Worker, are not covered; both are left to the manual smoke of story #315.
@@ -185,3 +177,25 @@ README の R2 bucket 記述、setup script（3 つ目の bucket、`ARTIFACT_CONT
 - **Detectable breakage.** A version without an entrypoint, or a preview-token 404, is shown as unavailable. A file missing from R2 behind a valid manifest is a 404 inside the frame and cannot be detected by the parent.
 - **Creator names** come from the members API; a member who left, or a viewer who cannot read the list, sees a shortened user id.
 - **Verified in a real browser** by `artifact-sandbox-app-preview.spec.ts`: the real SPA renders a published site, the frame attributes are exactly as above, the frame's `window.origin` is `null`, and the parent cannot read the frame document.
+
+### 2026-10-24 (story #315: production check)
+
+- **Access bypass confirmed on the real account (hosted production).** After an Access application for `<custom domain>/artifact-content/*` with an Everyone bypass policy was added, a request with an invalid token returns the Worker's 404 (with the sandbox CSP, `nosniff`, `no-referrer` and `no-store`) with and without `Sec-Fetch-*`, while `/` and `/api/projects` without a login still redirect to Access. Before that application existed the same request was redirected to the Access login, so previews could not render.
+- **The setup script only covers the workers.dev host.** `ensureArtifactContentBypass` creates the bypass for `<worker>.<subdomain>.workers.dev`, not for a custom domain, and the hosted production uses a custom domain, a control plane and build-time resource IDs. The application was therefore created by hand. Making the script handle custom domains is story #320.
+- **Signing key.** The hosted production had no `ARTIFACT_CONTENT_SIGNING_KEY` (preview-token would have answered 503). It was added as a secret in the dashboard.
+- **Rendering in production.** A published sample (HTML, CSS, JavaScript) renders in the preview frame, the script ran, and the untrusted-content notice is shown.
+- **Not verified yet:** Firefox and Safari (opaque origin, path-scoped CSP, CORS module scripts), and `window.origin === "null"` inside the production frame was not read back (the check relies on the Chromium suite).
+
+### 2026-10-24 (story #314: untrusted-content notice removed)
+
+- **The always-visible "untrusted content" notice is removed from the detail screen** (decided by shwld). It was the mitigation in §2 for a phishing form drawn inside the frame. The main use of artifacts is a team hosting its own documents, where the notice read as an unexplained warning. Only project members and API keys with `artifact:write` can publish, and nothing is public or anonymous.
+- **Residual risk (accepted):** content a member published, including generated pages and third-party code pulled in by a build, can draw a fake form inside the frame, and nothing on the page says it is not tatsumaki. The sandbox, CSP, `frame-src` and token design are unchanged, so the content still cannot reach the app, its cookies or its API, and the frame cannot be sent to another site. This supersedes the "always display" wording in §2 and in story #302's Definition of Done.
+- The README still describes the sandbox constraints for people who publish artifacts.
+
+## References
+
+- https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/iframe
+- https://developer.mozilla.org/en-US/docs/Web/Security/Defenses/Same-origin_policy
+- https://developers.cloudflare.com/workers/platform/limits/
+- https://developers.cloudflare.com/r2/platform/limits/
+- https://developers.cloudflare.com/workers/examples/security-headers/

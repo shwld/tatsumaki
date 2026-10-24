@@ -6,6 +6,50 @@
   },
   "components": {
     "schemas": {
+      "ArtifactError": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "INVALID_REQUEST",
+              "EMPTY_MANIFEST",
+              "INVALID_PATH",
+              "DUPLICATE_PATH",
+              "SENSITIVE_FILE",
+              "INVALID_SIZE",
+              "INVALID_SHA256",
+              "INVALID_ENTRYPOINT",
+              "FORBIDDEN",
+              "ARTIFACT_NOT_FOUND",
+              "VERSION_NOT_FOUND",
+              "FILE_NOT_FOUND",
+              "SESSION_NOT_FOUND",
+              "BASE_VERSION_CONFLICT",
+              "PUBLISH_CONFLICT",
+              "SESSION_NOT_PENDING",
+              "UPLOAD_INCOMPLETE",
+              "SESSION_EXPIRED",
+              "TOO_MANY_FILES",
+              "FILE_TOO_LARGE",
+              "TOTAL_TOO_LARGE",
+              "UNSUPPORTED_MEDIA_TYPE",
+              "IDEMPOTENCY_KEY_REUSED",
+              "TREE_DIGEST_MISMATCH",
+              "FILE_NOT_IN_MANIFEST",
+              "FILE_SIZE_MISMATCH",
+              "FILE_DIGEST_MISMATCH",
+              "STORAGE_ERROR",
+              "INTERNAL_ERROR",
+              "NOT_FOUND"
+            ]
+          }
+        },
+        "required": ["error", "code"]
+      },
       "StoryGetResponse": {
         "type": "object",
         "properties": {
@@ -1093,7 +1137,7 @@
             "description": "Unauthorized"
           },
           "404": {
-            "description": "Not found"
+            "description": "Not found. Body: ArtifactError"
           }
         }
       }
@@ -1136,7 +1180,7 @@
             "description": "Unauthorized"
           },
           "404": {
-            "description": "Not found"
+            "description": "Not found. Body: ArtifactError"
           }
         }
       },
@@ -1189,16 +1233,16 @@
             }
           },
           "400": {
-            "description": "Invalid request"
+            "description": "Invalid request. Body: ArtifactError"
           },
           "401": {
             "description": "Unauthorized"
           },
           "403": {
-            "description": "Forbidden"
+            "description": "Forbidden. Body: ArtifactError"
           },
           "404": {
-            "description": "Not found"
+            "description": "Not found. Body: ArtifactError"
           }
         }
       }
@@ -1241,10 +1285,10 @@
             "description": "Unauthorized"
           },
           "403": {
-            "description": "Forbidden"
+            "description": "Forbidden. Body: ArtifactError"
           },
           "404": {
-            "description": "Not found"
+            "description": "Not found. Body: ArtifactError"
           }
         }
       }
@@ -1287,10 +1331,10 @@
             "description": "Unauthorized"
           },
           "403": {
-            "description": "Forbidden"
+            "description": "Forbidden. Body: ArtifactError"
           },
           "404": {
-            "description": "Not found"
+            "description": "Not found. Body: ArtifactError"
           }
         }
       }
@@ -1333,7 +1377,7 @@
             "description": "Unauthorized"
           },
           "404": {
-            "description": "Not found"
+            "description": "Not found. Body: ArtifactError"
           }
         }
       }
@@ -1386,7 +1430,7 @@
             "description": "Unauthorized"
           },
           "404": {
-            "description": "Not found"
+            "description": "Not found. Body: ArtifactError"
           }
         }
       }
@@ -1451,7 +1495,7 @@
             "description": "Unauthorized"
           },
           "404": {
-            "description": "Not found"
+            "description": "Not found. Body: ArtifactError"
           }
         }
       }
@@ -1512,28 +1556,28 @@
             }
           },
           "400": {
-            "description": "Invalid request"
+            "description": "Invalid request. Body: ArtifactError"
           },
           "401": {
             "description": "Unauthorized"
           },
           "403": {
-            "description": "Forbidden"
+            "description": "Forbidden. Body: ArtifactError"
           },
           "404": {
-            "description": "Not found"
+            "description": "Not found. Body: ArtifactError"
           },
           "409": {
-            "description": "Conflict"
+            "description": "Conflict. Body: ArtifactError"
           },
           "413": {
-            "description": "Payload too large"
+            "description": "Payload too large. Body: ArtifactError"
           },
           "415": {
-            "description": "Unsupported media type"
+            "description": "Unsupported media type. Body: ArtifactError"
           },
           "422": {
-            "description": "Unprocessable"
+            "description": "Unprocessable. Body: ArtifactError"
           }
         }
       }
@@ -1606,19 +1650,19 @@
             "description": "Unauthorized"
           },
           "403": {
-            "description": "Forbidden"
+            "description": "Forbidden. Body: ArtifactError"
           },
           "404": {
-            "description": "Not found"
+            "description": "Not found. Body: ArtifactError"
           },
           "410": {
-            "description": "Upload session expired"
+            "description": "Upload session expired. Body: ArtifactError"
           },
           "413": {
-            "description": "Payload too large"
+            "description": "Payload too large. Body: ArtifactError"
           },
           "422": {
-            "description": "Unprocessable"
+            "description": "Unprocessable. Body: ArtifactError"
           }
         }
       }
@@ -1661,16 +1705,16 @@
             "description": "Unauthorized"
           },
           "403": {
-            "description": "Forbidden"
+            "description": "Forbidden. Body: ArtifactError"
           },
           "404": {
-            "description": "Not found"
+            "description": "Not found. Body: ArtifactError"
           },
           "409": {
-            "description": "Conflict"
+            "description": "Conflict. Body: ArtifactError"
           },
           "410": {
-            "description": "Upload session expired"
+            "description": "Upload session expired. Body: ArtifactError"
           }
         }
       }

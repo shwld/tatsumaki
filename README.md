@@ -112,6 +112,28 @@ References:
 - [Cloudflare R2 buckets API](https://developers.cloudflare.com/api/resources/r2/subresources/buckets/methods/create/)
 - [Cloudflare Wrangler configuration](https://developers.cloudflare.com/workers/wrangler/configuration/)
 
+## Artifacts
+
+An artifact is a project-scoped snapshot of a built static site (HTML, CSS, JavaScript, images, fonts) that project members open in tatsumaki. It is published only with the CLI; the Web lists and previews it read-only.
+
+Put a `tatsumaki-artifact.json` in the build directory:
+
+```json
+{ "schemaVersion": 1, "entrypoint": "index.html", "exclude": ["**/*.map"] }
+```
+
+```bash
+tm artifact create --project <project> --title "Release report" --path ./dist
+tm artifact update <artifact-id> --project <project> --path ./dist --base-version 1
+tm artifact download <artifact-id> --project <project> --version 1 --out ./restored
+```
+
+- Every update is an immutable version with a fixed URL (`/projects/<project>/artifacts/<id>/versions/<n>`) and a latest URL. Sending an identical tree is a no-op; changing the title or archiving does not create a version.
+- An update needs `--base-version`. If a newer version exists it fails with a conflict instead of overwriting it; there is no force option and no rollback command (download the old version and update from it).
+- The CLI rejects the whole upload for sensitive files (`.git`, `.env*`, keys, certificates, credential-like files), symlinks and unsafe paths. Limits: 50 MiB in total, 25 MiB per file, 1,000 files.
+- The page is untrusted and runs in an isolated sandbox with no network access (`connect-src none`), cookies, storage, popups, downloads or clipboard. Use relative asset paths and hash routing (`#/route`), because a version is served under a signed token path; external CDNs, remote images and web fonts do not load.
+- Owners and members can publish; viewers can read and download. Project API keys use the `artifact:read` and `artifact:write` scopes.
+
 ## Target Users
 
 tatsumaki is built for Scrum teams practicing agile development.

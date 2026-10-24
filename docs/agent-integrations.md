@@ -100,6 +100,7 @@ Cursor rule は初版では作らない。tatsumaki の integration は常時適
 - sandboxed agent では Keychain 読み取りに追加権限が必要な場合がある。
 - read は `--json` を優先し、write 操作はユーザー確認後に限定する。
 - `gh issue view` など provider CLI の直叩きは tatsumaki work-item の正本操作として使わない。
+- Artifact（build 済み静的サイトの project 単位の snapshot）は `tm artifact` で扱う。公開は write 操作としてユーザー確認後に行い、build と依存解決は agent 側で済ませる。manifest（`tatsumaki-artifact.json`）、上限、sandbox の制約（外部 network 不可、hash routing 前提）、`--base-version` による conflict の扱い、download 先の制約は skill 本文に書く。
 
 ## Maintenance
 
