@@ -82,12 +82,22 @@ test.describe("reaching the content route without the preview iframe", () => {
     page,
   }) => {
     const token = await issuePreviewToken(projectId, siteArtifact, 1);
-    const flipped = `${token.token.slice(0, -1)}${token.token.endsWith("A") ? "B" : "A"}`;
+    // Change a character in the middle of a segment. The last character of a
+    // base64url value carries unused bits, so altering it can decode to the
+    // same bytes and leave the token valid.
+    const alterAt = (index: number) =>
+      `${token.token.slice(0, index)}${token.token[index] === "A" ? "B" : "A"}${token.token.slice(index + 1)}`;
+    const [, , payload = "", signature = ""] = token.token.split(".");
+    const inSignature = alterAt(token.token.length - signature.length / 2);
+    const inPayload = alterAt(
+      token.token.indexOf(payload) + Math.floor(payload.length / 2),
+    );
     const asDocument = { "Sec-Fetch-Dest": "document" };
     const denied = [
       `${BASE_URL}/artifact-content/`,
       `${BASE_URL}/artifact-content/not-a-token/index.html`,
-      contentUrl(flipped, "index.html"),
+      contentUrl(inSignature, "index.html"),
+      contentUrl(inPayload, "index.html"),
       contentUrl(token.token, "missing.html"),
       `${BASE_URL}/artifact-content/${token.token}`,
     ];

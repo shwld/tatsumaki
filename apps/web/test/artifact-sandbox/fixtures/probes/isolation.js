@@ -228,6 +228,7 @@ onClick("self-nav", "ownNavigation", () => {
 });
 // eval must run from a page event: when Playwright starts the call through the
 // DevTools protocol, Chrome exempts it from the CSP's eval restriction.
+// eslint-disable-next-line no-eval -- the point is to see the CSP refuse it
 onClick("eval", "eval", () => eval("1 + 1"));
 onClick("modal", "alert", () => {
   alert("probe");

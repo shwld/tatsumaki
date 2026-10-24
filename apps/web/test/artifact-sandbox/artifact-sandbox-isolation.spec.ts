@@ -243,7 +243,6 @@ test.describe("artifact isolation in a real browser", () => {
       parentUrl({ src: token.contentPath, sandbox: "allow-scripts" }),
     );
     const frame = await waitForProbe(page);
-    const parentUrlBefore = page.url();
 
     const result = (await frame.evaluate(
       ([canary, external]) =>
