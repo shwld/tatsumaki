@@ -4,8 +4,8 @@ export type CliVersionCompatibility = {
 };
 
 const CURRENT_COMPATIBILITY: CliVersionCompatibility = {
-  apiVersion: "0.0.10",
-  minClientVersion: "0.0.10",
+  apiVersion: "0.0.11",
+  minClientVersion: "0.0.11",
 };
 
 export function getCliVersionCompatibility(): CliVersionCompatibility {
