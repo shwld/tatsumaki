@@ -54,7 +54,7 @@ export function ArtifactDetailScreen() {
   if (detail.isPending || versions.isPending) {
     if (!detail.isError && !versions.isError) {
       return (
-        <main className="mx-auto max-w-4xl p-4">
+        <main className="mx-auto w-full max-w-4xl p-4">
           {heading}
           <p role="status" className="text-sm text-gray-600">
             {t("artifactScreens.detail.loading")}
@@ -69,7 +69,7 @@ export function ArtifactDetailScreen() {
   );
   if (notFound || (versionParam && !VERSION_PATTERN.test(versionParam))) {
     return (
-      <main className="mx-auto max-w-4xl p-4">
+      <main className="mx-auto w-full max-w-4xl p-4">
         {heading}
         <p role="alert" className="text-sm text-gray-700">
           {t("artifactScreens.detail.notFound")}{" "}
@@ -86,7 +86,7 @@ export function ArtifactDetailScreen() {
 
   if (detail.isError || versions.isError || !detail.data || !versions.data) {
     return (
-      <main className="mx-auto max-w-4xl p-4">
+      <main className="mx-auto w-full max-w-4xl p-4">
         {heading}
         <div role="alert" className="text-sm text-red-700">
           <p>{t("artifactScreens.detail.loadError")}</p>
@@ -115,7 +115,7 @@ export function ArtifactDetailScreen() {
 
   if (versionParam && !shown) {
     return (
-      <main className="mx-auto max-w-4xl p-4">
+      <main className="mx-auto w-full max-w-4xl p-4">
         {heading}
         <p role="alert" className="text-sm text-gray-700">
           {t("artifactScreens.detail.notFound")}
@@ -131,7 +131,7 @@ export function ArtifactDetailScreen() {
     new Date(value).toLocaleString(i18n.language);
 
   return (
-    <main className="mx-auto max-w-4xl p-4">
+    <main className="mx-auto w-full max-w-4xl p-4">
       {heading}
       <h1 className="text-xl font-semibold text-gray-900">{artifact.title}</h1>
       {artifact.archivedAt ? (

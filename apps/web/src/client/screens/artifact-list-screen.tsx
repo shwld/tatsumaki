@@ -20,7 +20,7 @@ export function ArtifactListScreen() {
   }, [sessionExpired, notifySessionExpired]);
 
   return (
-    <main className="mx-auto max-w-3xl p-4">
+    <main className="mx-auto w-full max-w-3xl p-4">
       <ProjectStoryBreadcrumb
         projectId={projectId}
         currentPageLabel={t("artifactScreens.breadcrumb")}
