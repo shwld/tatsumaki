@@ -407,6 +407,7 @@ test.describe("artifact isolation in a real browser", () => {
       "imageSameOrigin",
       "scriptSameOrigin",
       "nestedFrame",
+      "serviceWorker",
     ]) {
       expect(
         result.passive[name]?.allowed,

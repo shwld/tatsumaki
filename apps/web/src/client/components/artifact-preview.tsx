@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useIssuePreviewToken } from "../hooks/use-artifact-queries";
-import { isHttpStatusError } from "../lib/api-error";
+import { useAuthError } from "../contexts/auth-error-context";
+import { isAuthError, isHttpStatusError } from "../lib/api-error";
 
 type ArtifactPreviewProps = {
   projectId: string;
@@ -25,6 +26,7 @@ export function ArtifactPreview({
   const { t } = useTranslation();
   const issue = useIssuePreviewToken(projectId, artifactId, version);
   const { mutate } = issue;
+  const { notifySessionExpired } = useAuthError();
   const [expired, setExpired] = useState(false);
 
   const load = useCallback(() => {
@@ -35,6 +37,12 @@ export function ArtifactPreview({
   useEffect(() => {
     load();
   }, [load]);
+
+  const sessionExpired =
+    isHttpStatusError(issue.error) && isAuthError(issue.error.status);
+  useEffect(() => {
+    if (sessionExpired) notifySessionExpired();
+  }, [sessionExpired, notifySessionExpired]);
 
   const expiresAt = issue.data?.expiresAt;
   useEffect(() => {

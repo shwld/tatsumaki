@@ -1,8 +1,18 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  AuthErrorProvider,
+  useAuthError,
+} from "../contexts/auth-error-context";
 import { ArtifactPreview } from "./artifact-preview";
 
 const json = (body: unknown, status = 200) =>
@@ -10,6 +20,10 @@ const json = (body: unknown, status = 200) =>
     status,
     headers: { "content-type": "application/json" },
   });
+
+function AuthKind() {
+  return <p data-testid="auth-kind">{useAuthError().authError.kind}</p>;
+}
 
 function renderPreview() {
   const client = new QueryClient({
@@ -20,12 +34,15 @@ function renderPreview() {
   });
   return render(
     <QueryClientProvider client={client}>
-      <ArtifactPreview
-        projectId="p1"
-        artifactId="a1"
-        version={2}
-        title="Demo"
-      />
+      <AuthErrorProvider>
+        <AuthKind />
+        <ArtifactPreview
+          projectId="p1"
+          artifactId="a1"
+          version={2}
+          title="Demo"
+        />
+      </AuthErrorProvider>
     </QueryClientProvider>,
   );
 }
@@ -122,6 +139,17 @@ describe("ArtifactPreview", () => {
       await screen.findByText("この版はプレビューできません。"),
     ).toBeInTheDocument();
     expect(screen.queryByRole("button")).toBeNull();
+  });
+
+  it("reports an expired session instead of a generic preview error", async () => {
+    vi.mocked(fetch).mockResolvedValue(json({ error: "unauthorized" }, 401));
+    renderPreview();
+
+    await waitFor(() =>
+      expect(screen.getByTestId("auth-kind")).toHaveTextContent(
+        "session-expired",
+      ),
+    );
   });
 
   it("offers a retry on other failures", async () => {

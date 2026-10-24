@@ -199,6 +199,31 @@ describe("artifact screens", () => {
       expect(screen.queryByText(/最新版ではありません/)).toBeNull();
     });
 
+    it("follows the detail response when the versions list lags behind it", async () => {
+      mockApi({
+        ...baseRoutes(),
+        "GET /api/projects/p1/artifacts/art-1": () =>
+          json({
+            artifact: { ...artifact, latestVersion: 3 },
+            latestVersion: versionOf(3),
+          }),
+        "POST /api/projects/p1/artifacts/art-1/versions/3/preview-token": () =>
+          json({
+            token: "T",
+            expiresAt: new Date(Date.now() + 600_000).toISOString(),
+            contentPath: "/artifact-content/three/index.html",
+          }),
+      });
+      renderAt("/projects/p1/artifacts/art-1");
+
+      const frame = await screen.findByTitle(/のプレビュー（v3）/);
+      expect(frame.getAttribute("src")).toBe(
+        "/artifact-content/three/index.html",
+      );
+      expect(screen.queryByText(/まだ公開された版がありません/)).toBeNull();
+      expect(screen.getByLabelText("バージョン")).toHaveValue("3");
+    });
+
     it("falls back to a short id when the creator cannot be resolved", async () => {
       mockApi({
         ...baseRoutes(),
@@ -304,8 +329,8 @@ describe("artifact screens", () => {
     it("does not render a preview for a version without an entrypoint", async () => {
       mockApi({
         ...baseRoutes(),
-        "GET /api/projects/p1/artifacts/art-1/versions": () =>
-          json({ versions: [versionOf(2, { entrypoint: "" }), versionOf(1)] }),
+        "GET /api/projects/p1/artifacts/art-1": () =>
+          json({ artifact, latestVersion: versionOf(2, { entrypoint: "" }) }),
       });
       renderAt("/projects/p1/artifacts/art-1");
       expect(

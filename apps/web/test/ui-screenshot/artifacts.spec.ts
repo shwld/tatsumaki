@@ -89,7 +89,10 @@ async function mockArtifactApi(page: Page, setup: Setup = {}) {
       : route.fulfill(
           json({
             artifact: setup.artifact ?? artifact,
-            latestVersion: versionOf(2),
+            latestVersion:
+              (setup.artifact ?? artifact).latestVersion === null
+                ? null
+                : versionOf(2),
           }),
         ),
   );

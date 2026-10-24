@@ -107,11 +107,18 @@ export function ArtifactDetailScreen() {
 
   const { artifact } = detail.data;
   const latest = artifact.latestVersion;
-  const shownNumber = versionParam ? Number(versionParam) : latest;
-  const shown =
-    shownNumber === null
-      ? undefined
-      : versions.data.versions.find((item) => item.version === shownNumber);
+  // The unpinned route follows the detail response, which is consistent with
+  // itself; the versions list is a separate request and can lag behind it.
+  const shown = versionParam
+    ? versions.data.versions.find(
+        (item) => item.version === Number(versionParam),
+      )
+    : (detail.data.latestVersion ?? undefined);
+  const selectable =
+    shown &&
+    !versions.data.versions.some((item) => item.version === shown.version)
+      ? [shown, ...versions.data.versions]
+      : versions.data.versions;
 
   if (versionParam && !shown) {
     return (
@@ -156,7 +163,7 @@ export function ArtifactDetailScreen() {
             id="artifact-version"
             className="rounded border border-gray-300 px-2 py-1 text-gray-900"
             value={shown?.version ?? ""}
-            disabled={versions.data.versions.length === 0}
+            disabled={selectable.length === 0}
             onChange={(event) =>
               navigate(
                 artifactVersionPath(
@@ -168,7 +175,7 @@ export function ArtifactDetailScreen() {
             }
           >
             {shown ? null : <option value="" />}
-            {versions.data.versions.map((item) => (
+            {selectable.map((item) => (
               <option key={item.version} value={item.version}>
                 {t("artifactScreens.detail.versionOption", {
                   version: item.version,
