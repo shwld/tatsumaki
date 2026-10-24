@@ -24,8 +24,8 @@ describe("cli route", () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
-      apiVersion: "0.0.10",
-      minClientVersion: "0.0.10",
+      apiVersion: "0.0.11",
+      minClientVersion: "0.0.11",
     });
   });
 
