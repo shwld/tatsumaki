@@ -13,7 +13,10 @@ const json = (body: unknown, status = 200) =>
 
 function renderPreview() {
   const client = new QueryClient({
-    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    defaultOptions: {
+      queries: { retry: false, retryDelay: 0 },
+      mutations: { retry: false },
+    },
   });
   return render(
     <QueryClientProvider client={client}>

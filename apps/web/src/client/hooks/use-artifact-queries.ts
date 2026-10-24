@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { HttpStatusError } from "../lib/api-error";
+import { HttpStatusError, isHttpStatusError } from "../lib/api-error";
 import {
   artifactApiPath,
   artifactVersionApiPath,
@@ -23,6 +23,12 @@ async function getJson<T>(path: string): Promise<T> {
   return (await response.json()) as T;
 }
 
+/** A 4xx answer is final (not found, forbidden, expired session); only transient failures are retried. */
+function retryTransientOnly(failureCount: number, error: unknown): boolean {
+  if (isHttpStatusError(error) && error.status < 500) return false;
+  return failureCount < 2;
+}
+
 export const artifactQueryKeys = {
   list: (projectId: string) => ["artifacts", projectId] as const,
   detail: (projectId: string, artifactId: string) =>
@@ -35,6 +41,7 @@ export const artifactQueryKeys = {
 export function useArtifactList(projectId: string) {
   return useQuery({
     queryKey: artifactQueryKeys.list(projectId),
+    retry: retryTransientOnly,
     queryFn: () =>
       getJson<{ artifacts: Artifact[] }>(artifactsApiPath(projectId)),
   });
@@ -43,6 +50,7 @@ export function useArtifactList(projectId: string) {
 export function useArtifactDetail(projectId: string, artifactId: string) {
   return useQuery({
     queryKey: artifactQueryKeys.detail(projectId, artifactId),
+    retry: retryTransientOnly,
     queryFn: () =>
       getJson<{ artifact: Artifact; latestVersion: ArtifactVersion | null }>(
         artifactApiPath(projectId, artifactId),
@@ -53,6 +61,7 @@ export function useArtifactDetail(projectId: string, artifactId: string) {
 export function useArtifactVersions(projectId: string, artifactId: string) {
   return useQuery({
     queryKey: artifactQueryKeys.versions(projectId, artifactId),
+    retry: retryTransientOnly,
     queryFn: () =>
       getJson<{ versions: ArtifactVersion[] }>(
         `${artifactApiPath(projectId, artifactId)}/versions`,

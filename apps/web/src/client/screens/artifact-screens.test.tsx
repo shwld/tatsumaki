@@ -79,7 +79,10 @@ function LocationProbe() {
 
 function renderAt(path: string) {
   const client = new QueryClient({
-    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    defaultOptions: {
+      queries: { retry: false, retryDelay: 0 },
+      mutations: { retry: false },
+    },
   });
   return render(
     <QueryClientProvider client={client}>
@@ -263,6 +266,12 @@ describe("artifact screens", () => {
       expect(
         await screen.findByText(/Artifact が見つかりません/),
       ).toBeInTheDocument();
+      const detailCalls = vi
+        .mocked(fetch)
+        .mock.calls.filter(
+          ([url]) => String(url) === "/api/projects/p1/artifacts/art-1",
+        );
+      expect(detailCalls).toHaveLength(1);
     });
 
     it("shows not found for a version that does not exist", async () => {
