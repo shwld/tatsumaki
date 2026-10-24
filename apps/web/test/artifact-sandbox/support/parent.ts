@@ -49,7 +49,12 @@ function canaryAnswer(name: string): {
   body: string | Buffer;
 } {
   if (name === "image") return { contentType: "image/png", body: PIXEL_PNG };
-  if (name === "script" || name === "module.js" || name === "worker.js") {
+  if (
+    name === "script" ||
+    name === "module.js" ||
+    name === "worker.js" ||
+    name === "sw.js"
+  ) {
     return {
       contentType: "text/javascript; charset=utf-8",
       body: "/* canary */",
@@ -110,7 +115,9 @@ export async function installParentRoutes(page: Page): Promise<{
   // Anything an artifact manages to reach lands here and is counted. The
   // answer has the right type for what asked, so a probe that gets through
   // really loads and a "blocked" result can only mean it was refused.
-  await page.route(/__canary/, (route) => {
+  // On the context: a service worker script is fetched outside the page's own
+  // routes, and without this the control would be refused for the wrong reason.
+  await page.context().route(/__canary/, (route) => {
     const url = new URL(route.request().url());
     hits.push(`${route.request().method()} ${route.request().url()}`);
     const name = url.pathname.split("/").pop() ?? "";
