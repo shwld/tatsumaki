@@ -28,8 +28,6 @@ export const artifactScreensJa = {
       noVersion: "この Artifact にはまだ公開された版がありません。",
       brokenEntrypoint:
         "この版は表示できません（入口ファイルが見つかりません）。",
-      untrustedNotice:
-        "信頼されていないコンテンツです。この Artifact は隔離された領域で実行されます。内容を信用せず、パスワードなどの機密情報を入力しないでください。",
     },
     preview: {
       title: "{{title}} のプレビュー（v{{version}}）",
@@ -72,8 +70,6 @@ export const artifactScreensEn = {
       noVersion: "This artifact has no published version yet.",
       brokenEntrypoint:
         "This version cannot be shown (its entry file is missing).",
-      untrustedNotice:
-        "Untrusted content. This artifact runs in an isolated sandbox. Do not trust it, and do not enter passwords or other secrets.",
     },
     preview: {
       title: "Preview of {{title}} (v{{version}})",

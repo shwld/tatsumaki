@@ -193,7 +193,6 @@ describe("artifact screens", () => {
       expect(screen.getByText("art-1")).toBeInTheDocument();
       expect(screen.getByText("3")).toBeInTheDocument();
       expect(screen.getByText("2.0 KB")).toBeInTheDocument();
-      expect(screen.getByRole("note")).toHaveTextContent("信頼されていない");
       const frame = await screen.findByTitle(/のプレビュー（v2）/);
       expect(frame.getAttribute("sandbox")).toBe("allow-scripts");
       expect(screen.queryByText(/最新版ではありません/)).toBeNull();
@@ -372,7 +371,6 @@ describe("artifact screens", () => {
       mockApi(baseRoutes());
       renderAt("/projects/p1/artifacts/art-1");
       expect(await screen.findByLabelText("Version")).toBeInTheDocument();
-      expect(screen.getByRole("note")).toHaveTextContent("Untrusted content");
       expect(
         await screen.findByTitle("Preview of Release report (v2)"),
       ).toBeInTheDocument();

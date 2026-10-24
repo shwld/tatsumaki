@@ -186,6 +186,12 @@ README の R2 bucket 記述、setup script（3 つ目の bucket、`ARTIFACT_CONT
 - **Rendering in production.** A published sample (HTML, CSS, JavaScript) renders in the preview frame, the script ran, and the untrusted-content notice is shown.
 - **Not verified yet:** Firefox and Safari (opaque origin, path-scoped CSP, CORS module scripts), and `window.origin === "null"` inside the production frame was not read back (the check relies on the Chromium suite).
 
+### 2026-10-24 (story #314: untrusted-content notice removed)
+
+- **The always-visible "untrusted content" notice is removed from the detail screen** (decided by shwld). It was the mitigation in §2 for a phishing form drawn inside the frame. The main use of artifacts is a team hosting its own documents, where the notice read as an unexplained warning. Only project members and API keys with `artifact:write` can publish, and nothing is public or anonymous.
+- **Residual risk (accepted):** content a member published, including generated pages and third-party code pulled in by a build, can draw a fake form inside the frame, and nothing on the page says it is not tatsumaki. The sandbox, CSP, `frame-src` and token design are unchanged, so the content still cannot reach the app, its cookies or its API, and the frame cannot be sent to another site. This supersedes the "always display" wording in §2 and in story #302's Definition of Done.
+- The README still describes the sandbox constraints for people who publish artifacts.
+
 ## References
 
 - https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/iframe
