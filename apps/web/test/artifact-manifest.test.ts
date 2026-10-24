@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import contentTypeFixture from "./fixtures/artifact-content-types.json";
+import sensitiveFixture from "./fixtures/artifact-sensitive-paths.json";
 import treeDigestFixture from "./fixtures/artifact-tree-digest.json";
 import { artifactContentTypeForPath } from "../src/domain/artifacts/content-type";
 import {
@@ -205,49 +207,20 @@ describe("validateArtifactPath", () => {
 });
 
 describe("artifactContentTypeForPath", () => {
-  it("is case-insensitive and rejects dotfiles without an extension", () => {
-    expect(artifactContentTypeForPath("A/B.PNG")).toBe("image/png");
-    expect(artifactContentTypeForPath(".js")).toBeNull();
-    expect(artifactContentTypeForPath("a/b")).toBeNull();
+  it.each(contentTypeFixture.cases)("$path -> $contentType", ({
+    path,
+    contentType,
+  }) => {
+    expect(artifactContentTypeForPath(path)).toBe(contentType);
   });
 });
 
 describe("isSensitiveArtifactPath", () => {
-  it.each([
-    ".env",
-    ".env.production",
-    "config/.ENV",
-    ".git/config",
-    "a/.git/HEAD",
-    "key.pem",
-    "certs/site.CRT",
-    "id.key",
-    "x.p12",
-    "x.pfx",
-    "aws/credentials",
-    "my-secret.json",
-    "api-token.txt",
-    ".npmrc",
-    ".netrc",
-    ".envrc",
-    ".pypirc",
-    ".docker/config.json",
-    "home/.DOCKER/config.json",
-    ".aws/config",
-    ".ssh/config",
-    ".ssh/id_ed25519",
-    ".kube/config",
-    ".gnupg/pubring.kbx",
-  ])("flags %s", (path) => {
+  it.each(sensitiveFixture.sensitive)("flags %s", (path) => {
     expect(isSensitiveArtifactPath(path)).toBe(true);
   });
 
-  it.each([
-    "index.html",
-    "assets/app.js",
-    "environment.js",
-    "gitignore.txt",
-  ])("allows %s", (path) => {
+  it.each(sensitiveFixture.allowed)("allows %s", (path) => {
     expect(isSensitiveArtifactPath(path)).toBe(false);
   });
 });

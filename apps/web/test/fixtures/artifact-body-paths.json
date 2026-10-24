@@ -1,0 +1,29 @@
+{
+  "valid": [
+    "index.html",
+    "assets/app.js",
+    "a b/c.txt",
+    "あ/index.html",
+    "100%25.txt",
+    "a%2Fb.txt",
+    ".hidden/file",
+    "a..b/c",
+    "é.txt"
+  ],
+  "invalid": [
+    { "input": "", "error": "EMPTY_PATH" },
+    { "input": "é.txt", "error": "NOT_NFC" },
+    { "input": "a\\b", "error": "FORBIDDEN_CHARACTER" },
+    { "input": "a\u0000b", "error": "FORBIDDEN_CHARACTER" },
+    { "input": "a\nb", "error": "FORBIDDEN_CHARACTER" },
+    { "input": "a\u007fb", "error": "FORBIDDEN_CHARACTER" },
+    { "input": "/abs/index.html", "error": "ABSOLUTE_PATH" },
+    { "input": "a//b", "error": "EMPTY_SEGMENT" },
+    { "input": "dir/", "error": "EMPTY_SEGMENT" },
+    { "input": ".", "error": "DOT_SEGMENT" },
+    { "input": "a/./b", "error": "DOT_SEGMENT" },
+    { "input": "../x", "error": "DOT_SEGMENT" }
+  ],
+  "validC1Control": ["a\u0085b"],
+  "maxBytes": 512
+}
