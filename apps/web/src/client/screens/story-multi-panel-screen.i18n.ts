@@ -47,6 +47,7 @@ export const storyMultiPanelScreenJa = {
     nav: {
       velocity: "ベロシティ",
       history: "Project History",
+      artifacts: "Artifacts",
       members: "メンバー",
       settings: "設定",
     },
@@ -212,6 +213,7 @@ export const storyMultiPanelScreenEn = {
     nav: {
       velocity: "Velocity",
       history: "Project History",
+      artifacts: "Artifacts",
       members: "Members",
       settings: "Settings",
     },

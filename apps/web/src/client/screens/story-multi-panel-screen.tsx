@@ -92,6 +92,7 @@ import {
   projectStoriesApiPath,
   projectVelocityDashboardPath,
 } from "../lib/story-routes";
+import { projectArtifactsPath } from "../lib/artifact-routes";
 import type { Iteration } from "../types/iteration";
 import type { ProjectLabel } from "../types/project-label";
 import {
@@ -2021,6 +2022,14 @@ export function StoryMultiPanelScreen() {
                 {projectId ? (
                   <Link
                     className="text-sm font-medium text-blue-700"
+                    to={projectArtifactsPath(projectId)}
+                  >
+                    {t("storyMultiPanelScreen.nav.artifacts")}
+                  </Link>
+                ) : null}
+                {projectId ? (
+                  <Link
+                    className="text-sm font-medium text-blue-700"
                     to={projectMembersPath(projectId)}
                   >
                     {t("storyMultiPanelScreen.nav.members")}
@@ -2473,6 +2482,14 @@ export function StoryMultiPanelScreen() {
                                   onClick={() => setMobileMenuOpen(false)}
                                 >
                                   {t("storyMultiPanelScreen.nav.history")}
+                                </Link>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem asChild>
+                                <Link
+                                  to={projectArtifactsPath(projectId)}
+                                  onClick={() => setMobileMenuOpen(false)}
+                                >
+                                  {t("storyMultiPanelScreen.nav.artifacts")}
                                 </Link>
                               </DropdownMenuItem>
                               <DropdownMenuItem asChild>
