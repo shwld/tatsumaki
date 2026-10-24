@@ -178,6 +178,14 @@ README の R2 bucket 記述、setup script（3 つ目の bucket、`ARTIFACT_CONT
 - **Creator names** come from the members API; a member who left, or a viewer who cannot read the list, sees a shortened user id.
 - **Verified in a real browser** by `artifact-sandbox-app-preview.spec.ts`: the real SPA renders a published site, the frame attributes are exactly as above, the frame's `window.origin` is `null`, and the parent cannot read the frame document.
 
+### 2026-10-24 (story #315: production check)
+
+- **Access bypass confirmed on the real account (hosted production).** After an Access application for `<custom domain>/artifact-content/*` with an Everyone bypass policy was added, a request with an invalid token returns the Worker's 404 (with the sandbox CSP, `nosniff`, `no-referrer` and `no-store`) with and without `Sec-Fetch-*`, while `/` and `/api/projects` without a login still redirect to Access. Before that application existed the same request was redirected to the Access login, so previews could not render.
+- **The setup script only covers the workers.dev host.** `ensureArtifactContentBypass` creates the bypass for `<worker>.<subdomain>.workers.dev`, not for a custom domain, and the hosted production uses a custom domain, a control plane and build-time resource IDs. The application was therefore created by hand. Making the script handle custom domains is story #320.
+- **Signing key.** The hosted production had no `ARTIFACT_CONTENT_SIGNING_KEY` (preview-token would have answered 503). It was added as a secret in the dashboard.
+- **Rendering in production.** A published sample (HTML, CSS, JavaScript) renders in the preview frame, the script ran, and the untrusted-content notice is shown.
+- **Not verified yet:** Firefox and Safari (opaque origin, path-scoped CSP, CORS module scripts), and `window.origin === "null"` inside the production frame was not read back (the check relies on the Chromium suite).
+
 ## References
 
 - https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/iframe
