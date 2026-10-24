@@ -169,3 +169,43 @@ jobs:
             apps/web/test-results/
             apps/web/playwright-report/
           if-no-files-found: ignore
+
+  artifact-sandbox:
+    timeout-minutes: 15
+    if: github.event_name != 'issue_comment'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          node-version: "24"
+      - run: bun install --frozen-lockfile
+        working-directory: apps/web
+      - name: Cache Playwright browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('apps/web/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+      - name: Install Playwright browser
+        run: bunx playwright install --with-deps chromium
+        working-directory: apps/web
+      - name: Build client
+        run: bun run build:client
+        working-directory: apps/web
+      # Real Worker (wrangler dev with local D1/R2) + real Chromium: the sandbox
+      # depends on the headers the Worker really sends, which the mocked
+      # screenshot suite cannot see.
+      - name: Run artifact sandbox tests
+        run: bunx playwright test -c playwright.artifact-sandbox.config.ts
+        working-directory: apps/web
+      - name: Upload artifact sandbox results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: artifact-sandbox
+          path: |
+            apps/web/test-results/
+            apps/web/playwright-report-artifact-sandbox/
+          if-no-files-found: ignore

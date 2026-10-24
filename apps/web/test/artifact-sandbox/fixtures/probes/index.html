@@ -1,0 +1,25 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>isolation probe</title>
+</head>
+<body>
+  <h1>isolation probe</h1>
+  <button id="open-popup" type="button">window.open</button>
+  <a id="link-blank" target="_blank" rel="opener" href="about:blank">target blank</a>
+  <a id="download" download="probe.txt" href="about:blank">download</a>
+  <form id="form" method="post" action="about:blank">
+    <button id="form-submit" type="submit">submit</button>
+  </form>
+  <button id="clipboard" type="button">clipboard</button>
+  <button id="fullscreen" type="button">fullscreen</button>
+  <button id="top-nav" type="button">top navigation</button>
+  <button id="self-nav" type="button">own navigation</button>
+  <button id="eval" type="button">eval</button>
+  <button id="modal" type="button">alert</button>
+  <a id="inner-link" href="inner.html">another page of this artifact</a>
+  <pre id="result"></pre>
+  <script src="isolation.js"></script>
+</body>
+</html>

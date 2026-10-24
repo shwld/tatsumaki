@@ -1,0 +1,14 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8" /><title>main thread probe</title></head>
+<body>
+  <button id="spin" type="button">spin</button>
+  <script>
+    window.__spin = (milliseconds) => {
+      const end = performance.now() + milliseconds;
+      while (performance.now() < end) { /* busy loop */ }
+    };
+    document.getElementById("spin").addEventListener("click", () => window.__spin(3000));
+  </script>
+</body>
+</html>
