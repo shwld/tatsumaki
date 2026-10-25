@@ -1051,6 +1051,45 @@ describe("story routes", () => {
     expect(response.status).toBe(409);
   });
 
+  it("does not partially apply a bulk status change when a later story is invalid", async () => {
+    const projectId = await createProject();
+    const createStoryForTest = async (title: string) => {
+      const response = await fetchWithAuth(storiesApiPath(projectId), {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ title, description: "", storyPoint: 3 }),
+      });
+      return (
+        (await response.json()) as {
+          story: { id: string; storyNumber: number };
+        }
+      ).story;
+    };
+    const started = await createStoryForTest("Already started");
+    const unstarted = await createStoryForTest("Still unstarted");
+    await forceStatusForTest(started.id, "Started");
+
+    const response = await fetchWithAuth(
+      `${storiesApiPath(projectId)}/bulk-status`,
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          storyIds: [started.id, unstarted.id],
+          status: "Finished",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(409);
+    const getResponse = await fetchWithAuth(
+      storyApiPath(projectId, String(started.storyNumber)),
+    );
+    expect(await getResponse.json()).toEqual({
+      story: expect.objectContaining({ status: "Started" }),
+    });
+  });
+
   it.each([
     "Started",
     "Finished",

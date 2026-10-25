@@ -83,6 +83,25 @@ type StoryUpdateActor = {
   name: string;
 };
 
+export function checkStoryStatusChange(
+  story: Pick<Story, "status" | "type" | "storyPoint">,
+  target: StoryStatus,
+  storyPoint: number | null = story.storyPoint,
+): InvalidStoryStatusTransitionError | EstimateRequiredError | null {
+  if (!canTransitionStoryStatus(story.status, target)) {
+    return {
+      code: "INVALID_STORY_STATUS_TRANSITION_ERROR",
+      from: story.status,
+      to: target,
+      allowedNext: listAllowedStoryStatusTransitions(story.status),
+    };
+  }
+  if (requiresEstimateForTransition(target, storyPoint, story.type)) {
+    return { code: "ESTIMATE_REQUIRED_ERROR", targetStatus: target };
+  }
+  return null;
+}
+
 function serializeStoryFieldValue(
   fieldName: StoryActivityField,
   story: Story,
@@ -212,23 +231,6 @@ export async function updateStory(
     return err(normalizedStatus.error);
   }
 
-  if (
-    normalizedStatus?.isOk() &&
-    !canTransitionStoryStatus(
-      currentResult.value.status,
-      normalizedStatus.value,
-    )
-  ) {
-    return err({
-      code: "INVALID_STORY_STATUS_TRANSITION_ERROR",
-      from: currentResult.value.status,
-      to: normalizedStatus.value,
-      allowedNext: listAllowedStoryStatusTransitions(
-        currentResult.value.status,
-      ),
-    });
-  }
-
   const normalizedStoryPoint =
     input.storyPoint !== undefined
       ? normalizeStoryPoint(input.storyPoint, input.allowedStoryPoints)
@@ -242,18 +244,15 @@ export async function updateStory(
     ? normalizedStoryPoint.value
     : currentResult.value.storyPoint;
 
-  if (
-    normalizedStatus?.isOk() &&
-    requiresEstimateForTransition(
+  if (normalizedStatus?.isOk()) {
+    const statusError = checkStoryStatusChange(
+      currentResult.value,
       normalizedStatus.value,
       effectiveStoryPoint,
-      currentResult.value.type,
-    )
-  ) {
-    return err({
-      code: "ESTIMATE_REQUIRED_ERROR",
-      targetStatus: normalizedStatus.value,
-    });
+    );
+    if (statusError) {
+      return err(statusError);
+    }
   }
 
   const normalizedLabels =
