@@ -1,5 +1,4 @@
 import { useParams } from "react-router";
-import { ProjectStoryBreadcrumb } from "../components/project-story-breadcrumb";
 import { useProjectHistory } from "../hooks/use-project-history";
 import { projectStoryEditPath } from "../lib/story-routes";
 import type { ProjectHistoryEntry } from "../types/story";
@@ -116,10 +115,6 @@ export function ProjectHistoryScreen() {
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-6">
-      <ProjectStoryBreadcrumb
-        projectId={projectId}
-        currentPageLabel="Project History"
-      />
       <h1 className="mb-6 text-xl font-semibold text-gray-900">
         Project History
       </h1>

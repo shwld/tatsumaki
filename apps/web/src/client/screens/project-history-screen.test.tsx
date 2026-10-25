@@ -3,7 +3,6 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { resetProjectStoryBreadcrumbCacheForTests } from "../components/project-story-breadcrumb";
 import { AuthErrorProvider } from "../contexts/auth-error-context";
 import { ToastProvider } from "../contexts/toast-context";
 import { ProjectHistoryScreen } from "./project-history-screen";
@@ -34,7 +33,6 @@ function renderScreen() {
 
 describe("ProjectHistoryScreen", () => {
   beforeEach(() => {
-    resetProjectStoryBreadcrumbCacheForTests();
     vi.spyOn(globalThis, "fetch");
   });
 

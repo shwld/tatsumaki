@@ -44,13 +44,6 @@ export const storyMultiPanelScreenJa = {
         "パネルの閲覧に必要な権限を申請するか、管理者に対応を依頼してください。",
       retryHint: "現在の画面を維持したまま再試行できます。",
     },
-    nav: {
-      velocity: "ベロシティ",
-      history: "Project History",
-      artifacts: "Artifacts",
-      members: "メンバー",
-      settings: "設定",
-    },
     panelMenu: {
       settingsLabel: "パネル表示・結合設定",
       panels: "Panels",
@@ -209,13 +202,6 @@ export const storyMultiPanelScreenEn = {
       nextAction:
         "Request permission to view panels, or ask an administrator for help.",
       retryHint: "You can retry while staying on this screen.",
-    },
-    nav: {
-      velocity: "Velocity",
-      history: "Project History",
-      artifacts: "Artifacts",
-      members: "Members",
-      settings: "Settings",
     },
     panelMenu: {
       settingsLabel: "Panel display and combine settings",

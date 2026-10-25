@@ -1,7 +1,6 @@
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 
-import { ProjectStoryBreadcrumb } from "../components/project-story-breadcrumb";
 import { useAuthError } from "../contexts/auth-error-context";
 import { useToast } from "../contexts/toast-context";
 import { isAuthError } from "../lib/api-error";
@@ -384,9 +383,6 @@ export function ProjectSettingsScreen() {
 
   return (
     <div className="mx-auto max-w-2xl p-4">
-      {projectId ? (
-        <ProjectStoryBreadcrumb projectId={projectId} currentPageLabel="設定" />
-      ) : null}
       <h1 className="mb-6 text-2xl font-bold text-gray-900">
         プロジェクト設定
       </h1>

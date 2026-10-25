@@ -3,7 +3,6 @@ import { useTranslation } from "react-i18next";
 import { useParams } from "react-router";
 
 import { PermissionDenied } from "../components/permission-denied";
-import { ProjectStoryBreadcrumb } from "../components/project-story-breadcrumb";
 import { useAuthError } from "../contexts/auth-error-context";
 import { isAuthError, isForbiddenError } from "../lib/api-error";
 import { parseErrorMessage } from "../lib/parse-error-message";
@@ -275,12 +274,6 @@ export function ProjectMembersScreen() {
   return (
     <main className="min-h-screen bg-gray-100 px-4 py-10">
       <div className="mx-auto max-w-3xl rounded-lg bg-white p-6 shadow-sm">
-        {projectId ? (
-          <ProjectStoryBreadcrumb
-            projectId={projectId}
-            currentPageLabel={t("projectMembersScreen.breadcrumb")}
-          />
-        ) : null}
         <h1 className="mb-6 text-2xl font-bold text-gray-900">
           {t("projectMembersScreen.title")}
         </h1>

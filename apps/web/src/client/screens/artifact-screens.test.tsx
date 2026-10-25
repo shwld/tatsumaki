@@ -3,7 +3,6 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { i18n } from "../i18n/config";
-import { resetProjectStoryBreadcrumbCacheForTests } from "../components/project-story-breadcrumb";
 import { AuthErrorProvider } from "../contexts/auth-error-context";
 import { ArtifactDetailScreen } from "./artifact-detail-screen";
 import { ArtifactListScreen } from "./artifact-list-screen";
@@ -111,7 +110,6 @@ function renderAt(path: string) {
 
 describe("artifact screens", () => {
   beforeEach(() => {
-    resetProjectStoryBreadcrumbCacheForTests();
     vi.stubGlobal("fetch", vi.fn());
   });
 

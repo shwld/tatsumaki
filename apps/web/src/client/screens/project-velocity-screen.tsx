@@ -5,7 +5,6 @@ import {
   IterationProgressChart,
   type IterationProgressChartPayload,
 } from "../components/iteration-progress-chart";
-import { ProjectStoryBreadcrumb } from "../components/project-story-breadcrumb";
 import { useAuthError } from "../contexts/auth-error-context";
 import { isAuthError } from "../lib/api-error";
 import { findCurrentIteration } from "../lib/current-iteration";
@@ -181,10 +180,6 @@ export function ProjectVelocityScreen() {
   return (
     <main className="min-h-screen bg-gray-100 px-4 py-10">
       <div className="mx-auto max-w-4xl rounded-lg bg-white p-6 shadow-sm">
-        <ProjectStoryBreadcrumb
-          projectId={projectId}
-          currentPageLabel="ベロシティ"
-        />
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">

@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useParams, useSearchParams } from "react-router";
+import { useParams, useSearchParams } from "react-router";
 
 import { ErrorRetry } from "../components/error-retry";
 import {
@@ -86,14 +86,9 @@ import { persistStoryReorder } from "../lib/story-reorder-request";
 import {
   projectPlanningPokerCloseApiPath,
   projectPlanningPokerSessionsApiPath,
-  projectHistoryPath,
-  projectMembersPath,
-  projectSettingsPath,
   projectStoriesApiPath,
-  projectVelocityDashboardPath,
 } from "../lib/story-routes";
 import { canTransitionStoryStatus } from "../../domain/entities/story";
-import { projectArtifactsPath } from "../lib/artifact-routes";
 import type { Iteration } from "../types/iteration";
 import type { ProjectLabel } from "../types/project-label";
 import {
@@ -2022,47 +2017,6 @@ export function StoryMultiPanelScreen() {
           <HeaderToolbar>
             <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
               <>
-                {projectId ? (
-                  <Link
-                    className="text-sm font-medium text-blue-700"
-                    to={projectVelocityDashboardPath(projectId)}
-                  >
-                    {t("storyMultiPanelScreen.nav.velocity")}
-                  </Link>
-                ) : null}
-                {projectId ? (
-                  <Link
-                    className="text-sm font-medium text-blue-700"
-                    to={projectHistoryPath(projectId)}
-                  >
-                    {t("storyMultiPanelScreen.nav.history")}
-                  </Link>
-                ) : null}
-                {projectId ? (
-                  <Link
-                    className="text-sm font-medium text-blue-700"
-                    to={projectArtifactsPath(projectId)}
-                  >
-                    {t("storyMultiPanelScreen.nav.artifacts")}
-                  </Link>
-                ) : null}
-                {projectId ? (
-                  <Link
-                    className="text-sm font-medium text-blue-700"
-                    to={projectMembersPath(projectId)}
-                  >
-                    {t("storyMultiPanelScreen.nav.members")}
-                  </Link>
-                ) : null}
-                {projectId ? (
-                  <Link
-                    className="text-sm font-medium text-blue-700"
-                    to={projectSettingsPath(projectId)}
-                  >
-                    {t("storyMultiPanelScreen.nav.settings")}
-                  </Link>
-                ) : null}
-
                 <div className="ml-auto">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -2490,51 +2444,6 @@ export function StoryMultiPanelScreen() {
                           className="min-w-64"
                           data-testid="mobile-sub-header-menu"
                         >
-                          {projectId ? (
-                            <>
-                              <DropdownMenuItem asChild>
-                                <Link
-                                  to={projectVelocityDashboardPath(projectId)}
-                                  onClick={() => setMobileMenuOpen(false)}
-                                >
-                                  {t("storyMultiPanelScreen.nav.velocity")}
-                                </Link>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem asChild>
-                                <Link
-                                  to={projectHistoryPath(projectId)}
-                                  onClick={() => setMobileMenuOpen(false)}
-                                >
-                                  {t("storyMultiPanelScreen.nav.history")}
-                                </Link>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem asChild>
-                                <Link
-                                  to={projectArtifactsPath(projectId)}
-                                  onClick={() => setMobileMenuOpen(false)}
-                                >
-                                  {t("storyMultiPanelScreen.nav.artifacts")}
-                                </Link>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem asChild>
-                                <Link
-                                  to={projectMembersPath(projectId)}
-                                  onClick={() => setMobileMenuOpen(false)}
-                                >
-                                  {t("storyMultiPanelScreen.nav.members")}
-                                </Link>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem asChild>
-                                <Link
-                                  to={projectSettingsPath(projectId)}
-                                  onClick={() => setMobileMenuOpen(false)}
-                                >
-                                  {t("storyMultiPanelScreen.nav.settings")}
-                                </Link>
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                            </>
-                          ) : null}
                           <DropdownMenuLabel className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
                             {t("storyMultiPanelScreen.panelMenu.panels")}
                           </DropdownMenuLabel>
