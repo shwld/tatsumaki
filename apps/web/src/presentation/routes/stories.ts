@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import { addStoryBlocker } from "../../application/usecases/add-story-blocker";
 import {
   bulkAddStoryLabels,
   EMPTY_LABELS_ERROR,
@@ -33,7 +32,6 @@ import { summarizeStories } from "../../application/usecases/summarize-stories";
 import { listStoryAttachments } from "../../application/usecases/list-story-attachments";
 import { listStoryPriorityHistory } from "../../application/usecases/list-story-priority-history";
 import { listStoryTimeline } from "../../application/usecases/list-story-timeline";
-import { removeStoryBlocker } from "../../application/usecases/remove-story-blocker";
 import { reorderStories } from "../../application/usecases/reorder-stories";
 import {
   uploadStoryAttachment,
@@ -64,6 +62,7 @@ import { InMemoryStoryAttachmentObjectStore } from "../../infrastructure/storage
 import { R2StoryAttachmentObjectStore } from "../../infrastructure/storage/r2-story-attachment-object-store";
 import type { Env } from "../../index";
 import { requireProjectMembership } from "./project-membership";
+import { changeStoryBlocker } from "./stories/blocker-handlers";
 import {
   STORY_TYPE_ERROR_MESSAGE,
   toCreateStoryErrorResponse,
@@ -76,7 +75,6 @@ import {
   parseBulkUpdateStoryStatusRequest,
   parseCreateStoryRequest,
   parseReorderStoriesRequest,
-  parseStoryBlockerRequest,
   parseUpdateStoryRequest,
 } from "./stories/request-parsers";
 import {
@@ -110,19 +108,6 @@ const ALLOWED_STORY_ATTACHMENT_MIME_TYPES = new Set([
   "image/gif",
   "image/webp",
 ]);
-
-async function resolveStoryByReference(
-  repository: D1StoryRepository,
-  projectId: string,
-  storyRef: string,
-) {
-  const storyNumber = parseStoryNumberReference(storyRef);
-  if (storyNumber !== null) {
-    return repository.findByStoryNumber(projectId, storyNumber);
-  }
-
-  return repository.findById(projectId, storyRef);
-}
 
 function normalizeStoryAttachmentMimeType(raw: string): string {
   return raw.trim().toLowerCase();
@@ -824,196 +809,31 @@ storiesRoute.get("/projects/:projectId/stories/:storyNumber", async (c) => {
   return c.json({ story: result.value });
 });
 
-storiesRoute.post(
-  "/projects/:projectId/stories/:storyNumber/blockers",
-  async (c) => {
-    const projectId = c.req.param("projectId");
-    const membership = await requireProjectMembership(c, projectId);
-    if (!membership.ok) {
-      return membership.response;
-    }
+for (const [method, action] of [
+  ["post", "add"],
+  ["delete", "remove"],
+] as const) {
+  storiesRoute[method](
+    "/projects/:projectId/stories/:storyNumber/blockers",
+    async (c) => {
+      const projectId = c.req.param("projectId");
+      const membership = await requireProjectMembership(c, projectId);
+      if (!membership.ok) {
+        return membership.response;
+      }
 
-    let body: unknown;
-    try {
-      body = await c.req.json();
-    } catch {
-      return c.json({ error: "Invalid JSON body" }, 400);
-    }
+      const change = await changeStoryBlocker(c, { projectId, action });
+      if (!change.ok) {
+        return change.response;
+      }
 
-    const parsed = parseStoryBlockerRequest(body);
-    if (!parsed.ok) {
-      return c.json({ error: parsed.message }, 400);
-    }
-
-    const repository = new D1StoryRepository(c.env.DB);
-    const storyNumber = parseStoryNumberReference(c.req.param("storyNumber"));
-    if (storyNumber === null) {
-      return c.json({ error: "Story not found" }, 404);
-    }
-    const storyResult = await repository.findByStoryNumber(
-      projectId,
-      storyNumber,
-    );
-    if (storyResult.isErr()) {
-      return c.json({ error: "Failed to resolve story" }, 500);
-    }
-    if (!storyResult.value) {
-      return c.json({ error: "Story not found" }, 404);
-    }
-    const targetStoryResult = await resolveStoryByReference(
-      repository,
-      projectId,
-      parsed.value.targetStoryId,
-    );
-    if (targetStoryResult.isErr()) {
-      return c.json({ error: "Failed to resolve story" }, 500);
-    }
-    if (!targetStoryResult.value) {
-      return c.json({ error: "Story not found" }, 404);
-    }
-
-    const blockingStoryId =
-      parsed.value.relation === "blockedBy"
-        ? targetStoryResult.value.id
-        : storyResult.value.id;
-    const blockedStoryId =
-      parsed.value.relation === "blockedBy"
-        ? storyResult.value.id
-        : targetStoryResult.value.id;
-
-    if (blockingStoryId === blockedStoryId) {
-      return c.json({ error: "A story cannot block itself" }, 400);
-    }
-
-    const [blockingStoryResult, blockedStoryResult] = await Promise.all([
-      repository.findById(projectId, blockingStoryId),
-      repository.findById(projectId, blockedStoryId),
-    ]);
-
-    if (blockingStoryResult.isErr() || blockedStoryResult.isErr()) {
-      return c.json({ error: "Failed to update story blockers" }, 500);
-    }
-
-    if (!blockingStoryResult.value || !blockedStoryResult.value) {
-      return c.json({ error: "Story not found" }, 404);
-    }
-
-    const addResult = await addStoryBlocker(repository, {
-      blockingStoryId,
-      blockedStoryId,
-    });
-    if (addResult.isErr()) {
-      return c.json({ error: "Failed to update story blockers" }, 500);
-    }
-
-    const [updatedStoryResult, relatedUpdatedStoryResult] = await Promise.all([
-      repository.findById(projectId, storyResult.value.id),
-      repository.findById(projectId, targetStoryResult.value.id),
-    ]);
-    if (
-      updatedStoryResult.isErr() ||
-      !updatedStoryResult.value ||
-      relatedUpdatedStoryResult.isErr() ||
-      !relatedUpdatedStoryResult.value
-    ) {
-      return c.json({ error: "Failed to load updated story" }, 500);
-    }
-
-    return c.json({
-      story: updatedStoryResult.value,
-      relatedStory: relatedUpdatedStoryResult.value,
-    });
-  },
-);
-
-storiesRoute.delete(
-  "/projects/:projectId/stories/:storyNumber/blockers",
-  async (c) => {
-    const projectId = c.req.param("projectId");
-    const membership = await requireProjectMembership(c, projectId);
-    if (!membership.ok) {
-      return membership.response;
-    }
-
-    let body: unknown;
-    try {
-      body = await c.req.json();
-    } catch {
-      return c.json({ error: "Invalid JSON body" }, 400);
-    }
-
-    const parsed = parseStoryBlockerRequest(body);
-    if (!parsed.ok) {
-      return c.json({ error: parsed.message }, 400);
-    }
-
-    const repository = new D1StoryRepository(c.env.DB);
-    const storyNumber = parseStoryNumberReference(c.req.param("storyNumber"));
-    if (storyNumber === null) {
-      return c.json({ error: "Story not found" }, 404);
-    }
-    const storyResult = await repository.findByStoryNumber(
-      projectId,
-      storyNumber,
-    );
-    if (storyResult.isErr()) {
-      return c.json({ error: "Failed to resolve story" }, 500);
-    }
-    if (!storyResult.value) {
-      return c.json({ error: "Story not found" }, 404);
-    }
-    const targetStoryResult = await resolveStoryByReference(
-      repository,
-      projectId,
-      parsed.value.targetStoryId,
-    );
-    if (targetStoryResult.isErr()) {
-      return c.json({ error: "Failed to resolve story" }, 500);
-    }
-    if (!targetStoryResult.value) {
-      return c.json({ error: "Story not found" }, 404);
-    }
-
-    const blockingStoryId =
-      parsed.value.relation === "blockedBy"
-        ? targetStoryResult.value.id
-        : storyResult.value.id;
-    const blockedStoryId =
-      parsed.value.relation === "blockedBy"
-        ? storyResult.value.id
-        : targetStoryResult.value.id;
-
-    if (blockingStoryId === blockedStoryId) {
-      return c.json({ error: "A story cannot block itself" }, 400);
-    }
-
-    const removeResult = await removeStoryBlocker(repository, {
-      blockingStoryId,
-      blockedStoryId,
-    });
-    if (removeResult.isErr()) {
-      return c.json({ error: "Failed to update story blockers" }, 500);
-    }
-
-    const [updatedStoryResult, relatedUpdatedStoryResult] = await Promise.all([
-      repository.findById(projectId, storyResult.value.id),
-      repository.findById(projectId, targetStoryResult.value.id),
-    ]);
-    if (
-      updatedStoryResult.isErr() ||
-      !updatedStoryResult.value ||
-      relatedUpdatedStoryResult.isErr() ||
-      !relatedUpdatedStoryResult.value
-    ) {
-      return c.json({ error: "Story not found" }, 404);
-    }
-
-    return c.json({
-      story: updatedStoryResult.value,
-      relatedStory: relatedUpdatedStoryResult.value,
-    });
-  },
-);
+      return c.json({
+        story: change.story,
+        relatedStory: change.relatedStory,
+      });
+    },
+  );
+}
 
 storiesRoute.get(
   "/projects/:projectId/stories/:storyNumber/attachments",

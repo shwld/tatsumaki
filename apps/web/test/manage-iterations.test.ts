@@ -278,6 +278,7 @@ describe("rebuildIterations", () => {
       reorder: vi.fn(),
       listPriorityHistory: vi.fn(),
       addBlocker: vi.fn(),
+      listBlockerPairs: vi.fn(),
       removeBlocker: vi.fn(),
       listByOwnerAcrossProjects: vi.fn(),
       listAcceptedForIterationRebuild: vi.fn(async () =>

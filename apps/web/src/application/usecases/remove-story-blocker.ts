@@ -1,24 +1,19 @@
-import { err, ok, type Result } from "neverthrow";
-import type {
-  StoryRepository,
-  StoryRepositoryError,
-} from "../../domain/repositories/story-repository";
+import { err, type Result } from "neverthrow";
+import type { StoryRepository } from "../../domain/repositories/story-repository";
+import {
+  STORY_BLOCKS_ITSELF_ERROR,
+  type StoryBlockerError,
+  type StoryBlockerInput,
+} from "./add-story-blocker";
 
+/** Resolves to false when there was no such blocker to remove. */
 export async function removeStoryBlocker(
   repository: StoryRepository,
-  input: {
-    blockingStoryId: string;
-    blockedStoryId: string;
-  },
-): Promise<Result<true, StoryRepositoryError>> {
-  const result = await repository.removeBlocker(
-    input.blockingStoryId,
-    input.blockedStoryId,
-  );
-
-  if (result.isErr()) {
-    return err(result.error);
+  input: StoryBlockerInput,
+): Promise<Result<boolean, StoryBlockerError>> {
+  if (input.blockingStoryId === input.blockedStoryId) {
+    return err(STORY_BLOCKS_ITSELF_ERROR);
   }
 
-  return ok(true);
+  return repository.removeBlocker(input.blockingStoryId, input.blockedStoryId);
 }

@@ -8,6 +8,11 @@ import type {
   StoryType,
 } from "../entities/story";
 
+export type StoryBlockerPair = {
+  blockingStoryId: string;
+  blockedStoryId: string;
+};
+
 export type CreateStoryInput = {
   projectId: string;
   title: string;
@@ -143,10 +148,14 @@ export interface StoryRepository {
   listPriorityHistory(
     projectId: string,
   ): Promise<Result<StoryPriorityHistory[], StoryRepositoryError>>;
+  /** Resolves to false when the pair was already registered. */
   addBlocker(
     blockingStoryId: string,
     blockedStoryId: string,
-  ): Promise<Result<void, StoryRepositoryError>>;
+  ): Promise<Result<boolean, StoryRepositoryError>>;
+  listBlockerPairs(
+    projectId: string,
+  ): Promise<Result<StoryBlockerPair[], StoryRepositoryError>>;
   removeBlocker(
     blockingStoryId: string,
     blockedStoryId: string,

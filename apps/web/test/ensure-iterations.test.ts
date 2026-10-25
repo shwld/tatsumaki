@@ -276,7 +276,8 @@ describe("backfillIncompleteStoriesIntoCurrentIteration", () => {
         return ok(2);
       },
       listPriorityHistory: async () => ok([]),
-      addBlocker: async () => ok(undefined),
+      addBlocker: async () => ok(true),
+      listBlockerPairs: async () => ok([]),
       removeBlocker: async () => ok(true),
       listByOwnerAcrossProjects: async () => ok([]),
       listAcceptedForIterationRebuild: async () => ok([]),

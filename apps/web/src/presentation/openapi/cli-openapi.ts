@@ -57,7 +57,12 @@ const StorySummarySchema = z
   .openapi("StorySummary");
 
 const StoryRelationSchema = z
-  .object({ id: z.string(), title: z.string() })
+  .object({
+    id: z.string(),
+    storyNumber: z.number().openapi({ example: 95 }),
+    title: z.string(),
+    status: z.string().openapi({ example: "Started" }),
+  })
   .openapi("StoryRelation");
 
 export const StoryDetailSchema = StorySummarySchema.extend({
@@ -140,6 +145,25 @@ const StoryUpdateBodySchema = z.object({
 const StoryCommentBodySchema = z.object({
   body: z.string().min(1),
 });
+const StoryBlockerBodySchema = z.object({
+  relation: z.enum(["blockedBy", "blocks"]).openapi({
+    description:
+      "blockedBy: the story in the path is blocked by the target. blocks: the story in the path blocks the target.",
+  }),
+  targetStoryId: z.string().min(1).openapi({
+    description: "Story number or story id of the other story",
+    example: "95",
+  }),
+});
+const StoryBlockerResponseSchema = z
+  .object({
+    story: StoryDetailSchema,
+    relatedStory: StoryDetailSchema,
+    changed: z.boolean().openapi({
+      description: "False when the blocker was already registered (or absent)",
+    }),
+  })
+  .openapi("StoryBlockerResponse");
 
 /**
  * Codes the artifact routes answer with: the use case errors plus NOT_FOUND
@@ -529,6 +553,46 @@ export function buildCliOpenApiDoc() {
   app.openapi(createStoryCommentRoute, (c) =>
     c.json({ comment: { id: "c1", body: "x" } }, 201),
   );
+
+  for (const [operationId, method, summary] of [
+    ["addStoryBlocker", "post", "Blocker added"],
+    ["removeStoryBlocker", "delete", "Blocker removed"],
+  ] as const) {
+    const blockerRoute = createRoute({
+      operationId,
+      method,
+      path: "/programmatic-api/v1/projects/{projectId}/stories/{storyNumber}/blockers",
+      request: {
+        params: StoryByNumberParamsSchema,
+        body: {
+          content: { "application/json": { schema: StoryBlockerBodySchema } },
+        },
+      },
+      responses: {
+        200: {
+          description: summary,
+          content: {
+            "application/json": { schema: StoryBlockerResponseSchema },
+          },
+        },
+        400: { description: "Invalid request body or a story blocking itself" },
+        401: { description: "Unauthorized" },
+        403: { description: "Forbidden" },
+        404: { description: "Story not found" },
+        409: { description: "The blocker would create a cycle" },
+      },
+    });
+    app.openapi(blockerRoute, (c) =>
+      c.json(
+        {
+          story: storyDetailExample(),
+          relatedStory: storyDetailExample(),
+          changed: true,
+        },
+        200,
+      ),
+    );
+  }
 
   const getProjectRoute = createRoute({
     operationId: "getProject",

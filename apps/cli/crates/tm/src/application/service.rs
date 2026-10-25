@@ -5,7 +5,7 @@ use std::{collections::HashMap, io::{Read, Write}, net::TcpListener, time::{Dura
 
 use crate::{CliError, EXIT_AUTH, EXIT_CONFIG, EXIT_INVALID_ARGUMENT};
 use semver::Version;
-use super::ports::{AuthGateway, CliVersionResponse, ConfigStore, ProjectGateway, ProjectGetBody, StoryCommentInput, StoryCreateInput, StoryGateway, StoryGetBody, StoryListBody, StoryListFilter, StoryReorderInput, StoryUpdateInput, TokenCache, TokenStore, UserGateway, VersionGateway, WhoamiResponse};
+use super::ports::{AuthGateway, CliVersionResponse, ConfigStore, ProjectGateway, ProjectGetBody, StoryBlockerInput, StoryCommentInput, StoryCreateInput, StoryGateway, StoryGetBody, StoryListBody, StoryListFilter, StoryReorderInput, StoryUpdateInput, TokenCache, TokenStore, UserGateway, VersionGateway, WhoamiResponse};
 
 pub struct CliService<TS, CS, AG, SG, UG, VG, PG> {
     pub token_store: TS,
@@ -239,6 +239,25 @@ where
                 let mut cache = self.token_store.load().map_err(|err| (err, EXIT_AUTH))?;
                 token = self.refresh_access_token(base_url, &mut cache).await?;
                 self.story_gateway.create_story_comment(project, story_number, input, &token).await.map_err(|err| {
+                    let code = crate::exit_code_for_error(&err);
+                    (err, code)
+                })
+            }
+            Err(e) => {
+                let code = crate::exit_code_for_error(&e);
+                Err((e, code))
+            }
+        }
+    }
+
+    pub async fn change_story_blocker(&self, base_url: &str, project: &str, story_number: i64, input: &StoryBlockerInput) -> Result<serde_json::Value, (CliError, i32)> {
+        let mut token = self.ensure_access_token(base_url).await?;
+        match self.story_gateway.change_story_blocker(project, story_number, input, &token).await {
+            Ok(body) => Ok(body),
+            Err(e) if crate::is_unauthorized(&e) => {
+                let mut cache = self.token_store.load().map_err(|err| (err, EXIT_AUTH))?;
+                token = self.refresh_access_token(base_url, &mut cache).await?;
+                self.story_gateway.change_story_blocker(project, story_number, input, &token).await.map_err(|err| {
                     let code = crate::exit_code_for_error(&err);
                     (err, code)
                 })

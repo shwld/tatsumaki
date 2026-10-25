@@ -134,6 +134,19 @@ tm story comment --project <project-id> 95 --body "Looks good"
 tm --json story comment --project <project-id> 95 --body "Please recheck"
 ```
 
+## Story block / unblock
+
+`--by` registers the story as blocked by another story; `--blocks` registers it as blocking another story. Registering an existing blocker or removing a missing one is not an error. Self-references and cycles are rejected.
+
+```bash
+tm story block --project <project-id> 328 --by 325
+tm story block --project <project-id> 325 --blocks 328
+tm story unblock --project <project-id> 328 --by 325
+tm --json story block --project <project-id> 328 --by 325
+```
+
+`tm story get` lists the stories involved under `blockingStories` (blocking this story) and `blockedStories` (blocked by this story), with their number, title and status.
+
 ## Story reorder
 
 ```bash
