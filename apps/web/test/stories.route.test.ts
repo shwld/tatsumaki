@@ -5,6 +5,8 @@ import { createAuthHeaders, setupAccessBindings } from "./helpers/access-jwt";
 import { resetDatabase } from "./helpers/db";
 import { createDb } from "../src/infrastructure/db/client";
 import { iterationsTable } from "../src/infrastructure/db/schema/iterations";
+import { STORY_STATUS_CHANGED_CONCURRENTLY_ERROR } from "../src/domain/repositories/story-repository";
+import { D1StoryRepository } from "../src/infrastructure/db/repositories/d1-story-repository";
 import { storiesTable } from "../src/infrastructure/db/schema/stories";
 import { storyTimelineEntriesTable } from "../src/infrastructure/db/schema/story-timeline";
 import { todayIso } from "../src/shared/date/today-iso";
@@ -138,6 +140,15 @@ describe("story routes", () => {
     return iterationId;
   };
 
+  /** Seeds a status directly in D1, bypassing the API, to model pre-existing data. */
+  const forceStatusForTest = async (storyId: string, status: string) => {
+    const db = createDb(env.DB);
+    await db
+      .update(storiesTable)
+      .set({ status })
+      .where(eq(storiesTable.id, storyId));
+  };
+
   const assignStoryToIterationForTest = async (
     projectId: string,
     storyId: string,
@@ -163,7 +174,7 @@ describe("story routes", () => {
         title: "Create authentication flow",
         description: "Implement login and logout",
         type: "feature",
-        status: "Started",
+        status: "Unstarted",
         storyPoint: 3,
         labels: ["auth", "backend"],
       }),
@@ -178,7 +189,7 @@ describe("story routes", () => {
         title: "Create authentication flow",
         description: "Implement login and logout",
         type: "feature",
-        status: "Started",
+        status: "Unstarted",
         storyNumber: 1,
         statusChangedAt: expect.any(String),
         completedAt: null,
@@ -211,7 +222,7 @@ describe("story routes", () => {
         title: "Estimate as 13 points",
         description: "Compatibility with PivotalTracker-like scale",
         type: "feature",
-        status: "Started",
+        status: "Unstarted",
         storyPoint: 13,
         labels: [],
       }),
@@ -973,7 +984,7 @@ describe("story routes", () => {
     });
   });
 
-  it("allows direct status changes without transition guidance", async () => {
+  it("rejects a status change that skips Started with transition guidance", async () => {
     const projectId = await createProject();
 
     const createResponse = await fetchWithAuth(storiesApiPath(projectId), {
@@ -988,18 +999,153 @@ describe("story routes", () => {
       story: { id: string; storyNumber: number };
     };
 
-    const updateResponse = await fetchWithAuth(
+    for (const status of ["Finished", "Delivered", "Accepted", "Rejected"]) {
+      const updateResponse = await fetchWithAuth(
+        storyApiPath(projectId, String(created.story.storyNumber)),
+        {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ status }),
+        },
+      );
+
+      expect(updateResponse.status).toBe(409);
+      expect(await updateResponse.json()).toEqual({
+        error: `Cannot change status from Unstarted to ${status}. Move to one of: Started before choosing ${status}.`,
+      });
+    }
+
+    const getResponse = await fetchWithAuth(
       storyApiPath(projectId, String(created.story.storyNumber)),
+    );
+    expect(await getResponse.json()).toEqual({
+      story: expect.objectContaining({
+        status: "Unstarted",
+        iterationId: null,
+      }),
+    });
+  });
+
+  it("rejects bulk status changes that skip Started without updating any story", async () => {
+    const projectId = await createProject();
+
+    const createResponse = await fetchWithAuth(storiesApiPath(projectId), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ title: "Bulk skip", description: "" }),
+    });
+    const created = (await createResponse.json()) as {
+      story: { id: string };
+    };
+
+    const response = await fetchWithAuth(
+      `${storiesApiPath(projectId)}/bulk-status`,
       {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ status: "Accepted" }),
+        body: JSON.stringify({
+          storyIds: [created.story.id],
+          status: "Accepted",
+        }),
       },
     );
 
-    expect(updateResponse.status).toBe(200);
-    expect(await updateResponse.json()).toEqual({
-      story: expect.objectContaining({ status: "Accepted" }),
+    expect(response.status).toBe(409);
+  });
+
+  it("refuses a status write when the stored status differs from the validated one", async () => {
+    const projectId = await createProject();
+    const createResponse = await fetchWithAuth(storiesApiPath(projectId), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ title: "Racing", description: "" }),
+    });
+    const created = (await createResponse.json()) as {
+      story: { id: string };
+    };
+    await forceStatusForTest(created.story.id, "Unstarted");
+
+    const result = await new D1StoryRepository(env.DB).update({
+      projectId,
+      id: created.story.id,
+      status: "Finished",
+      expectedStatus: "Started",
+    });
+
+    expect(result._unsafeUnwrapErr()).toBe(
+      STORY_STATUS_CHANGED_CONCURRENTLY_ERROR,
+    );
+    const db = createDb(env.DB);
+    const row = await db
+      .select({ status: storiesTable.status })
+      .from(storiesTable)
+      .where(eq(storiesTable.id, created.story.id))
+      .get();
+    expect(row?.status).toBe("Unstarted");
+  });
+
+  it("does not partially apply a bulk status change when a later story is invalid", async () => {
+    const projectId = await createProject();
+    const createStoryForTest = async (title: string) => {
+      const response = await fetchWithAuth(storiesApiPath(projectId), {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ title, description: "", storyPoint: 3 }),
+      });
+      return (
+        (await response.json()) as {
+          story: { id: string; storyNumber: number };
+        }
+      ).story;
+    };
+    const started = await createStoryForTest("Already started");
+    const unstarted = await createStoryForTest("Still unstarted");
+    await forceStatusForTest(started.id, "Started");
+
+    const response = await fetchWithAuth(
+      `${storiesApiPath(projectId)}/bulk-status`,
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          storyIds: [started.id, unstarted.id],
+          status: "Finished",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(409);
+    const getResponse = await fetchWithAuth(
+      storyApiPath(projectId, String(started.storyNumber)),
+    );
+    expect(await getResponse.json()).toEqual({
+      story: expect.objectContaining({ status: "Started" }),
+    });
+  });
+
+  it.each([
+    "Started",
+    "Finished",
+    "Delivered",
+    "Accepted",
+    "Rejected",
+  ])("rejects creating a story with initial status %s", async (status) => {
+    const projectId = await createProject();
+
+    const response = await fetchWithAuth(storiesApiPath(projectId), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        title: "Born past Unstarted",
+        description: "",
+        storyPoint: 3,
+        status,
+      }),
+    });
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error: "A new story must be created as Unstarted",
     });
   });
 
@@ -1012,12 +1158,12 @@ describe("story routes", () => {
       body: JSON.stringify({
         title: "Accepted story",
         description: "Rollback target",
-        status: "Accepted",
       }),
     });
     const created = (await createResponse.json()) as {
       story: { id: string; storyNumber: number };
     };
+    await forceStatusForTest(created.story.id, "Accepted");
 
     const updateResponse = await fetchWithAuth(
       storyApiPath(projectId, String(created.story.storyNumber)),
@@ -1034,7 +1180,7 @@ describe("story routes", () => {
     });
   });
 
-  it("allows Accepted story to move directly to Delivered", async () => {
+  it("rejects moving an Accepted story directly to Delivered", async () => {
     const projectId = await createProject();
 
     const createResponse = await fetchWithAuth(storiesApiPath(projectId), {
@@ -1043,12 +1189,12 @@ describe("story routes", () => {
       body: JSON.stringify({
         title: "Accepted story",
         description: "Forbidden rollback target",
-        status: "Accepted",
       }),
     });
     const created = (await createResponse.json()) as {
       story: { id: string; storyNumber: number };
     };
+    await forceStatusForTest(created.story.id, "Accepted");
 
     const updateResponse = await fetchWithAuth(
       storyApiPath(projectId, String(created.story.storyNumber)),
@@ -1059,24 +1205,26 @@ describe("story routes", () => {
       },
     );
 
-    expect(updateResponse.status).toBe(200);
+    expect(updateResponse.status).toBe(409);
     expect(await updateResponse.json()).toEqual({
-      story: expect.objectContaining({ status: "Delivered" }),
+      error:
+        "Cannot change status from Accepted to Delivered. Move to one of: Unstarted, Started before choosing Delivered.",
     });
   });
 
   it("filters stories by status", async () => {
     const projectId = await createProject();
 
-    await fetchWithAuth(storiesApiPath(projectId), {
+    const createOne = await fetchWithAuth(storiesApiPath(projectId), {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         title: "One",
         description: "Started",
-        status: "Started",
       }),
     });
+    const one = (await createOne.json()) as { story: { id: string } };
+    await forceStatusForTest(one.story.id, "Started");
     await fetchWithAuth(storiesApiPath(projectId), {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -1491,7 +1639,7 @@ describe("story routes", () => {
         body: JSON.stringify({
           title: "Current started",
           description: "Current panel item 1",
-          status: "Started",
+          status: "Unstarted",
           storyPoint: 3,
         }),
       },
@@ -1504,7 +1652,7 @@ describe("story routes", () => {
         body: JSON.stringify({
           title: "Current finished",
           description: "Current panel item 2",
-          status: "Finished",
+          status: "Unstarted",
           storyPoint: 3,
         }),
       },
@@ -1515,9 +1663,19 @@ describe("story routes", () => {
       body: JSON.stringify({
         title: "Done accepted",
         description: "Done panel item",
-        status: "Accepted",
+        status: "Unstarted",
       }),
     });
+    for (const [response, status] of [
+      [createCurrentStarted, "Started"],
+      [createCurrentFinished, "Finished"],
+      [createDone, "Accepted"],
+    ] as const) {
+      const { story } = (await response.clone().json()) as {
+        story: { id: string };
+      };
+      await forceStatusForTest(story.id, status);
+    }
     const createIcebox = await fetchWithAuth(storiesApiPath(projectId), {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -1606,7 +1764,7 @@ describe("story routes", () => {
       "Backlog second",
       "Backlog first",
     ]);
-    expect(currentTitles).toEqual(["Current started", "Current finished"]);
+    expect(currentTitles).toEqual(["Current finished", "Current started"]);
     expect(doneTitles).toEqual(["Done accepted"]);
     expect(iceboxTitles).toEqual(["Icebox newest", "Icebox item"]);
   });

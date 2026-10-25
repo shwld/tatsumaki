@@ -1,4 +1,7 @@
-import { type CreateStoryError } from "../../../application/usecases/create-story";
+import {
+  INVALID_STORY_INITIAL_STATUS_ERROR,
+  type CreateStoryError,
+} from "../../../application/usecases/create-story";
 import {
   CURRENT_ITERATION_ASSIGN_FAILED_ERROR,
   CURRENT_ITERATION_ASSIGN_ROLLBACK_FAILED_ERROR,
@@ -18,6 +21,7 @@ import {
 import {
   STORY_OWNER_NOT_PROJECT_MEMBER_ERROR,
   STORY_REPOSITORY_ERROR,
+  STORY_STATUS_CHANGED_CONCURRENTLY_ERROR,
   STORY_REQUESTER_NOT_PROJECT_MEMBER_ERROR,
 } from "../../../domain/repositories/story-repository";
 import {
@@ -68,6 +72,13 @@ export function toCreateStoryErrorResponse(
       message:
         "Story status must be Unstarted, Started, Finished, Delivered, Accepted, or Rejected",
       status: 400,
+    };
+  }
+
+  if (error === INVALID_STORY_INITIAL_STATUS_ERROR) {
+    return {
+      message: "A new story must be created as Unstarted",
+      status: 409,
     };
   }
 
@@ -225,6 +236,13 @@ export function toUpdateStoryErrorResponse(
 
   if (error === STORY_NOT_FOUND_ERROR) {
     return { message: "Story not found", status: 404 };
+  }
+
+  if (error === STORY_STATUS_CHANGED_CONCURRENTLY_ERROR) {
+    return {
+      message: "Story status was changed by another request. Reload and retry.",
+      status: 409,
+    };
   }
 
   if (error === STORY_REPOSITORY_ERROR) {

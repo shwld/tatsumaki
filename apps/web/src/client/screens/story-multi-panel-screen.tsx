@@ -92,6 +92,7 @@ import {
   projectStoriesApiPath,
   projectVelocityDashboardPath,
 } from "../lib/story-routes";
+import { canTransitionStoryStatus } from "../../domain/entities/story";
 import { projectArtifactsPath } from "../lib/artifact-routes";
 import type { Iteration } from "../types/iteration";
 import type { ProjectLabel } from "../types/project-label";
@@ -864,6 +865,10 @@ export function StoryMultiPanelScreen() {
     const selectedIdSet = new Set(selectedVisibleStoryIds);
     return allStories.filter((story) => selectedIdSet.has(story.id));
   }, [allStories, selectedVisibleStoryIds]);
+  const isBulkStatusAllowed = (status: StoryStatus) =>
+    selectedVisibleStories.every((story) =>
+      canTransitionStoryStatus(story.status, status),
+    );
 
   useEffect(() => {
     setSelectedStoryIds((current) => {
@@ -1544,7 +1549,12 @@ export function StoryMultiPanelScreen() {
           event.preventDefault();
           if (!activeStoryId) return;
           const target = allStories.find((story) => story.id === activeStoryId);
-          if (!target || target.status === status) return;
+          if (
+            !target ||
+            target.status === status ||
+            !canTransitionStoryStatus(target.status, status)
+          )
+            return;
           void handleStatusChange(target, status);
         },
         description: `Change active story status to ${status}`,
@@ -2290,7 +2300,11 @@ export function StoryMultiPanelScreen() {
               onChange={(e) => setBulkStatus(e.target.value as StoryStatus)}
             >
               {STORY_STATUSES.map((status) => (
-                <option key={status} value={status}>
+                <option
+                  key={status}
+                  value={status}
+                  disabled={!isBulkStatusAllowed(status)}
+                >
                   {t(`storyMultiPanelScreen.status.${status}`)}
                 </option>
               ))}
@@ -2301,6 +2315,7 @@ export function StoryMultiPanelScreen() {
               onClick={() => void handleBulkStatusChange()}
               disabled={
                 selectedVisibleStoryIds.length === 0 ||
+                !isBulkStatusAllowed(bulkStatus) ||
                 bulkStatusMutation.isPending
               }
             >

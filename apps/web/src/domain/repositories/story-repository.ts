@@ -30,6 +30,8 @@ export type UpdateStoryInput = {
   description?: string;
   type?: StoryType;
   status?: StoryStatus;
+  /** The status the transition was validated against; the write fails if the stored status differs. */
+  expectedStatus?: StoryStatus;
   storyPoint?: StoryPoint | null;
   labels?: string[];
   epicId?: string | null;
@@ -97,6 +99,8 @@ export const STORY_OWNER_NOT_PROJECT_MEMBER_ERROR =
   "STORY_OWNER_NOT_PROJECT_MEMBER_ERROR" as const;
 export const STORY_REQUESTER_NOT_PROJECT_MEMBER_ERROR =
   "STORY_REQUESTER_NOT_PROJECT_MEMBER_ERROR" as const;
+export const STORY_STATUS_CHANGED_CONCURRENTLY_ERROR =
+  "STORY_STATUS_CHANGED_CONCURRENTLY_ERROR" as const;
 export const STORY_EPIC_NOT_FOUND_ERROR = "STORY_EPIC_NOT_FOUND_ERROR" as const;
 
 export type StoryRepositoryError =
@@ -104,6 +108,7 @@ export type StoryRepositoryError =
   | typeof STORY_OWNER_NOT_PROJECT_MEMBER_ERROR
   | typeof STORY_REQUESTER_NOT_PROJECT_MEMBER_ERROR
   | typeof STORY_EPIC_NOT_FOUND_ERROR
+  | typeof STORY_STATUS_CHANGED_CONCURRENTLY_ERROR
   | typeof INVALID_STORY_IS_ICEBOX_ERROR;
 
 export interface StoryRepository {

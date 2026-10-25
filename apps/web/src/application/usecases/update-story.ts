@@ -1,7 +1,9 @@
 import { err, ok, type Result } from "neverthrow";
 import { ulid } from "ulid";
 import {
+  canTransitionStoryStatus,
   INVALID_STORY_IS_ICEBOX_ERROR,
+  listAllowedStoryStatusTransitions,
   requiresEstimateForTransition,
   resolveStoryIsIcebox,
   type Story,
@@ -80,6 +82,25 @@ type StoryUpdateActor = {
   id: string;
   name: string;
 };
+
+export function checkStoryStatusChange(
+  story: Pick<Story, "status" | "type" | "storyPoint">,
+  target: StoryStatus,
+  storyPoint: number | null = story.storyPoint,
+): InvalidStoryStatusTransitionError | EstimateRequiredError | null {
+  if (!canTransitionStoryStatus(story.status, target)) {
+    return {
+      code: "INVALID_STORY_STATUS_TRANSITION_ERROR",
+      from: story.status,
+      to: target,
+      allowedNext: listAllowedStoryStatusTransitions(story.status),
+    };
+  }
+  if (requiresEstimateForTransition(target, storyPoint, story.type)) {
+    return { code: "ESTIMATE_REQUIRED_ERROR", targetStatus: target };
+  }
+  return null;
+}
 
 function serializeStoryFieldValue(
   fieldName: StoryActivityField,
@@ -223,18 +244,15 @@ export async function updateStory(
     ? normalizedStoryPoint.value
     : currentResult.value.storyPoint;
 
-  if (
-    normalizedStatus?.isOk() &&
-    requiresEstimateForTransition(
+  if (normalizedStatus?.isOk()) {
+    const statusError = checkStoryStatusChange(
+      currentResult.value,
       normalizedStatus.value,
       effectiveStoryPoint,
-      currentResult.value.type,
-    )
-  ) {
-    return err({
-      code: "ESTIMATE_REQUIRED_ERROR",
-      targetStatus: normalizedStatus.value,
-    });
+    );
+    if (statusError) {
+      return err(statusError);
+    }
   }
 
   const normalizedLabels =
@@ -284,7 +302,12 @@ export async function updateStory(
       ? { description: normalizedDescription }
       : {}),
     ...(normalizedType?.isOk() ? { type: normalizedType.value } : {}),
-    ...(normalizedStatus?.isOk() ? { status: normalizedStatus.value } : {}),
+    ...(normalizedStatus?.isOk()
+      ? {
+          status: normalizedStatus.value,
+          expectedStatus: currentResult.value.status,
+        }
+      : {}),
     ...(normalizedStoryPoint?.isOk()
       ? { storyPoint: normalizedStoryPoint.value }
       : {}),

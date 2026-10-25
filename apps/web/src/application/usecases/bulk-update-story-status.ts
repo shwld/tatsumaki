@@ -9,6 +9,8 @@ import {
   normalizeStoryStatus,
 } from "./story-input";
 import {
+  checkStoryStatusChange,
+  type EstimateRequiredError,
   type InvalidStoryStatusTransitionError,
   STORY_NOT_FOUND_ERROR,
   type UpdateStoryError,
@@ -33,6 +35,7 @@ export type BulkUpdateStoryStatusError =
   | typeof INVALID_STORY_STATUS_ERROR
   | typeof STORY_NOT_FOUND_ERROR
   | InvalidStoryStatusTransitionError
+  | EstimateRequiredError
   | StoryRepositoryError
   | StoryActivityRepositoryError;
 
@@ -75,6 +78,11 @@ export async function bulkUpdateStoryStatus(
     const story = storyResult.value;
     if (!story) {
       return err(STORY_NOT_FOUND_ERROR);
+    }
+
+    const statusError = checkStoryStatusChange(story, targetStatus);
+    if (statusError) {
+      return err(statusError);
     }
   }
 

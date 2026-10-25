@@ -37,6 +37,7 @@ import type {
 import {
   STORY_OWNER_NOT_PROJECT_MEMBER_ERROR,
   STORY_REPOSITORY_ERROR,
+  STORY_STATUS_CHANGED_CONCURRENTLY_ERROR,
   STORY_REQUESTER_NOT_PROJECT_MEMBER_ERROR,
 } from "../../../domain/repositories/story-repository";
 import { todayIso } from "../../../shared/date/today-iso";
@@ -815,6 +816,13 @@ export class D1StoryRepository implements StoryRepository {
       }
     }
 
+    if (
+      input.expectedStatus !== undefined &&
+      input.expectedStatus !== current.status
+    ) {
+      return err(STORY_STATUS_CHANGED_CONCURRENTLY_ERROR);
+    }
+
     const shouldUpdateStatusTimestamp =
       input.status !== undefined && input.status !== current.status;
     const nextStatus = (input.status ?? current.status) as StoryStatus;
@@ -938,7 +946,11 @@ export class D1StoryRepository implements StoryRepository {
       .returning({ id: storiesTable.id });
 
     if (updatedRows.length === 0) {
-      return err(STORY_REPOSITORY_ERROR);
+      return err(
+        input.expectedStatus !== undefined
+          ? STORY_STATUS_CHANGED_CONCURRENTLY_ERROR
+          : STORY_REPOSITORY_ERROR,
+      );
     }
 
     if (input.ownerIds !== undefined) {

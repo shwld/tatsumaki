@@ -1,4 +1,5 @@
 import {
+  canTransitionStoryStatus,
   listAllowedStoryStatusTransitions as listAllowedStoryStatusTransitionsInDomain,
   requiresEstimateForTransition,
 } from "../../domain/entities/story";
@@ -76,9 +77,12 @@ export function listAllowedStoryStatusTransitions(
 }
 
 export function listSelectableStoryStatuses(
-  _status: StoryStatus,
+  status: StoryStatus,
 ): StoryStatus[] {
-  return [...STORY_STATUSES];
+  return STORY_STATUSES.filter(
+    (candidate) =>
+      candidate === status || canTransitionStoryStatus(status, candidate),
+  );
 }
 
 export function formatStoryStatusChangedAt(value: string): string {

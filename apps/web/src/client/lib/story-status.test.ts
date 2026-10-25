@@ -35,27 +35,18 @@ describe("getWorkflowActions", () => {
 });
 
 describe("listSelectableStoryStatuses", () => {
-  it("returns all statuses for Unstarted", () => {
-    const statuses = listSelectableStoryStatuses("Unstarted");
-    expect(statuses).toEqual([
+  it("returns only the current status and allowed transitions for Unstarted", () => {
+    expect(listSelectableStoryStatuses("Unstarted")).toEqual([
       "Unstarted",
       "Started",
-      "Finished",
-      "Delivered",
-      "Accepted",
-      "Rejected",
     ]);
   });
 
-  it("returns all statuses for Accepted", () => {
-    const statuses = listSelectableStoryStatuses("Accepted");
-    expect(statuses).toEqual([
+  it("returns only the current status and allowed transitions for Accepted", () => {
+    expect(listSelectableStoryStatuses("Accepted")).toEqual([
       "Unstarted",
       "Started",
-      "Finished",
-      "Delivered",
       "Accepted",
-      "Rejected",
     ]);
   });
 });
