@@ -152,6 +152,10 @@ enum StorySubcommand {
         story_point: Option<i64>,
         #[arg(long, conflicts_with = "story_point")]
         clear_story_point: bool,
+        #[arg(long, conflicts_with = "no_icebox")]
+        icebox: bool,
+        #[arg(long, conflicts_with = "icebox")]
+        no_icebox: bool,
     },
     Status {
         #[arg(long)]
@@ -539,6 +543,8 @@ async fn run() -> Result<(), (CliError, i32)> {
                     story_type,
                     story_point,
                     clear_story_point,
+                    icebox,
+                    no_icebox,
                 } => {
                     let input = StoryUpdateInput {
                         title,
@@ -550,6 +556,13 @@ async fn run() -> Result<(), (CliError, i32)> {
                             story_point.map(StoryPointUpdate::Set)
                         },
                         status: None,
+                        is_icebox: if icebox {
+                            Some(true)
+                        } else if no_icebox {
+                            Some(false)
+                        } else {
+                            None
+                        },
                     };
                     let body = service
                         .update_story(&base_url, &project, story_number, &input)
@@ -579,6 +592,7 @@ async fn run() -> Result<(), (CliError, i32)> {
                         r#type: None,
                         story_point: None,
                         status: Some(status.as_api_str().to_string()),
+                        is_icebox: None,
                     };
                     let body = service
                         .update_story(&base_url, &project, story_number, &input)
@@ -905,6 +919,19 @@ mod tests {
         ]);
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn story_update_accepts_icebox_flags_but_not_both() {
+        let parse = |flag: &str| {
+            Cli::try_parse_from(["tm", "story", "update", "--project", "p", "332", flag])
+        };
+        assert!(parse("--icebox").is_ok());
+        assert!(parse("--no-icebox").is_ok());
+        assert!(Cli::try_parse_from([
+            "tm", "story", "update", "--project", "p", "332", "--icebox", "--no-icebox",
+        ])
+        .is_err());
     }
 
     // --- tm artifact ---
