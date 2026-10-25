@@ -68,6 +68,7 @@ export class D1StoryActivityRepository implements StoryActivityRepository {
     }
 
     try {
+      const now = new Date().toISOString();
       await this.db.insert(storyTimelineEntriesTable).values(
         activities.map((activity) => {
           return {
@@ -81,6 +82,8 @@ export class D1StoryActivityRepository implements StoryActivityRepository {
             fieldName: activity.fieldName,
             oldValue: activity.oldValue,
             newValue: activity.newValue,
+            createdAt: now,
+            updatedAt: now,
           };
         }),
       );

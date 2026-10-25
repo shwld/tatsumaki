@@ -19,6 +19,10 @@ export const storyTimelineEntriesTable = sqliteTable("story_timeline_entries", {
   oldValue: text("old_value"),
   newValue: text("new_value"),
   body: text("body"),
-  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
-  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
+  updatedAt: text("updated_at")
+    .notNull()
+    .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
 });
