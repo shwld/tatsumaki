@@ -5,6 +5,7 @@ import {
   eq,
   inArray,
   isNull,
+  ne,
   or,
   sql,
   type SQL,
@@ -896,7 +897,9 @@ export class D1StoryRepository implements StoryRepository {
       shouldClearIterationId = !assignedCurrentIteration;
     }
 
-    const updatedRows = await this.db
+    const shouldMoveToTop =
+      input.moveToTop === true && current.isIcebox === 1 && !nextIsIcebox;
+    const updateQuery = this.db
       .update(storiesTable)
       .set({
         ...(input.title !== undefined ? { title: input.title } : {}),
@@ -920,6 +923,7 @@ export class D1StoryRepository implements StoryRepository {
         ...(resolvedIsIcebox.value !== undefined
           ? { isIcebox: resolvedIsIcebox.value ? 1 : 0 }
           : {}),
+        ...(shouldMoveToTop ? { position: 1 } : {}),
         ...(autoAssignedIterationId !== null
           ? { iterationId: autoAssignedIterationId }
           : {}),
@@ -944,6 +948,29 @@ export class D1StoryRepository implements StoryRepository {
         ),
       )
       .returning({ id: storiesTable.id });
+
+    // Shifting the others and moving the target must commit together, and the
+    // shift only applies while the optimistic guard on the target still holds.
+    const updatedRows = shouldMoveToTop
+      ? (
+          await this.db.batch([
+            this.db
+              .update(storiesTable)
+              .set({
+                position: sql`${storiesTable.position} + 1`,
+                updatedAt: sql`CURRENT_TIMESTAMP`,
+              })
+              .where(
+                and(
+                  eq(storiesTable.projectId, input.projectId),
+                  ne(storiesTable.id, input.id),
+                  sql`exists (select 1 from ${storiesTable} as target where target.id = ${input.id} and target.status = ${current.status} and target.is_icebox = ${current.isIcebox})`,
+                ),
+              ),
+            updateQuery,
+          ])
+        )[1]
+      : await updateQuery;
 
     if (updatedRows.length === 0) {
       return err(

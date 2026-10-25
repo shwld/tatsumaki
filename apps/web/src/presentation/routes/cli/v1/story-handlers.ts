@@ -92,6 +92,7 @@ export async function handleCliStoryUpdate(
       id: resolvedStoryId,
       allowedStoryPoints,
       ...parsed.value,
+      moveToTopOnLeavingIcebox: true,
       actor: {
         id: actorId,
         name: actorName,

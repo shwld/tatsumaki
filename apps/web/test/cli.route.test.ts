@@ -293,6 +293,64 @@ describe("cli route", () => {
     });
   });
 
+  it("puts a story leaving the Icebox at the top of the Backlog", async () => {
+    const accessToken = await issueAccessTokenForCliV1();
+    const projectId = await createProject();
+    const headers = {
+      authorization: `Bearer ${accessToken}`,
+      "content-type": "application/json",
+    };
+    const storiesUrl = `https://localhost/programmatic-api/v1/projects/${projectId}/stories`;
+    const createStory = async (title: string, isIcebox: boolean) => {
+      const response = await SELF.fetch(storiesUrl, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ title, type: "chore", isIcebox }),
+      });
+      return (
+        (await response.json()) as {
+          story: { id: string; storyNumber: number };
+        }
+      ).story;
+    };
+    await createStory("First", false);
+    await createStory("Second", false);
+    const iceboxed = await createStory("From icebox", true);
+
+    const rejected = await SELF.fetch(`${storiesUrl}/${iceboxed.storyNumber}`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ isIcebox: false, title: "" }),
+    });
+    expect(rejected.status).toBe(400);
+    const titlesAfterRejection = (
+      (await (
+        await SELF.fetch(`${storiesUrl}?status=Unstarted`, { headers })
+      ).json()) as { stories: { title: string; isIcebox: boolean }[] }
+    ).stories
+      .filter((story) => !story.isIcebox)
+      .map((story) => story.title);
+    expect(titlesAfterRejection).toEqual(["Second", "First"]);
+
+    const moved = await SELF.fetch(`${storiesUrl}/${iceboxed.storyNumber}`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ isIcebox: false }),
+    });
+    expect(moved.status).toBe(200);
+
+    const listResponse = await SELF.fetch(`${storiesUrl}?status=Unstarted`, {
+      headers,
+    });
+    const listed = (await listResponse.json()) as {
+      stories: { title: string; isIcebox: boolean }[];
+    };
+    const backlogTitles = listed.stories
+      .filter((story) => !story.isIcebox)
+      .map((story) => story.title);
+    expect(backlogTitles).toEqual(["From icebox", "Second", "First"]);
+  });
+
   it("supports CLI reorder and rejects empty orderedIds", async () => {
     const accessToken = await issueAccessTokenForCliV1();
     const projectId = await createProject();
