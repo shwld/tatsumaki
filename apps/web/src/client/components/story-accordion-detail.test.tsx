@@ -201,15 +201,9 @@ describe("StoryAccordionDetail", () => {
     expect(screen.getByRole("option", { name: "着手中" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "未着手" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "完了" })).toBeInTheDocument();
-    expect(
-      screen.getByRole("option", { name: "デリバリー済み" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("option", { name: "受け入れ済み" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("option", { name: "リジェクト" }),
-    ).toBeInTheDocument();
+    for (const name of ["デリバリー済み", "受け入れ済み", "リジェクト"]) {
+      expect(screen.queryByRole("option", { name })).not.toBeInTheDocument();
+    }
   });
 
   it("switches an open accordion detail from Japanese to English", async () => {

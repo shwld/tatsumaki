@@ -946,7 +946,11 @@ export class D1StoryRepository implements StoryRepository {
       .returning({ id: storiesTable.id });
 
     if (updatedRows.length === 0) {
-      return err(STORY_REPOSITORY_ERROR);
+      return err(
+        input.expectedStatus !== undefined
+          ? STORY_STATUS_CHANGED_CONCURRENTLY_ERROR
+          : STORY_REPOSITORY_ERROR,
+      );
     }
 
     if (input.ownerIds !== undefined) {
