@@ -135,6 +135,10 @@ export interface StoryRepository {
   reorder(
     input: ReorderStoriesInput,
   ): Promise<Result<Story[] | null, StoryRepositoryError>>;
+  moveToTop(
+    projectId: string,
+    id: string,
+  ): Promise<Result<Story | null, StoryRepositoryError>>;
   reassignStoriesAcrossIterations(
     input: ReassignStoriesAcrossIterationsInput,
   ): Promise<Result<number, StoryRepositoryError>>;

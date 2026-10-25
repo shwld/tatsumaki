@@ -82,6 +82,12 @@ export async function handleCliStoryUpdate(
     return c.json({ error: parsed.message }, 400);
   }
 
+  let leavesIcebox = false;
+  if (parsed.value.isIcebox === false) {
+    const before = await storyRepository.findById(projectId, resolvedStoryId);
+    leavesIcebox = before.isOk() && before.value?.isIcebox === true;
+  }
+
   const activityRepository = new D1StoryActivityRepository(c.env.DB);
   const notificationRepository = new D1NotificationRepository(c.env.DB);
   const result = await updateStory(
@@ -103,6 +109,14 @@ export async function handleCliStoryUpdate(
   if (result.isErr()) {
     const response = toUpdateStoryErrorResponse(result.error);
     return c.json({ error: response.message }, response.status);
+  }
+
+  if (leavesIcebox) {
+    const moved = await storyRepository.moveToTop(projectId, resolvedStoryId);
+    if (moved.isErr()) {
+      return c.json({ error: "Failed to move story to the Backlog top" }, 500);
+    }
+    return c.json({ story: moved.value ?? result.value });
   }
 
   return c.json({ story: result.value });

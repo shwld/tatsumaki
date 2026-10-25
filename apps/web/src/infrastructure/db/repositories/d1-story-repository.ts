@@ -5,6 +5,7 @@ import {
   eq,
   inArray,
   isNull,
+  ne,
   or,
   sql,
   type SQL,
@@ -1201,6 +1202,46 @@ export class D1StoryRepository implements StoryRepository {
       .all();
 
     return ok(await this.listWithRelations(reordered));
+  }
+
+  async moveToTop(
+    projectId: string,
+    id: string,
+  ): Promise<Result<Story | null, StoryRepositoryError>> {
+    const target = await this.db
+      .select({ position: storiesTable.position })
+      .from(storiesTable)
+      .where(
+        and(eq(storiesTable.projectId, projectId), eq(storiesTable.id, id)),
+      )
+      .get();
+    if (!target) {
+      return ok(null);
+    }
+
+    await this.db
+      .update(storiesTable)
+      .set({
+        position: sql`${storiesTable.position} + 1`,
+        updatedAt: sql`CURRENT_TIMESTAMP`,
+      })
+      .where(
+        and(eq(storiesTable.projectId, projectId), ne(storiesTable.id, id)),
+      );
+    await this.db
+      .update(storiesTable)
+      .set({ position: 1, updatedAt: sql`CURRENT_TIMESTAMP` })
+      .where(
+        and(eq(storiesTable.projectId, projectId), eq(storiesTable.id, id)),
+      );
+    await this.db.insert(storyPriorityHistoryTable).values({
+      id: ulid(),
+      storyId: id,
+      fromPosition: target.position,
+      toPosition: 1,
+    });
+
+    return ok(await this.findByIdWithRelations(projectId, id));
   }
 
   async listPriorityHistory(

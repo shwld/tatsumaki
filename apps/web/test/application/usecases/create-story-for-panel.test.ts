@@ -53,6 +53,7 @@ function createStoryRepository() {
       ok({ total: 0, totalPoints: 0, pointsByIterationId: {} }),
     ),
     reorder: vi.fn(async () => ok([])),
+    moveToTop: vi.fn(async () => ok(null)),
     reassignStoriesAcrossIterations: vi.fn(async () => ok(0)),
     listPriorityHistory: vi.fn(async () => ok([])),
     addBlocker: vi.fn(async () => ok(undefined)),
