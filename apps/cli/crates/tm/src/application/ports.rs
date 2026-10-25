@@ -43,6 +43,7 @@ pub struct StoryUpdateInput {
     pub r#type: Option<String>,
     pub story_point: Option<StoryPointUpdate>,
     pub status: Option<String>,
+    pub is_icebox: Option<bool>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum StoryPointUpdate {

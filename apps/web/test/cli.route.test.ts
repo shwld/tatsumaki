@@ -213,6 +213,86 @@ describe("cli route", () => {
     });
   });
 
+  it("moves a CLI story between Icebox and Backlog and rejects it once started", async () => {
+    const accessToken = await issueAccessTokenForCliV1();
+    const projectId = await createProject();
+    const headers = {
+      authorization: `Bearer ${accessToken}`,
+      "content-type": "application/json",
+    };
+
+    const createResponse = await SELF.fetch(
+      `https://localhost/programmatic-api/v1/projects/${projectId}/stories`,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          title: "CLI icebox story",
+          type: "chore",
+          isIcebox: true,
+        }),
+      },
+    );
+    expect(createResponse.status).toBe(201);
+    const created = (await createResponse.json()) as {
+      story: { storyNumber: number; isIcebox: boolean };
+    };
+    expect(created.story.isIcebox).toBe(true);
+    const storyUrl = `https://localhost/programmatic-api/v1/projects/${projectId}/stories/${created.story.storyNumber}`;
+
+    const toBacklog = await SELF.fetch(storyUrl, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ isIcebox: false }),
+    });
+    expect(toBacklog.status).toBe(200);
+    expect(await toBacklog.json()).toEqual(
+      expect.objectContaining({
+        story: expect.objectContaining({ isIcebox: false }),
+      }),
+    );
+
+    const backToIcebox = await SELF.fetch(storyUrl, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ isIcebox: true }),
+    });
+    expect(backToIcebox.status).toBe(200);
+    expect(await backToIcebox.json()).toEqual(
+      expect.objectContaining({
+        story: expect.objectContaining({ isIcebox: true }),
+      }),
+    );
+
+    const started = await SELF.fetch(storyUrl, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ status: "Started" }),
+    });
+    expect(started.status).toBe(200);
+
+    const iceboxStarted = await SELF.fetch(storyUrl, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ isIcebox: true }),
+    });
+    expect(iceboxStarted.status).toBe(400);
+    expect(await iceboxStarted.json()).toEqual({
+      error:
+        "Only an Unstarted story without an iteration can be in the Icebox",
+    });
+
+    const invalidType = await SELF.fetch(storyUrl, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ isIcebox: "no" }),
+    });
+    expect(invalidType.status).toBe(400);
+    expect(await invalidType.json()).toEqual({
+      error: "isIcebox must be a boolean",
+    });
+  });
+
   it("supports CLI reorder and rejects empty orderedIds", async () => {
     const accessToken = await issueAccessTokenForCliV1();
     const projectId = await createProject();

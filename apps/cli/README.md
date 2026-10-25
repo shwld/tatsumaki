@@ -112,9 +112,13 @@ tm story update --project <project-id> 95 --title "Updated title"
 tm --json story update --project <project-id> 95 --description "Updated description" --type release
 tm story update --project <project-id> 95 --story-point 5
 tm story update --project <project-id> 95 --clear-story-point
+tm story update --project <project-id> 95 --no-icebox
+tm story update --project <project-id> 95 --icebox
 ```
 
 `--story-point` must follow the project's configured point scale.
+
+`--icebox` / `--no-icebox` move a story between the Icebox and the Backlog without changing its position. Only an Unstarted story without an iteration can be moved to the Icebox; otherwise the server's reason is printed (HTTP 400).
 
 ## Story status
 

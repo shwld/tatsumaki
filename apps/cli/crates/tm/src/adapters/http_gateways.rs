@@ -201,7 +201,7 @@ impl StoryGateway for HttpStoryGateway {
         stories: body.get("stories").and_then(|v| v.as_array()).cloned().unwrap_or_default(),
       });
     }
-    Err(Self::map_error(response.status()))
+    Err(Self::error_from_response(response).await)
   }
 
   async fn create_story_comment(&self, project: &str, story_number: i64, input: &StoryCommentInput, bearer_token: &str) -> Result<serde_json::Value, CliError> {
@@ -217,7 +217,7 @@ impl StoryGateway for HttpStoryGateway {
       let body: serde_json::Value = response.json().await?;
       return Ok(body.get("comment").cloned().unwrap_or(body));
     }
-    Err(Self::map_error(response.status()))
+    Err(Self::error_from_response(response).await)
   }
 }
 
@@ -244,6 +244,9 @@ fn story_update_payload(input: &StoryUpdateInput) -> serde_json::Value {
   if let Some(status) = &input.status {
     payload.insert("status".to_string(), status.clone().into());
   }
+  if let Some(is_icebox) = input.is_icebox {
+    payload.insert("isIcebox".to_string(), is_icebox.into());
+  }
   payload.into()
 }
 
@@ -255,17 +258,30 @@ impl HttpStoryGateway {
         story: body.get("story").cloned().unwrap_or(body),
       });
     }
-    Err(Self::map_error(response.status()))
+    Err(Self::error_from_response(response).await)
   }
 
-  fn map_error(status: StatusCode) -> CliError {
+  async fn error_from_response(response: reqwest::Response) -> CliError {
+    let status = response.status();
+    let server_message = response
+      .json::<serde_json::Value>()
+      .await
+      .ok()
+      .and_then(|body| body.get("error").and_then(|v| v.as_str()).map(str::to_string));
+    Self::map_error(status, server_message)
+  }
+
+  fn map_error(status: StatusCode, server_message: Option<String>) -> CliError {
     if status == StatusCode::NOT_FOUND {
       return CliError::Message("Story not found".to_string());
     }
     if status == StatusCode::UNAUTHORIZED || status == StatusCode::FORBIDDEN {
       return CliError::Message("Unauthorized".to_string());
     }
-    CliError::Message(format!("Request failed with status {status}"))
+    match server_message {
+      Some(message) => CliError::Message(format!("{message} (status {status})")),
+      None => CliError::Message(format!("Request failed with status {status}")),
+    }
   }
 }
 
@@ -281,6 +297,7 @@ mod tests {
       r#type: None,
       story_point: None,
       status: None,
+      is_icebox: None,
     }
   }
 
@@ -312,6 +329,31 @@ mod tests {
     });
 
     assert_eq!(payload, serde_json::json!({ "storyPoint": null }));
+  }
+
+  #[test]
+  fn map_error_includes_the_server_message() {
+    let error = super::HttpStoryGateway::map_error(
+      reqwest::StatusCode::BAD_REQUEST,
+      Some("Only an Unstarted story can be in the Icebox".to_string()),
+    );
+
+    assert_eq!(
+      error.to_string(),
+      "Only an Unstarted story can be in the Icebox (status 400 Bad Request)"
+    );
+  }
+
+  #[test]
+  fn story_update_payload_sets_icebox_both_ways() {
+    for is_icebox in [true, false] {
+      let payload = story_update_payload(&StoryUpdateInput {
+        is_icebox: Some(is_icebox),
+        ..empty_update()
+      });
+
+      assert_eq!(payload, serde_json::json!({ "isIcebox": is_icebox }));
+    }
   }
 }
 
