@@ -1219,27 +1219,29 @@ export class D1StoryRepository implements StoryRepository {
       return ok(null);
     }
 
-    await this.db
-      .update(storiesTable)
-      .set({
-        position: sql`${storiesTable.position} + 1`,
-        updatedAt: sql`CURRENT_TIMESTAMP`,
-      })
-      .where(
-        and(eq(storiesTable.projectId, projectId), ne(storiesTable.id, id)),
-      );
-    await this.db
-      .update(storiesTable)
-      .set({ position: 1, updatedAt: sql`CURRENT_TIMESTAMP` })
-      .where(
-        and(eq(storiesTable.projectId, projectId), eq(storiesTable.id, id)),
-      );
-    await this.db.insert(storyPriorityHistoryTable).values({
-      id: ulid(),
-      storyId: id,
-      fromPosition: target.position,
-      toPosition: 1,
-    });
+    await this.db.batch([
+      this.db
+        .update(storiesTable)
+        .set({
+          position: sql`${storiesTable.position} + 1`,
+          updatedAt: sql`CURRENT_TIMESTAMP`,
+        })
+        .where(
+          and(eq(storiesTable.projectId, projectId), ne(storiesTable.id, id)),
+        ),
+      this.db
+        .update(storiesTable)
+        .set({ position: 1, updatedAt: sql`CURRENT_TIMESTAMP` })
+        .where(
+          and(eq(storiesTable.projectId, projectId), eq(storiesTable.id, id)),
+        ),
+      this.db.insert(storyPriorityHistoryTable).values({
+        id: ulid(),
+        storyId: id,
+        fromPosition: target.position,
+        toPosition: 1,
+      }),
+    ]);
 
     return ok(await this.findByIdWithRelations(projectId, id));
   }
