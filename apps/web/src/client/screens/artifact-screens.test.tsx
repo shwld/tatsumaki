@@ -187,6 +187,12 @@ describe("artifact screens", () => {
       expect(
         await screen.findByRole("heading", { name: "Release report" }),
       ).toBeInTheDocument();
+      const toggle = screen.getByRole("button", { name: "詳細を表示" });
+      expect(toggle).toHaveAttribute("aria-expanded", "false");
+      expect(screen.queryByText("art-1")).toBeNull();
+      expect(screen.queryByText("Alice")).toBeNull();
+      fireEvent.click(toggle);
+      expect(toggle).toHaveAttribute("aria-expanded", "true");
       expect(await screen.findByText("Alice")).toBeInTheDocument();
       expect(screen.getByText("art-1")).toBeInTheDocument();
       expect(screen.getByText("3")).toBeInTheDocument();
@@ -228,6 +234,9 @@ describe("artifact screens", () => {
       });
       renderAt("/projects/p1/artifacts/art-1");
 
+      fireEvent.click(
+        await screen.findByRole("button", { name: "詳細を表示" }),
+      );
       expect(await screen.findByText("github|1")).toBeInTheDocument();
     });
 
@@ -238,6 +247,9 @@ describe("artifact screens", () => {
       });
       renderAt("/projects/p1/artifacts/art-1");
 
+      fireEvent.click(
+        await screen.findByRole("button", { name: "詳細を表示" }),
+      );
       expect(await screen.findByText("github|1")).toBeInTheDocument();
     });
 
