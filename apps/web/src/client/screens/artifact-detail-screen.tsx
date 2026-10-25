@@ -191,6 +191,7 @@ export function ArtifactDetailScreen() {
           </dt>
           <dd className="text-gray-900">
             <ActorLabel
+              key={creatorId}
               displayName={
                 creator?.displayName ?? creatorId.slice(0, SHORT_ID_LENGTH)
               }
