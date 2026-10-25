@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router";
-import { ProjectStoryBreadcrumb } from "../components/project-story-breadcrumb";
 import { useAuthError } from "../contexts/auth-error-context";
 import { useArtifactList } from "../hooks/use-artifact-queries";
 import { isAuthError, isHttpStatusError } from "../lib/api-error";
@@ -21,10 +20,6 @@ export function ArtifactListScreen() {
 
   return (
     <main className="mx-auto w-full max-w-3xl p-4">
-      <ProjectStoryBreadcrumb
-        projectId={projectId}
-        currentPageLabel={t("artifactScreens.breadcrumb")}
-      />
       <h1 className="mb-4 text-xl font-semibold text-gray-900">
         {t("artifactScreens.list.title")}
       </h1>

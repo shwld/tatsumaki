@@ -27,10 +27,7 @@ import {
   projectListItemEn,
   projectListItemJa,
 } from "../components/project-list-item.i18n";
-import {
-  projectStoryBreadcrumbEn,
-  projectStoryBreadcrumbJa,
-} from "../components/project-story-breadcrumb.i18n";
+import { projectNavEn, projectNavJa } from "../components/project-nav.i18n";
 import {
   artifactScreensEn,
   artifactScreensJa,
@@ -81,7 +78,7 @@ i18n.use(initReactI18next).init({
         ...layoutJa,
         ...permissionDeniedJa,
         ...errorRetryJa,
-        ...projectStoryBreadcrumbJa,
+        ...projectNavJa,
         ...loginScreenJa,
         ...projectListScreenJa,
         ...projectListContentJa,
@@ -103,7 +100,7 @@ i18n.use(initReactI18next).init({
         ...layoutEn,
         ...permissionDeniedEn,
         ...errorRetryEn,
-        ...projectStoryBreadcrumbEn,
+        ...projectNavEn,
         ...loginScreenEn,
         ...projectListScreenEn,
         ...projectListContentEn,

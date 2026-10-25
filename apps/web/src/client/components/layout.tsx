@@ -3,6 +3,7 @@ import { Bell, Tornado } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "react-router";
 import { HeaderToolbarContext } from "./header-toolbar";
+import { ProjectNav } from "./project-nav";
 import { useScrollHeader } from "../hooks/use-scroll-header";
 import type { Notification } from "../types/notification";
 import {
@@ -188,6 +189,7 @@ export function Layout({ children }: LayoutProps) {
               >
                 <Tornado className="size-5" aria-hidden="true" />
               </Link>
+              <ProjectNav />
               <div ref={setToolbarHost} className="min-w-0 flex-1" />
               {!isLoading && user ? (
                 <div className="relative ml-auto flex shrink-0 items-center gap-2">

@@ -1,18 +1,15 @@
 import { screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { resetProjectStoryBreadcrumbCacheForTests } from "../components/project-story-breadcrumb";
 import { createStoryMultiPanelFetchMock } from "../test/story-multi-panel/fetch-mock-builder";
 import { renderStoryMultiPanel } from "../test/story-multi-panel/render-harness";
 
 describe("StoryMultiPanelScreen layout contracts", () => {
   beforeEach(() => {
-    resetProjectStoryBreadcrumbCacheForTests();
     localStorage.clear();
   });
 
   afterEach(() => {
-    resetProjectStoryBreadcrumbCacheForTests();
     localStorage.clear();
     vi.unstubAllGlobals();
     Object.defineProperty(window, "innerWidth", {

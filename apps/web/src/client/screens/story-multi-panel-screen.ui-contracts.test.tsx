@@ -10,7 +10,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { resetProjectStoryBreadcrumbCacheForTests } from "../components/project-story-breadcrumb";
 import { createStoryMultiPanelFetchMock } from "../test/story-multi-panel/fetch-mock-builder";
 import { PROJECT_ID } from "../test/story-multi-panel/fixtures";
 import { renderStoryMultiPanel } from "../test/story-multi-panel/render-harness";
@@ -29,13 +28,11 @@ vi.mock("../components/story-accordion-detail", () => {
 
 describe("StoryMultiPanelScreen UI contracts", () => {
   beforeEach(() => {
-    resetProjectStoryBreadcrumbCacheForTests();
     localStorage.clear();
     void i18n.changeLanguage("ja");
   });
 
   afterEach(() => {
-    resetProjectStoryBreadcrumbCacheForTests();
     localStorage.clear();
     vi.unstubAllGlobals();
     Object.defineProperty(window, "innerWidth", {
@@ -161,23 +158,6 @@ describe("StoryMultiPanelScreen UI contracts", () => {
     ).toHaveLength(1);
   });
 
-  it("links to the project's artifacts from the toolbar on wide screens", async () => {
-    vi.stubGlobal("fetch", createStoryMultiPanelFetchMock());
-    Object.defineProperty(window, "innerWidth", {
-      value: 1440,
-      writable: true,
-      configurable: true,
-    });
-    window.dispatchEvent(new Event("resize"));
-    renderStoryMultiPanel();
-
-    expect(await screen.findByText("Backlog story")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Artifacts" })).toHaveAttribute(
-      "href",
-      expect.stringMatching(/^\/projects\/[^/]+\/artifacts$/),
-    );
-  });
-
   it("uses hamburger menu on small screens with accessible expanded state", async () => {
     vi.stubGlobal("fetch", createStoryMultiPanelFetchMock());
     Object.defineProperty(window, "innerWidth", {
@@ -191,18 +171,11 @@ describe("StoryMultiPanelScreen UI contracts", () => {
     expect(await screen.findByText("Backlog story")).toBeInTheDocument();
     const toggle = screen.getByTestId("mobile-sub-header-menu-toggle");
     expect(toggle).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByText("Project History")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("mobile-sub-header-menu")).toBeNull();
 
     await userEvent.click(toggle);
     expect(screen.getByTestId("mobile-sub-header-menu")).toBeInTheDocument();
     expect(toggle).toHaveAttribute("aria-expanded", "true");
-    expect(
-      screen.getByRole("menuitem", { name: "Project History" }),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("menuitem", { name: "Artifacts" })).toHaveAttribute(
-      "href",
-      expect.stringMatching(/^\/projects\/[^/]+\/artifacts$/),
-    );
 
     await userEvent.click(
       screen.getByRole("menuitem", { name: "高度な検索を開く" }),

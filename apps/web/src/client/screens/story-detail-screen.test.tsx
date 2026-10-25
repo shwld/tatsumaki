@@ -2,7 +2,6 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { resetProjectStoryBreadcrumbCacheForTests } from "../components/project-story-breadcrumb";
 import { AuthErrorProvider } from "../contexts/auth-error-context";
 import { StoryDetailScreen } from "./story-detail-screen";
 import type { Story } from "../types/story";
@@ -60,7 +59,6 @@ function renderScreen() {
 
 describe("StoryDetailScreen", () => {
   beforeEach(() => {
-    resetProjectStoryBreadcrumbCacheForTests();
     localStorage.clear();
     vi.stubGlobal(
       "fetch",
@@ -84,7 +82,6 @@ describe("StoryDetailScreen", () => {
   });
 
   afterEach(() => {
-    resetProjectStoryBreadcrumbCacheForTests();
     vi.unstubAllGlobals();
     localStorage.clear();
   });

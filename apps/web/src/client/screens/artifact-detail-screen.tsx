@@ -2,7 +2,6 @@ import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router";
 import { ArtifactPreview } from "../components/artifact-preview";
-import { ProjectStoryBreadcrumb } from "../components/project-story-breadcrumb";
 import { useAuthError } from "../contexts/auth-error-context";
 import {
   useArtifactDetail,
@@ -44,18 +43,10 @@ export function ArtifactDetailScreen() {
     if (sessionExpired) notifySessionExpired();
   }, [sessionExpired, notifySessionExpired]);
 
-  const heading = (
-    <ProjectStoryBreadcrumb
-      projectId={projectId}
-      currentPageLabel={t("artifactScreens.breadcrumb")}
-    />
-  );
-
   if (detail.isPending || versions.isPending) {
     if (!detail.isError && !versions.isError) {
       return (
         <main className="mx-auto w-full max-w-4xl p-4">
-          {heading}
           <p role="status" className="text-sm text-gray-600">
             {t("artifactScreens.detail.loading")}
           </p>
@@ -70,7 +61,6 @@ export function ArtifactDetailScreen() {
   if (notFound || (versionParam && !VERSION_PATTERN.test(versionParam))) {
     return (
       <main className="mx-auto w-full max-w-4xl p-4">
-        {heading}
         <p role="alert" className="text-sm text-gray-700">
           {t("artifactScreens.detail.notFound")}{" "}
           <Link
@@ -87,7 +77,6 @@ export function ArtifactDetailScreen() {
   if (detail.isError || versions.isError || !detail.data || !versions.data) {
     return (
       <main className="mx-auto w-full max-w-4xl p-4">
-        {heading}
         <div role="alert" className="text-sm text-red-700">
           <p>{t("artifactScreens.detail.loadError")}</p>
           <button
@@ -123,7 +112,6 @@ export function ArtifactDetailScreen() {
   if (versionParam && !shown) {
     return (
       <main className="mx-auto w-full max-w-4xl p-4">
-        {heading}
         <p role="alert" className="text-sm text-gray-700">
           {t("artifactScreens.detail.notFound")}
         </p>
@@ -139,7 +127,6 @@ export function ArtifactDetailScreen() {
 
   return (
     <main className="mx-auto w-full max-w-4xl p-4">
-      {heading}
       <h1 className="text-xl font-semibold text-gray-900">{artifact.title}</h1>
       {artifact.archivedAt ? (
         <p

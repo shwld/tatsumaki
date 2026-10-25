@@ -4,7 +4,6 @@ import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 
 import { PermissionDenied } from "../components/permission-denied";
-import { ProjectStoryBreadcrumb } from "../components/project-story-breadcrumb";
 import { StoryAccordionDetail } from "../components/story-accordion-detail";
 import { StoryDeleteConfirmDialog } from "../components/story-delete-confirm-dialog";
 import { useAuthError } from "../contexts/auth-error-context";
@@ -263,10 +262,6 @@ export function StoryEditScreen() {
   return (
     <main className="min-h-screen bg-gray-100 px-4 py-10">
       <div className="mx-auto max-w-2xl rounded-lg bg-white p-6 shadow-sm">
-        <ProjectStoryBreadcrumb
-          projectId={projectId}
-          currentPageLabel={t("storyEditScreen.title")}
-        />
         <div className="flex items-center justify-between gap-4">
           <h1 className="text-2xl font-bold text-gray-900">
             {t("storyEditScreen.title")}

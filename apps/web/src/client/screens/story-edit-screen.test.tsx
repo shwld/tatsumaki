@@ -2,7 +2,6 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { resetProjectStoryBreadcrumbCacheForTests } from "../components/project-story-breadcrumb";
 import { AuthErrorProvider } from "../contexts/auth-error-context";
 import { ToastProvider } from "../contexts/toast-context";
 import { StoryEditScreen } from "./story-edit-screen";
@@ -108,7 +107,6 @@ describe("StoryEditScreen", () => {
   let fetchInner: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    resetProjectStoryBreadcrumbCacheForTests();
     localStorage.clear();
     const { wrapper, inner } = createFetchMock();
     fetchInner = inner;
@@ -116,7 +114,6 @@ describe("StoryEditScreen", () => {
   });
 
   afterEach(() => {
-    resetProjectStoryBreadcrumbCacheForTests();
     vi.unstubAllGlobals();
     localStorage.clear();
   });
@@ -163,9 +160,7 @@ describe("StoryEditScreen", () => {
         "Sample story",
       );
     });
-    expect(
-      screen.getByRole("navigation", { name: "パンくず" }),
-    ).toHaveTextContent("Projects/Alpha Project/ストーリーを編集");
+    expect(screen.queryByRole("navigation", { name: "パンくず" })).toBeNull();
   });
 
   it("shows error when story is not found", async () => {

@@ -4,7 +4,6 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { AuthErrorProvider } from "../contexts/auth-error-context";
 import { ToastProvider } from "../contexts/toast-context";
 import { ProjectSettingsScreen } from "./project-settings-screen";
-import { resetProjectStoryBreadcrumbCacheForTests } from "../components/project-story-breadcrumb";
 
 const mockProject = {
   id: "p1",
@@ -43,7 +42,6 @@ function renderScreen() {
 
 describe("ProjectSettingsScreen", () => {
   beforeEach(() => {
-    resetProjectStoryBreadcrumbCacheForTests();
     vi.spyOn(globalThis, "fetch");
   });
 

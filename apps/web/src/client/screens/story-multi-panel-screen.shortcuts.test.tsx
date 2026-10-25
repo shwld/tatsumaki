@@ -1,18 +1,15 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { resetProjectStoryBreadcrumbCacheForTests } from "../components/project-story-breadcrumb";
 import { createStoryMultiPanelFetchMock } from "../test/story-multi-panel/fetch-mock-builder";
 import { renderStoryMultiPanel } from "../test/story-multi-panel/render-harness";
 
 describe("StoryMultiPanelScreen shortcuts", () => {
   beforeEach(() => {
-    resetProjectStoryBreadcrumbCacheForTests();
     localStorage.clear();
   });
 
   afterEach(() => {
-    resetProjectStoryBreadcrumbCacheForTests();
     localStorage.clear();
     vi.unstubAllGlobals();
   });

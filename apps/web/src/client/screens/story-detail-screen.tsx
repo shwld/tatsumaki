@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
 
 import { PermissionDenied } from "../components/permission-denied";
-import { ProjectStoryBreadcrumb } from "../components/project-story-breadcrumb";
 import { StoryAccordionDetail } from "../components/story-accordion-detail";
 import { useAuthError } from "../contexts/auth-error-context";
 import { useStoryDetail } from "../hooks/use-story-detail";
@@ -106,10 +105,6 @@ export function StoryDetailScreen() {
   return (
     <main className="min-h-screen bg-gray-100 px-4 py-10">
       <div className="mx-auto max-w-2xl rounded-lg bg-white p-6 shadow-sm">
-        <ProjectStoryBreadcrumb
-          projectId={projectId}
-          currentPageLabel="ストーリー"
-        />
         <div className="flex items-center justify-between gap-4">
           <h1 className="text-2xl font-bold text-gray-900">ストーリー詳細</h1>
           <Link className="text-sm font-medium text-blue-700" to={storiesPath}>
