@@ -5,6 +5,8 @@ import { createAuthHeaders, setupAccessBindings } from "./helpers/access-jwt";
 import { resetDatabase } from "./helpers/db";
 import { createDb } from "../src/infrastructure/db/client";
 import { iterationsTable } from "../src/infrastructure/db/schema/iterations";
+import { STORY_STATUS_CHANGED_CONCURRENTLY_ERROR } from "../src/domain/repositories/story-repository";
+import { D1StoryRepository } from "../src/infrastructure/db/repositories/d1-story-repository";
 import { storiesTable } from "../src/infrastructure/db/schema/stories";
 import { storyTimelineEntriesTable } from "../src/infrastructure/db/schema/story-timeline";
 import { todayIso } from "../src/shared/date/today-iso";
@@ -1049,6 +1051,37 @@ describe("story routes", () => {
     );
 
     expect(response.status).toBe(409);
+  });
+
+  it("refuses a status write when the stored status differs from the validated one", async () => {
+    const projectId = await createProject();
+    const createResponse = await fetchWithAuth(storiesApiPath(projectId), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ title: "Racing", description: "" }),
+    });
+    const created = (await createResponse.json()) as {
+      story: { id: string };
+    };
+    await forceStatusForTest(created.story.id, "Unstarted");
+
+    const result = await new D1StoryRepository(env.DB).update({
+      projectId,
+      id: created.story.id,
+      status: "Finished",
+      expectedStatus: "Started",
+    });
+
+    expect(result._unsafeUnwrapErr()).toBe(
+      STORY_STATUS_CHANGED_CONCURRENTLY_ERROR,
+    );
+    const db = createDb(env.DB);
+    const row = await db
+      .select({ status: storiesTable.status })
+      .from(storiesTable)
+      .where(eq(storiesTable.id, created.story.id))
+      .get();
+    expect(row?.status).toBe("Unstarted");
   });
 
   it("does not partially apply a bulk status change when a later story is invalid", async () => {

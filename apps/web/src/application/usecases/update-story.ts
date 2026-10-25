@@ -302,7 +302,12 @@ export async function updateStory(
       ? { description: normalizedDescription }
       : {}),
     ...(normalizedType?.isOk() ? { type: normalizedType.value } : {}),
-    ...(normalizedStatus?.isOk() ? { status: normalizedStatus.value } : {}),
+    ...(normalizedStatus?.isOk()
+      ? {
+          status: normalizedStatus.value,
+          expectedStatus: currentResult.value.status,
+        }
+      : {}),
     ...(normalizedStoryPoint?.isOk()
       ? { storyPoint: normalizedStoryPoint.value }
       : {}),

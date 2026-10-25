@@ -37,6 +37,7 @@ import type {
 import {
   STORY_OWNER_NOT_PROJECT_MEMBER_ERROR,
   STORY_REPOSITORY_ERROR,
+  STORY_STATUS_CHANGED_CONCURRENTLY_ERROR,
   STORY_REQUESTER_NOT_PROJECT_MEMBER_ERROR,
 } from "../../../domain/repositories/story-repository";
 import { todayIso } from "../../../shared/date/today-iso";
@@ -813,6 +814,13 @@ export class D1StoryRepository implements StoryRepository {
       if (requesterValidation.isErr()) {
         return err(requesterValidation.error);
       }
+    }
+
+    if (
+      input.expectedStatus !== undefined &&
+      input.expectedStatus !== current.status
+    ) {
+      return err(STORY_STATUS_CHANGED_CONCURRENTLY_ERROR);
     }
 
     const shouldUpdateStatusTimestamp =
