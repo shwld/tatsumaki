@@ -60,8 +60,9 @@ function useProjectName(projectId: string, pathname: string): string | null {
 
 export function ProjectNav() {
   const match = useMatch("/projects/:projectId/*");
+  const isInvitationAccept = useMatch("/projects/:projectId/invitations/*");
   const projectId = match?.params.projectId;
-  if (!projectId || projectId === "new") return null;
+  if (!projectId || projectId === "new" || isInvitationAccept) return null;
   return <ProjectNavContent projectId={projectId} />;
 }
 

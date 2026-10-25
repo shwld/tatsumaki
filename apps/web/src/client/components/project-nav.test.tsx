@@ -112,3 +112,10 @@ it("revalidates the cached project name on navigation so renames show up", async
     expect(screen.getByTestId("project-nav-name")).toHaveTextContent("Beta"),
   );
 });
+
+it("is hidden on the invitation accept route until membership exists", () => {
+  setup("/projects/p1/invitations/i1/accept");
+  expect(
+    screen.queryByRole("navigation", { name: "プロジェクトメニュー" }),
+  ).toBeNull();
+});
