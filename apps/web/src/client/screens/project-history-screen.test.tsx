@@ -140,6 +140,63 @@ describe("ProjectHistoryScreen", () => {
     expect(screen.getByText("ステータス を変更")).toBeInTheDocument();
   });
 
+  it("shows member avatars and falls back to initials for departed users", async () => {
+    const base = {
+      __typename: "ProjectHistoryEntry",
+      storyId: "story-1",
+      storyTitle: "Story",
+      action: "created",
+      fieldName: "story",
+      oldValue: null,
+      newValue: "Story",
+      createdAt: "2026-01-03T10:00:00.000Z",
+    };
+    const mockHistory = [
+      { ...base, id: "act-1", actorUserId: "user-1", actorName: "Alice" },
+      { ...base, id: "act-2", actorUserId: null, actorName: "Zed Left" },
+    ];
+
+    vi.mocked(fetch).mockImplementation(async (input) => {
+      const url = typeof input === "string" ? input : (input as Request).url;
+      if (url.includes("/history")) {
+        return new Response(
+          JSON.stringify({
+            history: mockHistory,
+            hasMore: false,
+            nextCursor: null,
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.includes("/members")) {
+        return new Response(
+          JSON.stringify({
+            members: [
+              {
+                userId: "user-1",
+                displayName: "Alice",
+                avatarUrl: "https://example.com/alice.png",
+                gravatarUrl: null,
+              },
+            ],
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response(JSON.stringify({ projects: [] }), { status: 200 });
+    });
+
+    renderScreen();
+
+    await waitFor(() => {
+      expect(screen.getByRole("img", { name: "Alice" })).toHaveAttribute(
+        "src",
+        "https://example.com/alice.png",
+      );
+    });
+    expect(screen.getByLabelText("Zed Left")).toHaveTextContent("ZL");
+  });
+
   it("shows error on fetch failure", async () => {
     vi.mocked(fetch).mockImplementation(async (input) => {
       const url = typeof input === "string" ? input : (input as Request).url;
