@@ -164,11 +164,20 @@ type DesktopRefetchEventDetail = {
 
 type CreateTargetPanel = "Icebox" | "Backlog" | "Current";
 
-function toCreateTargetPanel(panel: DisplayPanelType): CreateTargetPanel {
-  if (panel === "Current" || panel === "CurrentBacklogCombined")
-    return "Current";
-  if (panel === "Icebox") return "Icebox";
-  return "Backlog";
+function toCreateTargetPanel(
+  panel: DisplayPanelType,
+): CreateTargetPanel | null {
+  switch (panel) {
+    case "Current":
+    case "CurrentBacklogCombined":
+      return "Current";
+    case "Icebox":
+      return "Icebox";
+    case "Backlog":
+      return "Backlog";
+    case "Done":
+      return null;
+  }
 }
 
 function toCreatePayloadPanel(
@@ -1682,8 +1691,8 @@ export function StoryMultiPanelScreen() {
       panelTestIdOverride={panel}
       headerAction={(() => {
         const targetPanel = toCreateTargetPanel(panel);
+        if (!projectId || !targetPanel) return null;
         const isOpen = createTargetPanel === targetPanel;
-        if (!projectId) return null;
         return (
           <div className="relative">
             <button
