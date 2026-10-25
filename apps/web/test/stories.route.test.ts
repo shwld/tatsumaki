@@ -622,7 +622,14 @@ describe("story routes", () => {
         id: blockedStory.story.id,
         isBlocked: true,
         isBlocking: false,
-        blockingStories: [{ id: blockingStory.story.id, title: "Backend API" }],
+        blockingStories: [
+          {
+            id: blockingStory.story.id,
+            storyNumber: blockingStory.story.storyNumber,
+            title: "Backend API",
+            status: "Unstarted",
+          },
+        ],
         blockedStories: [],
       }),
       relatedStory: expect.objectContaining({
@@ -649,10 +656,20 @@ describe("story routes", () => {
     });
 
     expect(backendStory?.blockedStories).toEqual([
-      { id: blockedStory.story.id, title: "Frontend UI" },
+      {
+        id: blockedStory.story.id,
+        storyNumber: blockedStory.story.storyNumber,
+        title: "Frontend UI",
+        status: "Unstarted",
+      },
     ]);
     expect(frontendStory?.blockingStories).toEqual([
-      { id: blockingStory.story.id, title: "Backend API" },
+      {
+        id: blockingStory.story.id,
+        storyNumber: blockingStory.story.storyNumber,
+        title: "Backend API",
+        status: "Unstarted",
+      },
     ]);
 
     const unsetBlockerResponse = await fetchWithAuth(

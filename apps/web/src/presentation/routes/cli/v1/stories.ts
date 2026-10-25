@@ -22,6 +22,7 @@ import {
 } from "../../stories/error-responses";
 import { STORY_COMMENT_NOT_FOUND_ERROR } from "../../../../domain/repositories/story-comment-repository";
 import { getPointScale } from "../../../../domain/entities/project";
+import { changeStoryBlocker } from "../../stories/blocker-handlers";
 import {
   handleCliStoryUpdate,
   resolveStoryIdByNumber,
@@ -247,3 +248,30 @@ cliV1StoriesRoute.post(
     return c.json({ comment: result.value }, 201);
   },
 );
+
+for (const [method, action] of [
+  ["post", "add"],
+  ["delete", "remove"],
+] as const) {
+  cliV1StoriesRoute[method](
+    "/:projectId/stories/:storyNumber/blockers",
+    async (c) => {
+      const projectId = c.req.param("projectId");
+      const membership = await requireProjectMembership(c, projectId);
+      if (!membership.ok) {
+        return membership.response;
+      }
+
+      const change = await changeStoryBlocker(c, { projectId, action });
+      if (!change.ok) {
+        return change.response;
+      }
+
+      return c.json({
+        story: change.story,
+        relatedStory: change.relatedStory,
+        changed: change.changed,
+      });
+    },
+  );
+}

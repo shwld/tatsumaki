@@ -397,6 +397,210 @@ describe("cli route", () => {
     );
     expect(invalidResponse.status).toBe(400);
   });
+
+  describe("story blockers", () => {
+    const blockersUrl = (projectId: string, storyNumber: number) =>
+      `https://localhost/programmatic-api/v1/projects/${projectId}/stories/${storyNumber}/blockers`;
+
+    const createStories = async (projectId: string, count: number) => {
+      const accessToken = await issueAccessTokenForCliV1();
+      const stories: Array<{ id: string; storyNumber: number }> = [];
+      for (let index = 0; index < count; index += 1) {
+        const response = await SELF.fetch(
+          `https://localhost/programmatic-api/v1/projects/${projectId}/stories`,
+          {
+            method: "POST",
+            headers: {
+              authorization: `Bearer ${accessToken}`,
+              "content-type": "application/json",
+            },
+            body: JSON.stringify({
+              title: `Story ${index + 1}`,
+              type: "feature",
+              description: "d",
+            }),
+          },
+        );
+        expect(response.status).toBe(201);
+        stories.push(
+          ((await response.json()) as { story: (typeof stories)[number] })
+            .story,
+        );
+      }
+      return stories;
+    };
+
+    const changeBlocker = async (
+      method: "POST" | "DELETE",
+      projectId: string,
+      storyNumber: number,
+      body: unknown,
+    ) => {
+      const accessToken = await issueAccessTokenForCliV1();
+      return SELF.fetch(blockersUrl(projectId, storyNumber), {
+        method,
+        headers: {
+          authorization: `Bearer ${accessToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+    };
+
+    it("adds and removes a blocker by story number and reports whether it changed", async () => {
+      const projectId = await createProject();
+      const [blocking, blocked] = await createStories(projectId, 2);
+
+      const add = await changeBlocker("POST", projectId, blocked.storyNumber, {
+        relation: "blockedBy",
+        targetStoryId: String(blocking.storyNumber),
+      });
+      expect(add.status).toBe(200);
+      expect(await add.json()).toEqual({
+        story: expect.objectContaining({
+          storyNumber: blocked.storyNumber,
+          isBlocked: true,
+          blockingStories: [
+            {
+              id: blocking.id,
+              storyNumber: blocking.storyNumber,
+              title: "Story 1",
+              status: "Unstarted",
+            },
+          ],
+        }),
+        relatedStory: expect.objectContaining({
+          storyNumber: blocking.storyNumber,
+          isBlocking: true,
+        }),
+        changed: true,
+      });
+
+      const addAgain = await changeBlocker(
+        "POST",
+        projectId,
+        blocked.storyNumber,
+        { relation: "blockedBy", targetStoryId: String(blocking.storyNumber) },
+      );
+      expect(addAgain.status).toBe(200);
+      expect(await addAgain.json()).toEqual(
+        expect.objectContaining({ changed: false }),
+      );
+
+      const accessToken = await issueAccessTokenForCliV1();
+      const getResponse = await SELF.fetch(
+        `https://localhost/programmatic-api/v1/projects/${projectId}/stories/${blocked.storyNumber}`,
+        { headers: { authorization: `Bearer ${accessToken}` } },
+      );
+      const fetched = (await getResponse.json()) as {
+        story: { blockingStories: Array<{ storyNumber: number }> };
+      };
+      expect(fetched.story.blockingStories).toEqual([
+        expect.objectContaining({ storyNumber: blocking.storyNumber }),
+      ]);
+
+      const remove = await changeBlocker(
+        "DELETE",
+        projectId,
+        blocking.storyNumber,
+        { relation: "blocks", targetStoryId: String(blocked.storyNumber) },
+      );
+      expect(remove.status).toBe(200);
+      expect(await remove.json()).toEqual(
+        expect.objectContaining({
+          changed: true,
+          story: expect.objectContaining({ isBlocking: false }),
+        }),
+      );
+
+      const removeAgain = await changeBlocker(
+        "DELETE",
+        projectId,
+        blocking.storyNumber,
+        { relation: "blocks", targetStoryId: String(blocked.storyNumber) },
+      );
+      expect(await removeAgain.json()).toEqual(
+        expect.objectContaining({ changed: false }),
+      );
+    });
+
+    it("rejects a story blocking itself", async () => {
+      const projectId = await createProject();
+      const [story] = await createStories(projectId, 1);
+
+      const response = await changeBlocker(
+        "POST",
+        projectId,
+        story.storyNumber,
+        { relation: "blockedBy", targetStoryId: String(story.storyNumber) },
+      );
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        error: "A story cannot block itself",
+      });
+    });
+
+    it("rejects a missing story", async () => {
+      const projectId = await createProject();
+      const [story] = await createStories(projectId, 1);
+
+      const response = await changeBlocker(
+        "POST",
+        projectId,
+        story.storyNumber,
+        { relation: "blockedBy", targetStoryId: "999" },
+      );
+      expect(response.status).toBe(404);
+    });
+
+    it("rejects a story from another project", async () => {
+      const projectId = await createProject();
+      const otherProjectId = await createProject();
+      const [story] = await createStories(projectId, 1);
+      const [other] = await createStories(otherProjectId, 1);
+
+      const byId = await changeBlocker("POST", projectId, story.storyNumber, {
+        relation: "blockedBy",
+        targetStoryId: other.id,
+      });
+      expect(byId.status).toBe(404);
+    });
+
+    it("rejects direct and transitive cycles", async () => {
+      const projectId = await createProject();
+      const [a, b, c] = await createStories(projectId, 3);
+      const blockedBy = (story: typeof a, by: typeof a) =>
+        changeBlocker("POST", projectId, story.storyNumber, {
+          relation: "blockedBy",
+          targetStoryId: String(by.storyNumber),
+        });
+
+      expect((await blockedBy(a, b)).status).toBe(200);
+      expect((await blockedBy(b, c)).status).toBe(200);
+
+      const direct = await blockedBy(b, a);
+      expect(direct.status).toBe(409);
+      expect(await direct.json()).toEqual({
+        error: `Cannot make #${a.storyNumber} block #${b.storyNumber}: #${b.storyNumber} already blocks #${a.storyNumber} (directly or through other stories)`,
+      });
+
+      const transitive = await blockedBy(c, a);
+      expect(transitive.status).toBe(409);
+    });
+
+    it("rejects an invalid body", async () => {
+      const projectId = await createProject();
+      const [story] = await createStories(projectId, 1);
+
+      const response = await changeBlocker(
+        "POST",
+        projectId,
+        story.storyNumber,
+        { relation: "nope", targetStoryId: "1" },
+      );
+      expect(response.status).toBe(400);
+    });
+  });
 });
 
 async function createProject() {

@@ -58,6 +58,30 @@ pub struct StoryReorderInput {
 pub struct StoryCommentInput {
     pub body: String,
 }
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StoryBlockerAction {
+    Add,
+    Remove,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StoryBlockerRelation {
+    BlockedBy,
+    Blocks,
+}
+impl StoryBlockerRelation {
+    pub fn as_api_str(self) -> &'static str {
+        match self {
+            Self::BlockedBy => "blockedBy",
+            Self::Blocks => "blocks",
+        }
+    }
+}
+#[derive(Debug, Clone, Copy)]
+pub struct StoryBlockerInput {
+    pub action: StoryBlockerAction,
+    pub relation: StoryBlockerRelation,
+    pub target_story_number: i64,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectGetBody {
@@ -155,6 +179,13 @@ pub trait StoryGateway {
         project: &str,
         story_number: i64,
         input: &StoryCommentInput,
+        bearer_token: &str,
+    ) -> Result<serde_json::Value, CliError>;
+    async fn change_story_blocker(
+        &self,
+        project: &str,
+        story_number: i64,
+        input: &StoryBlockerInput,
         bearer_token: &str,
     ) -> Result<serde_json::Value, CliError>;
 }

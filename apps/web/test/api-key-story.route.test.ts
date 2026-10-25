@@ -95,6 +95,45 @@ describe("api-key story route", () => {
     expect(body.story.title).toBe("Updated via API key");
   });
 
+  it("story:write key can add a blocker but a key without it cannot", async () => {
+    const projectId = await createProject();
+    const blocking = await createStory(projectId);
+    const blocked = await createStory(projectId);
+    const writer = await issueApiKey(projectId, ["story:write"]);
+    const reader = await issueApiKey(projectId, ["artifact:read"]);
+    const blockersUrl = `https://localhost/api-key/v1/projects/${projectId}/stories/${blocked.storyNumber}/blockers`;
+    const body = JSON.stringify({
+      relation: "blockedBy",
+      targetStoryId: String(blocking.storyNumber),
+    });
+
+    const denied = await SELF.fetch(blockersUrl, {
+      method: "POST",
+      headers: {
+        "X-Api-Key": reader.rawKey,
+        "content-type": "application/json",
+      },
+      body,
+    });
+    expect(denied.status).toBe(403);
+
+    const added = await SELF.fetch(blockersUrl, {
+      method: "POST",
+      headers: {
+        "X-Api-Key": writer.rawKey,
+        "content-type": "application/json",
+      },
+      body,
+    });
+    expect(added.status).toBe(200);
+    expect(await added.json()).toEqual(
+      expect.objectContaining({
+        changed: true,
+        story: expect.objectContaining({ isBlocked: true }),
+      }),
+    );
+  });
+
   it("unknown key returns 401", async () => {
     const projectId = await createProject();
     const story = await createStory(projectId);

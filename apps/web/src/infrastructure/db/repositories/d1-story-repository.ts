@@ -15,6 +15,7 @@ import { ulid } from "ulid";
 import type {
   Story,
   StoryPoint,
+  StoryRelation,
   StoryPriorityHistory,
   StoryStatus,
   StoryType,
@@ -31,6 +32,7 @@ import type {
   ListStoriesSummary,
   ReassignStoriesAcrossIterationsInput,
   ReorderStoriesInput,
+  StoryBlockerPair,
   StoryRepository,
   StoryRepositoryError,
   UpdateStoryInput,
@@ -70,6 +72,22 @@ function parseLabels(labelsJson: string): string[] {
   } catch {
     return [];
   }
+}
+
+function toStoryRelation(row: {
+  id: string;
+  storyNumber: number;
+  title: string;
+  status: string;
+}): StoryRelation {
+  return {
+    id: row.id,
+    storyNumber: row.storyNumber,
+    title: row.title,
+    status: STORY_STATUSES.includes(row.status as StoryStatus)
+      ? (row.status as StoryStatus)
+      : "Unstarted",
+  };
 }
 
 function toStory(
@@ -339,7 +357,7 @@ export class D1StoryRepository implements StoryRepository {
   private attachStoryRelations(
     stories: Story[],
     blockerRows: StoryBlockerRow[],
-    titleByStoryId: Map<string, string>,
+    relationByStoryId: Map<string, StoryRelation>,
   ): Story[] {
     const storyById = new Map(
       stories.map((story) => {
@@ -354,23 +372,23 @@ export class D1StoryRepository implements StoryRepository {
         continue;
       }
 
-      const blockingTitle = titleByStoryId.get(row.blockingStoryId);
-      const blockedTitle = titleByStoryId.get(row.blockedStoryId);
-      if (!blockingTitle || !blockedTitle) {
+      const blockingRelation = relationByStoryId.get(row.blockingStoryId);
+      const blockedRelation = relationByStoryId.get(row.blockedStoryId);
+      if (!blockingRelation || !blockedRelation) {
         continue;
       }
 
       if (blocked) {
         blocked.blockingStories = [
           ...(blocked.blockingStories ?? []),
-          { id: row.blockingStoryId, title: blockingTitle },
+          blockingRelation,
         ];
       }
 
       if (blocking) {
         blocking.blockedStories = [
           ...(blocking.blockedStories ?? []),
-          { id: row.blockedStoryId, title: blockedTitle },
+          blockedRelation,
         ];
       }
     }
@@ -436,9 +454,9 @@ export class D1StoryRepository implements StoryRepository {
       return toStory(row, ownerIdsByStoryId);
     });
 
-    const titleByStoryId = new Map(
+    const relationByStoryId = new Map(
       stories.map((story) => {
-        return [story.id, story.title];
+        return [story.id, toStoryRelation(story)];
       }),
     );
     // D1 has a limit of 100 bind parameters per query.
@@ -459,7 +477,7 @@ export class D1StoryRepository implements StoryRepository {
       blockerRows.push(...rows);
     }
 
-    return this.attachStoryRelations(stories, blockerRows, titleByStoryId);
+    return this.attachStoryRelations(stories, blockerRows, relationByStoryId);
   }
 
   private async enrichSummaryBlockFlags(stories: Story[]): Promise<Story[]> {
@@ -498,10 +516,10 @@ export class D1StoryRepository implements StoryRepository {
     return stories;
   }
 
-  private async findStoryTitlesByIds(
+  private async findStoryRelationsByIds(
     projectId: string,
     ids: string[],
-  ): Promise<Map<string, string>> {
+  ): Promise<Map<string, StoryRelation>> {
     if (ids.length === 0) {
       return new Map();
     }
@@ -512,7 +530,12 @@ export class D1StoryRepository implements StoryRepository {
     const allRows = [];
     for (const chunk of chunks) {
       const rows = await this.db
-        .select({ id: storiesTable.id, title: storiesTable.title })
+        .select({
+          id: storiesTable.id,
+          storyNumber: storiesTable.storyNumber,
+          title: storiesTable.title,
+          status: storiesTable.status,
+        })
         .from(storiesTable)
         .where(
           and(
@@ -526,7 +549,7 @@ export class D1StoryRepository implements StoryRepository {
 
     return new Map(
       allRows.map((row) => {
-        return [row.id, row.title];
+        return [row.id, toStoryRelation(row)];
       }),
     );
   }
@@ -563,12 +586,16 @@ export class D1StoryRepository implements StoryRepository {
     const relatedIds = blockerRows.flatMap((blocker) => {
       return [blocker.blockingStoryId, blocker.blockedStoryId];
     });
-    const titleByStoryId = await this.findStoryTitlesByIds(projectId, [
+    const relationByStoryId = await this.findStoryRelationsByIds(projectId, [
       id,
       ...relatedIds,
     ]);
 
-    return this.attachStoryRelations([story], blockerRows, titleByStoryId)[0];
+    return this.attachStoryRelations(
+      [story],
+      blockerRows,
+      relationByStoryId,
+    )[0];
   }
 
   private async assertOwnerIdsAreProjectMembers(
@@ -1257,7 +1284,7 @@ export class D1StoryRepository implements StoryRepository {
   async addBlocker(
     blockingStoryId: string,
     blockedStoryId: string,
-  ): Promise<Result<void, StoryRepositoryError>> {
+  ): Promise<Result<boolean, StoryRepositoryError>> {
     const inserted = await this.db
       .insert(storyBlockersTable)
       .values({
@@ -1272,7 +1299,26 @@ export class D1StoryRepository implements StoryRepository {
       return err(STORY_REPOSITORY_ERROR);
     }
 
-    return ok(undefined);
+    return ok(inserted.length === 1);
+  }
+
+  async listBlockerPairs(
+    projectId: string,
+  ): Promise<Result<StoryBlockerPair[], StoryRepositoryError>> {
+    const rows = await this.db
+      .select({
+        blockingStoryId: storyBlockersTable.blockingStoryId,
+        blockedStoryId: storyBlockersTable.blockedStoryId,
+      })
+      .from(storyBlockersTable)
+      .innerJoin(
+        storiesTable,
+        eq(storiesTable.id, storyBlockersTable.blockingStoryId),
+      )
+      .where(eq(storiesTable.projectId, projectId))
+      .all();
+
+    return ok(rows);
   }
 
   async removeBlocker(

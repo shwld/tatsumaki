@@ -21,7 +21,9 @@ export type StoryStatus = (typeof STORY_STATUSES)[number];
 
 export type StoryRelation = {
   id: string;
+  storyNumber: number;
   title: string;
+  status: StoryStatus;
 };
 
 /** A story is always created Unstarted so that it reaches Started (and an iteration) before any later status. */

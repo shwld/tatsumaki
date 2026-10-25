@@ -15,7 +15,9 @@ export type StoryStatus = (typeof STORY_STATUSES)[number];
 
 export type StoryRelation = {
   id: string;
+  storyNumber: number;
   title: string;
+  status: StoryStatus;
 };
 
 export type StoryAttachment = {

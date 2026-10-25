@@ -8,7 +8,7 @@ mod infrastructure;
 mod update;
 
 use crate::application::ports::{
-    StoryCommentInput, StoryCreateInput, StoryListFilter, StoryPointUpdate, StoryReorderInput,
+    StoryBlockerAction, StoryBlockerInput, StoryBlockerRelation, StoryCommentInput, StoryCreateInput, StoryListFilter, StoryPointUpdate, StoryReorderInput,
     StoryUpdateInput, TokenStore,
 };
 use adapters::{
@@ -171,12 +171,83 @@ enum StorySubcommand {
         #[arg(long)]
         body: String,
     },
+    /// Make <STORY_NUMBER> blocked by --by, or blocking --blocks
+    Block {
+        #[arg(long)]
+        project: String,
+        story_number: i64,
+        #[command(flatten)]
+        relation: StoryBlockerRelationArgs,
+    },
+    /// Remove a blocker registered with `story block`
+    Unblock {
+        #[arg(long)]
+        project: String,
+        story_number: i64,
+        #[command(flatten)]
+        relation: StoryBlockerRelationArgs,
+    },
     Reorder {
         #[arg(long)]
         project: String,
         #[arg(long = "ordered-id")]
         ordered_ids: Vec<String>,
     },
+}
+
+impl StorySubcommand {
+    fn blocker_action(&self) -> Option<StoryBlockerAction> {
+        match self {
+            Self::Block { .. } => Some(StoryBlockerAction::Add),
+            Self::Unblock { .. } => Some(StoryBlockerAction::Remove),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Args, Debug)]
+#[group(required = true, multiple = false)]
+struct StoryBlockerRelationArgs {
+    /// Story number that blocks <STORY_NUMBER>
+    #[arg(long, value_name = "STORY_NUMBER")]
+    by: Option<i64>,
+    /// Story number that <STORY_NUMBER> blocks
+    #[arg(long, value_name = "STORY_NUMBER")]
+    blocks: Option<i64>,
+}
+
+impl StoryBlockerRelationArgs {
+    fn into_relation(self) -> (StoryBlockerRelation, i64) {
+        match (self.by, self.blocks) {
+            (Some(target), _) => (StoryBlockerRelation::BlockedBy, target),
+            (None, Some(target)) => (StoryBlockerRelation::Blocks, target),
+            (None, None) => unreachable!("clap requires one of --by and --blocks"),
+        }
+    }
+}
+
+fn describe_story_blocker_change(
+    story_number: i64,
+    input: &StoryBlockerInput,
+    changed: bool,
+) -> String {
+    let target = input.target_story_number;
+    let (blocking, blocked) = match input.relation {
+        StoryBlockerRelation::BlockedBy => (target, story_number),
+        StoryBlockerRelation::Blocks => (story_number, target),
+    };
+    match (input.action, changed) {
+        (StoryBlockerAction::Add, true) => format!("#{blocked} は #{blocking} にブロックされています"),
+        (StoryBlockerAction::Add, false) => {
+            format!("既に登録済みです: #{blocked} は #{blocking} にブロックされています")
+        }
+        (StoryBlockerAction::Remove, true) => {
+            format!("#{blocked} は #{blocking} にブロックされなくなりました")
+        }
+        (StoryBlockerAction::Remove, false) => {
+            format!("登録されていません: #{blocked} は #{blocking} にブロックされていません")
+        }
+    }
 }
 
 #[derive(Args, Debug)]
@@ -437,6 +508,7 @@ async fn run() -> Result<(), (CliError, i32)> {
             {
                 eprintln!("{warning}");
             }
+            let blocker_action = story_cmd.command.blocker_action();
             match story_cmd.command {
                 StorySubcommand::Get {
                     project,
@@ -632,6 +704,36 @@ async fn run() -> Result<(), (CliError, i32)> {
                             serde_json::to_string_pretty(&comment)
                                 .map_err(|e| (CliError::Json(e), EXIT_GENERAL))?
                         );
+                    }
+                }
+                StorySubcommand::Block {
+                    project,
+                    story_number,
+                    relation,
+                }
+                | StorySubcommand::Unblock {
+                    project,
+                    story_number,
+                    relation,
+                } => {
+                    let (relation, target_story_number) = relation.into_relation();
+                    let input = StoryBlockerInput {
+                        action: blocker_action.expect("block and unblock set an action"),
+                        relation,
+                        target_story_number,
+                    };
+                    let body = service
+                        .change_story_blocker(&base_url, &project, story_number, &input)
+                        .await?;
+                    if cli.json {
+                        println!(
+                            "{}",
+                            serde_json::to_string_pretty(&body)
+                                .map_err(|e| (CliError::Json(e), EXIT_GENERAL))?
+                        );
+                    } else {
+                        let changed = body.get("changed").and_then(|v| v.as_bool()).unwrap_or(true);
+                        println!("{}", describe_story_blocker_change(story_number, &input, changed));
                     }
                 }
                 StorySubcommand::Reorder {
@@ -874,6 +976,64 @@ mod tests {
         };
         assert_eq!(story_point, Some(5));
         assert!(!clear_story_point);
+    }
+
+    fn parse_story_blocker(args: &[&str]) -> Result<(StoryBlockerAction, i64, StoryBlockerRelation, i64), clap::Error> {
+        let mut argv = vec!["tm", "story"];
+        argv.extend_from_slice(args);
+        let parsed = Cli::try_parse_from(argv)?;
+        let Commands::Story(StoryCommand { command }) = parsed.command else {
+            panic!("expected story command");
+        };
+        let action = command.blocker_action().expect("block or unblock");
+        let (StorySubcommand::Block { story_number, relation, .. }
+        | StorySubcommand::Unblock { story_number, relation, .. }) = command
+        else {
+            panic!("expected block or unblock");
+        };
+        let (relation, target) = relation.into_relation();
+        Ok((action, story_number, relation, target))
+    }
+
+    #[test]
+    fn story_block_takes_exactly_one_of_by_and_blocks() {
+        assert_eq!(
+            parse_story_blocker(&["block", "--project", "p", "328", "--by", "325"]).unwrap(),
+            (StoryBlockerAction::Add, 328, StoryBlockerRelation::BlockedBy, 325)
+        );
+        assert_eq!(
+            parse_story_blocker(&["unblock", "--project", "p", "328", "--blocks", "330"]).unwrap(),
+            (StoryBlockerAction::Remove, 328, StoryBlockerRelation::Blocks, 330)
+        );
+        assert!(parse_story_blocker(&["block", "--project", "p", "328"]).is_err());
+        assert!(
+            parse_story_blocker(&["block", "--project", "p", "328", "--by", "1", "--blocks", "2"]).is_err()
+        );
+    }
+
+    #[test]
+    fn story_blocker_result_is_stated_as_a_sentence() {
+        let input = |action, relation| StoryBlockerInput { action, relation, target_story_number: 325 };
+        assert_eq!(
+            describe_story_blocker_change(328, &input(StoryBlockerAction::Add, StoryBlockerRelation::BlockedBy), true),
+            "#328 は #325 にブロックされています"
+        );
+        assert_eq!(
+            describe_story_blocker_change(328, &input(StoryBlockerAction::Add, StoryBlockerRelation::Blocks), true),
+            "#325 は #328 にブロックされています"
+        );
+        assert_eq!(
+            describe_story_blocker_change(328, &input(StoryBlockerAction::Add, StoryBlockerRelation::BlockedBy), false),
+            "既に登録済みです: #328 は #325 にブロックされています"
+        );
+        assert_eq!(
+            describe_story_blocker_change(328, &input(StoryBlockerAction::Remove, StoryBlockerRelation::BlockedBy), true),
+            "#328 は #325 にブロックされなくなりました"
+        );
+        assert_eq!(
+            describe_story_blocker_change(328, &input(StoryBlockerAction::Remove, StoryBlockerRelation::BlockedBy), false),
+            "登録されていません: #328 は #325 にブロックされていません"
+        );
     }
 
     #[test]

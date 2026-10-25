@@ -1,7 +1,7 @@
 use progenitor::generate_api;
 use reqwest::StatusCode;
 
-use crate::{application::ports::{AuthGateway, CliVersionResponse, OAuthTokenResponse, ProjectGateway, ProjectGetBody, StoryCommentInput, StoryCreateInput, StoryGateway, StoryGetBody, StoryListBody, StoryListFilter, StoryPointUpdate, StoryReorderInput, StoryUpdateInput, UserGateway, VersionGateway, WhoamiResponse}, CliError};
+use crate::{application::ports::{AuthGateway, CliVersionResponse, OAuthTokenResponse, ProjectGateway, ProjectGetBody, StoryBlockerAction, StoryBlockerInput, StoryCommentInput, StoryCreateInput, StoryGateway, StoryGetBody, StoryListBody, StoryListFilter, StoryPointUpdate, StoryReorderInput, StoryUpdateInput, UserGateway, VersionGateway, WhoamiResponse}, CliError};
 use crate::infrastructure::http_client;
 use self::types::{CliVersionCompatibilityResponse, GetProjectProjectId, GetStoryByNumberProjectId, GetStoryByNumberStoryNumber, ListStoriesIterationDateScope, ListStoriesLimit, ListStoriesProjectId, StoryStatus};
 
@@ -216,6 +216,26 @@ impl StoryGateway for HttpStoryGateway {
     if response.status().is_success() {
       let body: serde_json::Value = response.json().await?;
       return Ok(body.get("comment").cloned().unwrap_or(body));
+    }
+    Err(Self::error_from_response(response).await)
+  }
+
+  async fn change_story_blocker(&self, project: &str, story_number: i64, input: &StoryBlockerInput, bearer_token: &str) -> Result<serde_json::Value, CliError> {
+    let url = format!("{}/programmatic-api/v1/projects/{project}/stories/{story_number}/blockers", self.base_url);
+    let request = match input.action {
+      StoryBlockerAction::Add => self.client.post(url),
+      StoryBlockerAction::Remove => self.client.delete(url),
+    };
+    let response = request
+      .bearer_auth(bearer_token)
+      .json(&serde_json::json!({
+        "relation": input.relation.as_api_str(),
+        "targetStoryId": input.target_story_number.to_string(),
+      }))
+      .send()
+      .await?;
+    if response.status().is_success() {
+      return Ok(response.json().await?);
     }
     Err(Self::error_from_response(response).await)
   }
