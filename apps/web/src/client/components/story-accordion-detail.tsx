@@ -19,6 +19,7 @@ import { useAuthError } from "../contexts/auth-error-context";
 import { useToast } from "../contexts/toast-context";
 import { storyQueryKeys } from "../hooks/story-query-keys";
 import { useCurrentUser } from "../hooks/use-current-user";
+import { userIdsEqual } from "../lib/user-ids-equal";
 import { useProjectBootstrap } from "../hooks/use-project-bootstrap";
 import { useStoryDetail, useStoryTimeline } from "../hooks/use-story-detail";
 import { useStoryPatch } from "../hooks/use-story-patch";
@@ -58,15 +59,6 @@ import { Avatar } from "./avatar";
 function sameStringArray(a: string[], b: string[]) {
   if (a.length !== b.length) return false;
   return a.every((v, i) => v === b[i]);
-}
-
-/** タイムラインの actor id と /api/auth/me の id を突き合わせる（前後空白のズレを吸収） */
-function userIdsEqual(
-  a: string | null | undefined,
-  b: string | null | undefined,
-): boolean {
-  if (a == null || b == null) return false;
-  return a.trim() === b.trim();
 }
 
 type StoryAccordionDetailProps = {

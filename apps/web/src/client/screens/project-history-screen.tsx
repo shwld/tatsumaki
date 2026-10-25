@@ -2,6 +2,7 @@ import { useParams } from "react-router";
 import { ActorLabel } from "../components/actor-label";
 import { useProjectBootstrap } from "../hooks/use-project-bootstrap";
 import { useProjectHistory } from "../hooks/use-project-history";
+import { userIdsEqual } from "../lib/user-ids-equal";
 import { projectStoryEditPath } from "../lib/story-routes";
 import type { ProjectMemberProfile } from "../types/project";
 import type { ProjectHistoryEntry } from "../types/story";
@@ -80,10 +81,7 @@ function HistoryEntryRow({ entry, projectId, members }: HistoryEntryRowProps) {
     (entry.action === "deleted" ? entry.oldValue : entry.newValue) ??
     entry.storyId;
 
-  const member =
-    entry.actorUserId === null
-      ? undefined
-      : members.find((m) => m.id === entry.actorUserId);
+  const member = members.find((m) => userIdsEqual(m.id, entry.actorUserId));
 
   return (
     <tr className="border-b border-gray-100 hover:bg-gray-50">
