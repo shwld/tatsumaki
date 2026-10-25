@@ -1,6 +1,9 @@
 import { useParams } from "react-router";
+import { ActorLabel } from "../components/actor-label";
+import { useProjectBootstrap } from "../hooks/use-project-bootstrap";
 import { useProjectHistory } from "../hooks/use-project-history";
 import { projectStoryEditPath } from "../lib/story-routes";
+import type { ProjectMemberProfile } from "../types/project";
 import type { ProjectHistoryEntry } from "../types/story";
 
 function formatDate(isoString: string): string {
@@ -68,23 +71,35 @@ function getActionBadgeColor(action: ProjectHistoryEntry["action"]): string {
 type HistoryEntryRowProps = {
   entry: ProjectHistoryEntry;
   projectId: string;
+  members: ProjectMemberProfile[];
 };
 
-function HistoryEntryRow({ entry, projectId }: HistoryEntryRowProps) {
+function HistoryEntryRow({ entry, projectId, members }: HistoryEntryRowProps) {
   const storyTitle =
     entry.storyTitle ??
     (entry.action === "deleted" ? entry.oldValue : entry.newValue) ??
     entry.storyId;
 
+  const member =
+    entry.actorUserId === null
+      ? undefined
+      : members.find((m) => m.id === entry.actorUserId);
+
   return (
     <tr className="border-b border-gray-100 hover:bg-gray-50">
-      <td className="px-4 py-3 text-sm text-gray-500">
+      <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">
         {formatDate(entry.createdAt)}
       </td>
-      <td className="px-4 py-3 text-sm text-gray-700">{entry.actorName}</td>
-      <td className="px-4 py-3">
+      <td className="max-w-[14rem] px-4 py-3 text-sm text-gray-700">
+        <ActorLabel
+          displayName={entry.actorName}
+          avatarUrl={member?.avatarUrl ?? null}
+          gravatarUrl={member?.gravatarUrl ?? null}
+        />
+      </td>
+      <td className="whitespace-nowrap px-4 py-3">
         <span
-          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${getActionBadgeColor(entry.action)}`}
+          className={`inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${getActionBadgeColor(entry.action)}`}
         >
           {getActionLabel(entry)}
         </span>
@@ -112,9 +127,11 @@ export function ProjectHistoryScreen() {
   const { projectId } = useParams();
   const { history, isLoading, error, hasMore, loadMore, isLoadingMore } =
     useProjectHistory(projectId ?? "");
+  const { data: bootstrap } = useProjectBootstrap(projectId);
+  const members = bootstrap?.memberOptions ?? [];
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-6">
+    <main className="px-4 py-6">
       <h1 className="mb-6 text-xl font-semibold text-gray-900">
         Project History
       </h1>
@@ -131,7 +148,7 @@ export function ProjectHistoryScreen() {
         <p className="text-sm text-gray-500">まだ操作履歴がありません。</p>
       ) : (
         <div className="space-y-3">
-          <div className="overflow-hidden rounded-lg border border-gray-200">
+          <div className="overflow-x-auto rounded-lg border border-gray-200">
             <table className="w-full text-left">
               <thead className="bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500">
                 <tr>
@@ -148,6 +165,7 @@ export function ProjectHistoryScreen() {
                     key={entry.id}
                     entry={entry}
                     projectId={projectId ?? ""}
+                    members={members}
                   />
                 ))}
               </tbody>
