@@ -69,18 +69,38 @@ export function useArtifactVersions(projectId: string, artifactId: string) {
   });
 }
 
+export type ArtifactMemberProfile = {
+  displayName: string;
+  avatarUrl: string | null;
+  gravatarUrl: string | null;
+};
+
 /** A failed or missing members list only costs the creator's display name. */
-export function useMemberNames(projectId: string) {
+export function useMembers(projectId: string) {
   return useQuery({
     queryKey: artifactQueryKeys.members(projectId),
     queryFn: async () => {
       const data = await getJson<{
-        members?: { userId: string; displayName?: string }[];
+        members?: {
+          userId: string;
+          displayName?: string;
+          avatarUrl?: string | null;
+          gravatarUrl?: string | null;
+        }[];
       }>(`/api/projects/${projectId}/members`);
-      return new Map(
+      return new Map<string, ArtifactMemberProfile>(
         (data.members ?? []).flatMap((member) =>
           member.displayName
-            ? [[member.userId, member.displayName] as const]
+            ? [
+                [
+                  member.userId,
+                  {
+                    displayName: member.displayName,
+                    avatarUrl: member.avatarUrl ?? null,
+                    gravatarUrl: member.gravatarUrl ?? null,
+                  },
+                ] as const,
+              ]
             : [],
         ),
       );

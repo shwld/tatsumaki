@@ -52,7 +52,13 @@ const baseRoutes = (): Routes => ({
     json({ projects: [{ id: "p1", name: "Demo project" }] }),
   "GET /api/projects/p1/members": () =>
     json({
-      members: [{ userId: "github|1234567890", displayName: "Alice" }],
+      members: [
+        {
+          userId: "github|1234567890",
+          displayName: "Alice",
+          avatarUrl: "https://example.test/alice.png",
+        },
+      ],
     }),
   "GET /api/projects/p1/artifacts/art-1": () =>
     json({ artifact, latestVersion: versionOf(2) }),
@@ -194,6 +200,10 @@ describe("artifact screens", () => {
       fireEvent.click(toggle);
       expect(toggle).toHaveAttribute("aria-expanded", "true");
       expect(await screen.findByText("Alice")).toBeInTheDocument();
+      expect(screen.getByRole("img", { name: "Alice" })).toHaveAttribute(
+        "src",
+        "https://example.test/alice.png",
+      );
       expect(screen.getByText("art-1")).toBeInTheDocument();
       expect(screen.getByText("3")).toBeInTheDocument();
       expect(screen.getByText("2.0 KB")).toBeInTheDocument();
