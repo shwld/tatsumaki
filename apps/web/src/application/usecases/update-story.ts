@@ -176,6 +176,7 @@ export async function updateStory(
     ownerIds?: string[];
     epicId?: string | null;
     isIcebox?: boolean;
+    moveToTopOnLeavingIcebox?: boolean;
     requesterId?: string | null;
     allowedStoryPoints?: number[];
     actor: StoryUpdateActor;
@@ -318,6 +319,11 @@ export async function updateStory(
     ...(normalizedEpicId?.isOk() ? { epicId: normalizedEpicId.value } : {}),
     ...(resolvedIsIcebox.value !== undefined
       ? { isIcebox: resolvedIsIcebox.value }
+      : {}),
+    ...(input.moveToTopOnLeavingIcebox &&
+    currentResult.value.isIcebox &&
+    resolvedIsIcebox.value === false
+      ? { moveToTop: true }
       : {}),
     ...(normalizedRequesterId?.isOk()
       ? { requesterId: normalizedRequesterId.value }

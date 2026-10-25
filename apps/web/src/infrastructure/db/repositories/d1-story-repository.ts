@@ -897,7 +897,9 @@ export class D1StoryRepository implements StoryRepository {
       shouldClearIterationId = !assignedCurrentIteration;
     }
 
-    const updatedRows = await this.db
+    const shouldMoveToTop =
+      input.moveToTop === true && current.isIcebox === 1 && !nextIsIcebox;
+    const updateQuery = this.db
       .update(storiesTable)
       .set({
         ...(input.title !== undefined ? { title: input.title } : {}),
@@ -921,6 +923,7 @@ export class D1StoryRepository implements StoryRepository {
         ...(resolvedIsIcebox.value !== undefined
           ? { isIcebox: resolvedIsIcebox.value ? 1 : 0 }
           : {}),
+        ...(shouldMoveToTop ? { position: 1 } : {}),
         ...(autoAssignedIterationId !== null
           ? { iterationId: autoAssignedIterationId }
           : {}),
@@ -945,6 +948,29 @@ export class D1StoryRepository implements StoryRepository {
         ),
       )
       .returning({ id: storiesTable.id });
+
+    // Shifting the others and moving the target must commit together, and the
+    // shift only applies while the optimistic guard on the target still holds.
+    const updatedRows = shouldMoveToTop
+      ? (
+          await this.db.batch([
+            this.db
+              .update(storiesTable)
+              .set({
+                position: sql`${storiesTable.position} + 1`,
+                updatedAt: sql`CURRENT_TIMESTAMP`,
+              })
+              .where(
+                and(
+                  eq(storiesTable.projectId, input.projectId),
+                  ne(storiesTable.id, input.id),
+                  sql`exists (select 1 from ${storiesTable} as target where target.id = ${input.id} and target.status = ${current.status} and target.is_icebox = ${current.isIcebox})`,
+                ),
+              ),
+            updateQuery,
+          ])
+        )[1]
+      : await updateQuery;
 
     if (updatedRows.length === 0) {
       return err(
@@ -1202,48 +1228,6 @@ export class D1StoryRepository implements StoryRepository {
       .all();
 
     return ok(await this.listWithRelations(reordered));
-  }
-
-  async moveToTop(
-    projectId: string,
-    id: string,
-  ): Promise<Result<Story | null, StoryRepositoryError>> {
-    const target = await this.db
-      .select({ position: storiesTable.position })
-      .from(storiesTable)
-      .where(
-        and(eq(storiesTable.projectId, projectId), eq(storiesTable.id, id)),
-      )
-      .get();
-    if (!target) {
-      return ok(null);
-    }
-
-    await this.db.batch([
-      this.db
-        .update(storiesTable)
-        .set({
-          position: sql`${storiesTable.position} + 1`,
-          updatedAt: sql`CURRENT_TIMESTAMP`,
-        })
-        .where(
-          and(eq(storiesTable.projectId, projectId), ne(storiesTable.id, id)),
-        ),
-      this.db
-        .update(storiesTable)
-        .set({ position: 1, updatedAt: sql`CURRENT_TIMESTAMP` })
-        .where(
-          and(eq(storiesTable.projectId, projectId), eq(storiesTable.id, id)),
-        ),
-      this.db.insert(storyPriorityHistoryTable).values({
-        id: ulid(),
-        storyId: id,
-        fromPosition: target.position,
-        toPosition: 1,
-      }),
-    ]);
-
-    return ok(await this.findByIdWithRelations(projectId, id));
   }
 
   async listPriorityHistory(

@@ -82,21 +82,6 @@ export async function handleCliStoryUpdate(
     return c.json({ error: parsed.message }, 400);
   }
 
-  let leavesIcebox = false;
-  if (parsed.value.isIcebox === false) {
-    const before = await storyRepository.findById(projectId, resolvedStoryId);
-    leavesIcebox = before.isOk() && before.value?.isIcebox === true;
-  }
-
-  // Move before leaving the Icebox: a failure here leaves the story in the
-  // Icebox, so a retry still sees the transition and repeats the move.
-  if (leavesIcebox) {
-    const moved = await storyRepository.moveToTop(projectId, resolvedStoryId);
-    if (moved.isErr()) {
-      return c.json({ error: "Failed to move story to the Backlog top" }, 500);
-    }
-  }
-
   const activityRepository = new D1StoryActivityRepository(c.env.DB);
   const notificationRepository = new D1NotificationRepository(c.env.DB);
   const result = await updateStory(
@@ -107,6 +92,7 @@ export async function handleCliStoryUpdate(
       id: resolvedStoryId,
       allowedStoryPoints,
       ...parsed.value,
+      moveToTopOnLeavingIcebox: true,
       actor: {
         id: actorId,
         name: actorName,

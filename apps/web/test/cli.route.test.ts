@@ -317,6 +317,21 @@ describe("cli route", () => {
     await createStory("Second", false);
     const iceboxed = await createStory("From icebox", true);
 
+    const rejected = await SELF.fetch(`${storiesUrl}/${iceboxed.storyNumber}`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ isIcebox: false, title: "" }),
+    });
+    expect(rejected.status).toBe(400);
+    const titlesAfterRejection = (
+      (await (
+        await SELF.fetch(`${storiesUrl}?status=Unstarted`, { headers })
+      ).json()) as { stories: { title: string; isIcebox: boolean }[] }
+    ).stories
+      .filter((story) => !story.isIcebox)
+      .map((story) => story.title);
+    expect(titlesAfterRejection).toEqual(["Second", "First"]);
+
     const moved = await SELF.fetch(`${storiesUrl}/${iceboxed.storyNumber}`, {
       method: "PATCH",
       headers,

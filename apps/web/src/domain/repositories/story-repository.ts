@@ -36,6 +36,8 @@ export type UpdateStoryInput = {
   labels?: string[];
   epicId?: string | null;
   isIcebox?: boolean;
+  /** Put the story at the top of the position order in the same write that takes it out of the Icebox. */
+  moveToTop?: boolean;
   ownerIds?: string[];
   requesterId?: string | null;
   releaseDate?: string | null;
@@ -135,10 +137,6 @@ export interface StoryRepository {
   reorder(
     input: ReorderStoriesInput,
   ): Promise<Result<Story[] | null, StoryRepositoryError>>;
-  moveToTop(
-    projectId: string,
-    id: string,
-  ): Promise<Result<Story | null, StoryRepositoryError>>;
   reassignStoriesAcrossIterations(
     input: ReassignStoriesAcrossIterationsInput,
   ): Promise<Result<number, StoryRepositoryError>>;

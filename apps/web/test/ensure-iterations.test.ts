@@ -271,7 +271,6 @@ describe("backfillIncompleteStoriesIntoCurrentIteration", () => {
       summarize: async () =>
         ok({ total: 0, totalPoints: 0, pointsByIterationId: {} }),
       reorder: async () => ok([]),
-      moveToTop: async () => ok(null),
       reassignStoriesAcrossIterations: async (input) => {
         calls.push(input as (typeof calls)[number]);
         return ok(2);
