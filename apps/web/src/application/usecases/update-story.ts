@@ -322,7 +322,7 @@ export async function updateStory(
       : {}),
     ...(input.moveToTopOnLeavingIcebox &&
     currentResult.value.isIcebox &&
-    resolvedIsIcebox.value === false
+    input.isIcebox === false
       ? { moveToTop: true }
       : {}),
     ...(normalizedRequesterId?.isOk()
