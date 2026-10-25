@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router";
+import { ActorLabel } from "../components/actor-label";
 import { ArtifactPreview } from "../components/artifact-preview";
 import { useAuthError } from "../contexts/auth-error-context";
 import {
   useArtifactDetail,
   useArtifactVersions,
-  useMemberNames,
+  useMembers,
 } from "../hooks/use-artifact-queries";
 import { isAuthError, isHttpStatusError } from "../lib/api-error";
 import {
@@ -34,7 +35,7 @@ export function ArtifactDetailScreen() {
   const { notifySessionExpired } = useAuthError();
   const detail = useArtifactDetail(projectId, artifactId);
   const versions = useArtifactVersions(projectId, artifactId);
-  const memberNames = useMemberNames(projectId);
+  const members = useMembers(projectId);
   const [expanded, setExpanded] = useState(false);
 
   const sessionExpired = [detail.error, versions.error].some(
@@ -121,8 +122,7 @@ export function ArtifactDetailScreen() {
   }
 
   const creatorId = shown?.createdBy ?? artifact.createdBy;
-  const creator =
-    memberNames.data?.get(creatorId) ?? creatorId.slice(0, SHORT_ID_LENGTH);
+  const creator = members.data?.get(creatorId);
   const formatDate = (value: string) =>
     new Date(value).toLocaleString(i18n.language);
 
@@ -189,7 +189,15 @@ export function ArtifactDetailScreen() {
           <dt className="text-gray-600">
             {t("artifactScreens.detail.createdBy")}
           </dt>
-          <dd className="text-gray-900">{creator}</dd>
+          <dd className="text-gray-900">
+            <ActorLabel
+              displayName={
+                creator?.displayName ?? creatorId.slice(0, SHORT_ID_LENGTH)
+              }
+              avatarUrl={creator?.avatarUrl ?? null}
+              gravatarUrl={creator?.gravatarUrl ?? null}
+            />
+          </dd>
           <dt className="text-gray-600">
             {t("artifactScreens.detail.createdAt")}
           </dt>
