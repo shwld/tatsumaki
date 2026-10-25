@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router";
+import { Link, MemoryRouter } from "react-router";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { Layout } from "./layout";
 import { resetProjectNavCacheForTests } from "./project-nav";
@@ -83,5 +83,32 @@ it("collapses into a dropdown below the lg breakpoint", async () => {
   expect(screen.getByRole("menuitem", { name: "メンバー" })).toHaveAttribute(
     "aria-current",
     "page",
+  );
+});
+
+it("revalidates the cached project name on navigation so renames show up", async () => {
+  let name = "Alpha";
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
+    String(input) === "/api/projects"
+      ? new Response(JSON.stringify({ projects: [{ id: "p1", name }] }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        })
+      : new Response(null, { status: 401 }),
+  );
+  render(
+    <MemoryRouter initialEntries={["/projects/p1/settings"]}>
+      <Layout>
+        <Link to="/projects/p1/history">go</Link>
+      </Layout>
+    </MemoryRouter>,
+  );
+  await waitFor(() =>
+    expect(screen.getByTestId("project-nav-name")).toHaveTextContent("Alpha"),
+  );
+  name = "Beta";
+  await userEvent.click(screen.getByRole("link", { name: "go" }));
+  await waitFor(() =>
+    expect(screen.getByTestId("project-nav-name")).toHaveTextContent("Beta"),
   );
 });

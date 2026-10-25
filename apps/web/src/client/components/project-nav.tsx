@@ -31,12 +31,7 @@ function useProjectName(projectId: string, pathname: string): string | null {
   );
 
   useEffect(() => {
-    const cached = projectNameCache.get(projectId);
-    if (cached) {
-      setName(cached);
-      return;
-    }
-    setName(null);
+    setName(projectNameCache.get(projectId) ?? null);
     let ignore = false;
     const load = async () => {
       try {
