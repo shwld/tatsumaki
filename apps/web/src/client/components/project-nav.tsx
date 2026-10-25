@@ -25,7 +25,7 @@ export function resetProjectNavCacheForTests(): void {
   projectNameCache.clear();
 }
 
-function useProjectName(projectId: string): string | null {
+function useProjectName(projectId: string, pathname: string): string | null {
   const [name, setName] = useState<string | null>(
     projectNameCache.get(projectId) ?? null,
   );
@@ -58,7 +58,7 @@ function useProjectName(projectId: string): string | null {
     return () => {
       ignore = true;
     };
-  }, [projectId]);
+  }, [projectId, pathname]);
 
   return name;
 }
@@ -74,7 +74,7 @@ function ProjectNavContent({ projectId }: { projectId: string }) {
   const { t } = useTranslation();
   const { pathname } = useLocation();
   const breakpoint = useBreakpoint();
-  const projectName = useProjectName(projectId);
+  const projectName = useProjectName(projectId, pathname);
   const [open, setOpen] = useState(false);
 
   const storiesPath = projectStoriesPath(projectId);
@@ -97,7 +97,7 @@ function ProjectNavContent({ projectId }: { projectId: string }) {
   });
   const displayName = projectName ?? t("projectNav.fallbackProjectName");
 
-  if (breakpoint === "sm") {
+  if (breakpoint !== "lg") {
     return (
       <nav
         aria-label={t("projectNav.label")}

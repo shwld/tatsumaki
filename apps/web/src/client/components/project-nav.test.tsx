@@ -72,8 +72,8 @@ it("is not rendered outside project routes", () => {
   ).toBeNull();
 });
 
-it("collapses into a dropdown on small widths", async () => {
-  setWidth(375);
+it("collapses into a dropdown below the lg breakpoint", async () => {
+  setWidth(800);
   setup("/projects/p1/members");
   expect(screen.queryByRole("link", { name: "Stories" })).toBeNull();
   await userEvent.click(screen.getByTestId("project-nav-toggle"));
