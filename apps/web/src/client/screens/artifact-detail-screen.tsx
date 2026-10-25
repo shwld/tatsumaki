@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router";
 import { ArtifactPreview } from "../components/artifact-preview";
@@ -35,6 +35,7 @@ export function ArtifactDetailScreen() {
   const detail = useArtifactDetail(projectId, artifactId);
   const versions = useArtifactVersions(projectId, artifactId);
   const memberNames = useMemberNames(projectId);
+  const [expanded, setExpanded] = useState(false);
 
   const sessionExpired = [detail.error, versions.error].some(
     (error) => isHttpStatusError(error) && isAuthError(error.status),
@@ -137,15 +138,9 @@ export function ArtifactDetailScreen() {
         </p>
       ) : null}
 
-      <dl className="mt-4 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">
-        <dt className="text-gray-600">{t("artifactScreens.detail.id")}</dt>
-        <dd className="break-all text-gray-900">{artifact.id}</dd>
-        <dt className="text-gray-600">
-          <label htmlFor="artifact-version">
-            {t("artifactScreens.detail.versionLabel")}
-          </label>
-        </dt>
-        <dd>
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+        <label className="flex items-center gap-2 text-gray-600">
+          <span>{t("artifactScreens.detail.versionLabel")}</span>
           <select
             id="artifact-version"
             className="rounded border border-gray-300 px-2 py-1 text-gray-900"
@@ -170,30 +165,51 @@ export function ArtifactDetailScreen() {
               </option>
             ))}
           </select>
-        </dd>
-        <dt className="text-gray-600">
-          {t("artifactScreens.detail.createdBy")}
-        </dt>
-        <dd className="text-gray-900">{creator}</dd>
-        <dt className="text-gray-600">
-          {t("artifactScreens.detail.createdAt")}
-        </dt>
-        <dd className="text-gray-900">
-          {formatDate(shown?.createdAt ?? artifact.createdAt)}
-        </dd>
-        {shown ? (
-          <>
-            <dt className="text-gray-600">
-              {t("artifactScreens.detail.fileCount")}
-            </dt>
-            <dd className="text-gray-900">{shown.fileCount}</dd>
-            <dt className="text-gray-600">
-              {t("artifactScreens.detail.totalSize")}
-            </dt>
-            <dd className="text-gray-900">{formatBytes(shown.totalBytes)}</dd>
-          </>
-        ) : null}
-      </dl>
+        </label>
+        <button
+          type="button"
+          className="rounded border border-gray-300 px-2 py-1 text-gray-900"
+          aria-expanded={expanded}
+          aria-controls="artifact-metadata"
+          onClick={() => setExpanded((value) => !value)}
+        >
+          {expanded
+            ? t("artifactScreens.detail.hideMetadata")
+            : t("artifactScreens.detail.showMetadata")}
+        </button>
+      </div>
+
+      {expanded ? (
+        <dl
+          id="artifact-metadata"
+          className="mt-3 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm"
+        >
+          <dt className="text-gray-600">{t("artifactScreens.detail.id")}</dt>
+          <dd className="break-all text-gray-900">{artifact.id}</dd>
+          <dt className="text-gray-600">
+            {t("artifactScreens.detail.createdBy")}
+          </dt>
+          <dd className="text-gray-900">{creator}</dd>
+          <dt className="text-gray-600">
+            {t("artifactScreens.detail.createdAt")}
+          </dt>
+          <dd className="text-gray-900">
+            {formatDate(shown?.createdAt ?? artifact.createdAt)}
+          </dd>
+          {shown ? (
+            <>
+              <dt className="text-gray-600">
+                {t("artifactScreens.detail.fileCount")}
+              </dt>
+              <dd className="text-gray-900">{shown.fileCount}</dd>
+              <dt className="text-gray-600">
+                {t("artifactScreens.detail.totalSize")}
+              </dt>
+              <dd className="text-gray-900">{formatBytes(shown.totalBytes)}</dd>
+            </>
+          ) : null}
+        </dl>
+      ) : null}
 
       {versionParam && latest !== null && shown?.version !== latest ? (
         <p role="status" className="mt-3 text-sm text-gray-700">
