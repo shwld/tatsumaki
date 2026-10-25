@@ -2,6 +2,7 @@ import { err, ok, type Result } from "neverthrow";
 import { ulid } from "ulid";
 import {
   DEFAULT_STORY_POINTS,
+  INITIAL_STORY_STATUS,
   INVALID_STORY_IS_ICEBOX_ERROR,
   resolveStoryIsIcebox,
 } from "../../domain/entities/story";
@@ -39,7 +40,11 @@ import type {
   NotificationRepositoryError,
 } from "../../domain/repositories/notification-repository";
 
+export const INVALID_STORY_INITIAL_STATUS_ERROR =
+  "INVALID_STORY_INITIAL_STATUS_ERROR" as const;
+
 export type CreateStoryError =
+  | typeof INVALID_STORY_INITIAL_STATUS_ERROR
   | typeof INVALID_STORY_TITLE_ERROR
   | typeof INVALID_STORY_TYPE_ERROR
   | typeof INVALID_STORY_STATUS_ERROR
@@ -92,6 +97,10 @@ export async function createStory(
   const statusResult = normalizeStoryStatus(input.status);
   if (statusResult.isErr()) {
     return err(statusResult.error);
+  }
+
+  if (statusResult.value !== INITIAL_STORY_STATUS) {
+    return err(INVALID_STORY_INITIAL_STATUS_ERROR);
   }
 
   const labelsResult = normalizeStoryLabels(input.labels);

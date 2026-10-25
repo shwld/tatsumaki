@@ -24,6 +24,9 @@ export type StoryRelation = {
   title: string;
 };
 
+/** A story is always created Unstarted so that it reaches Started (and an iteration) before any later status. */
+export const INITIAL_STORY_STATUS: StoryStatus = "Unstarted";
+
 const STORY_STATUS_TRANSITIONS: Record<StoryStatus, StoryStatus[]> = {
   Unstarted: ["Started"],
   Started: ["Unstarted", "Finished"],

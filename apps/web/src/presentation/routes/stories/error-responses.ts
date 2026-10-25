@@ -1,4 +1,7 @@
-import { type CreateStoryError } from "../../../application/usecases/create-story";
+import {
+  INVALID_STORY_INITIAL_STATUS_ERROR,
+  type CreateStoryError,
+} from "../../../application/usecases/create-story";
 import {
   CURRENT_ITERATION_ASSIGN_FAILED_ERROR,
   CURRENT_ITERATION_ASSIGN_ROLLBACK_FAILED_ERROR,
@@ -68,6 +71,13 @@ export function toCreateStoryErrorResponse(
       message:
         "Story status must be Unstarted, Started, Finished, Delivered, Accepted, or Rejected",
       status: 400,
+    };
+  }
+
+  if (error === INVALID_STORY_INITIAL_STATUS_ERROR) {
+    return {
+      message: "A new story must be created as Unstarted",
+      status: 409,
     };
   }
 

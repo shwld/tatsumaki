@@ -468,7 +468,7 @@ describe("MCP OAuth", () => {
     });
   });
 
-  it("updates story status directly when update_story_status jumps ahead", async () => {
+  it("rejects update_story_status when it skips Started", async () => {
     const projectId = await createProject("Invalid Transition Project");
     const storyId = await createStory(projectId, "Skip ahead", {
       storyPoint: 5,
@@ -496,13 +496,10 @@ describe("MCP OAuth", () => {
         content?: Array<{ text?: string }>;
       };
     };
-    expect(payload.result?.isError).not.toBe(true);
-    expect(JSON.parse(payload.result?.content?.[0]?.text ?? "")).toEqual({
-      story: expect.objectContaining({
-        id: storyId,
-        status: "Delivered",
-      }),
-    });
+    expect(payload.result?.isError).toBe(true);
+    expect(payload.result?.content?.[0]?.text).toContain(
+      "Cannot change status from Unstarted to Delivered",
+    );
   });
 
   it("returns an estimate-required error when update_story_status starts an unestimated feature", async () => {

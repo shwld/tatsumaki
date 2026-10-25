@@ -1,7 +1,9 @@
 import { err, ok, type Result } from "neverthrow";
 import { ulid } from "ulid";
 import {
+  canTransitionStoryStatus,
   INVALID_STORY_IS_ICEBOX_ERROR,
+  listAllowedStoryStatusTransitions,
   requiresEstimateForTransition,
   resolveStoryIsIcebox,
   type Story,
@@ -208,6 +210,23 @@ export async function updateStory(
     input.status !== undefined ? normalizeStoryStatus(input.status) : undefined;
   if (normalizedStatus?.isErr()) {
     return err(normalizedStatus.error);
+  }
+
+  if (
+    normalizedStatus?.isOk() &&
+    !canTransitionStoryStatus(
+      currentResult.value.status,
+      normalizedStatus.value,
+    )
+  ) {
+    return err({
+      code: "INVALID_STORY_STATUS_TRANSITION_ERROR",
+      from: currentResult.value.status,
+      to: normalizedStatus.value,
+      allowedNext: listAllowedStoryStatusTransitions(
+        currentResult.value.status,
+      ),
+    });
   }
 
   const normalizedStoryPoint =
