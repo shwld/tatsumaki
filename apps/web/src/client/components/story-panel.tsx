@@ -890,7 +890,10 @@ const SortableStoryItem = memo(function SortableStoryItem({
   const drag = useStoryDragState();
   const showInsertLine =
     drag.allowed && drag.overId === story.id && drag.activeStoryId !== story.id;
-  const insertsAfterRow = activeIndex >= 0 && activeIndex < index;
+  const insertsAfterRow =
+    drag.sourcePanel === drag.targetPanel &&
+    activeIndex >= 0 &&
+    activeIndex < index;
 
   return (
     <li
