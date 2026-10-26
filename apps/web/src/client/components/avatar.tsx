@@ -5,6 +5,7 @@ type AvatarProps = {
   avatarUrl: string | null;
   gravatarUrl: string | null;
   size?: "sm" | "md" | "lg";
+  initials?: string;
   className?: string;
 };
 
@@ -36,6 +37,7 @@ export function Avatar({
   avatarUrl,
   gravatarUrl,
   size = "md",
+  initials,
   className = "",
 }: AvatarProps) {
   const [gravatarFailed, setGravatarFailed] = useState(false);
@@ -79,7 +81,7 @@ export function Avatar({
         aria-label={displayName}
       >
         <span className="font-medium text-white">
-          {getInitials(displayName)}
+          {initials ?? getInitials(displayName)}
         </span>
       </span>
     );

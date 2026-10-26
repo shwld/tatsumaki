@@ -1,5 +1,6 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
+import { actorLabelEn, actorLabelJa } from "../components/actor-label.i18n";
 import { errorRetryEn, errorRetryJa } from "../components/error-retry.i18n";
 import { layoutEn, layoutJa } from "../components/layout.i18n";
 import {
@@ -78,6 +79,7 @@ i18n.use(initReactI18next).init({
         ...layoutJa,
         ...permissionDeniedJa,
         ...errorRetryJa,
+        ...actorLabelJa,
         ...projectNavJa,
         ...loginScreenJa,
         ...projectListScreenJa,
@@ -100,6 +102,7 @@ i18n.use(initReactI18next).init({
         ...layoutEn,
         ...permissionDeniedEn,
         ...errorRetryEn,
+        ...actorLabelEn,
         ...projectNavEn,
         ...loginScreenEn,
         ...projectListScreenEn,

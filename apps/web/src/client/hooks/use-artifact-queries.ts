@@ -71,6 +71,7 @@ export function useArtifactVersions(projectId: string, artifactId: string) {
 
 export type ArtifactMemberProfile = {
   displayName: string;
+  profileResolved: boolean;
   avatarUrl: string | null;
   gravatarUrl: string | null;
 };
@@ -84,18 +85,20 @@ export function useMembers(projectId: string) {
         members?: {
           userId: string;
           displayName?: string;
+          profileResolved?: boolean;
           avatarUrl?: string | null;
           gravatarUrl?: string | null;
         }[];
       }>(`/api/projects/${projectId}/members`);
       return new Map<string, ArtifactMemberProfile>(
         (data.members ?? []).flatMap((member) =>
-          member.displayName
+          member.displayName && member.profileResolved
             ? [
                 [
                   member.userId,
                   {
                     displayName: member.displayName,
+                    profileResolved: true,
                     avatarUrl: member.avatarUrl ?? null,
                     gravatarUrl: member.gravatarUrl ?? null,
                   },

@@ -17,7 +17,6 @@ import {
 } from "../lib/artifact-routes";
 import { formatBytes } from "../lib/format-bytes";
 
-const SHORT_ID_LENGTH = 8;
 const VERSION_PATTERN = /^[1-9][0-9]*$/;
 
 export function ArtifactDetailScreen() {
@@ -190,14 +189,7 @@ export function ArtifactDetailScreen() {
             {t("artifactScreens.detail.createdBy")}
           </dt>
           <dd className="text-gray-900">
-            <ActorLabel
-              key={creatorId}
-              displayName={
-                creator?.displayName ?? creatorId.slice(0, SHORT_ID_LENGTH)
-              }
-              avatarUrl={creator?.avatarUrl ?? null}
-              gravatarUrl={creator?.gravatarUrl ?? null}
-            />
+            <ActorLabel key={creatorId} member={creator} actorName={null} />
           </dd>
           <dt className="text-gray-600">
             {t("artifactScreens.detail.createdAt")}

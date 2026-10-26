@@ -54,7 +54,7 @@ import { RichTextEditor } from "./rich-text-editor";
 import { StoryAccordionAttachmentsSection } from "./story-accordion-attachments-section";
 import { StoryAccordionBlockersSection } from "./story-accordion-blockers-section";
 import type { ProjectMemberProfile } from "../types/project";
-import { Avatar } from "./avatar";
+import { ActorLabel } from "./actor-label";
 
 function sameStringArray(a: string[], b: string[]) {
   if (a.length !== b.length) return false;
@@ -928,24 +928,12 @@ function StoryAccordionDetailComponent({
                       >
                         <div className="mb-1 flex items-center justify-between gap-2">
                           <span className="flex items-center gap-1 text-xs font-medium text-gray-600 dark:text-slate-300">
-                            {(() => {
-                              const actor = memberOptionsResolved.find((m) =>
+                            <ActorLabel
+                              member={memberOptionsResolved.find((m) =>
                                 userIdsEqual(m.id, entry.actorUserId),
-                              );
-                              const displayName =
-                                actor?.displayName ?? entry.actorName;
-                              return (
-                                <>
-                                  <Avatar
-                                    displayName={displayName}
-                                    avatarUrl={actor?.avatarUrl ?? null}
-                                    gravatarUrl={actor?.gravatarUrl ?? null}
-                                    size="sm"
-                                  />
-                                  {displayName}
-                                </>
-                              );
-                            })()}
+                              )}
+                              actorName={entry.actorName}
+                            />
                           </span>
                           <span className="shrink-0 text-[10px] text-gray-400 dark:text-slate-500">
                             {new Date(entry.createdAt).toLocaleTimeString(
@@ -1089,25 +1077,14 @@ const CommentItem = memo(function CommentItem({
     comment.actorName !== viewerEmail &&
     comment.actorName !== viewerUserId &&
     comment.actorName !== viewerDisplayName;
-  const displayName = actorLabelMismatch
-    ? comment.actorName
-    : (authorProfile?.displayName ?? comment.actorName);
-  const avatarUrl =
-    actorLabelMismatch || !authorProfile ? null : authorProfile.avatarUrl;
-  const gravatarUrl =
-    actorLabelMismatch || !authorProfile ? null : authorProfile.gravatarUrl;
-
   return (
     <div className="rounded border border-gray-100 p-2 dark:border-slate-700">
       <div className="mb-1 flex items-center justify-between gap-2">
         <span className="flex items-center gap-1 text-xs font-medium text-gray-600 dark:text-slate-300">
-          <Avatar
-            displayName={displayName}
-            avatarUrl={avatarUrl}
-            gravatarUrl={gravatarUrl}
-            size="sm"
+          <ActorLabel
+            member={actorLabelMismatch ? null : authorProfile}
+            actorName={comment.actorName}
           />
-          {displayName}
         </span>
         <span className="shrink-0 text-[10px] text-gray-400 dark:text-slate-500">
           {new Date(comment.createdAt).toLocaleTimeString(locale, {

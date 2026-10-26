@@ -89,11 +89,7 @@ function HistoryEntryRow({ entry, projectId, members }: HistoryEntryRowProps) {
         {formatDate(entry.createdAt)}
       </td>
       <td className="max-w-[14rem] px-4 py-3 text-sm text-gray-700">
-        <ActorLabel
-          displayName={entry.actorName}
-          avatarUrl={member?.avatarUrl ?? null}
-          gravatarUrl={member?.gravatarUrl ?? null}
-        />
+        <ActorLabel member={member} actorName={entry.actorName} />
       </td>
       <td className="whitespace-nowrap px-4 py-3">
         <span

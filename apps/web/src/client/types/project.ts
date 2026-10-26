@@ -62,6 +62,8 @@ export type ProjectMemberRole = "owner" | "member" | "viewer";
 export type ProjectMemberProfile = {
   id: string;
   displayName: string;
+  /** false のとき displayName は表示用フォールバックであり、ユーザー本人の名前ではない。 */
+  profileResolved: boolean;
   avatarUrl: string | null;
   gravatarUrl: string | null;
 };
