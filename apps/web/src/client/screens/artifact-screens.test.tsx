@@ -56,6 +56,7 @@ const baseRoutes = (): Routes => ({
         {
           userId: "github|1234567890",
           displayName: "Alice",
+          profileResolved: true,
           avatarUrl: "https://example.test/alice.png",
         },
       ],

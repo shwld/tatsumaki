@@ -106,6 +106,7 @@ vi.mock("./rich-text-editor", () => ({
     mentionCandidates?: Array<{
       id: string;
       displayName: string;
+      profileResolved: boolean;
       avatarUrl: string | null;
       gravatarUrl: string | null;
     }>;
@@ -128,6 +129,7 @@ function renderDetail(
   mentionCandidates: Array<{
     id: string;
     displayName: string;
+    profileResolved: boolean;
     avatarUrl: string | null;
     gravatarUrl: string | null;
   }> = [],
@@ -405,12 +407,14 @@ describe("StoryAccordionDetail", () => {
       {
         id: "github|member-1",
         displayName: "Member One",
+        profileResolved: true,
         avatarUrl: null,
         gravatarUrl: null,
       },
       {
         id: "github|member-2",
         displayName: "Member Two",
+        profileResolved: true,
         avatarUrl: null,
         gravatarUrl: null,
       },
@@ -444,6 +448,7 @@ describe("StoryAccordionDetail", () => {
       {
         id: "github|member-1",
         displayName: "Member One",
+        profileResolved: true,
         avatarUrl: null,
         gravatarUrl: null,
       },
@@ -473,6 +478,7 @@ describe("StoryAccordionDetail", () => {
       {
         id: "github|member-1",
         displayName: "Member_[One]",
+        profileResolved: true,
         avatarUrl: null,
         gravatarUrl: null,
       },
@@ -503,6 +509,7 @@ describe("StoryAccordionDetail", () => {
       {
         id: "github|member-1",
         displayName: "Member One",
+        profileResolved: true,
         avatarUrl: null,
         gravatarUrl: null,
       },

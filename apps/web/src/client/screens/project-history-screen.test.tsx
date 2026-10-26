@@ -175,6 +175,7 @@ describe("ProjectHistoryScreen", () => {
               {
                 userId: "user-1",
                 displayName: "Alice",
+                profileResolved: true,
                 avatarUrl: "https://example.com/alice.png",
                 gravatarUrl: null,
               },

@@ -57,6 +57,7 @@ async function fetchProjectBootstrap(
     members?: Array<{
       userId?: string;
       displayName?: string;
+      profileResolved?: boolean;
       avatarUrl?: string | null;
       gravatarUrl?: string | null;
     }>;
@@ -86,6 +87,7 @@ async function fetchProjectBootstrap(
             (member): ProjectMemberProfile => ({
               id: member.userId,
               displayName: member.displayName ?? UNKNOWN_MEMBER_DISPLAY_NAME,
+              profileResolved: member.profileResolved ?? false,
               avatarUrl: member.avatarUrl ?? null,
               gravatarUrl: member.gravatarUrl ?? null,
             }),

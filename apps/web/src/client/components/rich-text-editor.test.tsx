@@ -79,6 +79,7 @@ describe("RichTextEditor", () => {
           {
             id: "github|member-1",
             displayName: "Member One",
+            profileResolved: true,
             avatarUrl: null,
             gravatarUrl: null,
           },

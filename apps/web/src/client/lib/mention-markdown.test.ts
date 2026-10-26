@@ -13,6 +13,7 @@ describe("mention-markdown", () => {
         {
           id: "github|member-1",
           displayName: "Member One",
+          profileResolved: true,
           avatarUrl: null,
           gravatarUrl: null,
         },
@@ -31,6 +32,7 @@ describe("mention-markdown", () => {
         {
           id: "github|member-1",
           displayName: "Member One",
+          profileResolved: true,
           avatarUrl: null,
           gravatarUrl: null,
         },

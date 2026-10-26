@@ -7,6 +7,7 @@ import { ActorLabel } from "./actor-label";
 const alice = {
   id: "u1",
   displayName: "Alice",
+  profileResolved: true,
   avatarUrl: "https://example.com/a.png",
   gravatarUrl: null,
 };
@@ -29,7 +30,23 @@ describe("ActorLabel", () => {
     expect(screen.getByText("Alice Bob")).toBeInTheDocument();
   });
 
-  it("treats the server's unknown-member placeholder as unresolved", () => {
+  it("treats a member without a resolved profile as unresolved", () => {
+    render(
+      <ActorLabel
+        member={{
+          ...alice,
+          displayName: "不明なユーザー",
+          profileResolved: false,
+          avatarUrl: null,
+        }}
+        actorName={null}
+      />,
+    );
+
+    expect(screen.getByLabelText("不明なユーザー")).toHaveTextContent("?");
+  });
+
+  it("keeps a resolved member whose chosen name equals the placeholder", () => {
     render(
       <ActorLabel
         member={{ ...alice, displayName: "不明なユーザー", avatarUrl: null }}
@@ -37,7 +54,7 @@ describe("ActorLabel", () => {
       />,
     );
 
-    expect(screen.getByLabelText("不明なユーザー")).toHaveTextContent("?");
+    expect(screen.getByLabelText("不明なユーザー")).toHaveTextContent("不");
   });
 
   it.each([

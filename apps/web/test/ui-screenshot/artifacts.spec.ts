@@ -64,7 +64,15 @@ async function mockArtifactApi(page: Page, setup: Setup = {}) {
   );
   await page.route("**/api/projects/project-1/members", (route) =>
     route.fulfill(
-      json({ members: [{ userId: "github|owner", displayName: "Alice" }] }),
+      json({
+        members: [
+          {
+            userId: "github|owner",
+            displayName: "Alice",
+            profileResolved: true,
+          },
+        ],
+      }),
     ),
   );
   await page.route("**/api/projects/project-1/artifacts", (route) =>

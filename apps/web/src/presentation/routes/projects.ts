@@ -217,6 +217,7 @@ projectsRoute.get("/projects/:projectId/members", async (c) => {
       return {
         ...member,
         displayName: user?.displayName ?? UNKNOWN_MEMBER_DISPLAY_NAME,
+        profileResolved: Boolean(user),
         avatarUrl: user ? `/api/auth/users/${user.id}/avatar` : null,
         gravatarUrl,
       };
