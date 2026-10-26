@@ -24,11 +24,10 @@ function isReadableActorName(actorName: string | null): actorName is string {
 
 export function ActorLabel({ member, actorName }: ActorLabelProps) {
   const { t } = useTranslation();
-  const displayName =
+  const knownName =
     member?.displayName ??
-    (isReadableActorName(actorName)
-      ? actorName.trim()
-      : t("actorLabel.unknownUser"));
+    (isReadableActorName(actorName) ? actorName.trim() : null);
+  const displayName = knownName ?? t("actorLabel.unknownUser");
 
   return (
     <span className="inline-flex max-w-full items-center gap-2 whitespace-nowrap">
@@ -37,6 +36,7 @@ export function ActorLabel({ member, actorName }: ActorLabelProps) {
         avatarUrl={member?.avatarUrl ?? null}
         gravatarUrl={member?.gravatarUrl ?? null}
         size="sm"
+        initials={knownName ? undefined : "?"}
       />
       <span className="truncate">{displayName}</span>
     </span>

@@ -39,6 +39,7 @@ describe("ActorLabel", () => {
     render(<ActorLabel member={undefined} actorName={actorName} />);
 
     expect(screen.getByText("不明なユーザー")).toBeInTheDocument();
+    expect(screen.getByLabelText("不明なユーザー")).toHaveTextContent("?");
     expect(screen.queryByText("alice@example.com")).not.toBeInTheDocument();
   });
 });
