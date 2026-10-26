@@ -36,6 +36,7 @@ import {
   groupStoriesByIteration,
 } from "../lib/story-panel-grouping";
 import { useToast } from "../contexts/toast-context";
+import { useStoryDragState } from "../contexts/story-drag-context";
 import { useStoryPatch } from "../hooks/use-story-patch";
 import { shouldShowPointEstimation } from "../lib/story-estimation";
 import { getWorkflowActions } from "../lib/story-status";
@@ -882,7 +883,17 @@ const SortableStoryItem = memo(function SortableStoryItem({
     transform,
     transition,
     isDragging,
+    index,
+    activeIndex,
   } = useSortable({ id: story.id });
+  const { t } = useTranslation();
+  const drag = useStoryDragState();
+  const showInsertLine =
+    drag.allowed && drag.overId === story.id && drag.activeStoryId !== story.id;
+  const insertsAfterRow =
+    drag.sourcePanel === drag.targetPanel &&
+    activeIndex >= 0 &&
+    activeIndex < index;
 
   return (
     <li
@@ -893,11 +904,33 @@ const SortableStoryItem = memo(function SortableStoryItem({
         transition,
       }}
     >
+      {showInsertLine && !insertsAfterRow ? (
+        <div
+          role="presentation"
+          data-testid="drop-insert-line"
+          className="relative -mb-0.5 h-0.5 bg-blue-600 dark:bg-blue-400"
+        >
+          <span className="absolute -top-2.5 left-1 rounded bg-blue-600 px-1 text-[10px] font-medium leading-4 text-white dark:bg-blue-400 dark:text-gray-900">
+            {t("storyPanel.dropInsertHere")}
+          </span>
+        </div>
+      ) : null}
       <StoryCard
         story={story}
         {...cardProps}
         dragHandleProps={{ ...attributes, ...listeners }}
       />
+      {showInsertLine && insertsAfterRow ? (
+        <div
+          role="presentation"
+          data-testid="drop-insert-line"
+          className="relative -mt-0.5 h-0.5 bg-blue-600 dark:bg-blue-400"
+        >
+          <span className="absolute -top-3.5 left-1 rounded bg-blue-600 px-1 text-[10px] font-medium leading-4 text-white dark:bg-blue-400 dark:text-gray-900">
+            {t("storyPanel.dropInsertHere")}
+          </span>
+        </div>
+      ) : null}
     </li>
   );
 });
@@ -919,6 +952,9 @@ const GroupHeaderDroppable = memo(function GroupHeaderDroppable({
 }: GroupHeaderDroppableProps) {
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const { setNodeRef, isOver } = useDroppable({ id: dropZoneId });
+  const { t } = useTranslation();
+  const drag = useStoryDragState();
+  const isActiveDropTarget = isOver && drag.activeStoryId !== null;
 
   const setRefs = useCallback(
     (node: HTMLDivElement | null) => {
@@ -952,9 +988,23 @@ const GroupHeaderDroppable = memo(function GroupHeaderDroppable({
   return (
     <div
       ref={setRefs}
-      className={`sticky top-0 ${Z_ITERATION_ROW_STICKY} ${isOver ? "ring-1 ring-inset ring-blue-300" : ""}`}
+      className={`sticky top-0 ${Z_ITERATION_ROW_STICKY} ${
+        isActiveDropTarget
+          ? drag.allowed
+            ? "ring-2 ring-inset ring-blue-500 dark:ring-blue-400"
+            : "cursor-not-allowed ring-2 ring-inset ring-red-500 dark:ring-red-400"
+          : ""
+      }`}
     >
       {children}
+      {isActiveDropTarget && !drag.allowed ? (
+        <p
+          data-testid="drop-group-label"
+          className="bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-700 dark:bg-red-950 dark:text-red-200"
+        >
+          {t("storyPanel.dropNotAllowed")}
+        </p>
+      ) : null}
     </div>
   );
 });
@@ -1163,6 +1213,16 @@ function StoryPanelComponent({
   const { setNodeRef: setDropRef } = useDroppable({
     id: `drop-zone-${panelType}`,
   });
+  const drag = useStoryDragState();
+  const isCombinedPanel = panelTestIdOverride === "CurrentBacklogCombined";
+  const isCrossPanelDropTarget =
+    drag.activeStoryId !== null &&
+    drag.targetPanel !== null &&
+    drag.sourcePanel !== drag.targetPanel &&
+    (drag.targetPanel === panelType ||
+      (isCombinedPanel && drag.targetPanel === "Current"));
+  const isCrossPanelDropAllowed = isCrossPanelDropTarget && drag.allowed;
+  const isCrossPanelDropDenied = isCrossPanelDropTarget && !drag.allowed;
   const toggleGroup = useCallback((groupKey: string) => {
     setCollapsedGroupKeys((current) => {
       const next = new Set(current);
@@ -1263,8 +1323,21 @@ function StoryPanelComponent({
     "flex w-full items-center justify-between gap-2 border-b border-gray-100 bg-white px-2 py-1.5 text-left";
   return (
     <section
-      className="flex min-h-0 min-w-[300px] flex-1 flex-col border-r border-gray-200 last:border-r-0"
+      className={`flex min-h-0 min-w-[300px] flex-1 flex-col border-r border-gray-200 last:border-r-0 ${
+        isCrossPanelDropAllowed
+          ? "bg-blue-50/60 ring-2 ring-inset ring-blue-500 dark:bg-blue-950/40 dark:ring-blue-400"
+          : isCrossPanelDropDenied
+            ? "cursor-not-allowed ring-2 ring-inset ring-red-500 dark:ring-red-400"
+            : ""
+      }`}
       data-testid={`panel-${panelIdForTest}`}
+      data-drop-state={
+        isCrossPanelDropAllowed
+          ? "allowed"
+          : isCrossPanelDropDenied
+            ? "denied"
+            : undefined
+      }
     >
       <header
         className={`sticky top-0 ${Z_PANEL_HEADER_STICKY} flex items-center justify-between border-b border-gray-200 bg-gray-50 px-3 py-2`}
@@ -1273,6 +1346,22 @@ function StoryPanelComponent({
           <h2 className="text-sm font-semibold text-gray-900">
             {panelLabelOverride ?? PANEL_LABELS[panelType]}
           </h2>
+          {isCrossPanelDropTarget && drag.targetPanel ? (
+            <span
+              data-testid="drop-panel-label"
+              className={`rounded px-1.5 py-0.5 text-xs font-medium ${
+                drag.allowed
+                  ? "bg-blue-600 text-white dark:bg-blue-400 dark:text-gray-900"
+                  : "bg-red-600 text-white dark:bg-red-400 dark:text-gray-900"
+              }`}
+            >
+              {drag.allowed
+                ? t("storyPanel.dropMoveTo", {
+                    panel: PANEL_LABELS[drag.targetPanel],
+                  })
+                : t("storyPanel.dropNotAllowed")}
+            </span>
+          ) : null}
           <span
             className={`rounded-full px-2 py-0.5 text-xs font-medium ${
               error ? "bg-red-100 text-red-700" : "bg-gray-200 text-gray-700"

@@ -35,18 +35,36 @@ export type StoryMultiPanelDropValidationContext = {
   currentUnacceptedStories: Story[];
 };
 
+export type StoryMultiPanelDropDescription = {
+  allowed: boolean;
+  sourcePanel: PanelType | null;
+  targetPanel: PanelType | null;
+};
+
+const NOT_DROPPABLE: StoryMultiPanelDropDescription = {
+  allowed: false,
+  sourcePanel: null,
+  targetPanel: null,
+};
+
 /**
  * Mirrors drag-end target resolution in StoryMultiPanelScreen to drive cursor / hover feedback.
  */
 export function isStoryMultiPanelDropAllowed(
   ctx: StoryMultiPanelDropValidationContext,
 ): boolean {
-  if (!ctx.overId || !ctx.projectId) return false;
+  return describeStoryMultiPanelDrop(ctx).allowed;
+}
+
+export function describeStoryMultiPanelDrop(
+  ctx: StoryMultiPanelDropValidationContext,
+): StoryMultiPanelDropDescription {
+  if (!ctx.overId || !ctx.projectId) return NOT_DROPPABLE;
 
   const activeId = ctx.activeStoryId;
   const overIdStr = String(ctx.overId);
   const sourcePanel = ctx.findPanelByStoryId(activeId);
-  if (!sourcePanel) return false;
+  if (!sourcePanel) return NOT_DROPPABLE;
 
   let targetPanel: PanelType | null = null;
   if (
@@ -78,25 +96,30 @@ export function isStoryMultiPanelDropAllowed(
   ) {
     targetPanel = sourcePanel;
   }
-  if (!targetPanel) return false;
+  if (!targetPanel) return { ...NOT_DROPPABLE, sourcePanel };
+  const result = (allowed: boolean): StoryMultiPanelDropDescription => ({
+    allowed,
+    sourcePanel,
+    targetPanel,
+  });
 
   if (sourcePanel !== targetPanel) {
-    if (targetPanel === "Done") return false;
+    if (targetPanel === "Done") return result(false);
     if (
       targetPanel === "Backlog" ||
       targetPanel === "Current" ||
       targetPanel === "Icebox"
     ) {
       const originalStory = ctx.allStories.find((s) => s.id === activeId);
-      if (!originalStory) return false;
+      if (!originalStory) return result(false);
       const plan = planStoryMoveToPanel({
         story: originalStory,
         targetPanel,
         currentIterationId: ctx.currentIterationId,
       });
-      return plan.ok;
+      return result(plan.ok);
     }
-    return false;
+    return result(false);
   }
 
   const reorderTargetStories =
@@ -107,5 +130,7 @@ export function isStoryMultiPanelDropAllowed(
         : sourcePanel === "Icebox"
           ? ctx.groupedStories.Icebox
           : null;
-  return Boolean(reorderTargetStories && reorderTargetStories.length > 0);
+  return result(
+    Boolean(reorderTargetStories && reorderTargetStories.length > 0),
+  );
 }

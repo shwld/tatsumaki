@@ -1,8 +1,10 @@
 import { HeaderToolbar } from "../components/header-toolbar";
 import {
   DndContext,
+  DragOverlay,
   type DragEndEvent,
   type DragMoveEvent,
+  type DragStartEvent,
   PointerSensor,
   useSensor,
   useSensors,
@@ -47,6 +49,11 @@ import { StoryPanel } from "../components/story-panel";
 import { AutoGrowSingleLineTextarea } from "../components/auto-grow-single-line-textarea";
 import { useAuthError } from "../contexts/auth-error-context";
 import { useToast } from "../contexts/toast-context";
+import {
+  IDLE_STORY_DRAG_STATE,
+  StoryDragProvider,
+  type StoryDragState,
+} from "../contexts/story-drag-context";
 import { useBreakpoint } from "../hooks/use-breakpoint";
 import { useCurrentUser } from "../hooks/use-current-user";
 import {
@@ -74,7 +81,7 @@ import {
   groupStoriesByIteration,
 } from "../lib/story-panel-grouping";
 import {
-  isStoryMultiPanelDropAllowed,
+  describeStoryMultiPanelDrop,
   panelTypeFromDropZoneGroupId,
 } from "../lib/story-multi-panel-drop-allowed";
 import {
@@ -1271,25 +1278,56 @@ export function StoryMultiPanelScreen() {
     ],
   );
 
+  const [dragState, setDragState] = useState<StoryDragState>(
+    IDLE_STORY_DRAG_STATE,
+  );
+
   const handleDndDragMove = useCallback(
     (event: DragMoveEvent) => {
-      const allowed = isStoryMultiPanelDropAllowed({
+      const activeStoryId = String(event.active.id);
+      const description = describeStoryMultiPanelDrop({
         ...dropAllowanceBase,
-        activeStoryId: String(event.active.id),
+        activeStoryId,
         overId: event.over?.id,
       });
-      document.body.style.cursor = allowed ? "grabbing" : "not-allowed";
+      document.body.style.cursor = description.allowed
+        ? "grabbing"
+        : "not-allowed";
+      const overId = event.over ? String(event.over.id) : null;
+      setDragState((current) =>
+        current.activeStoryId === activeStoryId &&
+        current.overId === overId &&
+        current.allowed === description.allowed &&
+        current.targetPanel === description.targetPanel
+          ? current
+          : {
+              activeStoryId,
+              overId,
+              allowed: description.allowed,
+              sourcePanel: description.sourcePanel,
+              targetPanel: description.targetPanel,
+            },
+      );
     },
     [dropAllowanceBase],
   );
 
-  const handleDndDragStart = useCallback(() => {
+  const handleDndDragStart = useCallback((event: DragStartEvent) => {
     document.body.style.cursor = "grabbing";
+    setDragState({
+      ...IDLE_STORY_DRAG_STATE,
+      activeStoryId: String(event.active.id),
+    });
   }, []);
 
   const resetDndBodyCursor = useCallback(() => {
     document.body.style.cursor = "";
+    setDragState(IDLE_STORY_DRAG_STATE);
   }, []);
+
+  const draggingStory = dragState.activeStoryId
+    ? (allStories.find((story) => story.id === dragState.activeStoryId) ?? null)
+    : null;
 
   // --- Selection helpers ---
 
@@ -2368,169 +2406,184 @@ export function StoryMultiPanelScreen() {
           filteredStories.length === 0 &&
           !hasPanelErrors
         ) ? (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={storyPanelCollisionDetection}
-            onDragStart={handleDndDragStart}
-            onDragMove={handleDndDragMove}
-            onDragEnd={(event) => {
-              resetDndBodyCursor();
-              void handleDragEnd(event);
-            }}
-            onDragCancel={resetDndBodyCursor}
-          >
-            <div
-              className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
-              data-testid="panel-container"
+          <StoryDragProvider value={dragState}>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={storyPanelCollisionDetection}
+              onDragStart={handleDndDragStart}
+              onDragMove={handleDndDragMove}
+              onDragEnd={(event) => {
+                resetDndBodyCursor();
+                void handleDragEnd(event);
+              }}
+              onDragCancel={resetDndBodyCursor}
             >
-              {displayVisiblePanels.length === 0 ? (
-                <div className="flex flex-1 items-center justify-center">
-                  <p className="text-sm text-gray-500">
-                    {t("storyMultiPanelScreen.panelMenu.emptyPanels")}
-                  </p>
-                </div>
-              ) : breakpoint === "sm" ? (
-                <>
-                  <nav
-                    className="flex items-center border-b border-gray-200 bg-white"
-                    data-testid="panel-tabs"
-                  >
-                    {displayVisiblePanels.map((panel) => (
-                      <button
-                        key={panel}
-                        type="button"
-                        onClick={() => setActiveTab(panel)}
-                        className={`flex-1 px-3 py-2 text-center text-sm font-medium ${
-                          (
-                            displayVisiblePanels.includes(activeTab)
-                              ? activeTab
-                              : displayVisiblePanels[0]
-                          ) === panel
-                            ? "border-b-2 border-blue-600 text-blue-600"
-                            : "text-gray-500 hover:text-gray-700"
-                        }`}
-                        data-testid={`panel-tab-${panel}`}
-                      >
-                        {panel === "CurrentBacklogCombined"
-                          ? "Current + Backlog"
-                          : PANEL_LABELS[panel]}
-                      </button>
-                    ))}
-                    <div className="pr-2">
-                      <DropdownMenu
-                        open={mobileMenuOpen}
-                        onOpenChange={setMobileMenuOpen}
-                      >
-                        <DropdownMenuTrigger asChild>
-                          <button
-                            type="button"
-                            aria-label={t(
-                              "storyMultiPanelScreen.panelMenu.mobileMenu",
-                            )}
-                            aria-controls="mobile-sub-header-menu"
-                            aria-expanded={mobileMenuOpen}
-                            title={t(
-                              "storyMultiPanelScreen.panelMenu.mobileMenu",
-                            )}
-                            className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300"
-                            data-testid="mobile-sub-header-menu-toggle"
-                          >
-                            <Menu className="size-4" aria-hidden />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent
-                          id="mobile-sub-header-menu"
-                          align="end"
-                          className="min-w-64"
-                          data-testid="mobile-sub-header-menu"
+              <div
+                className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+                data-testid="panel-container"
+              >
+                {displayVisiblePanels.length === 0 ? (
+                  <div className="flex flex-1 items-center justify-center">
+                    <p className="text-sm text-gray-500">
+                      {t("storyMultiPanelScreen.panelMenu.emptyPanels")}
+                    </p>
+                  </div>
+                ) : breakpoint === "sm" ? (
+                  <>
+                    <nav
+                      className="flex items-center border-b border-gray-200 bg-white"
+                      data-testid="panel-tabs"
+                    >
+                      {displayVisiblePanels.map((panel) => (
+                        <button
+                          key={panel}
+                          type="button"
+                          onClick={() => setActiveTab(panel)}
+                          className={`flex-1 px-3 py-2 text-center text-sm font-medium ${
+                            (
+                              displayVisiblePanels.includes(activeTab)
+                                ? activeTab
+                                : displayVisiblePanels[0]
+                            ) === panel
+                              ? "border-b-2 border-blue-600 text-blue-600"
+                              : "text-gray-500 hover:text-gray-700"
+                          }`}
+                          data-testid={`panel-tab-${panel}`}
                         >
-                          <DropdownMenuLabel className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                            {t("storyMultiPanelScreen.panelMenu.panels")}
-                          </DropdownMenuLabel>
-                          {PANEL_TYPES.map((panel) => (
-                            <DropdownMenuCheckboxItem
-                              key={panel}
-                              checked={visibility[panel]}
+                          {panel === "CurrentBacklogCombined"
+                            ? "Current + Backlog"
+                            : PANEL_LABELS[panel]}
+                        </button>
+                      ))}
+                      <div className="pr-2">
+                        <DropdownMenu
+                          open={mobileMenuOpen}
+                          onOpenChange={setMobileMenuOpen}
+                        >
+                          <DropdownMenuTrigger asChild>
+                            <button
+                              type="button"
+                              aria-label={t(
+                                "storyMultiPanelScreen.panelMenu.mobileMenu",
+                              )}
+                              aria-controls="mobile-sub-header-menu"
+                              aria-expanded={mobileMenuOpen}
+                              title={t(
+                                "storyMultiPanelScreen.panelMenu.mobileMenu",
+                              )}
+                              className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300"
+                              data-testid="mobile-sub-header-menu-toggle"
+                            >
+                              <Menu className="size-4" aria-hidden />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent
+                            id="mobile-sub-header-menu"
+                            align="end"
+                            className="min-w-64"
+                            data-testid="mobile-sub-header-menu"
+                          >
+                            <DropdownMenuLabel className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                              {t("storyMultiPanelScreen.panelMenu.panels")}
+                            </DropdownMenuLabel>
+                            {PANEL_TYPES.map((panel) => (
+                              <DropdownMenuCheckboxItem
+                                key={panel}
+                                checked={visibility[panel]}
+                                className="text-xs"
+                                onCheckedChange={(checked) => {
+                                  const on = checked === true;
+                                  if (on !== visibility[panel])
+                                    togglePanel(panel);
+                                  setMobileMenuOpen(false);
+                                }}
+                                data-testid={`panel-toggle-${panel}`}
+                              >
+                                {PANEL_LABELS[panel]}
+                              </DropdownMenuCheckboxItem>
+                            ))}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
                               className="text-xs"
-                              onCheckedChange={(checked) => {
-                                const on = checked === true;
-                                if (on !== visibility[panel])
-                                  togglePanel(panel);
+                              onSelect={() => {
+                                toggleCurrentBacklogMode();
                                 setMobileMenuOpen(false);
                               }}
-                              data-testid={`panel-toggle-${panel}`}
                             >
-                              {PANEL_LABELS[panel]}
-                            </DropdownMenuCheckboxItem>
-                          ))}
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="text-xs"
-                            onSelect={() => {
-                              toggleCurrentBacklogMode();
-                              setMobileMenuOpen(false);
-                            }}
-                          >
-                            {currentBacklogViewMode === "split"
-                              ? t(
-                                  "storyMultiPanelScreen.panelMenu.combineCurrentBacklog",
-                                )
-                              : t(
-                                  "storyMultiPanelScreen.panelMenu.splitCurrentBacklog",
-                                )}
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="text-xs"
-                            onSelect={() => {
-                              setShowSearchBar((v) => !v);
-                              setMobileMenuOpen(false);
-                            }}
-                          >
-                            {showSearchBar
-                              ? t(
-                                  "storyMultiPanelScreen.panelMenu.closeAdvancedSearch",
-                                )
-                              : t(
-                                  "storyMultiPanelScreen.panelMenu.openAdvancedSearch",
-                                )}
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                              {currentBacklogViewMode === "split"
+                                ? t(
+                                    "storyMultiPanelScreen.panelMenu.combineCurrentBacklog",
+                                  )
+                                : t(
+                                    "storyMultiPanelScreen.panelMenu.splitCurrentBacklog",
+                                  )}
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-xs"
+                              onSelect={() => {
+                                setShowSearchBar((v) => !v);
+                                setMobileMenuOpen(false);
+                              }}
+                            >
+                              {showSearchBar
+                                ? t(
+                                    "storyMultiPanelScreen.panelMenu.closeAdvancedSearch",
+                                  )
+                                : t(
+                                    "storyMultiPanelScreen.panelMenu.openAdvancedSearch",
+                                  )}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </nav>
+                    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+                      {renderPanel(
+                        displayVisiblePanels.includes(activeTab)
+                          ? activeTab
+                          : displayVisiblePanels[0],
+                      )}
                     </div>
-                  </nav>
-                  <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-                    {renderPanel(
-                      displayVisiblePanels.includes(activeTab)
-                        ? activeTab
-                        : displayVisiblePanels[0],
-                    )}
+                  </>
+                ) : breakpoint === "md" ? (
+                  <div
+                    className={`grid min-h-0 min-w-0 flex-1 ${
+                      displayVisiblePanels.length === 1
+                        ? "grid-cols-1"
+                        : "grid-cols-2"
+                    } grid-rows-[minmax(0,1fr)] overflow-hidden`}
+                  >
+                    {displayVisiblePanels.map((panel) => (
+                      <div
+                        key={panel}
+                        className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-r border-gray-200 last:border-r-0"
+                      >
+                        {renderPanel(panel)}
+                      </div>
+                    ))}
                   </div>
-                </>
-              ) : breakpoint === "md" ? (
-                <div
-                  className={`grid min-h-0 min-w-0 flex-1 ${
-                    displayVisiblePanels.length === 1
-                      ? "grid-cols-1"
-                      : "grid-cols-2"
-                  } grid-rows-[minmax(0,1fr)] overflow-hidden`}
-                >
-                  {displayVisiblePanels.map((panel) => (
-                    <div
-                      key={panel}
-                      className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-r border-gray-200 last:border-r-0"
-                    >
-                      {renderPanel(panel)}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
-                  {displayVisiblePanels.map((panel) => renderPanel(panel))}
-                </div>
-              )}
-            </div>
-          </DndContext>
+                ) : (
+                  <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
+                    {displayVisiblePanels.map((panel) => renderPanel(panel))}
+                  </div>
+                )}
+              </div>
+              <DragOverlay dropAnimation={null}>
+                {draggingStory ? (
+                  <div
+                    data-testid="story-drag-overlay"
+                    className="cursor-grabbing rounded border border-blue-500 bg-white px-3 py-2 text-sm font-medium text-gray-900 shadow-lg dark:border-blue-400 dark:bg-gray-800 dark:text-gray-100"
+                  >
+                    <span className="mr-2 text-xs text-gray-500">
+                      #{draggingStory.storyNumber}
+                    </span>
+                    {draggingStory.title}
+                  </div>
+                ) : null}
+              </DragOverlay>
+            </DndContext>
+          </StoryDragProvider>
         ) : null}
       </div>
 
