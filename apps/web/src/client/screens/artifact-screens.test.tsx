@@ -237,7 +237,7 @@ describe("artifact screens", () => {
       expect(screen.getByLabelText("バージョン")).toHaveValue("3");
     });
 
-    it("falls back to a short id when the creator cannot be resolved", async () => {
+    it("shows the unknown-user label when the creator cannot be resolved", async () => {
       mockApi({
         ...baseRoutes(),
         "GET /api/projects/p1/members": () => json({ error: "no" }, 403),
@@ -247,10 +247,10 @@ describe("artifact screens", () => {
       fireEvent.click(
         await screen.findByRole("button", { name: "詳細を表示" }),
       );
-      expect(await screen.findByText("github|1")).toBeInTheDocument();
+      expect(await screen.findByText("不明なユーザー")).toBeInTheDocument();
     });
 
-    it("falls back to a short id for a removed member", async () => {
+    it("shows the unknown-user label for a removed member", async () => {
       mockApi({
         ...baseRoutes(),
         "GET /api/projects/p1/members": () => json({ members: [] }),
@@ -260,7 +260,7 @@ describe("artifact screens", () => {
       fireEvent.click(
         await screen.findByRole("button", { name: "詳細を表示" }),
       );
-      expect(await screen.findByText("github|1")).toBeInTheDocument();
+      expect(await screen.findByText("不明なユーザー")).toBeInTheDocument();
     });
 
     it("navigates to a fixed URL from the version selector", async () => {

@@ -135,7 +135,7 @@ describe("ProjectHistoryScreen", () => {
       expect(screen.getAllByText("Set up authentication")).not.toHaveLength(0);
     });
 
-    expect(screen.getAllByText("user@example.com")).toHaveLength(2);
+    expect(screen.getAllByText("不明なユーザー")).toHaveLength(2);
     expect(screen.getByText("作成")).toBeInTheDocument();
     expect(screen.getByText("ステータス を変更")).toBeInTheDocument();
   });
