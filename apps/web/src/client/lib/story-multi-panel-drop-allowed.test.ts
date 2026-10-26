@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  describeStoryMultiPanelDrop,
   isStoryMultiPanelDropAllowed,
   panelTypeFromDropZoneGroupId,
 } from "./story-multi-panel-drop-allowed";
@@ -179,5 +180,52 @@ describe("isStoryMultiPanelDropAllowed", () => {
         currentUnacceptedStories: grouped.Current,
       }),
     ).toBe(true);
+  });
+});
+
+describe("describeStoryMultiPanelDrop", () => {
+  const baseCtx = (story: Story, panel: PanelType) => {
+    const grouped = emptyGrouped();
+    grouped[panel] = [story];
+    return {
+      projectId: "p1",
+      activeStoryId: story.id,
+      findPanelByStoryId: (id: string) => (id === story.id ? panel : null),
+      shouldCombineCurrentBacklog: false,
+      combinedGroupDropZonePrefix: "drop-zone-group:CurrentBacklogCombined:",
+      combinedTargetPanelByGroupKey: new Map<string, PanelType>(),
+      allStories: [story],
+      currentIterationId: "iter-current",
+      groupedStories: grouped,
+      currentUnacceptedStories: grouped.Current,
+    };
+  };
+
+  it("reports source and target panels for an allowed cross-panel move", () => {
+    const story = mkStory({
+      status: "Unstarted",
+      isIcebox: true,
+      iterationId: null,
+    });
+    expect(
+      describeStoryMultiPanelDrop({
+        ...baseCtx(story, "Icebox"),
+        overId: "drop-zone-Backlog",
+      }),
+    ).toEqual({
+      allowed: true,
+      sourcePanel: "Icebox",
+      targetPanel: "Backlog",
+    });
+  });
+
+  it("reports the target panel even when the drop is denied", () => {
+    const story = mkStory({});
+    expect(
+      describeStoryMultiPanelDrop({
+        ...baseCtx(story, "Current"),
+        overId: "drop-zone-Done",
+      }),
+    ).toEqual({ allowed: false, sourcePanel: "Current", targetPanel: "Done" });
   });
 });

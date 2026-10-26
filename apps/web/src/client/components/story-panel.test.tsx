@@ -6,6 +6,11 @@ import { StoryPanel } from "./story-panel";
 import type { StoryInlineEditContext } from "./story-panel";
 import { AuthErrorProvider } from "../contexts/auth-error-context";
 import { ToastProvider } from "../contexts/toast-context";
+import {
+  IDLE_STORY_DRAG_STATE,
+  StoryDragProvider,
+  type StoryDragState,
+} from "../contexts/story-drag-context";
 import type { Story } from "../types/story";
 import type { Iteration } from "../types/iteration";
 
@@ -833,5 +838,81 @@ describe("StoryPanel", () => {
 
     expect(screen.getByText("2026.05 リリース")).toBeInTheDocument();
     expect(screen.queryByText("#201")).not.toBeInTheDocument();
+  });
+});
+
+describe("StoryPanel drag feedback", () => {
+  const renderWithDrag = (
+    drag: StoryDragState,
+    props: Partial<React.ComponentProps<typeof StoryPanel>> = {},
+  ) =>
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <AuthErrorProvider>
+          <ToastProvider>
+            <StoryDragProvider value={drag}>
+              <DndContext>
+                <StoryPanel
+                  panelType="Backlog"
+                  sortable
+                  stories={[
+                    makeStory({ id: "s1", title: "First" }),
+                    makeStory({ id: "s2", title: "Second", storyNumber: 2 }),
+                  ]}
+                  {...props}
+                />
+              </DndContext>
+            </StoryDragProvider>
+          </ToastProvider>
+        </AuthErrorProvider>
+      </QueryClientProvider>,
+    );
+
+  it("shows nothing while idle", () => {
+    renderWithDrag(IDLE_STORY_DRAG_STATE);
+    expect(screen.queryByTestId("drop-insert-line")).toBeNull();
+    expect(screen.queryByTestId("drop-panel-label")).toBeNull();
+  });
+
+  it("shows an insertion line on the hovered row", () => {
+    renderWithDrag({
+      activeStoryId: "other",
+      overId: "s2",
+      allowed: true,
+      sourcePanel: "Backlog",
+      targetPanel: "Backlog",
+    });
+    expect(screen.getAllByTestId("drop-insert-line")).toHaveLength(1);
+    expect(screen.queryByTestId("drop-panel-label")).toBeNull();
+  });
+
+  it("highlights the target panel with the move label", () => {
+    renderWithDrag({
+      activeStoryId: "other",
+      overId: "drop-zone-Backlog",
+      allowed: true,
+      sourcePanel: "Icebox",
+      targetPanel: "Backlog",
+    });
+    expect(screen.getByTestId("panel-Backlog")).toHaveAttribute(
+      "data-drop-state",
+      "allowed",
+    );
+    expect(screen.getByTestId("drop-panel-label")).toBeInTheDocument();
+  });
+
+  it("marks a denied target panel without an insertion line", () => {
+    renderWithDrag({
+      activeStoryId: "other",
+      overId: "s2",
+      allowed: false,
+      sourcePanel: "Icebox",
+      targetPanel: "Backlog",
+    });
+    expect(screen.getByTestId("panel-Backlog")).toHaveAttribute(
+      "data-drop-state",
+      "denied",
+    );
+    expect(screen.queryByTestId("drop-insert-line")).toBeNull();
   });
 });

@@ -22,6 +22,10 @@ export const storyPanelJa = {
     empty: "ストーリーはありません",
     utilization: "稼働率",
     estimateRequired: "見積もりが必要です",
+    dropInsertHere: "ここに挿入",
+    dropAtGroupEnd: "このグループの末尾に追加",
+    dropMoveTo: "{{panel}} に移動",
+    dropNotAllowed: "ここには移動できません",
   },
 } as const;
 
@@ -49,5 +53,9 @@ export const storyPanelEn = {
     empty: "No stories",
     utilization: "Utilization",
     estimateRequired: "Estimate required",
+    dropInsertHere: "Insert here",
+    dropAtGroupEnd: "Add to the end of this group",
+    dropMoveTo: "Move to {{panel}}",
+    dropNotAllowed: "Can't move here",
   },
 } as const;
