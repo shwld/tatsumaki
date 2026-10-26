@@ -33,6 +33,7 @@ describe("ActorLabel", () => {
     ["email", "alice@example.com"],
     ["uuid", "123e4567-e89b-12d3-a456-426614174000"],
     ["ulid", "01KN9P32R248P2PK1413DKQQG5"],
+    ["provider id", "github|author"],
     ["empty", "  "],
     ["null", null],
   ])("shows the unknown-user label for %s actorName", (_, actorName) => {

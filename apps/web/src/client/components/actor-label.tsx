@@ -12,9 +12,9 @@ type ActorLabelProps = {
 };
 
 const OPAQUE_ID_PATTERN =
-  /^([0-9a-f]{8}-[0-9a-f-]{27}|[0-9A-HJKMNP-TV-Z]{26})$/i;
+  /^([a-z0-9_-]+\|.+|[0-9a-f]{8}-[0-9a-f-]{27}|[0-9A-HJKMNP-TV-Z]{26})$/i;
 
-// 旧形式で保存されたメール・内部 ID は人に読める名前ではないため、未解決扱いにする
+// 旧形式で保存されたメール・プロバイダ接頭辞付き ID・内部 ID は人に読める名前ではないため、未解決扱いにする
 function isReadableActorName(actorName: string | null): actorName is string {
   const name = actorName?.trim();
   return (
