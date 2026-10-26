@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 
+import { UNKNOWN_MEMBER_DISPLAY_NAME } from "../../lib/member-display-name";
 import type { ProjectMemberProfile } from "../types/project";
 import { Avatar } from "./avatar";
 
@@ -24,9 +25,12 @@ function isReadableActorName(actorName: string | null): actorName is string {
 
 export function ActorLabel({ member, actorName }: ActorLabelProps) {
   const { t } = useTranslation();
+  const memberName =
+    member?.displayName === UNKNOWN_MEMBER_DISPLAY_NAME
+      ? null
+      : member?.displayName;
   const knownName =
-    member?.displayName ??
-    (isReadableActorName(actorName) ? actorName.trim() : null);
+    memberName ?? (isReadableActorName(actorName) ? actorName.trim() : null);
   const displayName = knownName ?? t("actorLabel.unknownUser");
 
   return (
