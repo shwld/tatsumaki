@@ -12,6 +12,7 @@ use crate::{
         ports::{ArtifactInfo, ArtifactVersionInfo},
     },
     artifact::scan::scan_directory,
+    infrastructure::project_file::require_project,
 };
 
 #[derive(Args, Debug)]
@@ -25,7 +26,7 @@ pub enum ArtifactSubcommand {
     /// Upload a built directory as a new artifact
     Create {
         #[arg(long)]
-        project: String,
+        project: Option<String>,
         #[arg(long)]
         title: String,
         /// Directory that contains tatsumaki-artifact.json
@@ -35,7 +36,7 @@ pub enum ArtifactSubcommand {
     /// Show an artifact and its latest version
     Get {
         #[arg(long)]
-        project: String,
+        project: Option<String>,
         artifact_id: String,
         /// Also list the files of the latest version
         #[arg(long)]
@@ -44,7 +45,7 @@ pub enum ArtifactSubcommand {
     /// List the artifacts of a project
     List {
         #[arg(long)]
-        project: String,
+        project: Option<String>,
         /// List archived artifacts instead of active ones
         #[arg(long)]
         archived: bool,
@@ -52,7 +53,7 @@ pub enum ArtifactSubcommand {
     /// Change the title and/or publish a new version from a directory
     Update {
         #[arg(long)]
-        project: String,
+        project: Option<String>,
         artifact_id: String,
         #[arg(long)]
         title: Option<String>,
@@ -66,13 +67,13 @@ pub enum ArtifactSubcommand {
     /// List the versions of an artifact
     Versions {
         #[arg(long)]
-        project: String,
+        project: Option<String>,
         artifact_id: String,
     },
     /// Download a version into a new or empty directory
     Download {
         #[arg(long)]
-        project: String,
+        project: Option<String>,
         artifact_id: String,
         /// Defaults to the latest version
         #[arg(long)]
@@ -84,15 +85,30 @@ pub enum ArtifactSubcommand {
     /// Remove an artifact from the default list (its versions are kept)
     Archive {
         #[arg(long)]
-        project: String,
+        project: Option<String>,
         artifact_id: String,
     },
     /// Bring an archived artifact back into the default list
     Unarchive {
         #[arg(long)]
-        project: String,
+        project: Option<String>,
         artifact_id: String,
     },
+}
+
+impl ArtifactSubcommand {
+    pub fn project_slot(&mut self) -> &mut Option<String> {
+        match self {
+            Self::Create { project, .. }
+            | Self::Get { project, .. }
+            | Self::List { project, .. }
+            | Self::Update { project, .. }
+            | Self::Versions { project, .. }
+            | Self::Download { project, .. }
+            | Self::Archive { project, .. }
+            | Self::Unarchive { project, .. } => project,
+        }
+    }
 }
 
 pub fn latest_url(base_url: &str, project: &str, artifact_id: &str) -> String {
@@ -266,6 +282,7 @@ pub async fn run_artifact<T: TokenProvider + Sync>(
             title,
             path,
         } => {
+            let project = require_project(project)?;
             let title = validate_title(&title).map_err(invalid)?;
             let scan = scan_directory(&path).map_err(|e| invalid(e.to_string()))?;
             announce_upload(&scan, json);
@@ -285,6 +302,7 @@ pub async fn run_artifact<T: TokenProvider + Sync>(
             artifact_id,
             files,
         } => {
+            let project = require_project(project)?;
             let detail = flow.get_artifact(&project, &artifact_id).await?;
             let artifact = artifact_output(base_url, detail.artifact);
             let latest = detail.latest_version.map(|latest| {
@@ -343,6 +361,7 @@ pub async fn run_artifact<T: TokenProvider + Sync>(
             Ok(())
         }
         ArtifactSubcommand::List { project, archived } => {
+            let project = require_project(project)?;
             let artifacts = flow.list_artifacts(&project, archived).await?;
             if json {
                 #[derive(Serialize)]
@@ -378,6 +397,7 @@ pub async fn run_artifact<T: TokenProvider + Sync>(
             path,
             base_version,
         } => {
+            let project = require_project(project)?;
             if title.is_none() && path.is_none() {
                 return Err(invalid("give --title, --path with --base-version, or both"));
             }
@@ -441,6 +461,7 @@ pub async fn run_artifact<T: TokenProvider + Sync>(
             project,
             artifact_id,
         } => {
+            let project = require_project(project)?;
             let versions = flow.list_versions(&project, &artifact_id).await?;
             if json {
                 #[derive(Serialize)]
@@ -477,6 +498,7 @@ pub async fn run_artifact<T: TokenProvider + Sync>(
             version,
             out,
         } => {
+            let project = require_project(project)?;
             let downloaded = flow.download(&project, &artifact_id, version, &out).await?;
             if json {
                 #[derive(Serialize)]
@@ -509,6 +531,7 @@ pub async fn run_artifact<T: TokenProvider + Sync>(
             project,
             artifact_id,
         } => {
+            let project = require_project(project)?;
             let info = flow.set_archived(&project, &artifact_id, true).await?;
             print_artifact(base_url, info, json)
         }
@@ -516,6 +539,7 @@ pub async fn run_artifact<T: TokenProvider + Sync>(
             project,
             artifact_id,
         } => {
+            let project = require_project(project)?;
             let info = flow.set_archived(&project, &artifact_id, false).await?;
             print_artifact(base_url, info, json)
         }

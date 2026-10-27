@@ -8,8 +8,9 @@ mod infrastructure;
 mod update;
 
 use crate::application::ports::{
-    StoryBlockerAction, StoryBlockerInput, StoryBlockerRelation, StoryCommentInput, StoryCreateInput, StoryListFilter, StoryPointUpdate, StoryReorderInput,
-    StoryUpdateInput, TokenStore,
+    StoryBlockerAction, StoryBlockerInput, StoryBlockerRelation, StoryCommentInput,
+    StoryCreateInput, StoryListFilter, StoryPointUpdate, StoryReorderInput, StoryUpdateInput,
+    TokenStore,
 };
 use adapters::{
     config_store::FileConfigStore,
@@ -22,6 +23,10 @@ use application::service::{CliService, resolve_base_url};
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use desktop_ipc_client::DEFAULT_IPC_TIMEOUT_MS;
 use desktop_ipc_command::{DesktopRefetchKind, execute_refetch};
+use infrastructure::{
+    config_file::config_path,
+    project_file::{find_project_file, optional_project, require_project},
+};
 use tabled::{Table, Tabled, settings::Style};
 use url::Url;
 
@@ -86,7 +91,11 @@ enum Commands {
 struct UpdateCommand {
     #[arg(long, help = "Only check whether a newer version is available")]
     check: bool,
-    #[arg(long, value_name = "TAG", help = "Install a specific release tag (cli-vX.Y.Z)")]
+    #[arg(
+        long,
+        value_name = "TAG",
+        help = "Install a specific release tag (cli-vX.Y.Z)"
+    )]
     version: Option<String>,
 }
 
@@ -113,12 +122,12 @@ struct StoryCommand {
 enum StorySubcommand {
     Get {
         #[arg(long)]
-        project: String,
+        project: Option<String>,
         story_number: i64,
     },
     List {
         #[arg(long)]
-        project: String,
+        project: Option<String>,
         #[arg(long, value_enum)]
         status: Option<StoryStatusArg>,
         #[arg(long, value_enum)]
@@ -128,7 +137,7 @@ enum StorySubcommand {
     },
     Create {
         #[arg(long)]
-        project: String,
+        project: Option<String>,
         #[arg(long)]
         title: String,
         #[arg(long = "type")]
@@ -140,7 +149,7 @@ enum StorySubcommand {
     },
     Update {
         #[arg(long)]
-        project: String,
+        project: Option<String>,
         story_number: i64,
         #[arg(long)]
         title: Option<String>,
@@ -159,14 +168,14 @@ enum StorySubcommand {
     },
     Status {
         #[arg(long)]
-        project: String,
+        project: Option<String>,
         story_number: i64,
         #[arg(long, value_enum)]
         status: StoryStatusArg,
     },
     Comment {
         #[arg(long)]
-        project: String,
+        project: Option<String>,
         story_number: i64,
         #[arg(long)]
         body: String,
@@ -174,7 +183,7 @@ enum StorySubcommand {
     /// Make <STORY_NUMBER> blocked by --by, or blocking --blocks
     Block {
         #[arg(long)]
-        project: String,
+        project: Option<String>,
         story_number: i64,
         #[command(flatten)]
         relation: StoryBlockerRelationArgs,
@@ -182,20 +191,34 @@ enum StorySubcommand {
     /// Remove a blocker registered with `story block`
     Unblock {
         #[arg(long)]
-        project: String,
+        project: Option<String>,
         story_number: i64,
         #[command(flatten)]
         relation: StoryBlockerRelationArgs,
     },
     Reorder {
         #[arg(long)]
-        project: String,
+        project: Option<String>,
         #[arg(long = "ordered-id")]
         ordered_ids: Vec<String>,
     },
 }
 
 impl StorySubcommand {
+    fn project_slot(&mut self) -> &mut Option<String> {
+        match self {
+            Self::Get { project, .. }
+            | Self::List { project, .. }
+            | Self::Create { project, .. }
+            | Self::Update { project, .. }
+            | Self::Status { project, .. }
+            | Self::Comment { project, .. }
+            | Self::Block { project, .. }
+            | Self::Unblock { project, .. }
+            | Self::Reorder { project, .. } => project,
+        }
+    }
+
     fn blocker_action(&self) -> Option<StoryBlockerAction> {
         match self {
             Self::Block { .. } => Some(StoryBlockerAction::Add),
@@ -237,7 +260,9 @@ fn describe_story_blocker_change(
         StoryBlockerRelation::Blocks => (story_number, target),
     };
     match (input.action, changed) {
-        (StoryBlockerAction::Add, true) => format!("#{blocked} は #{blocking} にブロックされています"),
+        (StoryBlockerAction::Add, true) => {
+            format!("#{blocked} は #{blocking} にブロックされています")
+        }
         (StoryBlockerAction::Add, false) => {
             format!("既に登録済みです: #{blocked} は #{blocking} にブロックされています")
         }
@@ -258,7 +283,7 @@ struct ProjectCommand {
 
 #[derive(Subcommand, Debug)]
 enum ProjectSubcommand {
-    Get { project_id: String },
+    Get { project_id: Option<String> },
 }
 
 #[derive(Args, Debug)]
@@ -406,13 +431,23 @@ pub fn exit_code_for_api_error(status: u16, code: &str) -> i32 {
         "BASE_VERSION_CONFLICT" | "PUBLISH_CONFLICT" => EXIT_CONFLICT,
         "NOT_FOUND" | "ARTIFACT_NOT_FOUND" | "VERSION_NOT_FOUND" | "FILE_NOT_FOUND"
         | "SESSION_NOT_FOUND" => EXIT_NOT_FOUND,
-        "INVALID_REQUEST" | "EMPTY_MANIFEST" | "INVALID_PATH" | "DUPLICATE_PATH"
-        | "SENSITIVE_FILE" | "INVALID_SIZE" | "INVALID_SHA256" | "INVALID_ENTRYPOINT"
-        | "TOO_MANY_FILES" | "FILE_TOO_LARGE" | "TOTAL_TOO_LARGE"
-        | "UNSUPPORTED_MEDIA_TYPE" | "IDEMPOTENCY_KEY_REUSED" | "TREE_DIGEST_MISMATCH"
-        | "FILE_NOT_IN_MANIFEST" | "FILE_SIZE_MISMATCH" | "FILE_DIGEST_MISMATCH" => {
-            EXIT_INVALID_ARGUMENT
-        }
+        "INVALID_REQUEST"
+        | "EMPTY_MANIFEST"
+        | "INVALID_PATH"
+        | "DUPLICATE_PATH"
+        | "SENSITIVE_FILE"
+        | "INVALID_SIZE"
+        | "INVALID_SHA256"
+        | "INVALID_ENTRYPOINT"
+        | "TOO_MANY_FILES"
+        | "FILE_TOO_LARGE"
+        | "TOTAL_TOO_LARGE"
+        | "UNSUPPORTED_MEDIA_TYPE"
+        | "IDEMPOTENCY_KEY_REUSED"
+        | "TREE_DIGEST_MISMATCH"
+        | "FILE_NOT_IN_MANIFEST"
+        | "FILE_SIZE_MISMATCH"
+        | "FILE_DIGEST_MISMATCH" => EXIT_INVALID_ARGUMENT,
         _ if status == 401 => EXIT_AUTH,
         _ if status == 403 => EXIT_AUTH,
         _ if status == 404 => EXIT_NOT_FOUND,
@@ -488,7 +523,9 @@ async fn run() -> Result<(), (CliError, i32)> {
             }
             Ok(())
         }
-        Commands::Artifact(artifact_cmd) => {
+        Commands::Artifact(mut artifact_cmd) => {
+            let slot = artifact_cmd.command.project_slot();
+            *slot = Some(require_project(slot.take())?);
             let base_url = resolve_base_url(&config_store, cli.base_url.clone())?;
             let service = build_service(base_url.clone());
             if let Some(warning) = service
@@ -499,7 +536,9 @@ async fn run() -> Result<(), (CliError, i32)> {
             }
             artifact_cli::run_artifact(artifact_cmd, &base_url, &service, cli.json).await
         }
-        Commands::Story(story_cmd) => {
+        Commands::Story(mut story_cmd) => {
+            let slot = story_cmd.command.project_slot();
+            *slot = Some(require_project(slot.take())?);
             let base_url = resolve_base_url(&config_store, cli.base_url.clone())?;
             let service = build_service(base_url.clone());
             if let Some(warning) = service
@@ -514,6 +553,7 @@ async fn run() -> Result<(), (CliError, i32)> {
                     project,
                     story_number,
                 } => {
+                    let project = require_project(project)?;
                     let body = service
                         .get_story(&base_url, &project, story_number, cli.json)
                         .await?;
@@ -537,6 +577,7 @@ async fn run() -> Result<(), (CliError, i32)> {
                     iteration,
                     limit,
                 } => {
+                    let project = require_project(project)?;
                     let filter = StoryListFilter {
                         status: status.map(|s| s.as_api_str().to_string()),
                         iteration_date_scope: iteration.map(|i| i.as_api_str().to_string()),
@@ -586,6 +627,7 @@ async fn run() -> Result<(), (CliError, i32)> {
                     description,
                     is_icebox,
                 } => {
+                    let project = require_project(project)?;
                     let input = StoryCreateInput {
                         title,
                         r#type: story_type.as_api_str().to_string(),
@@ -618,6 +660,7 @@ async fn run() -> Result<(), (CliError, i32)> {
                     icebox,
                     no_icebox,
                 } => {
+                    let project = require_project(project)?;
                     let input = StoryUpdateInput {
                         title,
                         description,
@@ -658,6 +701,7 @@ async fn run() -> Result<(), (CliError, i32)> {
                     story_number,
                     status,
                 } => {
+                    let project = require_project(project)?;
                     let input = StoryUpdateInput {
                         title: None,
                         description: None,
@@ -688,6 +732,7 @@ async fn run() -> Result<(), (CliError, i32)> {
                     story_number,
                     body,
                 } => {
+                    let project = require_project(project)?;
                     let input = StoryCommentInput { body };
                     let comment = service
                         .create_story_comment(&base_url, &project, story_number, &input)
@@ -716,6 +761,7 @@ async fn run() -> Result<(), (CliError, i32)> {
                     story_number,
                     relation,
                 } => {
+                    let project = require_project(project)?;
                     let (relation, target_story_number) = relation.into_relation();
                     let input = StoryBlockerInput {
                         action: blocker_action.expect("block and unblock set an action"),
@@ -732,14 +778,21 @@ async fn run() -> Result<(), (CliError, i32)> {
                                 .map_err(|e| (CliError::Json(e), EXIT_GENERAL))?
                         );
                     } else {
-                        let changed = body.get("changed").and_then(|v| v.as_bool()).unwrap_or(true);
-                        println!("{}", describe_story_blocker_change(story_number, &input, changed));
+                        let changed = body
+                            .get("changed")
+                            .and_then(|v| v.as_bool())
+                            .unwrap_or(true);
+                        println!(
+                            "{}",
+                            describe_story_blocker_change(story_number, &input, changed)
+                        );
                     }
                 }
                 StorySubcommand::Reorder {
                     project,
                     ordered_ids,
                 } => {
+                    let project = require_project(project)?;
                     let input = StoryReorderInput { ordered_ids };
                     let body = service.reorder_stories(&base_url, &project, &input).await?;
                     if cli.json {
@@ -781,7 +834,9 @@ async fn run() -> Result<(), (CliError, i32)> {
             }
             Ok(())
         }
-        Commands::Project(project_cmd) => {
+        Commands::Project(mut project_cmd) => {
+            let ProjectSubcommand::Get { project_id } = &mut project_cmd.command;
+            *project_id = Some(require_project(project_id.take())?);
             let base_url = resolve_base_url(&config_store, cli.base_url.clone())?;
             let service = build_service(base_url.clone());
             if let Some(warning) = service
@@ -792,6 +847,7 @@ async fn run() -> Result<(), (CliError, i32)> {
             }
             match project_cmd.command {
                 ProjectSubcommand::Get { project_id } => {
+                    let project_id = require_project(project_id)?;
                     let body = service.get_project(&base_url, &project_id).await?;
                     if cli.json {
                         println!(
@@ -818,6 +874,7 @@ async fn run() -> Result<(), (CliError, i32)> {
                 r#type,
                 timeout_ms,
             } => {
+                let project = optional_project(project)?;
                 let (request_id, ipc_type, project) =
                     execute_refetch(project, r#type.as_refetch_kind(), timeout_ms).await?;
                 if cli.json {
@@ -912,7 +969,23 @@ fn run_config(
         }
         ConfigSubcommand::Show => {
             use crate::application::ports::ConfigStore;
+            println!(
+                "# global: {}",
+                config_path().map_err(|e| (e, EXIT_CONFIG))?.display()
+            );
             println!("{}", config_store.show_raw().map_err(|e| (e, EXIT_CONFIG))?);
+            let cwd = std::env::current_dir().map_err(|e| (CliError::Io(e), EXIT_CONFIG))?;
+            match find_project_file(&cwd) {
+                Some(path) => {
+                    println!("# project: {}", path.display());
+                    println!(
+                        "{}",
+                        std::fs::read_to_string(&path)
+                            .map_err(|e| (CliError::Io(e), EXIT_CONFIG))?
+                    );
+                }
+                None => println!("# project: (no tatsumaki.toml found)"),
+            }
             Ok(())
         }
     }
@@ -978,7 +1051,9 @@ mod tests {
         assert!(!clear_story_point);
     }
 
-    fn parse_story_blocker(args: &[&str]) -> Result<(StoryBlockerAction, i64, StoryBlockerRelation, i64), clap::Error> {
+    fn parse_story_blocker(
+        args: &[&str],
+    ) -> Result<(StoryBlockerAction, i64, StoryBlockerRelation, i64), clap::Error> {
         let mut argv = vec!["tm", "story"];
         argv.extend_from_slice(args);
         let parsed = Cli::try_parse_from(argv)?;
@@ -986,8 +1061,16 @@ mod tests {
             panic!("expected story command");
         };
         let action = command.blocker_action().expect("block or unblock");
-        let (StorySubcommand::Block { story_number, relation, .. }
-        | StorySubcommand::Unblock { story_number, relation, .. }) = command
+        let (StorySubcommand::Block {
+            story_number,
+            relation,
+            ..
+        }
+        | StorySubcommand::Unblock {
+            story_number,
+            relation,
+            ..
+        }) = command
         else {
             panic!("expected block or unblock");
         };
@@ -999,39 +1082,83 @@ mod tests {
     fn story_block_takes_exactly_one_of_by_and_blocks() {
         assert_eq!(
             parse_story_blocker(&["block", "--project", "p", "328", "--by", "325"]).unwrap(),
-            (StoryBlockerAction::Add, 328, StoryBlockerRelation::BlockedBy, 325)
+            (
+                StoryBlockerAction::Add,
+                328,
+                StoryBlockerRelation::BlockedBy,
+                325
+            )
         );
         assert_eq!(
             parse_story_blocker(&["unblock", "--project", "p", "328", "--blocks", "330"]).unwrap(),
-            (StoryBlockerAction::Remove, 328, StoryBlockerRelation::Blocks, 330)
+            (
+                StoryBlockerAction::Remove,
+                328,
+                StoryBlockerRelation::Blocks,
+                330
+            )
         );
         assert!(parse_story_blocker(&["block", "--project", "p", "328"]).is_err());
         assert!(
-            parse_story_blocker(&["block", "--project", "p", "328", "--by", "1", "--blocks", "2"]).is_err()
+            parse_story_blocker(&[
+                "block",
+                "--project",
+                "p",
+                "328",
+                "--by",
+                "1",
+                "--blocks",
+                "2"
+            ])
+            .is_err()
         );
     }
 
     #[test]
     fn story_blocker_result_is_stated_as_a_sentence() {
-        let input = |action, relation| StoryBlockerInput { action, relation, target_story_number: 325 };
+        let input = |action, relation| StoryBlockerInput {
+            action,
+            relation,
+            target_story_number: 325,
+        };
         assert_eq!(
-            describe_story_blocker_change(328, &input(StoryBlockerAction::Add, StoryBlockerRelation::BlockedBy), true),
+            describe_story_blocker_change(
+                328,
+                &input(StoryBlockerAction::Add, StoryBlockerRelation::BlockedBy),
+                true
+            ),
             "#328 は #325 にブロックされています"
         );
         assert_eq!(
-            describe_story_blocker_change(328, &input(StoryBlockerAction::Add, StoryBlockerRelation::Blocks), true),
+            describe_story_blocker_change(
+                328,
+                &input(StoryBlockerAction::Add, StoryBlockerRelation::Blocks),
+                true
+            ),
             "#325 は #328 にブロックされています"
         );
         assert_eq!(
-            describe_story_blocker_change(328, &input(StoryBlockerAction::Add, StoryBlockerRelation::BlockedBy), false),
+            describe_story_blocker_change(
+                328,
+                &input(StoryBlockerAction::Add, StoryBlockerRelation::BlockedBy),
+                false
+            ),
             "既に登録済みです: #328 は #325 にブロックされています"
         );
         assert_eq!(
-            describe_story_blocker_change(328, &input(StoryBlockerAction::Remove, StoryBlockerRelation::BlockedBy), true),
+            describe_story_blocker_change(
+                328,
+                &input(StoryBlockerAction::Remove, StoryBlockerRelation::BlockedBy),
+                true
+            ),
             "#328 は #325 にブロックされなくなりました"
         );
         assert_eq!(
-            describe_story_blocker_change(328, &input(StoryBlockerAction::Remove, StoryBlockerRelation::BlockedBy), false),
+            describe_story_blocker_change(
+                328,
+                &input(StoryBlockerAction::Remove, StoryBlockerRelation::BlockedBy),
+                false
+            ),
             "登録されていません: #328 は #325 にブロックされていません"
         );
     }
@@ -1088,10 +1215,19 @@ mod tests {
         };
         assert!(parse("--icebox").is_ok());
         assert!(parse("--no-icebox").is_ok());
-        assert!(Cli::try_parse_from([
-            "tm", "story", "update", "--project", "p", "332", "--icebox", "--no-icebox",
-        ])
-        .is_err());
+        assert!(
+            Cli::try_parse_from([
+                "tm",
+                "story",
+                "update",
+                "--project",
+                "p",
+                "332",
+                "--icebox",
+                "--no-icebox",
+            ])
+            .is_err()
+        );
     }
 
     // --- tm artifact ---
@@ -1109,9 +1245,11 @@ mod tests {
     }
 
     #[test]
-    fn artifact_create_needs_project_title_and_path() {
-        assert!(parse_artifact(&["create", "--project", "p", "--title", "T", "--path", "dist"]).is_ok());
-        assert!(parse_artifact(&["create", "--title", "T", "--path", "dist"]).is_err());
+    fn artifact_create_needs_title_and_path() {
+        assert!(
+            parse_artifact(&["create", "--project", "p", "--title", "T", "--path", "dist"]).is_ok()
+        );
+        assert!(parse_artifact(&["create", "--path", "dist"]).is_err());
         assert!(parse_artifact(&["create", "--project", "p", "--path", "dist"]).is_err());
         assert!(parse_artifact(&["create", "--project", "p", "--title", "T"]).is_err());
     }
@@ -1119,21 +1257,54 @@ mod tests {
     #[test]
     fn artifact_update_needs_a_base_version_exactly_when_a_directory_is_given() {
         assert!(parse_artifact(&["update", "--project", "p", "A1", "--title", "New"]).is_ok());
-        assert!(parse_artifact(&["update", "--project", "p", "A1", "--path", "dist", "--base-version", "2"]).is_ok());
-        assert!(parse_artifact(&["update", "--project", "p", "A1", "--path", "dist"]).is_err());
-        assert!(parse_artifact(&["update", "--project", "p", "A1", "--base-version", "2"]).is_err());
         assert!(
-            parse_artifact(&["update", "--project", "p", "A1", "--title", "T", "--path", "dist", "--base-version", "2"])
-                .is_ok()
+            parse_artifact(&[
+                "update",
+                "--project",
+                "p",
+                "A1",
+                "--path",
+                "dist",
+                "--base-version",
+                "2"
+            ])
+            .is_ok()
+        );
+        assert!(parse_artifact(&["update", "--project", "p", "A1", "--path", "dist"]).is_err());
+        assert!(
+            parse_artifact(&["update", "--project", "p", "A1", "--base-version", "2"]).is_err()
+        );
+        assert!(
+            parse_artifact(&[
+                "update",
+                "--project",
+                "p",
+                "A1",
+                "--title",
+                "T",
+                "--path",
+                "dist",
+                "--base-version",
+                "2"
+            ])
+            .is_ok()
         );
     }
 
     #[test]
     fn artifact_download_needs_an_output_directory_and_takes_an_optional_version() {
         assert!(parse_artifact(&["download", "--project", "p", "A1"]).is_err());
-        let ArtifactSubcommand::Download { version, .. } =
-            parse_artifact(&["download", "--project", "p", "A1", "--out", "site", "--version", "3"]).unwrap()
-        else {
+        let ArtifactSubcommand::Download { version, .. } = parse_artifact(&[
+            "download",
+            "--project",
+            "p",
+            "A1",
+            "--out",
+            "site",
+            "--version",
+            "3",
+        ])
+        .unwrap() else {
             panic!("expected download");
         };
         assert_eq!(version, Some(3));
@@ -1160,13 +1331,17 @@ mod tests {
         };
         assert!(files);
         for name in ["versions", "archive", "unarchive"] {
-            assert!(parse_artifact(&[name, "--project", "p", "A1"]).is_ok(), "{name}");
+            assert!(
+                parse_artifact(&[name, "--project", "p", "A1"]).is_ok(),
+                "{name}"
+            );
         }
     }
 
     #[test]
     fn artifact_commands_honour_the_global_json_flag() {
-        let cli = Cli::try_parse_from(["tm", "--json", "artifact", "list", "--project", "p"]).unwrap();
+        let cli =
+            Cli::try_parse_from(["tm", "--json", "artifact", "list", "--project", "p"]).unwrap();
         assert!(cli.json);
     }
 
@@ -1174,7 +1349,10 @@ mod tests {
     fn every_server_error_code_maps_to_the_documented_exit_code() {
         let fixture = crate::artifact::read_fixture("artifact-error-codes.json");
         let table = fixture["statusByCode"].as_object().unwrap();
-        assert!(table.len() >= 25, "the fixture should list every server code");
+        assert!(
+            table.len() >= 25,
+            "the fixture should list every server code"
+        );
         for (code, status) in table {
             let status = status.as_u64().unwrap() as u16;
             let expected = match (status, code.as_str()) {
@@ -1184,7 +1362,11 @@ mod tests {
                 (400 | 413 | 415 | 422, _) => EXIT_INVALID_ARGUMENT,
                 _ => EXIT_GENERAL,
             };
-            assert_eq!(exit_code_for_api_error(status, code), expected, "{code} ({status})");
+            assert_eq!(
+                exit_code_for_api_error(status, code),
+                expected,
+                "{code} ({status})"
+            );
         }
     }
 

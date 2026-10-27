@@ -128,6 +128,7 @@ tm artifact update <artifact-id> --project <project> --path ./dist --base-versio
 tm artifact download <artifact-id> --project <project> --version 1 --out ./restored
 ```
 
+- `--project` は省略できます。`TATSUMAKI_PROJECT_ID`、次に最も近い `tatsumaki.toml` の `project_id` の順に解決します（`apps/cli/README.md` 参照）。
 - 更新のたびに不変の version ができ、固定 URL（`/projects/<project>/artifacts/<id>/versions/<n>`）と latest URL で開けます。同一内容の再送は no-op で、title 変更と archive は version を増やしません。
 - 更新には `--base-version` が必要です。より新しい version があるときは上書きせず conflict で失敗します。force option と rollback command はありません（古い version を download して、そこから update します）。
 - 機密性のある file（`.git`、`.env*`、鍵、証明書、credential 系）、symlink、安全でない path があると、CLI は一部をスキップせず全体を拒否します。上限は合計 50 MiB、1 file 25 MiB、1,000 files です。
