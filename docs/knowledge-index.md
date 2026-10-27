@@ -10,6 +10,7 @@
 - `docs/guidelines/implementation-decision-policy.md` | [link](guidelines/implementation-decision-policy.md) | 責務: 実装判断ポリシー | Load when: 短期/長期の方針を決めるとき | 更新責任: リポジトリメンテナ
 - `docs/guidelines/documentation-management.md` | [link](guidelines/documentation-management.md) | 責務: ドキュメント管理ルール | Load when: docs や入口ポインタを整理するとき | 更新責任: リポジトリメンテナ
 - `docs/guidelines/i18n-translation-rules.md` | [link](guidelines/i18n-translation-rules.md) | 責務: i18n キー命名と翻訳分割ルール | Load when: 翻訳キーや locale ファイルを変更するとき | 更新責任: Web フロントエンド実装者
+- `docs/guidelines/project-page-layout.md` | [link](guidelines/project-page-layout.md) | 責務: projects 配下の共通ページレイアウト基準 | Load when: projects 配下の画面の枠・見出し・幅を変更するとき | 更新責任: Web フロントエンド実装者
 - `docs/workflow/story-rules.md` | [link](workflow/story-rules.md) | 責務: story 運用規約 | Load when: story と PR を更新するとき | 更新責任: 開発フロー管理者
 - `docs/workflow/cli-release-operations.md` | [link](workflow/cli-release-operations.md) | 責務: CLI リリース実行手順 | Load when: CLI をリリースするとき | 更新責任: CLI 運用担当
 - `docs/workflow/public-repository-settings-checklist.md` | [link](workflow/public-repository-settings-checklist.md) | 責務: OSS 公開 repository の GitHub 側設定 checklist | Load when: 公開用 repository の設定を確認するとき | 更新責任: リポジトリメンテナ

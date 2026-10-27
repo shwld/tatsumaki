@@ -1,5 +1,6 @@
 import { useParams } from "react-router";
 import { ActorLabel } from "../components/actor-label";
+import { ProjectPage } from "../components/project-page";
 import { useProjectBootstrap } from "../hooks/use-project-bootstrap";
 import { useProjectHistory } from "../hooks/use-project-history";
 import { userIdsEqual } from "../lib/user-ids-equal";
@@ -125,11 +126,7 @@ export function ProjectHistoryScreen() {
   const members = bootstrap?.memberOptions ?? [];
 
   return (
-    <main className="px-4 py-6">
-      <h1 className="mb-6 text-xl font-semibold text-gray-900">
-        Project History
-      </h1>
-
+    <ProjectPage title="Project History">
       {error && (
         <p className="mb-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
@@ -179,6 +176,6 @@ export function ProjectHistoryScreen() {
           ) : null}
         </div>
       )}
-    </main>
+    </ProjectPage>
   );
 }
