@@ -96,6 +96,21 @@ pub enum ArtifactSubcommand {
     },
 }
 
+impl ArtifactSubcommand {
+    pub fn project_slot(&mut self) -> &mut Option<String> {
+        match self {
+            Self::Create { project, .. }
+            | Self::Get { project, .. }
+            | Self::List { project, .. }
+            | Self::Update { project, .. }
+            | Self::Versions { project, .. }
+            | Self::Download { project, .. }
+            | Self::Archive { project, .. }
+            | Self::Unarchive { project, .. } => project,
+        }
+    }
+}
+
 pub fn latest_url(base_url: &str, project: &str, artifact_id: &str) -> String {
     format!(
         "{}/projects/{}/artifacts/{}",

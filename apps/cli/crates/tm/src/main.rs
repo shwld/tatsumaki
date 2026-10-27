@@ -205,6 +205,20 @@ enum StorySubcommand {
 }
 
 impl StorySubcommand {
+    fn project_slot(&mut self) -> &mut Option<String> {
+        match self {
+            Self::Get { project, .. }
+            | Self::List { project, .. }
+            | Self::Create { project, .. }
+            | Self::Update { project, .. }
+            | Self::Status { project, .. }
+            | Self::Comment { project, .. }
+            | Self::Block { project, .. }
+            | Self::Unblock { project, .. }
+            | Self::Reorder { project, .. } => project,
+        }
+    }
+
     fn blocker_action(&self) -> Option<StoryBlockerAction> {
         match self {
             Self::Block { .. } => Some(StoryBlockerAction::Add),
@@ -509,7 +523,9 @@ async fn run() -> Result<(), (CliError, i32)> {
             }
             Ok(())
         }
-        Commands::Artifact(artifact_cmd) => {
+        Commands::Artifact(mut artifact_cmd) => {
+            let slot = artifact_cmd.command.project_slot();
+            *slot = Some(require_project(slot.take())?);
             let base_url = resolve_base_url(&config_store, cli.base_url.clone())?;
             let service = build_service(base_url.clone());
             if let Some(warning) = service
@@ -520,7 +536,9 @@ async fn run() -> Result<(), (CliError, i32)> {
             }
             artifact_cli::run_artifact(artifact_cmd, &base_url, &service, cli.json).await
         }
-        Commands::Story(story_cmd) => {
+        Commands::Story(mut story_cmd) => {
+            let slot = story_cmd.command.project_slot();
+            *slot = Some(require_project(slot.take())?);
             let base_url = resolve_base_url(&config_store, cli.base_url.clone())?;
             let service = build_service(base_url.clone());
             if let Some(warning) = service
@@ -816,7 +834,9 @@ async fn run() -> Result<(), (CliError, i32)> {
             }
             Ok(())
         }
-        Commands::Project(project_cmd) => {
+        Commands::Project(mut project_cmd) => {
+            let ProjectSubcommand::Get { project_id } = &mut project_cmd.command;
+            *project_id = Some(require_project(project_id.take())?);
             let base_url = resolve_base_url(&config_store, cli.base_url.clone())?;
             let service = build_service(base_url.clone());
             if let Some(warning) = service

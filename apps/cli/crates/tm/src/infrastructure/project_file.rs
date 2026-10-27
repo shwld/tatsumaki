@@ -52,7 +52,7 @@ pub fn require_project(flag: Option<String>) -> Result<String, (CliError, i32)> 
         .ok_or_else(|| {
             (
                 CliError::Message(format!(
-                    "Project is not specified: pass --project, set {PROJECT_ID_ENV}, or add project_id to {PROJECT_FILE_NAME}"
+                    "Project is not specified: pass the project (--project, or the ID argument for `project get`), set {PROJECT_ID_ENV}, or add project_id to {PROJECT_FILE_NAME}"
                 )),
                 EXIT_CONFIG,
             )
