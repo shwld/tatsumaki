@@ -66,6 +66,21 @@ tm config show
 
 `http://` is allowed only for loopback hosts (`localhost`, `127.0.0.1`, `::1`).
 
+## Project resolution
+
+`tm story`, `tm artifact`, `tm project get` and `tm desktop refetch` resolve the project in this order:
+
+1. `--project`
+2. `TATSUMAKI_PROJECT_ID`
+3. `project_id` in the nearest `tatsumaki.toml`, searched from the current directory upward
+
+```toml
+# tatsumaki.toml (commit it at the repository root)
+project_id = "01ABC..."
+```
+
+Unknown keys and invalid TOML are errors. `tm config show` prints both the global config and the `tatsumaki.toml` in use.
+
 ## Auth
 
 ```bash

@@ -128,6 +128,7 @@ tm artifact update <artifact-id> --project <project> --path ./dist --base-versio
 tm artifact download <artifact-id> --project <project> --version 1 --out ./restored
 ```
 
+- `--project` can be omitted: it falls back to `TATSUMAKI_PROJECT_ID`, then `project_id` in the nearest `tatsumaki.toml` (see `apps/cli/README.md`).
 - Every update is an immutable version with a fixed URL (`/projects/<project>/artifacts/<id>/versions/<n>`) and a latest URL. Sending an identical tree is a no-op; changing the title or archiving does not create a version.
 - An update needs `--base-version`. If a newer version exists it fails with a conflict instead of overwriting it; there is no force option and no rollback command (download the old version and update from it).
 - The CLI rejects the whole upload for sensitive files (`.git`, `.env*`, keys, certificates, credential-like files), symlinks and unsafe paths. Limits: 50 MiB in total, 25 MiB per file, 1,000 files.
