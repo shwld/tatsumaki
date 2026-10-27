@@ -70,7 +70,7 @@ tm config show
 
 `tm story`, `tm artifact`, `tm project get` and `tm desktop refetch` resolve the project in this order:
 
-1. `--project`
+1. `--project` (for `tm project get`, the positional project ID)
 2. `TATSUMAKI_PROJECT_ID`
 3. `project_id` in the nearest `tatsumaki.toml`, searched from the current directory upward
 
