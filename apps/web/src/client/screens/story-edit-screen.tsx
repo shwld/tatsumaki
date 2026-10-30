@@ -1,9 +1,10 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router";
+import { useNavigate, useParams, useSearchParams } from "react-router";
 
 import { PermissionDenied } from "../components/permission-denied";
+import { ProjectPage } from "../components/project-page";
 import { StoryAccordionDetail } from "../components/story-accordion-detail";
 import { StoryDeleteConfirmDialog } from "../components/story-delete-confirm-dialog";
 import { useAuthError } from "../contexts/auth-error-context";
@@ -262,40 +263,30 @@ export function StoryEditScreen() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-100 px-4 py-10">
-      <div className="mx-auto max-w-2xl rounded-lg bg-white p-6 shadow-sm">
-        <div className="flex items-center justify-between gap-4">
-          <h1 className="text-2xl font-bold text-gray-900">
-            {t("storyEditScreen.title")}
-          </h1>
-          <Link className="text-sm font-medium text-blue-700" to={storiesPath}>
-            {t("storyEditScreen.backToStories")}
-          </Link>
-        </div>
-        <p className="mt-2 text-sm text-gray-600">
-          {t("storyEditScreen.description")}
+    <ProjectPage title={t("storyEditScreen.title")}>
+      <p className="mb-6 text-sm text-gray-600">
+        {t("storyEditScreen.description")}
+      </p>
+
+      {isLoading ? (
+        <p className="text-gray-600">{t("storyEditScreen.loading")}</p>
+      ) : null}
+
+      {!isLoading && displayLoadError && !loadedStory ? (
+        <p className="text-sm text-red-600" role="alert">
+          {displayLoadError}
         </p>
+      ) : null}
 
-        {isLoading ? (
-          <p className="mt-6 text-gray-600">{t("storyEditScreen.loading")}</p>
-        ) : null}
-
-        {!isLoading && displayLoadError && !loadedStory ? (
-          <p className="mt-6 text-sm text-red-600" role="alert">
-            {displayLoadError}
-          </p>
-        ) : null}
-
-        {!isLoading && loadedStory ? (
-          <div className="mt-6 rounded-lg border border-gray-200 bg-white">
-            <StoryAccordionDetail
-              story={loadedStory}
-              mentionCandidates={memberOptions}
-              onStoryUpdated={setLoadedStory}
-            />
-          </div>
-        ) : null}
-      </div>
+      {!isLoading && loadedStory ? (
+        <div className="max-w-2xl rounded-lg border border-gray-200 bg-white">
+          <StoryAccordionDetail
+            story={loadedStory}
+            mentionCandidates={memberOptions}
+            onStoryUpdated={setLoadedStory}
+          />
+        </div>
+      ) : null}
 
       <StoryDeleteConfirmDialog
         isOpen={pendingDeleteStory !== null}
@@ -309,6 +300,6 @@ export function StoryEditScreen() {
           void handleConfirmDelete();
         }}
       />
-    </main>
+    </ProjectPage>
   );
 }

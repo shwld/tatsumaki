@@ -111,6 +111,12 @@ describe("StoryDetailScreen", () => {
         "Sample story",
       );
     });
+    const main = screen.getByRole("main");
+    expect(main.className).not.toContain("bg-gray-100");
+    expect(main.className).not.toContain("min-h-screen");
+    expect(screen.getByRole("heading", { level: 1 }).className).toContain(
+      "text-xl font-semibold",
+    );
   });
 
   it("shows not found when story does not exist", async () => {
