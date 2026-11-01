@@ -78,6 +78,33 @@ describe("validateArtifactManifest", () => {
     ],
     ["exact duplicate", [indexFile, indexFile], "DUPLICATE_PATH"],
     [
+      "file and directory collision",
+      [
+        indexFile,
+        { path: "a.js", size: 1, sha256: SHA },
+        { path: "a.js/b.js", size: 1, sha256: SHA },
+      ],
+      "INVALID_PATH",
+    ],
+    [
+      "case-only file and directory collision",
+      [
+        indexFile,
+        { path: "A.js", size: 1, sha256: SHA },
+        { path: "a.js/b.js", size: 1, sha256: SHA },
+      ],
+      "INVALID_PATH",
+    ],
+    [
+      "nested file and directory collision",
+      [
+        indexFile,
+        { path: "x/a.js", size: 1, sha256: SHA },
+        { path: "x/a.js/y/b.js", size: 1, sha256: SHA },
+      ],
+      "INVALID_PATH",
+    ],
+    [
       "sensitive file",
       [indexFile, { path: ".env", size: 1, sha256: SHA }],
       "SENSITIVE_FILE",

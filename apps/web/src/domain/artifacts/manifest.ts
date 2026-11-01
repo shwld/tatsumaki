@@ -3,6 +3,7 @@ import { ARTIFACT_LIMITS } from "../entities/artifact";
 import type { ArtifactManifestEntry } from "../entities/artifact";
 import {
   findCaseInsensitiveDuplicates,
+  findFileDirectoryConflicts,
   validateArtifactPath,
 } from "./canonical-path";
 import { artifactContentTypeForPath } from "./content-type";
@@ -134,6 +135,12 @@ export async function validateArtifactManifest(input: {
   }
   if (findCaseInsensitiveDuplicates(paths).length > 0) {
     return fail("DUPLICATE_PATH", "Paths differing only by case");
+  }
+  if (findFileDirectoryConflicts(paths).length > 0) {
+    return fail(
+      "INVALID_PATH",
+      "A path cannot be both a file and a directory of another file",
+    );
   }
 
   if (
