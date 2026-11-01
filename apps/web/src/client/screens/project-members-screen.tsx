@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useParams } from "react-router";
 
 import { PermissionDenied } from "../components/permission-denied";
+import { ProjectPage } from "../components/project-page";
 import { useAuthError } from "../contexts/auth-error-context";
 import { isAuthError, isForbiddenError } from "../lib/api-error";
 import { parseErrorMessage } from "../lib/parse-error-message";
@@ -272,12 +273,8 @@ export function ProjectMembersScreen() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-100 px-4 py-10">
-      <div className="mx-auto max-w-3xl rounded-lg bg-white p-6 shadow-sm">
-        <h1 className="mb-6 text-2xl font-bold text-gray-900">
-          {t("projectMembersScreen.title")}
-        </h1>
-
+    <ProjectPage title={t("projectMembersScreen.title")}>
+      <div className="max-w-3xl">
         {isLoading ? (
           <p className="mt-5 text-gray-600">
             {t("projectMembersScreen.loading")}
@@ -514,6 +511,6 @@ export function ProjectMembersScreen() {
           </>
         ) : null}
       </div>
-    </main>
+    </ProjectPage>
   );
 }
