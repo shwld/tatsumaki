@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router";
 import { ActorLabel } from "../components/actor-label";
 import { ArtifactPreview } from "../components/artifact-preview";
+import { ProjectPage } from "../components/project-page";
 import { useAuthError } from "../contexts/auth-error-context";
 import {
   useArtifactDetail,
@@ -47,11 +48,11 @@ export function ArtifactDetailScreen() {
   if (detail.isPending || versions.isPending) {
     if (!detail.isError && !versions.isError) {
       return (
-        <main className="mx-auto w-full max-w-4xl p-4">
+        <ProjectPage title={t("artifactScreens.list.title")}>
           <p role="status" className="text-sm text-gray-600">
             {t("artifactScreens.detail.loading")}
           </p>
-        </main>
+        </ProjectPage>
       );
     }
   }
@@ -61,7 +62,7 @@ export function ArtifactDetailScreen() {
   );
   if (notFound || (versionParam && !VERSION_PATTERN.test(versionParam))) {
     return (
-      <main className="mx-auto w-full max-w-4xl p-4">
+      <ProjectPage title={t("artifactScreens.list.title")}>
         <p role="alert" className="text-sm text-gray-700">
           {t("artifactScreens.detail.notFound")}{" "}
           <Link
@@ -71,13 +72,13 @@ export function ArtifactDetailScreen() {
             {t("artifactScreens.breadcrumb")}
           </Link>
         </p>
-      </main>
+      </ProjectPage>
     );
   }
 
   if (detail.isError || versions.isError || !detail.data || !versions.data) {
     return (
-      <main className="mx-auto w-full max-w-4xl p-4">
+      <ProjectPage title={t("artifactScreens.list.title")}>
         <div role="alert" className="text-sm text-red-700">
           <p>{t("artifactScreens.detail.loadError")}</p>
           <button
@@ -91,7 +92,7 @@ export function ArtifactDetailScreen() {
             {t("artifactScreens.detail.retry")}
           </button>
         </div>
-      </main>
+      </ProjectPage>
     );
   }
 
@@ -112,11 +113,11 @@ export function ArtifactDetailScreen() {
 
   if (versionParam && !shown) {
     return (
-      <main className="mx-auto w-full max-w-4xl p-4">
+      <ProjectPage title={t("artifactScreens.list.title")}>
         <p role="alert" className="text-sm text-gray-700">
           {t("artifactScreens.detail.notFound")}
         </p>
-      </main>
+      </ProjectPage>
     );
   }
 
@@ -126,8 +127,7 @@ export function ArtifactDetailScreen() {
     new Date(value).toLocaleString(i18n.language);
 
   return (
-    <main className="mx-auto w-full max-w-4xl p-4">
-      <h1 className="text-xl font-semibold text-gray-900">{artifact.title}</h1>
+    <ProjectPage title={artifact.title}>
       {artifact.archivedAt ? (
         <p
           role="status"
@@ -243,6 +243,6 @@ export function ArtifactDetailScreen() {
           />
         )}
       </section>
-    </main>
+    </ProjectPage>
   );
 }
