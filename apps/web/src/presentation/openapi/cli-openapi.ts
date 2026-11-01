@@ -46,7 +46,7 @@ const StoryListQuerySchema = z.object({
     }),
 });
 
-const StorySummarySchema = z
+export const StorySummarySchema = z
   .object({
     id: z.string().openapi({ example: "01KNCFJZJ0Z74X92QPCE0D9MK8" }),
     storyNumber: z.number().openapi({ example: 95 }),

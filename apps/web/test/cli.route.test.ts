@@ -1,6 +1,9 @@
 import { SELF, env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
-import { StoryDetailSchema } from "../src/presentation/openapi/cli-openapi";
+import {
+  StoryDetailSchema,
+  StorySummarySchema,
+} from "../src/presentation/openapi/cli-openapi";
 import { createAuthHeaders, setupAccessBindings } from "./helpers/access-jwt";
 import { resetDatabase } from "./helpers/db";
 import { issueAccessToken } from "./helpers/cli-auth";
@@ -148,6 +151,9 @@ describe("cli route", () => {
     const listed = (await listResponse.json()) as {
       stories: Array<{ id: string; title: string; status: string }>;
     };
+    for (const story of listed.stories) {
+      expect(StorySummarySchema.safeParse(story).success).toBe(true);
+    }
     expect(listed.stories).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
