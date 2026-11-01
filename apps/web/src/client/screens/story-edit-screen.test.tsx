@@ -161,6 +161,12 @@ describe("StoryEditScreen", () => {
       );
     });
     expect(screen.queryByRole("navigation", { name: "パンくず" })).toBeNull();
+    const main = screen.getByRole("main");
+    expect(main.className).not.toContain("bg-gray-100");
+    expect(main.className).not.toContain("min-h-screen");
+    expect(screen.getByRole("heading", { level: 1 }).className).toContain(
+      "text-xl font-semibold",
+    );
   });
 
   it("shows error when story is not found", async () => {

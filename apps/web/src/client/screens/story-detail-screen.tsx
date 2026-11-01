@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router";
+import { useParams } from "react-router";
 
 import { PermissionDenied } from "../components/permission-denied";
+import { ProjectPage } from "../components/project-page";
 import { StoryAccordionDetail } from "../components/story-accordion-detail";
 import { useAuthError } from "../contexts/auth-error-context";
 import { useStoryDetail } from "../hooks/use-story-detail";
@@ -103,32 +104,23 @@ export function StoryDetailScreen() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-100 px-4 py-10">
-      <div className="mx-auto max-w-2xl rounded-lg bg-white p-6 shadow-sm">
-        <div className="flex items-center justify-between gap-4">
-          <h1 className="text-2xl font-bold text-gray-900">ストーリー詳細</h1>
-          <Link className="text-sm font-medium text-blue-700" to={storiesPath}>
-            ストーリー一覧へ戻る
-          </Link>
+    <ProjectPage title="ストーリー詳細">
+      {isLoading ? (
+        <p className="text-gray-600">ストーリーを読み込み中です...</p>
+      ) : null}
+
+      {!isLoading && requestError && !loadedStory ? (
+        <div className="space-y-1 text-sm text-red-600" role="status">
+          {isNotFound ? <p>404 Not Found</p> : null}
+          <p>{requestError}</p>
         </div>
+      ) : null}
 
-        {isLoading ? (
-          <p className="mt-6 text-gray-600">ストーリーを読み込み中です...</p>
-        ) : null}
-
-        {!isLoading && requestError && !loadedStory ? (
-          <div className="mt-6 space-y-1 text-sm text-red-600" role="status">
-            {isNotFound ? <p>404 Not Found</p> : null}
-            <p>{requestError}</p>
-          </div>
-        ) : null}
-
-        {!isLoading && loadedStory ? (
-          <div className="mt-6 rounded-lg border border-gray-200 bg-white">
-            <StoryAccordionDetail story={loadedStory} />
-          </div>
-        ) : null}
-      </div>
-    </main>
+      {!isLoading && loadedStory ? (
+        <div className="max-w-2xl rounded-lg border border-gray-200 bg-white">
+          <StoryAccordionDetail story={loadedStory} />
+        </div>
+      ) : null}
+    </ProjectPage>
   );
 }
