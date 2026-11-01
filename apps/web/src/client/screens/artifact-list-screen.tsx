@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router";
+import { ProjectPage } from "../components/project-page";
 import { useAuthError } from "../contexts/auth-error-context";
 import { useArtifactList } from "../hooks/use-artifact-queries";
 import { isAuthError, isHttpStatusError } from "../lib/api-error";
@@ -19,10 +20,7 @@ export function ArtifactListScreen() {
   }, [sessionExpired, notifySessionExpired]);
 
   return (
-    <main className="mx-auto w-full max-w-3xl p-4">
-      <h1 className="mb-4 text-xl font-semibold text-gray-900">
-        {t("artifactScreens.list.title")}
-      </h1>
+    <ProjectPage title={t("artifactScreens.list.title")}>
       {query.isPending ? (
         <p role="status" className="text-sm text-gray-600">
           {t("artifactScreens.list.loading")}
@@ -36,7 +34,7 @@ export function ArtifactListScreen() {
           {t("artifactScreens.list.empty")}
         </p>
       ) : (
-        <ul className="space-y-2">
+        <ul className="max-w-3xl space-y-2">
           {query.data.artifacts.map((artifact) => (
             <li
               key={artifact.id}
@@ -65,6 +63,6 @@ export function ArtifactListScreen() {
           ))}
         </ul>
       )}
-    </main>
+    </ProjectPage>
   );
 }

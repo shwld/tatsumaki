@@ -5,6 +5,7 @@ import {
   IterationProgressChart,
   type IterationProgressChartPayload,
 } from "../components/iteration-progress-chart";
+import { ProjectPage } from "../components/project-page";
 import { useAuthError } from "../contexts/auth-error-context";
 import { isAuthError } from "../lib/api-error";
 import { findCurrentIteration } from "../lib/current-iteration";
@@ -178,26 +179,23 @@ export function ProjectVelocityScreen() {
   }, [completedIterations]);
 
   return (
-    <main className="min-h-screen bg-gray-100 px-4 py-10">
-      <div className="mx-auto max-w-4xl rounded-lg bg-white p-6 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              ベロシティダッシュボード
-            </h1>
-            <p className="mt-2 text-sm text-gray-600">
-              完了済みイテレーションの実績ポイントから、直近3スプリントの平均ベロシティを確認します。
-            </p>
-          </div>
-          {projectId ? (
-            <Link
-              className="text-sm font-medium text-blue-700"
-              to={projectStoriesPath(projectId)}
-            >
-              ストーリーへ戻る
-            </Link>
-          ) : null}
-        </div>
+    <ProjectPage
+      title="ベロシティダッシュボード"
+      actions={
+        projectId ? (
+          <Link
+            className="text-sm font-medium text-blue-700"
+            to={projectStoriesPath(projectId)}
+          >
+            ストーリーへ戻る
+          </Link>
+        ) : null
+      }
+    >
+      <div>
+        <p className="text-sm text-gray-600">
+          完了済みイテレーションの実績ポイントから、直近3スプリントの平均ベロシティを確認します。
+        </p>
 
         {error ? (
           <div className="mt-6 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -211,7 +209,7 @@ export function ProjectVelocityScreen() {
 
         {!isLoading && !error ? (
           <>
-            <section className="mt-6 grid gap-4 md:grid-cols-3">
+            <section className="mt-6 grid max-w-4xl gap-4 md:grid-cols-3">
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                   直近3スプリント平均
@@ -277,7 +275,7 @@ export function ProjectVelocityScreen() {
 
             {burndownPayload && currentIteration ? (
               <section
-                className="mt-6 rounded-md border border-gray-200 bg-white p-4 shadow-sm"
+                className="mt-6 max-w-4xl rounded-md border border-gray-200 bg-white p-4 shadow-sm"
                 aria-label="現在イテレーションの進捗チャート"
               >
                 <h2 className="text-base font-semibold text-gray-900">
@@ -369,6 +367,6 @@ export function ProjectVelocityScreen() {
           </>
         ) : null}
       </div>
-    </main>
+    </ProjectPage>
   );
 }
