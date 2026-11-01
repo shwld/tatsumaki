@@ -3,7 +3,7 @@ use reqwest::StatusCode;
 
 use crate::{application::ports::{AuthGateway, CliVersionResponse, OAuthTokenResponse, ProjectGateway, ProjectGetBody, StoryBlockerAction, StoryBlockerInput, StoryCommentInput, StoryCreateInput, StoryGateway, StoryGetBody, StoryListBody, StoryListFilter, StoryPointUpdate, StoryReorderInput, StoryUpdateInput, UserGateway, VersionGateway, WhoamiResponse}, CliError};
 use crate::infrastructure::http_client;
-use self::types::{CliVersionCompatibilityResponse, GetProjectProjectId, GetStoryByNumberProjectId, GetStoryByNumberStoryNumber, ListStoriesIterationDateScope, ListStoriesLimit, ListStoriesProjectId, StoryStatus};
+use self::types::{CliVersionCompatibilityResponse, GetProjectProjectId, GetStoryByNumberProjectId, GetStoryByNumberStoryNumber, ListStoriesIterationDateScope, StoryStatus};
 
 generate_api!("../../../../packages/contracts/cli-openapi.json");
 
@@ -112,49 +112,39 @@ impl StoryGateway for HttpStoryGateway {
     filter: &StoryListFilter,
     bearer_token: &str,
   ) -> Result<StoryListBody, CliError> {
-    let client = build_authed_client(&self.base_url, bearer_token)?;
-    let p = project
-      .parse::<ListStoriesProjectId>()
-      .map_err(|e| CliError::Message(e.to_string()))?;
-
-    let status: Option<StoryStatus> = if let Some(status_raw) = filter.status.as_deref() {
-      Some(serde_json::from_value(serde_json::Value::String(status_raw.to_string()))
-        .map_err(|e| CliError::Message(format!("Invalid status: {e}")))?)
-    } else {
-      None
-    };
-    let scope: Option<ListStoriesIterationDateScope> = if let Some(scope_raw) = filter.iteration_date_scope.as_deref() {
-      Some(serde_json::from_value(serde_json::Value::String(scope_raw.to_string()))
-        .map_err(|e| CliError::Message(format!("Invalid iterationDateScope: {e}")))?)
-    } else {
-      None
-    };
-    let limit_param: Option<ListStoriesLimit> = if let Some(limit) = filter.limit {
-      Some(limit.to_string().parse::<ListStoriesLimit>().map_err(|e| CliError::Message(e.to_string()))?)
-    } else {
-      None
-    };
-
-    match client.list_stories(&p, scope, limit_param.as_ref(), status).await {
-      Ok(v) => Ok(StoryListBody {
-        stories: v
-          .into_inner()
-          .stories
-          .into_iter()
-          .map(serde_json::to_value)
-          .collect::<Result<Vec<_>, _>>()
-          .map_err(CliError::Json)?,
-      }),
-      Err(e) => {
-        if let Some(status) = e.status() {
-          if status == StatusCode::UNAUTHORIZED || status == StatusCode::FORBIDDEN {
-            return Err(CliError::Message("Unauthorized".to_string()));
-          }
-          return Err(CliError::Message(format!("Request failed with status {status}")));
-        }
-        Err(CliError::Message(e.to_string()))
-      }
+    let mut query: Vec<(&str, String)> = Vec::new();
+    if let Some(status_raw) = filter.status.as_deref() {
+      let status: StoryStatus = serde_json::from_value(serde_json::Value::String(status_raw.to_string()))
+        .map_err(|e| CliError::Message(format!("Invalid status: {e}")))?;
+      query.push(("status", status.to_string()));
     }
+    if let Some(scope_raw) = filter.iteration_date_scope.as_deref() {
+      let scope: ListStoriesIterationDateScope = serde_json::from_value(serde_json::Value::String(scope_raw.to_string()))
+        .map_err(|e| CliError::Message(format!("Invalid iterationDateScope: {e}")))?;
+      query.push(("iterationDateScope", scope.to_string()));
+    }
+    if let Some(limit) = filter.limit {
+      query.push(("limit", limit.to_string()));
+    }
+
+    let url = format!("{}/programmatic-api/v1/projects/{project}/stories", self.base_url);
+    let response = self
+      .client
+      .get(url)
+      .bearer_auth(bearer_token)
+      .query(&query)
+      .send()
+      .await?;
+    if response.status().is_success() {
+      let body: serde_json::Value = response.json().await?;
+      return Ok(StoryListBody {
+        stories: body.get("stories").and_then(|v| v.as_array()).cloned().unwrap_or_default(),
+      });
+    }
+    if response.status() == StatusCode::NOT_FOUND {
+      return Err(CliError::Message("Project not found".to_string()));
+    }
+    Err(Self::error_from_response(response).await)
   }
 
   async fn create_story(&self, project: &str, input: &StoryCreateInput, bearer_token: &str) -> Result<StoryGetBody, CliError> {
