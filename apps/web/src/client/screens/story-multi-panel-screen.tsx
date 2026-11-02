@@ -1222,15 +1222,17 @@ export function StoryMultiPanelScreen() {
           activeId,
           targetPanel,
         );
+        const anchorIndex = groupLastStoryId
+          ? targetStories.findIndex((story) => story.id === groupLastStoryId)
+          : -1;
         const reordered =
-          (groupLastStoryId
-            ? moveStoryAfterAnchor(
-                [...targetStories, movedStory],
-                movedStory.id,
-                groupLastStoryId,
-              )
-            : null) ??
-          insertStoryAtDropTarget(targetStories, movedStory, overIdStr);
+          anchorIndex >= 0
+            ? [
+                ...targetStories.slice(0, anchorIndex + 1),
+                movedStory,
+                ...targetStories.slice(anchorIndex + 1),
+              ]
+            : insertStoryAtDropTarget(targetStories, movedStory, overIdStr);
         const rollbackStories = [...targetStories, movedStory].sort(
           (a, b) => a.position - b.position,
         );
