@@ -299,6 +299,52 @@ describe("cli route", () => {
     });
   });
 
+  it("lists only Icebox stories with icebox=true and rejects invalid combinations", async () => {
+    const accessToken = await issueAccessTokenForCliV1();
+    const projectId = await createProject();
+    const headers = {
+      authorization: `Bearer ${accessToken}`,
+      "content-type": "application/json",
+    };
+    const storiesUrl = `https://localhost/programmatic-api/v1/projects/${projectId}/stories`;
+
+    for (const [title, isIcebox] of [
+      ["icebox story", true],
+      ["backlog story", false],
+    ] as const) {
+      const created = await SELF.fetch(storiesUrl, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ title, type: "chore", isIcebox }),
+      });
+      expect(created.status).toBe(201);
+    }
+
+    const listed = await SELF.fetch(`${storiesUrl}?icebox=true`, { headers });
+    expect(listed.status).toBe(200);
+    const body = (await listed.json()) as {
+      stories: { title: string; isIcebox: boolean }[];
+    };
+    expect(body.stories.map((s) => [s.title, s.isIcebox])).toEqual([
+      ["icebox story", true],
+    ]);
+
+    const all = await SELF.fetch(storiesUrl, { headers });
+    const allBody = (await all.json()) as { stories: { isIcebox: boolean }[] };
+    expect(allBody.stories.map((s) => s.isIcebox).sort()).toEqual([
+      false,
+      true,
+    ]);
+
+    const invalid = await SELF.fetch(`${storiesUrl}?icebox=false`, { headers });
+    expect(invalid.status).toBe(400);
+    const combined = await SELF.fetch(
+      `${storiesUrl}?icebox=true&iterationDateScope=current`,
+      { headers },
+    );
+    expect(combined.status).toBe(400);
+  });
+
   it("puts a story leaving the Icebox at the top of the Backlog", async () => {
     const accessToken = await issueAccessTokenForCliV1();
     const projectId = await createProject();

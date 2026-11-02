@@ -108,6 +108,7 @@ TATSUMAKI_TOKEN=... tm --json story get --project <project-id> 95
 tm story list --project <project-id>
 tm story list --project <project-id> --status Unstarted
 tm story list --project <project-id> --iteration current
+tm story list --project <project-id> --icebox
 tm story list --project <project-id> --status Started --limit 10
 tm --json story list --project <project-id>
 ```
