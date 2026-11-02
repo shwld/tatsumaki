@@ -1264,6 +1264,13 @@ export function StoryMultiPanelScreen() {
       activeId,
       sourcePanel,
     );
+    if (
+      !groupLastStoryId &&
+      shouldCombineCurrentBacklog &&
+      overIdStr.startsWith(COMBINED_GROUP_DROP_ZONE_PREFIX)
+    ) {
+      return;
+    }
     const reordered = groupLastStoryId
       ? moveStoryAfterAnchor(sorted, activeId, groupLastStoryId)
       : reorderStoriesById(
