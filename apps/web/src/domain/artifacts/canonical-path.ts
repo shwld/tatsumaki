@@ -71,3 +71,21 @@ export function findCaseInsensitiveDuplicates(
   }
   return [...duplicates];
 }
+
+/**
+ * Returns canonical paths that are also a directory prefix of another path
+ * (`a` and `a/b`), compared case-insensitively. Such a tree cannot be extracted.
+ */
+export function findFileDirectoryConflicts(
+  canonicalPaths: readonly string[],
+): string[] {
+  const folded = new Set(canonicalPaths.map((path) => path.toLowerCase()));
+  const conflicts = new Set<string>();
+  for (const path of canonicalPaths) {
+    const segments = path.toLowerCase().split("/");
+    for (let end = 1; end < segments.length; end += 1) {
+      if (folded.has(segments.slice(0, end).join("/"))) conflicts.add(path);
+    }
+  }
+  return [...conflicts];
+}
