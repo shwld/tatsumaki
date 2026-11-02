@@ -86,6 +86,7 @@ import {
 } from "../lib/story-multi-panel-drop-allowed";
 import {
   insertStoryAtDropTarget,
+  moveStoryAfterAnchor,
   reorderStoriesById,
   reindexStoriesPosition,
 } from "../lib/story-reorder";
@@ -1129,6 +1130,38 @@ export function StoryMultiPanelScreen() {
     });
   };
 
+  const resolveCombinedGroupLastStoryId = (
+    overIdStr: string,
+    activeId: string,
+    targetPanel: PanelType,
+  ): string | null => {
+    if (
+      !shouldCombineCurrentBacklog ||
+      !overIdStr.startsWith(COMBINED_GROUP_DROP_ZONE_PREFIX)
+    ) {
+      return null;
+    }
+    const encodedGroupKey = overIdStr.slice(
+      COMBINED_GROUP_DROP_ZONE_PREFIX.length,
+    );
+    let groupKey = encodedGroupKey;
+    try {
+      groupKey = decodeURIComponent(encodedGroupKey);
+    } catch {
+      groupKey = encodedGroupKey;
+    }
+    const group = combinedIterationGroups.find((g) => g.key === groupKey);
+    const candidates =
+      group?.stories.filter(
+        (story) =>
+          story.id !== activeId &&
+          (targetPanel === "Current"
+            ? currentStoryIdSet.has(story.id) && story.status !== "Accepted"
+            : !currentStoryIdSet.has(story.id)),
+      ) ?? [];
+    return candidates[candidates.length - 1]?.id ?? null;
+  };
+
   const handleDragEnd = async (event: DragEndEvent) => {
     const overId = event.over?.id;
     if (!overId || !projectId) return;
@@ -1184,11 +1217,22 @@ export function StoryMultiPanelScreen() {
             : targetPanel === "Current"
               ? currentUnacceptedStories
               : groupedStories.Icebox;
-        const reordered = insertStoryAtDropTarget(
-          targetStories,
-          movedStory,
+        const groupLastStoryId = resolveCombinedGroupLastStoryId(
           overIdStr,
+          activeId,
+          targetPanel,
         );
+        const anchorIndex = groupLastStoryId
+          ? targetStories.findIndex((story) => story.id === groupLastStoryId)
+          : -1;
+        const reordered =
+          anchorIndex >= 0
+            ? [
+                ...targetStories.slice(0, anchorIndex + 1),
+                movedStory,
+                ...targetStories.slice(anchorIndex + 1),
+              ]
+            : insertStoryAtDropTarget(targetStories, movedStory, overIdStr);
         const rollbackStories = [...targetStories, movedStory].sort(
           (a, b) => a.position - b.position,
         );
@@ -1217,37 +1261,27 @@ export function StoryMultiPanelScreen() {
     // When over.id is the panel drop-zone sentinel (e.g. story dropped on a sprint
     // group header), @dnd-kit reports the panel droppable instead of a story id.
     // Resolve to the last story so the reorder completes rather than silently reverting.
-    let resolvedOverId = overIdStr;
-    if (overIdStr.startsWith("drop-zone-")) {
-      resolvedOverId = sorted[sorted.length - 1]?.id ?? overIdStr;
-    } else if (
+    const groupLastStoryId = resolveCombinedGroupLastStoryId(
+      overIdStr,
+      activeId,
+      sourcePanel,
+    );
+    if (
+      !groupLastStoryId &&
       shouldCombineCurrentBacklog &&
       overIdStr.startsWith(COMBINED_GROUP_DROP_ZONE_PREFIX)
     ) {
-      const encodedGroupKey = overIdStr.slice(
-        COMBINED_GROUP_DROP_ZONE_PREFIX.length,
-      );
-      let decodedGroupKey = encodedGroupKey;
-      try {
-        decodedGroupKey = decodeURIComponent(encodedGroupKey);
-      } catch {
-        decodedGroupKey = encodedGroupKey;
-      }
-      const targetGroup = combinedIterationGroups.find(
-        (group) => group.key === decodedGroupKey,
-      );
-      const candidateStories =
-        targetGroup?.stories.filter((story) =>
-          sourcePanel === "Current"
-            ? currentStoryIdSet.has(story.id) && story.status !== "Accepted"
-            : !currentStoryIdSet.has(story.id),
-        ) ?? [];
-      resolvedOverId =
-        candidateStories[candidateStories.length - 1]?.id ??
-        sorted[sorted.length - 1]?.id ??
-        overIdStr;
+      return;
     }
-    const reordered = reorderStoriesById(sorted, activeId, resolvedOverId);
+    const reordered = groupLastStoryId
+      ? moveStoryAfterAnchor(sorted, activeId, groupLastStoryId)
+      : reorderStoriesById(
+          sorted,
+          activeId,
+          overIdStr.startsWith("drop-zone-")
+            ? (sorted[sorted.length - 1]?.id ?? overIdStr)
+            : overIdStr,
+        );
     if (!reordered) return;
 
     const rollbackStories = panelQueries.panels[sourcePanel].stories;

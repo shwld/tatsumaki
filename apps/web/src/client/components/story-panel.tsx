@@ -955,6 +955,10 @@ const GroupHeaderDroppable = memo(function GroupHeaderDroppable({
   const { t } = useTranslation();
   const drag = useStoryDragState();
   const isActiveDropTarget = isOver && drag.activeStoryId !== null;
+  // Only the combined Current + Backlog headers resolve a drop to the group's end.
+  const appendsToGroupEnd = dropZoneId.startsWith(
+    "drop-zone-group:CurrentBacklogCombined:",
+  );
 
   const setRefs = useCallback(
     (node: HTMLDivElement | null) => {
@@ -997,12 +1001,18 @@ const GroupHeaderDroppable = memo(function GroupHeaderDroppable({
       }`}
     >
       {children}
-      {isActiveDropTarget && !drag.allowed ? (
+      {isActiveDropTarget && (!drag.allowed || appendsToGroupEnd) ? (
         <p
           data-testid="drop-group-label"
-          className="bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-700 dark:bg-red-950 dark:text-red-200"
+          className={`px-2 py-0.5 text-[10px] font-medium ${
+            drag.allowed
+              ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-200"
+              : "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-200"
+          }`}
         >
-          {t("storyPanel.dropNotAllowed")}
+          {drag.allowed
+            ? t("storyPanel.dropAtGroupEnd")
+            : t("storyPanel.dropNotAllowed")}
         </p>
       ) : null}
     </div>

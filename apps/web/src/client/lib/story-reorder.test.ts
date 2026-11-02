@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   insertStoryAtDropTarget,
+  moveStoryAfterAnchor,
   reindexStoriesPosition,
   reorderStoriesById,
 } from "./story-reorder";
@@ -75,6 +76,35 @@ describe("insertStoryAtDropTarget", () => {
         "drop-zone-group:Current:iter-current",
       ),
     ).toEqual([moved]);
+  });
+});
+
+describe("moveStoryAfterAnchor", () => {
+  const ids = (list: { id: string }[] | null) => list?.map((s) => s.id);
+  const list = ["a", "b", "c", "d"].map((id) => ({ id }));
+
+  it("lands after the anchor when moving down", () => {
+    expect(ids(moveStoryAfterAnchor(list, "a", "c"))).toEqual([
+      "b",
+      "c",
+      "a",
+      "d",
+    ]);
+  });
+
+  it("lands after the anchor when moving up", () => {
+    expect(ids(moveStoryAfterAnchor(list, "d", "b"))).toEqual([
+      "a",
+      "b",
+      "d",
+      "c",
+    ]);
+  });
+
+  it("returns null when the order is unchanged or the anchor is missing", () => {
+    expect(moveStoryAfterAnchor(list, "b", "a")).toBeNull();
+    expect(moveStoryAfterAnchor(list, "a", "zzz")).toBeNull();
+    expect(moveStoryAfterAnchor(list, "a", "a")).toBeNull();
   });
 });
 
