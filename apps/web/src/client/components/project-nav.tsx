@@ -129,6 +129,7 @@ function ProjectNavContent({ projectId }: { projectId: string }) {
         <span
           data-testid="project-nav-name"
           className="w-32 min-w-0 shrink truncate text-sm font-medium"
+          title={displayName}
         >
           {displayName}
         </span>
