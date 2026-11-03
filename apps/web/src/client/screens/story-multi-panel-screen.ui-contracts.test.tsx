@@ -1,5 +1,6 @@
 import userEvent from "@testing-library/user-event";
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -11,7 +12,7 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createStoryMultiPanelFetchMock } from "../test/story-multi-panel/fetch-mock-builder";
-import { PROJECT_ID } from "../test/story-multi-panel/fixtures";
+import { BASE_STORIES, PROJECT_ID } from "../test/story-multi-panel/fixtures";
 import { renderStoryMultiPanel } from "../test/story-multi-panel/render-harness";
 import { AuthErrorProvider } from "../contexts/auth-error-context";
 import { ToastProvider } from "../contexts/toast-context";
@@ -41,6 +42,106 @@ describe("StoryMultiPanelScreen UI contracts", () => {
       configurable: true,
     });
     window.dispatchEvent(new Event("resize"));
+  });
+
+  it("preserves each rapid status transition while the first save is pending", async () => {
+    const story = BASE_STORIES[1]!;
+    const baseFetch = createStoryMultiPanelFetchMock({ stories: [story] });
+    let resolveFirst!: (response: Response) => void;
+    const firstResponse = new Promise<Response>((resolve) => {
+      resolveFirst = resolve;
+    });
+    const statuses: string[] = [];
+    let serverStatus = story.status;
+    const fetchMock = vi.fn(
+      async (input: string | URL | Request, init?: RequestInit) => {
+        if (
+          String(input) === `/api/projects/${PROJECT_ID}/stories/2` &&
+          init?.method === "PATCH"
+        ) {
+          const { status } = JSON.parse(String(init.body)) as {
+            status: string;
+          };
+          statuses.push(status);
+          if (statuses.length === 1) return firstResponse;
+          if (serverStatus === "Finished" && status !== "Delivered") {
+            return new Response(
+              JSON.stringify({ error: "Invalid transition" }),
+              { status: 422 },
+            );
+          }
+          serverStatus = status as typeof serverStatus;
+          return new Response(JSON.stringify({ story: { ...story, status } }), {
+            status: 200,
+          });
+        }
+        return baseFetch(input, init);
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    renderStoryMultiPanel();
+    fireEvent.click(await screen.findByRole("button", { name: "Finish" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Deliver" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Accept" }));
+    expect(statuses).toEqual(["Finished"]);
+    await act(async () => {
+      serverStatus = "Finished";
+      resolveFirst(
+        new Response(
+          JSON.stringify({ story: { ...story, status: "Finished" } }),
+          { status: 200 },
+        ),
+      );
+    });
+    await waitFor(() =>
+      expect(statuses).toEqual(["Finished", "Delivered", "Accepted"]),
+    );
+    await waitFor(() => expect(serverStatus).toBe("Accepted"));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("drops dependent transitions and retries from the last saved status after a failure", async () => {
+    const story = BASE_STORIES[1]!;
+    const baseFetch = createStoryMultiPanelFetchMock({ stories: [story] });
+    let rejectFirst!: (response: Response) => void;
+    const firstResponse = new Promise<Response>((resolve) => {
+      rejectFirst = resolve;
+    });
+    const statuses: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        if (
+          String(input) === `/api/projects/${PROJECT_ID}/stories/2` &&
+          init?.method === "PATCH"
+        ) {
+          const { status } = JSON.parse(String(init.body)) as {
+            status: string;
+          };
+          statuses.push(status);
+          if (statuses.length === 1) return firstResponse;
+          return new Response(JSON.stringify({ story: { ...story, status } }), {
+            status: 200,
+          });
+        }
+        return baseFetch(input, init);
+      }),
+    );
+    renderStoryMultiPanel();
+    fireEvent.click(await screen.findByRole("button", { name: "Finish" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Deliver" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Accept" }));
+    await act(async () => {
+      rejectFirst(
+        new Response(JSON.stringify({ error: "Failed" }), { status: 500 }),
+      );
+    });
+    expect(statuses).toEqual(["Finished"]);
+    fireEvent.click(await screen.findByRole("button", { name: "再試行" }));
+    await waitFor(() => expect(statuses).toEqual(["Finished", "Finished"]));
+    expect(
+      await screen.findByRole("button", { name: "Deliver" }),
+    ).toBeInTheDocument();
   });
 
   it("shows Current/Backlog by default and keeps Done/Icebox hidden", async () => {
