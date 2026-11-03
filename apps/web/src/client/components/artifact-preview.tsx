@@ -119,7 +119,7 @@ export function ArtifactPreview({
       sandbox="allow-scripts"
       referrerPolicy="no-referrer"
       allow=""
-      className="h-[70vh] w-full rounded border border-gray-200 bg-white"
+      className="min-h-0 w-full flex-1 rounded border border-gray-200 bg-white"
     />
   );
 }
