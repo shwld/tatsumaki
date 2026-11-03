@@ -5,10 +5,7 @@ import { Avatar } from "./avatar";
 
 type ActorLabelProps = {
   member:
-    | Pick<
-        ProjectMemberProfile,
-        "displayName" | "profileResolved" | "avatarUrl" | "gravatarUrl"
-      >
+    | Pick<ProjectMemberProfile, "displayName" | "avatarUrl" | "gravatarUrl">
     | null
     | undefined;
   actorName: string | null;
@@ -27,10 +24,9 @@ function isReadableActorName(actorName: string | null): actorName is string {
 
 export function ActorLabel({ member, actorName }: ActorLabelProps) {
   const { t } = useTranslation();
-  const memberName =
-    member?.profileResolved === false ? null : member?.displayName;
   const knownName =
-    memberName ?? (isReadableActorName(actorName) ? actorName.trim() : null);
+    member?.displayName ??
+    (isReadableActorName(actorName) ? actorName.trim() : null);
   const displayName = knownName ?? t("actorLabel.unknownUser");
 
   return (

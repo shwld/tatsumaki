@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useRef, useState } from "react";
 import type { StoryType } from "../types/story";
 import type { ProjectLabel } from "../types/project-label";
 import type { ProjectMemberProfile } from "../types/project";
+import { useMemberDisplayName } from "../hooks/use-member-display-name";
 import { Avatar } from "./avatar";
 import { useTranslation } from "react-i18next";
 
@@ -38,6 +39,7 @@ export const StorySearchBar = memo(function StorySearchBar({
   onSaveSearch,
 }: StorySearchBarProps) {
   const { t } = useTranslation();
+  const memberName = useMemberDisplayName();
   const [filters, setFilters] = useState<StorySearchFilters>(initialFilters);
   const [queryInput, setQueryInput] = useState(initialFilters.query);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
@@ -256,16 +258,16 @@ export const StorySearchBar = memo(function StorySearchBar({
                       ? "bg-primary text-primary-foreground"
                       : "bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                   }`}
-                  title={member.displayName}
+                  title={memberName(member)}
                 >
                   <Avatar
-                    displayName={member.displayName}
+                    displayName={memberName(member)}
                     avatarUrl={member.avatarUrl}
                     gravatarUrl={member.gravatarUrl}
                     size="sm"
                   />
                   <span className="max-w-[8rem] truncate">
-                    {member.displayName}
+                    {memberName(member)}
                   </span>
                 </button>
               ))}

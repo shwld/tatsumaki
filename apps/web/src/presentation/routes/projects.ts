@@ -42,7 +42,6 @@ import {
   hashInvitationLinkToken,
 } from "../../application/usecases/invitation-link-crypto";
 import type { Env } from "../../index";
-import { UNKNOWN_MEMBER_DISPLAY_NAME } from "../../lib/member-display-name";
 import { requireProjectMembership } from "./project-membership";
 import { computeGravatarHash } from "../lib/gravatar";
 import { createEntitlementProvider } from "./billing";
@@ -216,7 +215,7 @@ projectsRoute.get("/projects/:projectId/members", async (c) => {
         : null;
       return {
         ...member,
-        displayName: user?.displayName ?? UNKNOWN_MEMBER_DISPLAY_NAME,
+        displayName: user?.displayName ?? null,
         profileResolved: Boolean(user),
         avatarUrl: user ? `/api/auth/users/${user.id}/avatar` : null,
         gravatarUrl,

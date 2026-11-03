@@ -369,6 +369,44 @@ describe("project routes", () => {
     });
   });
 
+  it("returns null displayName and profileResolved=false for a member without a user profile", async () => {
+    const createResponse = await SELF.fetch("https://localhost/api/projects", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        ...(await createAuthHeaders()),
+      },
+      body: JSON.stringify({ name: "Members Project" }),
+    });
+    const { project } = (await createResponse.json()) as {
+      project: { id: string };
+    };
+    await env.DB.prepare(
+      "insert into project_members (project_id, user_id, role) values (?, ?, ?)",
+    )
+      .bind(project.id, "github|no-profile", "member")
+      .run();
+
+    const response = await SELF.fetch(
+      `https://localhost/api/projects/${project.id}/members`,
+      { headers: await createAuthHeaders() },
+    );
+
+    expect(response.status).toBe(200);
+    const { members } = (await response.json()) as {
+      members: {
+        userId: string;
+        displayName: string | null;
+        profileResolved: boolean;
+      }[];
+    };
+    const unresolved = members.find((m) => m.userId === "github|no-profile");
+    expect(unresolved).toMatchObject({
+      displayName: null,
+      profileResolved: false,
+    });
+  });
+
   it("returns duplicate invitation guidance", async () => {
     const createResponse = await SELF.fetch("https://localhost/api/projects", {
       method: "POST",

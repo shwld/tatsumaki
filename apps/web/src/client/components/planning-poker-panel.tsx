@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Avatar } from "./avatar";
-import { UNKNOWN_MEMBER_DISPLAY_NAME } from "../../lib/member-display-name";
+import { ActorLabel } from "./actor-label";
 import { useToast } from "../contexts/toast-context";
 import { parseErrorMessage } from "../lib/parse-error-message";
 import {
@@ -181,23 +180,13 @@ export function PlanningPokerPanel({
           <div className="space-y-1">
             {participants.map((participantUserId) => {
               const member = membersById.get(participantUserId);
-              const displayName =
-                member?.displayName ?? UNKNOWN_MEMBER_DISPLAY_NAME;
-              const avatarUrl = member?.avatarUrl ?? null;
-              const gravatarUrl = member?.gravatarUrl ?? null;
               return (
                 <div
                   key={participantUserId}
                   className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 text-[11px] text-gray-700"
                 >
                   <span className="flex min-w-0 items-center gap-1.5">
-                    <Avatar
-                      size="sm"
-                      displayName={displayName}
-                      avatarUrl={avatarUrl}
-                      gravatarUrl={gravatarUrl}
-                    />
-                    <span className="truncate">{displayName}</span>
+                    <ActorLabel member={member} actorName={null} />
                   </span>
                   <span
                     className={

@@ -16,7 +16,6 @@ import type {
   ProjectLabel,
   ProjectLabelsResponse,
 } from "../types/project-label";
-import { UNKNOWN_MEMBER_DISPLAY_NAME } from "../../lib/member-display-name";
 import type { ProjectMemberProfile } from "../types/project";
 
 type ProjectBootstrapData = {
@@ -86,7 +85,7 @@ async function fetchProjectBootstrap(
           .map(
             (member): ProjectMemberProfile => ({
               id: member.userId,
-              displayName: member.displayName ?? UNKNOWN_MEMBER_DISPLAY_NAME,
+              displayName: member.displayName ?? null,
               profileResolved: member.profileResolved ?? false,
               avatarUrl: member.avatarUrl ?? null,
               gravatarUrl: member.gravatarUrl ?? null,

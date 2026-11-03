@@ -17,7 +17,6 @@ import { buildReturnPath, extractListContext } from "../lib/list-context";
 import { parseErrorMessage } from "../lib/parse-error-message";
 import { projectStoriesApiPath, projectStoriesPath } from "../lib/story-routes";
 import type { Story } from "../types/story";
-import { UNKNOWN_MEMBER_DISPLAY_NAME } from "../../lib/member-display-name";
 import type { ProjectMemberProfile } from "../types/project";
 
 function draftKey(projectId: string, storyNumber: string): string {
@@ -89,7 +88,7 @@ export function StoryEditScreen() {
         .filter((m): m is typeof m & { userId: string } => Boolean(m.userId))
         .map((m) => ({
           id: m.userId,
-          displayName: m.displayName ?? UNKNOWN_MEMBER_DISPLAY_NAME,
+          displayName: m.displayName ?? null,
           profileResolved: m.profileResolved ?? false,
           avatarUrl: m.avatarUrl ?? null,
           gravatarUrl: m.gravatarUrl ?? null,

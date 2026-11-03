@@ -4,6 +4,7 @@ import { Dice5, Trash2, UserCircle, Users } from "lucide-react";
 import { useStoryPatch } from "../hooks/use-story-patch";
 import type { ProjectMemberProfile } from "../types/project";
 import type { Story } from "../types/story";
+import { useMemberDisplayName } from "../hooks/use-member-display-name";
 import { Avatar } from "./avatar";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 
@@ -25,6 +26,7 @@ function StoryAccordionSubHeaderComponent({
   onOpenPoker,
 }: StoryAccordionSubHeaderProps) {
   const { t } = useTranslation();
+  const memberName = useMemberDisplayName();
   const { patchStory, isSaving } = useStoryPatch(
     story.projectId,
     String(story.storyNumber),
@@ -67,7 +69,7 @@ function StoryAccordionSubHeaderComponent({
                 {owners.slice(0, 3).map((owner) => (
                   <Avatar
                     key={owner.id}
-                    displayName={owner.displayName}
+                    displayName={memberName(owner)}
                     avatarUrl={owner.avatarUrl}
                     gravatarUrl={owner.gravatarUrl}
                     size="sm"
@@ -111,12 +113,12 @@ function StoryAccordionSubHeaderComponent({
                       className="h-3.5 w-3.5"
                     />
                     <Avatar
-                      displayName={member.displayName}
+                      displayName={memberName(member)}
                       avatarUrl={member.avatarUrl}
                       gravatarUrl={member.gravatarUrl}
                       size="sm"
                     />
-                    <span className="truncate">{member.displayName}</span>
+                    <span className="truncate">{memberName(member)}</span>
                   </label>
                 );
               })}
@@ -135,7 +137,7 @@ function StoryAccordionSubHeaderComponent({
           >
             {requester ? (
               <Avatar
-                displayName={requester.displayName}
+                displayName={memberName(requester)}
                 avatarUrl={requester.avatarUrl}
                 gravatarUrl={requester.gravatarUrl}
                 size="sm"
@@ -177,12 +179,12 @@ function StoryAccordionSubHeaderComponent({
                   className="h-3.5 w-3.5"
                 />
                 <Avatar
-                  displayName={member.displayName}
+                  displayName={memberName(member)}
                   avatarUrl={member.avatarUrl}
                   gravatarUrl={member.gravatarUrl}
                   size="sm"
                 />
-                <span className="truncate">{member.displayName}</span>
+                <span className="truncate">{memberName(member)}</span>
               </label>
             ))}
           </div>

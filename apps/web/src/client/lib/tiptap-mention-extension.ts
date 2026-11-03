@@ -162,7 +162,12 @@ export function createAppMentionExtension(
     suggestion: {
       char: "@",
       items: ({ query }: { query: string }) => {
-        const mentionCandidates = getMentionCandidates();
+        const mentionCandidates = getMentionCandidates().filter(
+          (
+            candidate,
+          ): candidate is ProjectMemberProfile & { displayName: string } =>
+            candidate.displayName !== null,
+        );
         const normalizedQuery = query.trim().toLowerCase();
         const matches =
           normalizedQuery.length === 0

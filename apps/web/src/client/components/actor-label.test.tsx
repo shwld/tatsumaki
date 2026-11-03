@@ -35,8 +35,7 @@ describe("ActorLabel", () => {
       <ActorLabel
         member={{
           ...alice,
-          displayName: "不明なユーザー",
-          profileResolved: false,
+          displayName: null,
           avatarUrl: null,
         }}
         actorName={null}
