@@ -43,6 +43,9 @@ SET
 DELETE FROM stories
 WHERE id LIKE '${SEED_PREFIX}-story-%';
 
+DELETE FROM iterations
+WHERE id LIKE '${SEED_PREFIX}-iteration-%';
+
 DELETE FROM project_members
 WHERE project_id LIKE '${SEED_PREFIX}-project-%';
 
@@ -92,6 +95,29 @@ SELECT printf('${SEED_PREFIX}-project-%03d', i), '${DEV_USER_ID}', 'owner'
 FROM n
 ;
 
+WITH RECURSIVE n(i) AS (
+  SELECT 1
+  UNION ALL
+  SELECT i + 1 FROM n WHERE i < ${PROJECT_COUNT}
+)
+INSERT INTO iterations (id, project_id, iteration_number, start_date, end_date)
+SELECT
+  printf('${SEED_PREFIX}-iteration-%03d-past', i),
+  printf('${SEED_PREFIX}-project-%03d', i),
+  1,
+  date('now', '-17 days'),
+  date('now', '-4 days')
+FROM n
+UNION ALL
+SELECT
+  printf('${SEED_PREFIX}-iteration-%03d-current', i),
+  printf('${SEED_PREFIX}-project-%03d', i),
+  2,
+  date('now', '-3 days'),
+  date('now', '+10 days')
+FROM n
+;
+
 WITH RECURSIVE
 project_numbers(p) AS (
   SELECT 1
@@ -119,7 +145,8 @@ INSERT INTO stories (
   iteration_id,
   release_date,
   is_icebox,
-  position
+  position,
+  story_number
 )
 SELECT
   printf('${SEED_PREFIX}-story-%03d-%04d', p, s),
@@ -153,9 +180,14 @@ SELECT
   json_array('seed', 'scroll'),
   '${DEV_USER_ID}',
   NULL,
-  NULL,
+  CASE
+    WHEN (s % 5) = 4 AND s > 12 THEN printf('${SEED_PREFIX}-iteration-%03d-past', p)
+    WHEN s <= 12 OR (s % 5) IN (1, 2, 3) THEN printf('${SEED_PREFIX}-iteration-%03d-current', p)
+    ELSE NULL
+  END,
   NULL,
   0,
+  s,
   s
 FROM project_numbers
 CROSS JOIN story_numbers
