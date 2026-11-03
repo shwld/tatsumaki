@@ -257,7 +257,7 @@ function isDecodablePunycode(label: string): boolean {
 function isHostname(value: string): boolean {
   const host = value.toLowerCase();
   return (
-    /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+([a-z]{2,}|xn--[a-z0-9-]{1,59})$/.test(
+    /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+([a-z]{2,63}|xn--[a-z0-9-]{1,59})$/.test(
       host,
     ) &&
     host

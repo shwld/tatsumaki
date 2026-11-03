@@ -521,7 +521,11 @@ describe("Cloudflare self-hosting setup", () => {
   });
 
   it("rejects malformed Punycode labels", () => {
-    for (const customDomain of ["preview.xn--a", "preview.xn--a-"]) {
+    for (const customDomain of [
+      "preview.xn--a",
+      "preview.xn--a-",
+      `preview.${"a".repeat(64)}`,
+    ]) {
       expect(() =>
         validateSetupOptions({ ...baseOptions, customDomain }),
       ).toThrow("bare hostname");
