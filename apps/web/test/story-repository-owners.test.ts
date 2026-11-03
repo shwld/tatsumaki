@@ -59,6 +59,30 @@ describe("D1StoryRepository.update owner membership", () => {
     ]);
   });
 
+  it("returns saved owners in summaries so adding an owner preserves them", async () => {
+    const repository = new D1StoryRepository(env.DB);
+    const result = await repository.list({
+      projectId: PROJECT_ID,
+      detailLevel: "summary",
+    });
+
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) throw new Error("Failed to list stories");
+    expect(result.value[0]?.ownerIds.sort()).toEqual(
+      [FORMER_MEMBER_ID, MEMBER_ID].sort(),
+    );
+
+    const updated = await repository.update({
+      projectId: PROJECT_ID,
+      id: STORY_ID,
+      ownerIds: [...result.value[0]!.ownerIds, NEW_MEMBER_ID],
+    });
+    expect(updated.isOk()).toBe(true);
+    expect(await storedOwnerIds()).toEqual(
+      [FORMER_MEMBER_ID, MEMBER_ID, NEW_MEMBER_ID].sort(),
+    );
+  });
+
   it("rejects adding a non-member and leaves the story unchanged", async () => {
     const result = await new D1StoryRepository(env.DB).update({
       projectId: PROJECT_ID,
