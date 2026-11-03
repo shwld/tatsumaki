@@ -602,8 +602,10 @@ describe("Cloudflare self-hosting setup", () => {
       ]),
       envelope([
         {
-          id: "p",
-          name: "tatsumaki artifact content (tatsumaki.example.com) bypass",
+          id: "manual-policy",
+          name: "manual",
+          decision: "bypass",
+          include: [{ everyone: {} }],
         },
       ]),
     ];

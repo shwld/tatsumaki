@@ -594,7 +594,14 @@ export class CloudflareClient {
     const policies = await this.listAll<AccessPolicy>(
       `access/apps/${application.id}/policies?per_page=100`,
     );
-    if (!policies.some((policy) => policy.name === policyName)) {
+    const hasBypass = policies.some(
+      (policy) =>
+        policy.name === policyName ||
+        (policy.decision === "bypass" &&
+          JSON.stringify(policy.include) ===
+            JSON.stringify([{ everyone: {} }])),
+    );
+    if (!hasBypass) {
       await this.request(`access/apps/${application.id}/policies`, {
         method: "POST",
         body: {
