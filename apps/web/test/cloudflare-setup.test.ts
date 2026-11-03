@@ -520,6 +520,14 @@ describe("Cloudflare self-hosting setup", () => {
     ).not.toThrow();
   });
 
+  it("rejects malformed Punycode labels", () => {
+    for (const customDomain of ["preview.xn--a", "preview.xn--a-"]) {
+      expect(() =>
+        validateSetupOptions({ ...baseOptions, customDomain }),
+      ).toThrow("bare hostname");
+    }
+  });
+
   it("rejects a staging custom domain in production-only mode", () => {
     expect(() =>
       validateSetupOptions({
@@ -786,6 +794,34 @@ describe("Cloudflare self-hosting setup", () => {
       "tatsumaki.account-subdomain.workers.dev",
     );
     expect(bodies.at(-1)).toEqual(expect.objectContaining({ precedence: 2 }));
+  });
+
+  it("repairs a bypass policy that retains require constraints", async () => {
+    const calls: string[] = [];
+    const responses = [
+      envelope([
+        bypassApp("app", "tatsumaki artifact content", WORKERS_DEV_BYPASS_URI),
+      ]),
+      envelope([
+        {
+          ...bypassPolicy("policy", "tatsumaki artifact content bypass"),
+          require: [{ email: { email: "a@example.com" } }],
+        },
+      ]),
+      envelope({ id: "policy" }),
+    ];
+    const client = new CloudflareClient("account-id", "api-token", (async (
+      _input: string | URL | Request,
+      init?: RequestInit,
+    ) => {
+      calls.push(init?.method ?? "GET");
+      return new Response(JSON.stringify(responses.shift()), { status: 200 });
+    }) as typeof fetch);
+    await client.ensureArtifactContentBypass(
+      buildEnvironmentPlans("tatsumaki", "production")[0],
+      "tatsumaki.account-subdomain.workers.dev",
+    );
+    expect(calls.at(-1)).toBe("PUT");
   });
 
   it("rejects selecting both staging modes", () => {

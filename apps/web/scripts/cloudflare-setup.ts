@@ -1,7 +1,7 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { domainToASCII, fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 
 const API_BASE_URL = "https://api.cloudflare.com/client/v4";
@@ -58,6 +58,8 @@ type AccessPolicy = NamedId & {
   decision?: string;
   include?: unknown[];
   precedence?: number;
+  exclude?: unknown[];
+  require?: unknown[];
 };
 
 export type SetupDependencies = {
@@ -200,8 +202,11 @@ function customDomainFor(
 }
 
 function isHostname(value: string): boolean {
-  return /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+([a-z]{2,}|xn--[a-z0-9-]{1,59})$/i.test(
-    value,
+  const host = value.toLowerCase();
+  return (
+    /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+([a-z]{2,}|xn--[a-z0-9-]{1,59})$/.test(
+      host,
+    ) && domainToASCII(host) === host
   );
 }
 
@@ -605,7 +610,9 @@ export class CloudflareClient {
     );
     const isBypass = (policy: AccessPolicy) =>
       policy.decision === "bypass" &&
-      JSON.stringify(policy.include) === JSON.stringify(include);
+      JSON.stringify(policy.include) === JSON.stringify(include) &&
+      !policy.exclude?.length &&
+      !policy.require?.length;
     if (!policies.some(isBypass)) {
       const drifted = policies.find((policy) => policy.name === policyName);
       const body = {
