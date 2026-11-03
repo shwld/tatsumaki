@@ -36,6 +36,13 @@ const StoryListQuerySchema = z.object({
       param: { name: "iterationDateScope", in: "query" },
       example: "current",
     }),
+  icebox: z
+    .literal("true")
+    .optional()
+    .openapi({
+      param: { name: "icebox", in: "query" },
+      example: "true",
+    }),
   limit: z
     .string()
     .regex(/^[1-9][0-9]*$/)
@@ -53,6 +60,7 @@ export const StorySummarySchema = z
     title: z.string().openapi({ example: "CLIを用意する" }),
     status: z.string().openapi({ example: "Started" }),
     type: z.string().openapi({ example: "feature" }),
+    isIcebox: z.boolean(),
   })
   .openapi("StorySummary");
 
@@ -74,7 +82,6 @@ export const StoryDetailSchema = StorySummarySchema.extend({
   labels: z.array(z.string()),
   epicId: z.string().nullable(),
   iterationId: z.string().nullable(),
-  isIcebox: z.boolean(),
   ownerIds: z.array(z.string()),
   requesterId: z.string().nullable(),
   releaseDate: z.string().nullable(),

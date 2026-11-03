@@ -132,6 +132,9 @@ enum StorySubcommand {
         status: Option<StoryStatusArg>,
         #[arg(long, value_enum)]
         iteration: Option<IterationScopeArg>,
+        /// Only list stories in the Icebox
+        #[arg(long, conflicts_with = "iteration")]
+        icebox: bool,
         #[arg(long)]
         limit: Option<u32>,
     },
@@ -575,12 +578,14 @@ async fn run() -> Result<(), (CliError, i32)> {
                     project,
                     status,
                     iteration,
+                    icebox,
                     limit,
                 } => {
                     let project = require_project(project)?;
                     let filter = StoryListFilter {
                         status: status.map(|s| s.as_api_str().to_string()),
                         iteration_date_scope: iteration.map(|i| i.as_api_str().to_string()),
+                        icebox,
                         limit,
                     };
                     let body = service.list_stories(&base_url, &project, &filter).await?;

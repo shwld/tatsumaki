@@ -92,6 +92,7 @@ pub struct ProjectGetBody {
 pub struct StoryListFilter {
     pub status: Option<String>,
     pub iteration_date_scope: Option<String>,
+    pub icebox: bool,
     pub limit: Option<u32>,
 }
 

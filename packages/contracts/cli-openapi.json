@@ -99,9 +99,6 @@
                 "type": "string",
                 "nullable": true
               },
-              "isIcebox": {
-                "type": "boolean"
-              },
               "ownerIds": {
                 "type": "array",
                 "items": {
@@ -153,7 +150,6 @@
               "labels",
               "epicId",
               "iterationId",
-              "isIcebox",
               "ownerIds",
               "requesterId",
               "releaseDate",
@@ -206,9 +202,12 @@
           "type": {
             "type": "string",
             "example": "feature"
+          },
+          "isIcebox": {
+            "type": "boolean"
           }
         },
-        "required": ["id", "storyNumber", "title", "status", "type"]
+        "required": ["id", "storyNumber", "title", "status", "type", "isIcebox"]
       },
       "StoryListResponse": {
         "type": "object",
@@ -826,6 +825,16 @@
             },
             "required": false,
             "name": "iterationDateScope",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": ["true"],
+              "example": "true"
+            },
+            "required": false,
+            "name": "icebox",
             "in": "query"
           },
           {

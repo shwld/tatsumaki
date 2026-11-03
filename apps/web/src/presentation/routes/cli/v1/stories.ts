@@ -67,7 +67,18 @@ cliV1StoriesRoute.get("/:projectId/stories", async (c) => {
 
   const status = c.req.query("status");
   const iterationDateScope = c.req.query("iterationDateScope");
+  const iceboxRaw = c.req.query("icebox");
   const limitRaw = c.req.query("limit");
+
+  if (iceboxRaw !== undefined && iceboxRaw !== "true") {
+    return c.json({ error: "icebox must be 'true'" }, 400);
+  }
+  if (iceboxRaw !== undefined && iterationDateScope !== undefined) {
+    return c.json(
+      { error: "icebox and iterationDateScope cannot be combined" },
+      400,
+    );
+  }
 
   if (iterationDateScope !== undefined && iterationDateScope !== "current") {
     return c.json({ error: "iterationDateScope must be 'current'" }, 400);
@@ -92,6 +103,7 @@ cliV1StoriesRoute.get("/:projectId/stories", async (c) => {
     ...(iterationDateScope === "current"
       ? { iterationDateScope: "current" as const }
       : {}),
+    ...(iceboxRaw === "true" ? { isIcebox: true } : {}),
     limit,
     detailLevel: "summary",
   });

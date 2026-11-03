@@ -123,6 +123,9 @@ impl StoryGateway for HttpStoryGateway {
         .map_err(|e| CliError::Message(format!("Invalid iterationDateScope: {e}")))?;
       query.push(("iterationDateScope", scope.to_string()));
     }
+    if filter.icebox {
+      query.push(("icebox", "true".to_string()));
+    }
     if let Some(limit) = filter.limit {
       query.push(("limit", limit.to_string()));
     }
