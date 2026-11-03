@@ -825,9 +825,15 @@ export class D1StoryRepository implements StoryRepository {
     }
 
     if (input.ownerIds !== undefined) {
+      // 脱退済みメンバーが owner に残る状態は正常。検証するのは新規に追加される owner のみ。
+      const currentOwnerIds = new Set(
+        (await this.listOwnerIdsByStoryIds([input.id])).get(input.id) ?? [],
+      );
       const ownerValidation = await this.assertOwnerIdsAreProjectMembers(
         input.projectId,
-        input.ownerIds,
+        input.ownerIds.filter((ownerId) => {
+          return !currentOwnerIds.has(ownerId);
+        }),
       );
       if (ownerValidation.isErr()) {
         return err(ownerValidation.error);
