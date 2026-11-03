@@ -12,7 +12,6 @@
 ## 実行前チェック
 
 - 対象 story に `## Plan` / `DoD` / `verify` があることを確認する
-- 進行中 story は 1 つに限定する
 - UI 変更は PivotalTracker 準拠（ADR-0002）を実装計画で明示し、差分がある場合は根拠を記録する
 - スコープ外に落とす要件がある場合は、実装前に follow-up story を作成して storyId を残す
 
