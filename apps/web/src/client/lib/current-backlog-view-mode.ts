@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 
 export const CURRENT_BACKLOG_VIEW_MODES = ["split", "combined"] as const;
 export type CurrentBacklogViewMode =
@@ -41,29 +41,31 @@ function saveViewMode(
 }
 
 export function useCurrentBacklogViewMode(userId: string | null | undefined) {
-  const [mode, setMode] = useState<CurrentBacklogViewMode>(() =>
-    loadViewMode(userId),
-  );
+  const [state, setState] = useState(() => ({
+    userId,
+    mode: loadViewMode(userId),
+  }));
 
-  useEffect(() => {
-    setMode(loadViewMode(userId));
-  }, [userId]);
+  // userId 変更時に effect で同期すると、旧 mode のまま1回 commit されレイアウトがシフトする
+  let mode = state.mode;
+  if (state.userId !== userId) {
+    mode = loadViewMode(userId);
+    setState({ userId, mode });
+  }
 
   const setViewMode = useCallback(
     (nextMode: CurrentBacklogViewMode) => {
-      setMode(nextMode);
+      setState({ userId, mode: nextMode });
       saveViewMode(userId, nextMode);
     },
     [userId],
   );
 
   const toggleMode = useCallback(() => {
-    setMode((current) => {
-      const next = current === "split" ? "combined" : "split";
-      saveViewMode(userId, next);
-      return next;
-    });
-  }, [userId]);
+    const next = mode === "split" ? "combined" : "split";
+    setState({ userId, mode: next });
+    saveViewMode(userId, next);
+  }, [userId, mode]);
 
   return { mode, setMode: setViewMode, toggleMode };
 }
