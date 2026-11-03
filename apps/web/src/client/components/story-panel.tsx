@@ -429,7 +429,7 @@ const StoryCardStaticMeta = memo(function StoryCardStaticMeta({
     <div
       className={`rounded-md border shadow-sm ${statusTone.card} ${
         isExpanded
-          ? `${statusTone.cardBorderExpanded} shadow`
+          ? `${statusTone.cardBorderExpanded} story-tone-expanded shadow`
           : `${statusTone.cardBorder} hover:border-blue-300 hover:shadow`
       }`}
       data-testid={`panel-story-${story.id}`}
@@ -638,7 +638,7 @@ const StoryCardWithInlineEdit = memo(function StoryCardWithInlineEdit({
     <div
       className={`rounded-md border shadow-sm ${statusTone.card} ${
         isExpanded
-          ? `${statusTone.cardBorderExpanded} shadow`
+          ? `${statusTone.cardBorderExpanded} story-tone-expanded shadow`
           : `${statusTone.cardBorder} hover:border-blue-300 hover:shadow`
       }`}
       data-testid={`panel-story-${story.id}`}
