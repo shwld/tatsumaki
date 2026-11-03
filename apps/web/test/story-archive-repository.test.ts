@@ -72,6 +72,31 @@ describe("story archive filtering", () => {
     ).toEqual(["active"]);
   });
 
+  it("reorders more stories than the D1 bind parameter limit", async () => {
+    const db = createDb(env.DB);
+    const ids = Array.from({ length: 120 }, (_, index) => `story-${index}`);
+    for (const [index, id] of ids.entries()) {
+      await db.insert(storiesTable).values({
+        id,
+        projectId,
+        storyNumber: index + 3,
+        title: id,
+        description: "",
+        position: index + 3,
+      });
+    }
+
+    const reorderedIds = [...ids].reverse();
+    const result = await new D1StoryRepository(env.DB).reorder({
+      projectId,
+      orderedIds: reorderedIds,
+    });
+    expect(result._unsafeUnwrap()?.map((story) => story.id)).toEqual([
+      "active",
+      ...reorderedIds,
+    ]);
+  });
+
   it("allows only unstarted and rejected statuses", () => {
     expect(
       ["Unstarted", "Rejected"].every((status) =>

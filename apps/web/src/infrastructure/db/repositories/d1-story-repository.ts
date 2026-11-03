@@ -1273,7 +1273,7 @@ export class D1StoryRepository implements StoryRepository {
     if (moves.length > 0) {
       // Every statement is guarded on the same condition so a concurrent
       // archive of any reordered story leaves positions and history untouched.
-      const noneArchived = sql`not exists (select 1 from ${storiesTable} where ${storiesTable.projectId} = ${input.projectId} and ${inArray(storiesTable.id, input.orderedIds)} and ${storiesTable.archivedAt} is not null)`;
+      const noneArchived = sql`not exists (select 1 from ${storiesTable} where ${storiesTable.projectId} = ${input.projectId} and ${storiesTable.id} in (select value from json_each(${JSON.stringify(input.orderedIds)})) and ${storiesTable.archivedAt} is not null)`;
       const [firstUpdate, ...rest] = moves.map((move) =>
         this.db
           .update(storiesTable)
