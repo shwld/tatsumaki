@@ -2,6 +2,7 @@ import type { Context } from "hono";
 import { setStoryArchived } from "../../../application/usecases/set-story-archived";
 import { D1StoryArchiveRepository } from "../../../infrastructure/db/repositories/d1-story-archive-repository";
 import { D1StoryRepository } from "../../../infrastructure/db/repositories/d1-story-repository";
+import type { ProjectMember } from "../../../domain/entities/project-member";
 import type { Env } from "../../../index";
 import { parseStoryNumberReference } from "../../lib/story-number-reference";
 import { requireProjectMembership } from "../project-membership";
@@ -9,13 +10,15 @@ import { requireProjectMembership } from "../project-membership";
 export async function handleStoryArchive(
   c: Context<Env>,
   archived: boolean,
-  options?: { actorName?: string },
+  options?: { actorName?: string; member?: ProjectMember },
 ): Promise<Response> {
   const projectId = c.req.param("projectId") ?? "";
-  const membership = await requireProjectMembership(c, projectId);
-  if (!membership.ok) return membership.response;
-  if (membership.member.role === "viewer")
-    return c.json({ error: "Viewers cannot archive stories" }, 403);
+  if (!options?.member) {
+    const membership = await requireProjectMembership(c, projectId);
+    if (!membership.ok) return membership.response;
+    if (membership.member.role === "viewer")
+      return c.json({ error: "Viewers cannot archive stories" }, 403);
+  }
   const number = parseStoryNumberReference(c.req.param("storyNumber") ?? "");
   if (number === null) return c.json({ error: "Story not found" }, 404);
   const stories = new D1StoryRepository(c.env.DB);

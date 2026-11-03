@@ -51,6 +51,7 @@ for (const [action, archived] of [
       );
       if (!editor.ok) return editor.response;
       return handleStoryArchive(c, archived, {
+        member: editor.member,
         actorName: `API Key: ${c.get("apiKeyName")}`,
       });
     },

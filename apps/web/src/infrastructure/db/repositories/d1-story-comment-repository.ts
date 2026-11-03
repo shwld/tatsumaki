@@ -224,6 +224,21 @@ export class D1StoryCommentRepository implements StoryCommentRepository {
     }
   }
 
+  private async reasonNoRowChanged(
+    projectId: string,
+    commentId: string,
+  ): Promise<
+    | typeof STORY_COMMENT_ARCHIVED_ERROR
+    | typeof STORY_COMMENT_NOT_FOUND_ERROR
+    | typeof STORY_COMMENT_REPOSITORY_ERROR
+  > {
+    const latest = await this.findById(projectId, commentId);
+    if (latest.isErr()) return STORY_COMMENT_REPOSITORY_ERROR;
+    return latest.value
+      ? STORY_COMMENT_ARCHIVED_ERROR
+      : STORY_COMMENT_NOT_FOUND_ERROR;
+  }
+
   async update(
     projectId: string,
     commentId: string,
@@ -250,7 +265,9 @@ export class D1StoryCommentRepository implements StoryCommentRepository {
           ),
         )
         .returning({ id: storyTimelineEntriesTable.id });
-      if (changed.length === 0) return err(STORY_COMMENT_ARCHIVED_ERROR);
+      if (changed.length === 0) {
+        return err(await this.reasonNoRowChanged(projectId, commentId));
+      }
 
       return ok({
         ...existing.value,
@@ -285,7 +302,9 @@ export class D1StoryCommentRepository implements StoryCommentRepository {
           ),
         )
         .returning({ id: storyTimelineEntriesTable.id });
-      if (changed.length === 0) return err(STORY_COMMENT_ARCHIVED_ERROR);
+      if (changed.length === 0) {
+        return err(await this.reasonNoRowChanged(projectId, commentId));
+      }
 
       return ok(undefined);
     } catch {

@@ -111,10 +111,7 @@ function panelBaseQuery(
     query.set("types", filters.activeTypes.join(","));
   }
 
-  if (archivedSearch) {
-    if (panel !== "Backlog") query.set("statuses", "Accepted");
-    return query;
-  }
+  if (archivedSearch) return query;
 
   if (panel === "Done") {
     query.set("statuses", "Accepted");
@@ -411,6 +408,9 @@ export function usePanelStoriesQuery({
   const queryClient = useQueryClient();
   const hasProject = Boolean(projectId);
   const baseEnabled = enabled && hasProject;
+  const { archived: archivedSearch } = parseArchivedSearch(filters.searchQuery);
+  // Archived stories are listed once, in the Backlog panel.
+  const panelEnabled = baseEnabled && !archivedSearch;
 
   const doneQueryKey = projectId
     ? storyQueryKeys.panelStories(
@@ -450,7 +450,7 @@ export function usePanelStoriesQuery({
 
   const done = useInfiniteQuery({
     queryKey: doneQueryKey,
-    enabled: baseEnabled,
+    enabled: panelEnabled,
     initialPageParam: 0,
     queryFn: ({ pageParam }) =>
       fetchPanelStoriesPage(
@@ -471,7 +471,7 @@ export function usePanelStoriesQuery({
 
   const current = useInfiniteQuery({
     queryKey: currentQueryKey,
-    enabled: baseEnabled,
+    enabled: panelEnabled,
     initialPageParam: 0,
     queryFn: ({ pageParam }) =>
       fetchPanelStoriesPage(
@@ -491,7 +491,7 @@ export function usePanelStoriesQuery({
   });
   const currentAccepted = useInfiniteQuery({
     queryKey: currentAcceptedQueryKey,
-    enabled: baseEnabled && Boolean(currentIterationId),
+    enabled: panelEnabled && Boolean(currentIterationId),
     initialPageParam: 0,
     queryFn: ({ pageParam }) =>
       fetchCurrentAcceptedStoriesPage(
@@ -532,7 +532,7 @@ export function usePanelStoriesQuery({
 
   const icebox = useInfiniteQuery({
     queryKey: iceboxQueryKey,
-    enabled: baseEnabled,
+    enabled: panelEnabled,
     initialPageParam: 0,
     queryFn: ({ pageParam }) =>
       fetchPanelStoriesPage(
