@@ -212,7 +212,7 @@ export function StoryMultiPanelScreen() {
   const retryRequestRef = useRef<null | (() => Promise<void>)>(null);
 
   // Status change
-  const pendingStatusRef = useRef<Map<string, StoryStatus>>(new Map());
+  const pendingStatusRef = useRef<Map<string, StoryStatus[]>>(new Map());
   const processingStoryIdsRef = useRef<Set<string>>(new Set());
   const optimisticStoryRef = useRef<Map<string, Story>>(new Map());
   const reorderRequestVersionRef = useRef<Record<PanelType, number>>({
@@ -584,7 +584,7 @@ export function StoryMultiPanelScreen() {
   useEffect(() => {
     if (!projectId) return;
     retryRequestRef.current = () => bootstrapQuery.refetch().then(() => {});
-  }, [bootstrapQuery, projectId]);
+  }, [bootstrapQuery.refetch, projectId]);
 
   useEffect(() => {
     if (bootstrapQuery.error instanceof Error) {
@@ -928,7 +928,9 @@ export function StoryMultiPanelScreen() {
     optimisticStoryRef.current.set(story.id, optimisticStory);
     panelQueries.applyStoryUpdate(optimisticStory);
 
-    pendingStatusRef.current.set(story.id, nextStatus);
+    const pendingStatuses = pendingStatusRef.current.get(story.id) ?? [];
+    pendingStatuses.push(nextStatus);
+    pendingStatusRef.current.set(story.id, pendingStatuses);
 
     if (processingStoryIdsRef.current.has(story.id)) {
       return;
@@ -940,11 +942,10 @@ export function StoryMultiPanelScreen() {
       let latestServerStory = story;
 
       while (true) {
-        const queuedStatus = pendingStatusRef.current.get(story.id);
+        const queuedStatus = pendingStatusRef.current.get(story.id)?.shift();
         if (queuedStatus === undefined) {
           break;
         }
-        pendingStatusRef.current.delete(story.id);
 
         try {
           latestServerStory = await statusMutation.mutateAsync({
@@ -962,8 +963,11 @@ export function StoryMultiPanelScreen() {
             optimisticStoryRef.current.set(story.id, latestServerStory);
           }
         } catch {
-          // Rollback and toast are handled in the mutation hook.
+          retryRequestRef.current = () =>
+            handleStatusChange(latestServerStory, queuedStatus);
+          panelQueries.applyStoryUpdate(latestServerStory);
           optimisticStoryRef.current.delete(story.id);
+          break;
         }
       }
     } finally {
@@ -2413,7 +2417,12 @@ export function StoryMultiPanelScreen() {
 
         {error && retryRequestRef.current ? (
           <div className="p-4">
-            <ErrorRetry message={error} onRetry={retryRequestRef.current} />
+            <ErrorRetry
+              message={error}
+              onRetry={async () => {
+                await retryRequestRef.current?.();
+              }}
+            />
           </div>
         ) : error ? (
           <p className="p-4 text-sm text-red-600" role="alert">
