@@ -5,6 +5,7 @@ import { createAuthHeaders, setupAccessBindings } from "./helpers/access-jwt";
 import { resetDatabase } from "./helpers/db";
 import { createDb } from "../src/infrastructure/db/client";
 import { iterationsTable } from "../src/infrastructure/db/schema/iterations";
+import { projectMembersTable } from "../src/infrastructure/db/schema/project-members";
 import { STORY_STATUS_CHANGED_CONCURRENTLY_ERROR } from "../src/domain/repositories/story-repository";
 import { D1StoryRepository } from "../src/infrastructure/db/repositories/d1-story-repository";
 import { storiesTable } from "../src/infrastructure/db/schema/stories";
@@ -213,6 +214,34 @@ describe("story routes", () => {
     expect(
       (await fetchWithAuth(`${path}/archive`, { method: "POST" })).status,
     ).toBe(409);
+  });
+
+  it("does not allow a viewer to archive a story", async () => {
+    const projectId = await createProject();
+    const created = await fetchWithAuth(storiesApiPath(projectId), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        title: "Viewer test",
+        description: "",
+        type: "feature",
+      }),
+    });
+    const { story } = (await created.json()) as {
+      story: { storyNumber: number };
+    };
+    await createDb(env.DB)
+      .update(projectMembersTable)
+      .set({ role: "viewer" })
+      .where(eq(projectMembersTable.projectId, projectId));
+    expect(
+      (
+        await fetchWithAuth(
+          `${storyApiPath(projectId, String(story.storyNumber))}/archive`,
+          { method: "POST" },
+        )
+      ).status,
+    ).toBe(403);
   });
 
   it("creates a story with title, description, type, status and labels", async () => {

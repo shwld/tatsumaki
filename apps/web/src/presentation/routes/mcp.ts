@@ -191,6 +191,16 @@ function createMcpServer({ db, currentUser }: McpRequestContext): McpServer {
           currentUser.id,
         );
         if (!access.ok) return access.response;
+        if (access.member.role === "viewer")
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: "Viewers cannot archive stories.",
+              },
+            ],
+            isError: true,
+          };
         const repository = new D1StoryRepository(db);
         const resolved = await resolveMcpStoryId(
           repository,

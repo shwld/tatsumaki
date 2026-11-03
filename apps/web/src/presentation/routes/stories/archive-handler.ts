@@ -13,6 +13,8 @@ export async function handleStoryArchive(
   const projectId = c.req.param("projectId") ?? "";
   const membership = await requireProjectMembership(c, projectId);
   if (!membership.ok) return membership.response;
+  if (membership.member.role === "viewer")
+    return c.json({ error: "Viewers cannot archive stories" }, 403);
   const number = parseStoryNumberReference(c.req.param("storyNumber") ?? "");
   if (number === null) return c.json({ error: "Story not found" }, 404);
   const stories = new D1StoryRepository(c.env.DB);
