@@ -235,6 +235,7 @@ describe("artifact screens", () => {
         "/artifact-content/three/index.html",
       );
       expect(screen.queryByText(/まだ公開された版がありません/)).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "詳細を表示" }));
       expect(screen.getByLabelText("バージョン")).toHaveValue("3");
     });
 
@@ -267,6 +268,9 @@ describe("artifact screens", () => {
     it("navigates to a fixed URL from the version selector", async () => {
       mockApi(baseRoutes());
       renderAt("/projects/p1/artifacts/art-1");
+      fireEvent.click(
+        await screen.findByRole("button", { name: "詳細を表示" }),
+      );
       const select = await screen.findByLabelText("バージョン");
 
       fireEvent.change(select, { target: { value: "1" } });
@@ -391,6 +395,9 @@ describe("artifact screens", () => {
       await i18n.changeLanguage("en");
       mockApi(baseRoutes());
       renderAt("/projects/p1/artifacts/art-1");
+      fireEvent.click(
+        await screen.findByRole("button", { name: "Show details" }),
+      );
       expect(await screen.findByLabelText("Version")).toBeInTheDocument();
       expect(
         await screen.findByTitle("Preview of Release report (v2)"),

@@ -1,3 +1,4 @@
+import { Info } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router";
@@ -127,89 +128,95 @@ export function ArtifactDetailScreen() {
     new Date(value).toLocaleString(i18n.language);
 
   return (
-    <ProjectPage title={artifact.title}>
-      {artifact.archivedAt ? (
-        <p
-          role="status"
-          className="mt-2 inline-block rounded border border-gray-300 px-2 py-0.5 text-xs text-gray-700"
-        >
-          {t("artifactScreens.detail.archived")}
-        </p>
-      ) : null}
-
-      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-        <label className="flex items-center gap-2 text-gray-600">
-          <span>{t("artifactScreens.detail.versionLabel")}</span>
-          <select
-            id="artifact-version"
-            className="rounded border border-gray-300 px-2 py-1 text-gray-900"
-            value={shown?.version ?? ""}
-            disabled={selectable.length === 0}
-            onChange={(event) =>
-              navigate(
-                artifactVersionPath(
-                  projectId,
-                  artifactId,
-                  Number(event.target.value),
-                ),
-              )
-            }
+    <main className="flex min-h-0 flex-1 flex-col px-4 py-2">
+      <div className="flex items-center gap-2">
+        <h1 className="min-w-0 truncate text-base font-semibold text-gray-900">
+          {artifact.title}
+        </h1>
+        {artifact.archivedAt ? (
+          <p
+            role="status"
+            className="shrink-0 rounded border border-gray-300 px-2 py-0.5 text-xs text-gray-700"
           >
-            {shown ? null : <option value="" />}
-            {selectable.map((item) => (
-              <option key={item.version} value={item.version}>
-                {t("artifactScreens.detail.versionOption", {
-                  version: item.version,
-                })}
-              </option>
-            ))}
-          </select>
-        </label>
+            {t("artifactScreens.detail.archived")}
+          </p>
+        ) : null}
         <button
           type="button"
-          className="rounded border border-gray-300 px-2 py-1 text-gray-900"
+          className="inline-flex size-7 shrink-0 items-center justify-center rounded text-gray-600 hover:bg-gray-100"
           aria-expanded={expanded}
-          aria-controls="artifact-metadata"
+          aria-controls="artifact-details"
+          aria-label={
+            expanded
+              ? t("artifactScreens.detail.hideMetadata")
+              : t("artifactScreens.detail.showMetadata")
+          }
           onClick={() => setExpanded((value) => !value)}
         >
-          {expanded
-            ? t("artifactScreens.detail.hideMetadata")
-            : t("artifactScreens.detail.showMetadata")}
+          <Info className="size-4" aria-hidden="true" />
         </button>
       </div>
 
       {expanded ? (
-        <dl
-          id="artifact-metadata"
-          className="mt-3 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm"
-        >
-          <dt className="text-gray-600">{t("artifactScreens.detail.id")}</dt>
-          <dd className="break-all text-gray-900">{artifact.id}</dd>
-          <dt className="text-gray-600">
-            {t("artifactScreens.detail.createdBy")}
-          </dt>
-          <dd className="text-gray-900">
-            <ActorLabel key={creatorId} member={creator} actorName={null} />
-          </dd>
-          <dt className="text-gray-600">
-            {t("artifactScreens.detail.createdAt")}
-          </dt>
-          <dd className="text-gray-900">
-            {formatDate(shown?.createdAt ?? artifact.createdAt)}
-          </dd>
-          {shown ? (
-            <>
-              <dt className="text-gray-600">
-                {t("artifactScreens.detail.fileCount")}
-              </dt>
-              <dd className="text-gray-900">{shown.fileCount}</dd>
-              <dt className="text-gray-600">
-                {t("artifactScreens.detail.totalSize")}
-              </dt>
-              <dd className="text-gray-900">{formatBytes(shown.totalBytes)}</dd>
-            </>
-          ) : null}
-        </dl>
+        <div id="artifact-details" className="mt-2 text-sm">
+          <label className="flex items-center gap-2 text-gray-600">
+            <span>{t("artifactScreens.detail.versionLabel")}</span>
+            <select
+              id="artifact-version"
+              className="rounded border border-gray-300 px-2 py-1 text-gray-900"
+              value={shown?.version ?? ""}
+              disabled={selectable.length === 0}
+              onChange={(event) =>
+                navigate(
+                  artifactVersionPath(
+                    projectId,
+                    artifactId,
+                    Number(event.target.value),
+                  ),
+                )
+              }
+            >
+              {shown ? null : <option value="" />}
+              {selectable.map((item) => (
+                <option key={item.version} value={item.version}>
+                  {t("artifactScreens.detail.versionOption", {
+                    version: item.version,
+                  })}
+                </option>
+              ))}
+            </select>
+          </label>
+          <dl className="mt-3 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">
+            <dt className="text-gray-600">{t("artifactScreens.detail.id")}</dt>
+            <dd className="break-all text-gray-900">{artifact.id}</dd>
+            <dt className="text-gray-600">
+              {t("artifactScreens.detail.createdBy")}
+            </dt>
+            <dd className="text-gray-900">
+              <ActorLabel key={creatorId} member={creator} actorName={null} />
+            </dd>
+            <dt className="text-gray-600">
+              {t("artifactScreens.detail.createdAt")}
+            </dt>
+            <dd className="text-gray-900">
+              {formatDate(shown?.createdAt ?? artifact.createdAt)}
+            </dd>
+            {shown ? (
+              <>
+                <dt className="text-gray-600">
+                  {t("artifactScreens.detail.fileCount")}
+                </dt>
+                <dd className="text-gray-900">{shown.fileCount}</dd>
+                <dt className="text-gray-600">
+                  {t("artifactScreens.detail.totalSize")}
+                </dt>
+                <dd className="text-gray-900">
+                  {formatBytes(shown.totalBytes)}
+                </dd>
+              </>
+            ) : null}
+          </dl>
+        </div>
       ) : null}
 
       {versionParam && latest !== null && shown?.version !== latest ? (
@@ -224,7 +231,7 @@ export function ArtifactDetailScreen() {
         </p>
       ) : null}
 
-      <section className="mt-4">
+      <section className="mt-2 flex min-h-0 flex-1 flex-col">
         {!shown ? (
           <p role="status" className="text-sm text-gray-700">
             {t("artifactScreens.detail.noVersion")}
@@ -243,6 +250,6 @@ export function ArtifactDetailScreen() {
           />
         )}
       </section>
-    </ProjectPage>
+    </main>
   );
 }
