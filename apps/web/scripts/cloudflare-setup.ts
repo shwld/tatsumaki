@@ -54,7 +54,11 @@ type AccessApplication = NamedId & {
   domain?: string;
   destinations?: Array<{ type: string; worker_id?: string; uri?: string }>;
 };
-type AccessPolicy = NamedId & { decision?: string; include?: unknown[] };
+type AccessPolicy = NamedId & {
+  decision?: string;
+  include?: unknown[];
+  precedence?: number;
+};
 
 export type SetupDependencies = {
   fetch?: typeof fetch;
@@ -570,10 +574,9 @@ export class CloudflareClient {
       "access/apps?per_page=100",
     );
     const targetsUri = (candidate: AccessApplication) =>
-      candidate.destinations?.some(
-        (destination) =>
-          destination.type === "public" && destination.uri === uri,
-      ) ?? false;
+      candidate.destinations?.length === 1 &&
+      candidate.destinations[0].type === "public" &&
+      candidate.destinations[0].uri === uri;
     const existing = applications.find(targetsUri);
     const sameName = applications.find((candidate) => candidate.name === name);
     if (!existing && sameName) {
@@ -604,13 +607,15 @@ export class CloudflareClient {
       policy.decision === "bypass" &&
       JSON.stringify(policy.include) === JSON.stringify(include);
     if (!policies.some(isBypass)) {
+      const drifted = policies.find((policy) => policy.name === policyName);
       const body = {
         name: policyName,
         decision: "bypass",
         include,
-        precedence: 1,
+        precedence:
+          drifted?.precedence ??
+          Math.max(0, ...policies.map((policy) => policy.precedence ?? 0)) + 1,
       };
-      const drifted = policies.find((policy) => policy.name === policyName);
       if (drifted) {
         await this.request(
           `access/apps/${application.id}/policies/${drifted.id}`,

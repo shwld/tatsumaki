@@ -721,6 +721,73 @@ describe("Cloudflare self-hosting setup", () => {
     });
   });
 
+  it("does not adopt an application that has additional destinations", async () => {
+    const calls: Array<{ method: string; body?: unknown }> = [];
+    const responses = [
+      envelope([
+        {
+          id: "shared",
+          name: "shared app",
+          destinations: [
+            { type: "public", uri: "tatsumaki.example.com/artifact-content/*" },
+            { type: "public", uri: "tatsumaki.example.com/admin" },
+          ],
+        },
+      ]),
+      envelope({ id: "new-app" }),
+      envelope([]),
+      envelope({ id: "new-policy" }),
+    ];
+    const client = new CloudflareClient("account-id", "api-token", (async (
+      _input: string | URL | Request,
+      init?: RequestInit,
+    ) => {
+      calls.push({
+        method: init?.method ?? "GET",
+        body:
+          typeof init?.body === "string" ? JSON.parse(init.body) : undefined,
+      });
+      return new Response(JSON.stringify(responses.shift()), { status: 200 });
+    }) as typeof fetch);
+    const application = await client.ensureArtifactContentBypass(
+      buildEnvironmentPlans("tatsumaki", "production")[0],
+      "tatsumaki.example.com",
+      { nameSuffix: " (tatsumaki.example.com)" },
+    );
+    expect(application.id).toBe("new-app");
+  });
+
+  it("picks an unused precedence for a new bypass policy", async () => {
+    const bodies: unknown[] = [];
+    const responses = [
+      envelope([
+        bypassApp("app", "tatsumaki artifact content", WORKERS_DEV_BYPASS_URI),
+      ]),
+      envelope([
+        {
+          id: "other",
+          name: "other",
+          decision: "allow",
+          include: [],
+          precedence: 1,
+        },
+      ]),
+      envelope({ id: "new" }),
+    ];
+    const client = new CloudflareClient("account-id", "api-token", (async (
+      _input: string | URL | Request,
+      init?: RequestInit,
+    ) => {
+      if (typeof init?.body === "string") bodies.push(JSON.parse(init.body));
+      return new Response(JSON.stringify(responses.shift()), { status: 200 });
+    }) as typeof fetch);
+    await client.ensureArtifactContentBypass(
+      buildEnvironmentPlans("tatsumaki", "production")[0],
+      "tatsumaki.account-subdomain.workers.dev",
+    );
+    expect(bodies.at(-1)).toEqual(expect.objectContaining({ precedence: 2 }));
+  });
+
   it("rejects selecting both staging modes", () => {
     expect(() =>
       validateSetupOptions({
