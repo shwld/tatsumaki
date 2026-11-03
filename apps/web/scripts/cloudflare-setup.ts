@@ -19,6 +19,8 @@ export type SetupOptions = {
   dryRun: boolean;
   namePrefix: string;
   stagingControlPlaneService?: string;
+  customDomain?: string;
+  stagingCustomDomain?: string;
 };
 
 export type EnvironmentPlan = {
@@ -52,7 +54,13 @@ type AccessApplication = NamedId & {
   domain?: string;
   destinations?: Array<{ type: string; worker_id?: string; uri?: string }>;
 };
-type AccessPolicy = NamedId & { decision?: string; include?: unknown[] };
+type AccessPolicy = NamedId & {
+  decision?: string;
+  include?: unknown[];
+  precedence?: number;
+  exclude?: unknown[];
+  require?: unknown[];
+};
 
 export type SetupDependencies = {
   fetch?: typeof fetch;
@@ -131,6 +139,24 @@ export function validateSetupOptions(options: SetupOptions): void {
       );
     }
   }
+  if (options.customDomain && environmentSelection === "staging") {
+    throw new Error("--custom-domain requires the production environment.");
+  }
+  if (options.stagingCustomDomain && environmentSelection === "production") {
+    throw new Error(
+      "--staging-custom-domain requires --with-staging or --staging-only.",
+    );
+  }
+  for (const customDomain of [
+    options.customDomain,
+    options.stagingCustomDomain,
+  ]) {
+    if (customDomain && !isHostname(customDomain)) {
+      throw new Error(
+        `Custom domain must be a bare hostname (no scheme or path): ${customDomain}`,
+      );
+    }
+  }
   for (const email of options.allowEmails) {
     if (!email.includes("@"))
       throw new Error(`Invalid email address: ${email}`);
@@ -166,6 +192,81 @@ export function validateSetupOptions(options: SetupOptions): void {
   }
 }
 
+function customDomainFor(
+  plan: EnvironmentPlan,
+  options: SetupOptions,
+): string | undefined {
+  return (
+    plan.environment === "staging"
+      ? options.stagingCustomDomain
+      : options.customDomain
+  )?.toLowerCase();
+}
+
+function isDecodablePunycode(label: string): boolean {
+  // RFC 3492 section 6.2 decoder, used only to validate that the label decodes.
+  const input = label.slice(4);
+  const delimiter = input.lastIndexOf("-");
+  if (delimiter === 0) return false;
+  const base = 36;
+  const tMin = 1;
+  const tMax = 26;
+  let n = 128;
+  let bias = 72;
+  let i = 0;
+  let length = delimiter > 0 ? delimiter : 0;
+  let position = delimiter > 0 ? delimiter + 1 : 0;
+  if (position >= input.length) return false;
+  while (position < input.length) {
+    const previous = i;
+    let weight = 1;
+    for (let k = base; ; k += base) {
+      if (position >= input.length) return false;
+      const code = input.charCodeAt(position++);
+      const digit =
+        code >= 97 && code <= 122
+          ? code - 97
+          : code >= 48 && code <= 57
+            ? code - 22
+            : -1;
+      if (digit < 0) return false;
+      i += digit * weight;
+      const t = k <= bias ? tMin : k >= bias + tMax ? tMax : k - bias;
+      if (digit < t) break;
+      weight *= base - t;
+    }
+    length += 1;
+    let delta = Math.floor(
+      previous === 0 ? (i - previous) / 700 : (i - previous) / 2,
+    );
+    delta += Math.floor(delta / length);
+    let k = 0;
+    while (delta > ((base - tMin) * tMax) / 2) {
+      delta = Math.floor(delta / (base - tMin));
+      k += base;
+    }
+    bias = k + Math.floor(((base - tMin + 1) * delta) / (delta + 38));
+    n += Math.floor(i / length);
+    if (n < 0xa0 || n > 0x10ffff || (n >= 0xd800 && n <= 0xdfff)) return false;
+    i %= length;
+    i += 1;
+  }
+  return true;
+}
+
+function isHostname(value: string): boolean {
+  const host = value.toLowerCase();
+  return (
+    /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+([a-z]{2,63}|xn--[a-z0-9-]{1,59})$/.test(
+      host,
+    ) &&
+    host
+      .split(".")
+      .filter((label) => label.startsWith("xn--"))
+      .every(isDecodablePunycode)
+  );
+}
+
 export async function setupCloudflare(
   options: SetupOptions,
   dependencies: SetupDependencies = {},
@@ -186,6 +287,8 @@ export async function setupCloudflare(
       `R2: ${plan.storyAttachmentsBucket}, ${plan.userAvatarsBucket}, ${plan.artifactsBucket}`,
     );
     log(`Access: ${plan.accessName}`);
+    const customDomain = customDomainFor(plan, options);
+    if (customDomain) log(`Custom domain: ${customDomain}`);
     if (plan.environment === "staging" && options.stagingControlPlaneService) {
       log(`Control Plane: ${options.stagingControlPlaneService}`);
     }
@@ -292,6 +395,12 @@ export async function setupCloudflare(
         options.allowDomains,
       );
       await client.ensureArtifactContentBypass(plan, workerDomain);
+      const customDomain = customDomainFor(plan, options);
+      if (customDomain) {
+        await client.ensureArtifactContentBypass(plan, customDomain, {
+          nameSuffix: ` (${customDomain})`,
+        });
+      }
 
       await writeFile(
         secretPath,
@@ -400,7 +509,7 @@ new_sqlite_classes = ["PlanningPokerDO"]
 `;
 }
 
-class CloudflareClient {
+export class CloudflareClient {
   constructor(
     private readonly accountId: string,
     private readonly token: string,
@@ -519,14 +628,26 @@ class CloudflareClient {
   async ensureArtifactContentBypass(
     plan: EnvironmentPlan,
     domain: string,
+    { nameSuffix = "" }: { nameSuffix?: string } = {},
   ): Promise<AccessApplication> {
-    const name = `${plan.accessName} artifact content`;
+    const name = `${plan.accessName} artifact content${nameSuffix}`;
     const uri = `${domain}/artifact-content/*`;
     const applications = await this.listAll<AccessApplication>(
       "access/apps?per_page=100",
     );
+    const targetsUri = (candidate: AccessApplication) =>
+      candidate.destinations?.length === 1 &&
+      candidate.destinations[0].type === "public" &&
+      candidate.destinations[0].uri === uri;
+    const existing = applications.find(targetsUri);
+    const sameName = applications.find((candidate) => candidate.name === name);
+    if (!existing && sameName) {
+      throw new Error(
+        `Access application ${name} already exists but does not cover ${uri}. Correct its destination or delete it and re-run setup.`,
+      );
+    }
     const application =
-      applications.find((candidate) => candidate.name === name) ??
+      existing ??
       (await this.request<AccessApplication>("access/apps", {
         method: "POST",
         body: {
@@ -540,19 +661,36 @@ class CloudflareClient {
       }));
 
     const policyName = `${name} bypass`;
+    const include = [{ everyone: {} }];
     const policies = await this.listAll<AccessPolicy>(
       `access/apps/${application.id}/policies?per_page=100`,
     );
-    if (!policies.some((policy) => policy.name === policyName)) {
-      await this.request(`access/apps/${application.id}/policies`, {
-        method: "POST",
-        body: {
-          name: policyName,
-          decision: "bypass",
-          include: [{ everyone: {} }],
-          precedence: 1,
-        },
-      });
+    const isBypass = (policy: AccessPolicy) =>
+      policy.decision === "bypass" &&
+      JSON.stringify(policy.include) === JSON.stringify(include) &&
+      !policy.exclude?.length &&
+      !policy.require?.length;
+    if (!policies.some(isBypass)) {
+      const drifted = policies.find((policy) => policy.name === policyName);
+      const body = {
+        name: policyName,
+        decision: "bypass",
+        include,
+        precedence:
+          drifted?.precedence ??
+          Math.max(0, ...policies.map((policy) => policy.precedence ?? 0)) + 1,
+      };
+      if (drifted) {
+        await this.request(
+          `access/apps/${application.id}/policies/${drifted.id}`,
+          { method: "PUT", body },
+        );
+      } else {
+        await this.request(`access/apps/${application.id}/policies`, {
+          method: "POST",
+          body,
+        });
+      }
     }
     return application;
   }

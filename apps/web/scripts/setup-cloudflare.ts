@@ -17,6 +17,9 @@ Options:
   --staging-only           Create or update only the isolated staging environment
   --staging-control-plane-service <name>
                            Bind staging to a Control Plane Worker by service name
+  --custom-domain <host>   Also bypass Access for /artifact-content/* on this production custom domain
+  --staging-custom-domain <host>
+                           Same, for the staging custom domain
   --name-prefix <name>     Resource name prefix (default: tatsumaki)
   --dry-run                Print the plan without contacting Cloudflare
   --help                   Show this help
@@ -51,6 +54,10 @@ export function parseArguments(
       options.allowDomains.push(requiredValue(args, ++index, argument));
     else if (argument === "--name-prefix")
       options.namePrefix = requiredValue(args, ++index, argument);
+    else if (argument === "--custom-domain")
+      options.customDomain = requiredValue(args, ++index, argument);
+    else if (argument === "--staging-custom-domain")
+      options.stagingCustomDomain = requiredValue(args, ++index, argument);
     else if (argument === "--staging-control-plane-service")
       options.stagingControlPlaneService = requiredValue(
         args,
