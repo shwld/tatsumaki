@@ -31,14 +31,14 @@ The goal is to open registration to anyone on the official hosted service, keep 
 ### Registration
 
 - Authentication is Cloudflare Access with email one-time PIN only. GitHub is not offered.
-- Access is not the gate for who may use the app. It proves control of an email address. Because email OTP is cheap to automate, Cloudflare Turnstile is required before a user becomes `allowed`. Turnstile is enabled only when its site key is configured, so self-hosted deployments are unaffected.
+- Access is not the gate for who may use the app. It proves control of an email address. Because email OTP is cheap to automate, Cloudflare Turnstile is required before a user becomes `allowed`. The challenge fails closed on the official hosted deployment (`ENTITLEMENT_MODE=control-plane`): onboarding is refused unless the complete Turnstile configuration (site key and secret) is present, so a missing or misnamed setting never becomes unchallenged registration. Only self-hosted deployments, where `ENTITLEMENT_MODE` is unset, treat Turnstile as optional.
 - A first sign-in lands on an onboarding screen. The user passes Turnstile and accepts the terms and privacy policy; the server then verifies Turnstile with Siteverify (single use, hostname and action checked) and creates the `users` row as `allowed`. No `users` row exists before that, so there are no leftover `pending` rows to clean up.
 - Invitations only join a project. Accepting one no longer decides whether the user may use the app.
 - The empty state for a free user with no projects explains that creating projects needs Pro and how to get invited to someone else's project.
 
 ### `access_status`
 
-- Keep the column and redefine it as a kill switch: `allowed` (default after onboarding) or `blocked` (set by the operator for abuse). `blocked` is refused on every path that uses `requireAppEntitlement` / `isAppEntitled`. `pending` is removed.
+- Keep the column and redefine it as a kill switch: `allowed` (default after onboarding) or `blocked` (set by the operator for abuse). `blocked` is refused on every path that uses `requireAppEntitlement` / `isAppEntitled`, and on `/api-key`, which authenticates a project API key and sets its owner as `currentUser` without that check today: `requireApiKeyAuth` must reject keys whose owner is `blocked`. `pending` is removed.
 - The error `INVITATION_REQUIRED` is replaced by separate codes for "onboarding not completed" and "account blocked". Every consumer of the old code and the "Invitation required" responses must be updated together: `app-entitlement.ts`, the two plain-text responses in `index.ts`, the web client's 403 handling, the CLI, and `docs/local-cloudflare-access-setup.md`.
 - Existing users were all set to `allowed` by migration 0049 and are unaffected.
 
