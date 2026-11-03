@@ -34,3 +34,5 @@ At the user's explicit request, combine the application controls and story toolb
 ## Amendment: story archives (story #330, 2026-11-03)
 
 Allow stories to be archived independently of their workflow status. PivotalTracker has no equivalent cancellation state, and deletion loses history while keeping obsolete stories in Icebox adds noise. Archived stories are excluded from normal panels and calculations, discoverable through search, and can be restored. Their details remain read-only while archived.
+
+Keep owner and blocker relationships when archiving. Archived stories do not appear as blockers in active story lists. When restoring a story whose iteration has ended, clear the iteration assignment so it returns to Backlog; retain current or future assignments.

@@ -311,7 +311,32 @@ impl HttpStoryGateway {
 #[cfg(test)]
 mod tests {
   use super::story_update_payload;
-  use crate::application::ports::{StoryPointUpdate, StoryUpdateInput};
+  use crate::application::ports::{StoryGateway, StoryPointUpdate, StoryUpdateInput};
+
+  #[tokio::test]
+  async fn archive_and_unarchive_use_the_authenticated_api() {
+    use std::io::{Read, Write};
+    let _ = rustls::crypto::ring::default_provider().install_default();
+    for (archived, action) in [(true, "archive"), (false, "unarchive")] {
+      let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+      let base_url = format!("http://{}", listener.local_addr().unwrap());
+      let server = std::thread::spawn(move || {
+        let (mut stream, _) = listener.accept().unwrap();
+        let mut buffer = [0u8; 4096];
+        let length = stream.read(&mut buffer).unwrap();
+        let request = String::from_utf8_lossy(&buffer[..length]).to_string();
+        let body = r#"{"story":{"id":"s"}}"#;
+        write!(stream, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}", body.len(), body).unwrap();
+        request
+      });
+      let gateway = super::HttpStoryGateway { base_url, client: reqwest::Client::new() };
+      let result = gateway.set_story_archived("project", 42, archived, "token").await.unwrap();
+      assert_eq!(result.story["id"], "s");
+      let request = server.join().unwrap();
+      assert!(request.starts_with(&format!("POST /programmatic-api/v1/projects/project/stories/42/{action} ")));
+      assert!(request.to_lowercase().contains("authorization: bearer token"));
+    }
+  }
 
   fn empty_update() -> StoryUpdateInput {
     StoryUpdateInput {

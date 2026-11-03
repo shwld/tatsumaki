@@ -9,6 +9,7 @@ import { D1StoryArchiveRepository } from "../src/infrastructure/db/repositories/
 import { D1StoryActivityRepository } from "../src/infrastructure/db/repositories/d1-story-activity-repository";
 import { projectsTable } from "../src/infrastructure/db/schema/projects";
 import { storiesTable } from "../src/infrastructure/db/schema/stories";
+import { iterationsTable } from "../src/infrastructure/db/schema/iterations";
 import { resetDatabase } from "./helpers/db";
 
 const projectId = "archive-test-project";
@@ -55,6 +56,20 @@ describe("story archive filtering", () => {
         .map((s) => s.id),
     ).toEqual(["active", "archived"]);
     expect((await repo.summarize({ projectId }))._unsafeUnwrap().total).toBe(1);
+  });
+
+  it("does not expose or reorder archived stories", async () => {
+    const repo = new D1StoryRepository(env.DB);
+    expect(
+      (
+        await repo.reorder({ projectId, orderedIds: ["archived"] })
+      )._unsafeUnwrap(),
+    ).toBeNull();
+    expect(
+      (await repo.reorder({ projectId, orderedIds: ["active"] }))
+        ._unsafeUnwrap()
+        ?.map((s) => s.id),
+    ).toEqual(["active"]);
   });
 
   it("allows only unstarted and rejected statuses", () => {
@@ -159,5 +174,79 @@ describe("story archive filtering", () => {
         )
       )._unsafeUnwrap(),
     ).toHaveLength(0);
+  });
+
+  it("restores stories from an elapsed iteration to the backlog", async () => {
+    const db = createDb(env.DB);
+    await db.insert(iterationsTable).values({
+      id: "past",
+      projectId,
+      iterationNumber: 1,
+      startDate: "2020-01-01",
+      endDate: "2020-01-15",
+    });
+    await db
+      .update(storiesTable)
+      .set({
+        iterationId: "past",
+        status: "Rejected",
+        archivedAt: "2020-01-10T00:00:00Z",
+      })
+      .where(eq(storiesTable.id, "active"));
+    const stories = new D1StoryRepository(env.DB);
+    const result = await setStoryArchived(
+      stories,
+      new D1StoryArchiveRepository(env.DB),
+      {
+        projectId,
+        storyId: "active",
+        archived: false,
+        actorId: "user",
+        actorName: "User",
+      },
+    );
+    expect(result._unsafeUnwrap()).toMatchObject({
+      archivedAt: null,
+      iterationId: null,
+    });
+    expect(
+      (
+        await stories.list({
+          projectId,
+          iterationDateScope: "future",
+          includeUnassignedIteration: true,
+        })
+      )
+        ._unsafeUnwrap()
+        .map((story) => story.id),
+    ).toContain("active");
+  });
+
+  it("retains a future iteration when restoring", async () => {
+    const db = createDb(env.DB);
+    await db.insert(iterationsTable).values({
+      id: "future",
+      projectId,
+      iterationNumber: 1,
+      startDate: "2099-01-01",
+      endDate: "2099-01-15",
+    });
+    await db
+      .update(storiesTable)
+      .set({ iterationId: "future", archivedAt: "2020-01-10T00:00:00Z" })
+      .where(eq(storiesTable.id, "active"));
+    const stories = new D1StoryRepository(env.DB);
+    const result = await setStoryArchived(
+      stories,
+      new D1StoryArchiveRepository(env.DB),
+      {
+        projectId,
+        storyId: "active",
+        archived: false,
+        actorId: "user",
+        actorName: "User",
+      },
+    );
+    expect(result._unsafeUnwrap().iterationId).toBe("future");
   });
 });

@@ -17,11 +17,13 @@ export class D1StoryArchiveRepository implements StoryArchiveRepository {
       const results = await this.db.batch([
         this.db
           .prepare(
-            "UPDATE stories SET archived_at = ?, updated_at = ? WHERE project_id = ? AND id = ? AND status = ? AND archived_at IS ?",
+            "UPDATE stories SET archived_at = ?, updated_at = ?, iteration_id = CASE WHEN ? = 0 AND EXISTS (SELECT 1 FROM iterations WHERE id = stories.iteration_id AND end_date <= ?) THEN NULL ELSE iteration_id END WHERE project_id = ? AND id = ? AND status = ? AND archived_at IS ?",
           )
           .bind(
             input.archived ? now : null,
             now,
+            input.archived ? 1 : 0,
+            now.slice(0, 10),
             input.story.projectId,
             input.story.id,
             input.story.status,

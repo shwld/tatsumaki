@@ -1028,6 +1028,17 @@ export class D1StoryRepository implements StoryRepository {
       : await updateQuery;
 
     if (updatedRows.length === 0) {
+      const latest = await this.db
+        .select({ archivedAt: storiesTable.archivedAt })
+        .from(storiesTable)
+        .where(
+          and(
+            eq(storiesTable.projectId, input.projectId),
+            eq(storiesTable.id, input.id),
+          ),
+        )
+        .get();
+      if (latest?.archivedAt) return err(STORY_ARCHIVED_ERROR);
       return err(
         input.expectedStatus !== undefined
           ? STORY_STATUS_CHANGED_CONCURRENTLY_ERROR
@@ -1221,7 +1232,12 @@ export class D1StoryRepository implements StoryRepository {
     const stories = await this.db
       .select({ id: storiesTable.id, position: storiesTable.position })
       .from(storiesTable)
-      .where(eq(storiesTable.projectId, input.projectId))
+      .where(
+        and(
+          eq(storiesTable.projectId, input.projectId),
+          isNull(storiesTable.archivedAt),
+        ),
+      )
       .orderBy(asc(storiesTable.position), asc(storiesTable.id))
       .all();
 
@@ -1255,7 +1271,7 @@ export class D1StoryRepository implements StoryRepository {
         continue;
       }
 
-      await this.db
+      const changed = await this.db
         .update(storiesTable)
         .set({
           position: newPosition,
@@ -1265,8 +1281,13 @@ export class D1StoryRepository implements StoryRepository {
           and(
             eq(storiesTable.projectId, input.projectId),
             eq(storiesTable.id, storyId),
+            isNull(storiesTable.archivedAt),
           ),
-        );
+        )
+        .returning({ id: storiesTable.id });
+
+      if (changed.length === 0)
+        return err(STORY_STATUS_CHANGED_CONCURRENTLY_ERROR);
 
       await this.db.insert(storyPriorityHistoryTable).values({
         id: ulid(),
@@ -1279,7 +1300,12 @@ export class D1StoryRepository implements StoryRepository {
     const reordered = await this.db
       .select()
       .from(storiesTable)
-      .where(eq(storiesTable.projectId, input.projectId))
+      .where(
+        and(
+          eq(storiesTable.projectId, input.projectId),
+          isNull(storiesTable.archivedAt),
+        ),
+      )
       .orderBy(asc(storiesTable.position), asc(storiesTable.id))
       .all();
 

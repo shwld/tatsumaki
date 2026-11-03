@@ -758,21 +758,30 @@ function StoryAccordionDetailComponent({
         </p>
         <p className="text-sm">
           {t("storyAccordion.subHeader.owners")}:{" "}
-          {resolvedStory.ownerIds
-            .map(
-              (id) =>
-                memberOptionsResolved.find((member) => member.id === id)
-                  ?.displayName ?? id,
-            )
-            .join(", ") || "—"}
+          {resolvedStory.ownerIds.length === 0
+            ? "—"
+            : resolvedStory.ownerIds.map((id) => (
+                <ActorLabel
+                  key={id}
+                  member={memberOptionsResolved.find(
+                    (member) => member.id === id,
+                  )}
+                  actorName={id}
+                />
+              ))}
         </p>
         <p className="text-sm">
           {t("storyAccordion.subHeader.requester")}:{" "}
-          {memberOptionsResolved.find(
-            (member) => member.id === resolvedStory.requesterId,
-          )?.displayName ??
-            resolvedStory.requesterId ??
-            "—"}
+          {resolvedStory.requesterId ? (
+            <ActorLabel
+              member={memberOptionsResolved.find(
+                (member) => member.id === resolvedStory.requesterId,
+              )}
+              actorName={resolvedStory.requesterId}
+            />
+          ) : (
+            "—"
+          )}
         </p>
         <MarkdownPreview content={resolvedStory.description} />
         <h4>{t("storyAccordion.attachments.title")}</h4>
@@ -809,7 +818,12 @@ function StoryAccordionDetailComponent({
         <ul>
           {timeline.map((entry) => (
             <li key={entry.id}>
-              <span>{entry.actorName}: </span>
+              <ActorLabel
+                member={memberOptionsResolved.find((member) =>
+                  userIdsEqual(member.id, entry.actorUserId),
+                )}
+                actorName={entry.actorName}
+              />
               <MarkdownPreview
                 content={
                   entry.entryType === "comment"
