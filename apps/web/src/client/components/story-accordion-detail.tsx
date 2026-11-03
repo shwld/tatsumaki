@@ -745,7 +745,7 @@ function StoryAccordionDetailComponent({
                   member={memberOptionsResolved.find(
                     (member) => member.id === id,
                   )}
-                  actorName={t("actorLabel.unknownUser")}
+                  actorName={id}
                 />
               ))}
         </p>
@@ -756,7 +756,7 @@ function StoryAccordionDetailComponent({
               member={memberOptionsResolved.find(
                 (member) => member.id === resolvedStory.requesterId,
               )}
-              actorName={t("actorLabel.unknownUser")}
+              actorName={resolvedStory.requesterId}
             />
           ) : (
             "—"
