@@ -101,12 +101,12 @@ const StoryCardWorkflowActions = memo(function StoryCardWorkflowActions({
 
 const STORY_CARD_STATUS_TONES = {
   Started: {
-    card: "bg-sky-50",
+    card: "bg-sky-50 story-tone-started",
     cardBorder: "border-sky-200",
     cardBorderExpanded: "border-sky-400",
   },
   Delivered: {
-    card: "bg-amber-50",
+    card: "bg-amber-50 story-tone-delivered",
     cardBorder: "border-amber-200",
     cardBorderExpanded: "border-amber-400",
   },
