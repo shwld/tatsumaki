@@ -23,6 +23,20 @@ const baseOptions: SetupOptions = {
   stagingControlPlaneService: undefined,
 };
 
+const bypassApp = (id: string, name: string, uri: string) => ({
+  id,
+  name,
+  destinations: [{ type: "public", uri }],
+});
+const bypassPolicy = (id: string, name: string) => ({
+  id,
+  name,
+  decision: "bypass",
+  include: [{ everyone: {} }],
+});
+const WORKERS_DEV_BYPASS_URI =
+  "tatsumaki.account-subdomain.workers.dev/artifact-content/*";
+
 describe("Cloudflare self-hosting setup", () => {
   it("builds isolated production and staging resource names", () => {
     expect(
@@ -280,9 +294,15 @@ describe("Cloudflare self-hosting setup", () => {
           include: [{ email: { email: "owner@example.com" } }],
         },
       ]),
-      envelope([{ id: "bypass-app-id", name: "tatsumaki artifact content" }]),
       envelope([
-        { id: "bypass-policy-id", name: "tatsumaki artifact content bypass" },
+        bypassApp(
+          "bypass-app-id",
+          "tatsumaki artifact content",
+          WORKERS_DEV_BYPASS_URI,
+        ),
+      ]),
+      envelope([
+        bypassPolicy("bypass-policy-id", "tatsumaki artifact content bypass"),
       ]),
     ];
     const methods: string[] = [];
@@ -542,17 +562,33 @@ describe("Cloudflare self-hosting setup", () => {
         },
       ]),
       envelope([
-        { id: "bypass-app-id", name: "tatsumaki artifact content" },
-        { id: "custom-bypass-id", name: bypassName },
+        bypassApp(
+          "bypass-app-id",
+          "tatsumaki artifact content",
+          WORKERS_DEV_BYPASS_URI,
+        ),
+        bypassApp(
+          "custom-bypass-id",
+          bypassName,
+          "tatsumaki.example.com/artifact-content/*",
+        ),
       ]),
       envelope([
-        { id: "bypass-policy-id", name: "tatsumaki artifact content bypass" },
+        bypassPolicy("bypass-policy-id", "tatsumaki artifact content bypass"),
       ]),
       envelope([
-        { id: "bypass-app-id", name: "tatsumaki artifact content" },
-        { id: "custom-bypass-id", name: bypassName },
+        bypassApp(
+          "bypass-app-id",
+          "tatsumaki artifact content",
+          WORKERS_DEV_BYPASS_URI,
+        ),
+        bypassApp(
+          "custom-bypass-id",
+          bypassName,
+          "tatsumaki.example.com/artifact-content/*",
+        ),
       ]),
-      envelope([{ id: "custom-policy-id", name: `${bypassName} bypass` }]),
+      envelope([bypassPolicy("custom-policy-id", `${bypassName} bypass`)]),
     ];
     const fetchMock = vi.fn(
       async (input: string | URL | Request, init?: RequestInit) => {
@@ -623,6 +659,66 @@ describe("Cloudflare self-hosting setup", () => {
     );
     expect(application.id).toBe("manual-id");
     expect(calls.filter((call) => call.method === "POST")).toEqual([]);
+  });
+
+  it("fails when the named bypass application does not cover the domain", async () => {
+    const client = new CloudflareClient(
+      "account-id",
+      "api-token",
+      (async () =>
+        new Response(
+          JSON.stringify(
+            envelope([
+              bypassApp(
+                "drifted",
+                "tatsumaki artifact content (a.example.com)",
+                "other.example.com/artifact-content/*",
+              ),
+            ]),
+          ),
+          { status: 200 },
+        )) as typeof fetch,
+    );
+    await expect(
+      client.ensureArtifactContentBypass(
+        buildEnvironmentPlans("tatsumaki", "production")[0],
+        "a.example.com",
+        { nameSuffix: " (a.example.com)" },
+      ),
+    ).rejects.toThrow("does not cover");
+  });
+
+  it("repairs a drifted named bypass policy in place", async () => {
+    const calls: Array<{ url: string; method: string }> = [];
+    const responses = [
+      envelope([
+        bypassApp("app", "tatsumaki artifact content", WORKERS_DEV_BYPASS_URI),
+      ]),
+      envelope([
+        {
+          id: "policy",
+          name: "tatsumaki artifact content bypass",
+          decision: "allow",
+          include: [],
+        },
+      ]),
+      envelope({ id: "policy" }),
+    ];
+    const client = new CloudflareClient("account-id", "api-token", (async (
+      input: string | URL | Request,
+      init?: RequestInit,
+    ) => {
+      calls.push({ url: input.toString(), method: init?.method ?? "GET" });
+      return new Response(JSON.stringify(responses.shift()), { status: 200 });
+    }) as typeof fetch);
+    await client.ensureArtifactContentBypass(
+      buildEnvironmentPlans("tatsumaki", "production")[0],
+      "tatsumaki.account-subdomain.workers.dev",
+    );
+    expect(calls.at(-1)).toEqual({
+      url: expect.stringContaining("/access/apps/app/policies/policy"),
+      method: "PUT",
+    });
   });
 
   it("rejects selecting both staging modes", () => {

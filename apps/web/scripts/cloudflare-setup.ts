@@ -569,15 +569,20 @@ export class CloudflareClient {
     const applications = await this.listAll<AccessApplication>(
       "access/apps?per_page=100",
     );
+    const targetsUri = (candidate: AccessApplication) =>
+      candidate.destinations?.some(
+        (destination) =>
+          destination.type === "public" && destination.uri === uri,
+      ) ?? false;
+    const existing = applications.find(targetsUri);
+    const sameName = applications.find((candidate) => candidate.name === name);
+    if (!existing && sameName) {
+      throw new Error(
+        `Access application ${name} already exists but does not cover ${uri}. Correct its destination or delete it and re-run setup.`,
+      );
+    }
     const application =
-      applications.find(
-        (candidate) =>
-          candidate.name === name ||
-          candidate.destinations?.some(
-            (destination) =>
-              destination.type === "public" && destination.uri === uri,
-          ),
-      ) ??
+      existing ??
       (await this.request<AccessApplication>("access/apps", {
         method: "POST",
         body: {
@@ -591,26 +596,32 @@ export class CloudflareClient {
       }));
 
     const policyName = `${name} bypass`;
+    const include = [{ everyone: {} }];
     const policies = await this.listAll<AccessPolicy>(
       `access/apps/${application.id}/policies?per_page=100`,
     );
-    const hasBypass = policies.some(
-      (policy) =>
-        policy.name === policyName ||
-        (policy.decision === "bypass" &&
-          JSON.stringify(policy.include) ===
-            JSON.stringify([{ everyone: {} }])),
-    );
-    if (!hasBypass) {
-      await this.request(`access/apps/${application.id}/policies`, {
-        method: "POST",
-        body: {
-          name: policyName,
-          decision: "bypass",
-          include: [{ everyone: {} }],
-          precedence: 1,
-        },
-      });
+    const isBypass = (policy: AccessPolicy) =>
+      policy.decision === "bypass" &&
+      JSON.stringify(policy.include) === JSON.stringify(include);
+    if (!policies.some(isBypass)) {
+      const body = {
+        name: policyName,
+        decision: "bypass",
+        include,
+        precedence: 1,
+      };
+      const drifted = policies.find((policy) => policy.name === policyName);
+      if (drifted) {
+        await this.request(
+          `access/apps/${application.id}/policies/${drifted.id}`,
+          { method: "PUT", body },
+        );
+      } else {
+        await this.request(`access/apps/${application.id}/policies`, {
+          method: "POST",
+          body,
+        });
+      }
     }
     return application;
   }
