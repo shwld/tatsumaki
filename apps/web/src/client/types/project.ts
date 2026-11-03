@@ -61,8 +61,8 @@ export type ProjectMemberRole = "owner" | "member" | "viewer";
 /** 表示用 DTO。ロール情報を持つドメイン型 ProjectMember とは責務が異なる。 */
 export type ProjectMemberProfile = {
   id: string;
-  displayName: string;
-  /** false のとき displayName は表示用フォールバックであり、ユーザー本人の名前ではない。 */
+  /** プロフィール未解決のとき null。 */
+  displayName: string | null;
   profileResolved: boolean;
   avatarUrl: string | null;
   gravatarUrl: string | null;
