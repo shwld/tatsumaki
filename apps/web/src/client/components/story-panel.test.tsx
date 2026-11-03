@@ -277,6 +277,23 @@ describe("StoryPanel", () => {
     ).toBeInTheDocument();
   });
 
+  it("tints Started and Delivered cards differently from other statuses", () => {
+    renderPanel({
+      stories: [
+        makeStory({ id: "s-tone-started", status: "Started", position: 1 }),
+        makeStory({ id: "s-tone-delivered", status: "Delivered", position: 2 }),
+        makeStory({ id: "s-tone-unstarted", status: "Unstarted", position: 3 }),
+      ],
+    });
+
+    const started = screen.getByTestId("panel-story-s-tone-started");
+    const delivered = screen.getByTestId("panel-story-s-tone-delivered");
+    const unstarted = screen.getByTestId("panel-story-s-tone-unstarted");
+    expect(started).toHaveClass("bg-sky-50");
+    expect(delivered).toHaveClass("bg-amber-50");
+    expect(unstarted).toHaveClass("bg-white");
+  });
+
   it("shows blocked icon when story is blocked by others", () => {
     renderPanel({
       stories: [

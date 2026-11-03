@@ -99,3 +99,21 @@ body {
 :root[data-theme="dark"] .hover\:border-emerald-300:hover {
   border-color: #34d399 !important;
 }
+
+:root[data-theme="dark"] .story-tone-started {
+  background-color: #0c2a3d !important;
+  border-color: #0369a1 !important;
+}
+
+:root[data-theme="dark"] .story-tone-started.story-tone-expanded {
+  border-color: #38bdf8 !important;
+}
+
+:root[data-theme="dark"] .story-tone-delivered {
+  background-color: #3a2a0c !important;
+  border-color: #b45309 !important;
+}
+
+:root[data-theme="dark"] .story-tone-delivered.story-tone-expanded {
+  border-color: #fbbf24 !important;
+}

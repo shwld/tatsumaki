@@ -99,6 +99,33 @@ const StoryCardWorkflowActions = memo(function StoryCardWorkflowActions({
   );
 });
 
+const STORY_CARD_STATUS_TONES = {
+  Started: {
+    card: "bg-sky-50 story-tone-started",
+    cardBorder: "border-sky-200",
+    cardBorderExpanded: "border-sky-400",
+  },
+  Delivered: {
+    card: "bg-amber-50 story-tone-delivered",
+    cardBorder: "border-amber-200",
+    cardBorderExpanded: "border-amber-400",
+  },
+} as const;
+
+const DEFAULT_STORY_CARD_STATUS_TONE = {
+  card: "bg-white",
+  cardBorder: "border-gray-200",
+  cardBorderExpanded: "border-blue-400",
+} as const;
+
+function getStoryCardStatusTone(status: StoryStatus) {
+  return (
+    (status === "Started" || status === "Delivered"
+      ? STORY_CARD_STATUS_TONES[status]
+      : undefined) ?? DEFAULT_STORY_CARD_STATUS_TONE
+  );
+}
+
 function shouldIgnoreHeaderToggleClick(target: EventTarget | null): boolean {
   /** Lucide icons render as SVG (`SVGElement`); clicks must still resolve `closest("button")`. */
   if (!(target instanceof Element)) return false;
@@ -378,6 +405,7 @@ const StoryCardStaticMeta = memo(function StoryCardStaticMeta({
     t("storyPanel.estimateRequired"),
   );
   const isSelected = selectedStoryIds?.has(story.id) ?? false;
+  const statusTone = getStoryCardStatusTone(story.status);
 
   const handleHeaderClick = useCallback(
     (e: MouseEvent<HTMLDivElement>) => {
@@ -399,15 +427,15 @@ const StoryCardStaticMeta = memo(function StoryCardStaticMeta({
 
   return (
     <div
-      className={`rounded-md border shadow-sm ${
+      className={`rounded-md border shadow-sm ${statusTone.card} ${
         isExpanded
-          ? "border-blue-400 bg-white shadow"
-          : "border-gray-200 bg-white hover:border-blue-300 hover:shadow"
+          ? `${statusTone.cardBorderExpanded} story-tone-expanded shadow`
+          : `${statusTone.cardBorder} hover:border-blue-300 hover:shadow`
       }`}
       data-testid={`panel-story-${story.id}`}
     >
       <div
-        className={`sticky ${Z_STORY_CARD_HEADER_STICKY} rounded-t-md ${stickyHeaderTopClassName} bg-white`}
+        className={`sticky ${Z_STORY_CARD_HEADER_STICKY} rounded-t-md ${stickyHeaderTopClassName} ${statusTone.card}`}
         style={
           stickyHeaderTopUsesIterationCssVar
             ? ({
@@ -556,6 +584,7 @@ const StoryCardWithInlineEdit = memo(function StoryCardWithInlineEdit({
     t("storyPanel.estimateRequired"),
   );
   const isSelected = selectedStoryIds?.has(story.id) ?? false;
+  const statusTone = getStoryCardStatusTone(story.status);
 
   const pointScale =
     storyInlineEdit.pointScale.length > 0
@@ -607,15 +636,15 @@ const StoryCardWithInlineEdit = memo(function StoryCardWithInlineEdit({
 
   return (
     <div
-      className={`rounded-md border shadow-sm ${
+      className={`rounded-md border shadow-sm ${statusTone.card} ${
         isExpanded
-          ? "border-blue-400 bg-white shadow"
-          : "border-gray-200 bg-white hover:border-blue-300 hover:shadow"
+          ? `${statusTone.cardBorderExpanded} story-tone-expanded shadow`
+          : `${statusTone.cardBorder} hover:border-blue-300 hover:shadow`
       }`}
       data-testid={`panel-story-${story.id}`}
     >
       <div
-        className={`sticky ${Z_STORY_CARD_HEADER_STICKY} rounded-t-md ${stickyHeaderTopClassName} bg-white`}
+        className={`sticky ${Z_STORY_CARD_HEADER_STICKY} rounded-t-md ${stickyHeaderTopClassName} ${statusTone.card}`}
         style={
           stickyHeaderTopUsesIterationCssVar
             ? ({
