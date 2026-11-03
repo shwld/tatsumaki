@@ -128,7 +128,8 @@ function ProjectNavContent({ projectId }: { projectId: string }) {
         </DropdownMenu>
         <span
           data-testid="project-nav-name"
-          className="min-w-0 truncate text-sm font-medium"
+          className="w-32 min-w-0 shrink truncate text-sm font-medium"
+          title={displayName}
         >
           {displayName}
         </span>
@@ -143,7 +144,7 @@ function ProjectNavContent({ projectId }: { projectId: string }) {
     >
       <span
         data-testid="project-nav-name"
-        className="max-w-40 shrink-0 truncate text-sm font-semibold"
+        className="w-40 shrink-0 truncate text-sm font-semibold"
         title={displayName}
       >
         {displayName}
