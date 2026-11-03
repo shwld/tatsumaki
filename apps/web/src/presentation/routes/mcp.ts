@@ -12,6 +12,8 @@ import { getStory } from "../../application/usecases/get-story";
 import { listStories } from "../../application/usecases/list-stories";
 import { reorderStories } from "../../application/usecases/reorder-stories";
 import { updateStory } from "../../application/usecases/update-story";
+import { setStoryArchived } from "../../application/usecases/set-story-archived";
+import { D1StoryArchiveRepository } from "../../infrastructure/db/repositories/d1-story-archive-repository";
 import { STORY_STATUSES, STORY_TYPES } from "../../domain/entities/story";
 import { getPointScale } from "../../domain/entities/project";
 import type { ProjectRepository } from "../../domain/repositories/project-repository";
@@ -167,6 +169,83 @@ function createMcpServer({ db, currentUser }: McpRequestContext): McpServer {
     version: "0.0.1",
   });
 
+  for (const archived of [true, false]) {
+    server.registerTool(
+      archived ? "archive_story" : "unarchive_story",
+      {
+        title: archived ? "Archive Story" : "Restore Story",
+        description: archived
+          ? "Archive an unstarted or rejected story."
+          : "Restore an archived story.",
+        inputSchema: z
+          .object({
+            projectId: z.string().min(1),
+            ...mcpStoryReferenceSchemaFields,
+          })
+          .superRefine(refineMcpStoryReference),
+      },
+      async ({ projectId, storyId, storyNumber }) => {
+        const access = await requireProjectAccess(
+          new D1ProjectRepository(db),
+          projectId,
+          currentUser.id,
+        );
+        if (!access.ok) return access.response;
+        if (access.member.role === "viewer")
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: "Viewers cannot archive stories.",
+              },
+            ],
+            isError: true,
+          };
+        const repository = new D1StoryRepository(db);
+        const resolved = await resolveMcpStoryId(
+          repository,
+          projectId,
+          storyId,
+          storyNumber,
+        );
+        if (!resolved.ok)
+          return {
+            content: [{ type: "text" as const, text: resolved.message }],
+            isError: true,
+          };
+        const result = await setStoryArchived(
+          repository,
+          new D1StoryArchiveRepository(db),
+          {
+            projectId,
+            storyId: resolved.storyId,
+            archived,
+            actorId: currentUser.id,
+            actorName: currentUser.email ?? currentUser.id,
+          },
+        );
+        if (result.isErr())
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: `Failed to change archive state: ${result.error}`,
+              },
+            ],
+            isError: true,
+          };
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify({ story: result.value }),
+            },
+          ],
+        };
+      },
+    );
+  }
+
   server.registerTool(
     "get_project",
     {
@@ -246,6 +325,7 @@ function createMcpServer({ db, currentUser }: McpRequestContext): McpServer {
         "Fetch stories from a tatsumaki project. Returns stories in priority order. Supports filtering to the current iteration and limiting to the top N stories.",
       inputSchema: z.object({
         projectId: z.string().min(1).describe("The project ID"),
+        archived: z.enum(["exclude", "include", "only"]).optional(),
         status: z
           .enum(STORY_STATUSES)
           .optional()
@@ -266,7 +346,7 @@ function createMcpServer({ db, currentUser }: McpRequestContext): McpServer {
           ),
       }),
     },
-    async ({ projectId, status, iterationScope, limit }) => {
+    async ({ projectId, status, iterationScope, limit, archived }) => {
       const projectRepository = new D1ProjectRepository(db);
       const access = await requireProjectAccess(
         projectRepository,
@@ -281,6 +361,7 @@ function createMcpServer({ db, currentUser }: McpRequestContext): McpServer {
       const repository = new D1StoryRepository(db);
       const result = await listStories(repository, {
         projectId,
+        ...(archived ? { archived } : {}),
         ...(status !== undefined ? { status } : {}),
       });
 
@@ -336,6 +417,7 @@ function createMcpServer({ db, currentUser }: McpRequestContext): McpServer {
         description: story.description,
         status: story.status,
         isIcebox: story.isIcebox,
+        archivedAt: story.archivedAt,
         storyPoint: story.storyPoint,
         type: story.type,
         labels: story.labels,
@@ -432,6 +514,7 @@ function createMcpServer({ db, currentUser }: McpRequestContext): McpServer {
                 description: result.value.description,
                 status: result.value.status,
                 isIcebox: result.value.isIcebox,
+                archivedAt: result.value.archivedAt,
                 storyPoint: result.value.storyPoint,
                 type: result.value.type,
                 labels: result.value.labels,

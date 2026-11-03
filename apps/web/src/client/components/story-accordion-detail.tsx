@@ -18,6 +18,7 @@ import { useTranslation } from "react-i18next";
 import { useAuthError } from "../contexts/auth-error-context";
 import { useToast } from "../contexts/toast-context";
 import { storyQueryKeys } from "../hooks/story-query-keys";
+import { useStoryArchive } from "../hooks/use-story-archive";
 import { useCurrentUser } from "../hooks/use-current-user";
 import { userIdsEqual } from "../lib/user-ids-equal";
 import { useProjectBootstrap } from "../hooks/use-project-bootstrap";
@@ -100,6 +101,10 @@ function StoryAccordionDetailComponent({
       },
     },
   );
+  const restoreStory = useStoryArchive(story, (restored) => {
+    syncStoryUpdate(restored);
+    onStoryUpdated?.(restored);
+  });
   const { data: bootstrap } = useProjectBootstrap(story.projectId);
   const projectLabels = bootstrap?.projectLabels ?? [];
   const { user: viewer } = useCurrentUser();
@@ -699,6 +704,118 @@ function StoryAccordionDetailComponent({
   const labelsError = metadataFieldErrors.labels ?? null;
   const storyPointError = metadataFieldErrors.storyPoint ?? null;
   const titleError = metadataFieldErrors.title ?? null;
+
+  if (resolvedStory.archivedAt) {
+    return (
+      <div className="space-y-3 px-3 pb-3 pt-2">
+        <div className="flex items-center justify-between rounded border bg-gray-50 p-2 text-sm">
+          <span>{t("storyAccordion.detail.archived")}</span>
+          <button
+            type="button"
+            className="underline"
+            onClick={() => {
+              void restoreStory(false).catch(() =>
+                showToast("error", t("storyAccordion.detail.restoreFailed")),
+              );
+            }}
+          >
+            {t("storyAccordion.detail.restore")}
+          </button>
+        </div>
+        <p className="font-medium">{resolvedStory.title}</p>
+        <p className="text-sm">
+          {t("storyAccordion.detail.status")}:{" "}
+          {t(`storyAccordion.status.options.${resolvedStory.status}`)}
+        </p>
+        <p className="text-sm">
+          {t("storyAccordion.detail.points")}:{" "}
+          {resolvedStory.storyPoint ?? t("storyAccordion.detail.unset")}
+        </p>
+        <p className="text-sm">
+          {t("storyAccordion.detail.labels")}:{" "}
+          {resolvedStory.labels.join(", ") || "—"}
+        </p>
+        <p className="text-sm">
+          {t("storyAccordion.subHeader.owners")}:{" "}
+          {resolvedStory.ownerIds.length === 0
+            ? "—"
+            : resolvedStory.ownerIds.map((id) => (
+                <ActorLabel
+                  key={id}
+                  member={memberOptionsResolved.find(
+                    (member) => member.id === id,
+                  )}
+                  actorName={id}
+                />
+              ))}
+        </p>
+        <p className="text-sm">
+          {t("storyAccordion.subHeader.requester")}:{" "}
+          {resolvedStory.requesterId ? (
+            <ActorLabel
+              member={memberOptionsResolved.find(
+                (member) => member.id === resolvedStory.requesterId,
+              )}
+              actorName={resolvedStory.requesterId}
+            />
+          ) : (
+            "—"
+          )}
+        </p>
+        <MarkdownPreview content={resolvedStory.description} />
+        <h4>{t("storyAccordion.attachments.title")}</h4>
+        <ul>
+          {attachments.map((attachment) => (
+            <li key={attachment.id}>
+              <a
+                className="underline"
+                href={projectStoryAttachmentContentApiPath(
+                  story.projectId,
+                  String(story.storyNumber),
+                  attachment.id,
+                )}
+              >
+                {attachment.fileName}
+              </a>
+            </li>
+          ))}
+        </ul>
+        <h4>{t("storyAccordion.blockers.title")}</h4>
+        <p className="text-sm">
+          {t("storyAccordion.blockers.blockingThisStory")}:{" "}
+          {(resolvedStory.blockingStories ?? [])
+            .map((item) => `#${item.storyNumber} ${item.title}`)
+            .join(", ") || "—"}
+        </p>
+        <p className="text-sm">
+          {t("storyAccordion.blockers.blockedByThisStory")}:{" "}
+          {(resolvedStory.blockedStories ?? [])
+            .map((item) => `#${item.storyNumber} ${item.title}`)
+            .join(", ") || "—"}
+        </p>
+        <h4>{t("storyAccordion.timeline.title")}</h4>
+        <ul>
+          {timeline.map((entry) => (
+            <li key={entry.id}>
+              <ActorLabel
+                member={memberOptionsResolved.find((member) =>
+                  userIdsEqual(member.id, entry.actorUserId),
+                )}
+                actorName={entry.actorName}
+              />
+              <MarkdownPreview
+                content={
+                  entry.entryType === "comment"
+                    ? entry.body
+                    : formatStoryTimelineSummary(entry, locale)
+                }
+              />
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3 px-3 pb-3 pt-2">

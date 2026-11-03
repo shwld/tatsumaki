@@ -351,6 +351,24 @@ describe("iteration routes", () => {
       updatedAt: timestamp,
     });
 
+    await db.insert(storiesTable).values({
+      id: ulid(),
+      storyNumber: 2,
+      projectId,
+      title: "Archived fixture",
+      description: "-",
+      type: "chore",
+      status: "Unstarted",
+      storyPoint: 8,
+      labels: "[]",
+      iterationId,
+      position: 2,
+      isIcebox: 0,
+      archivedAt: timestamp,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    });
+
     const response = await fetchWithAuth(
       iterationBurndownApiUrl(projectId, iterationId),
     );

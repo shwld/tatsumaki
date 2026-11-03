@@ -120,6 +120,16 @@ struct StoryCommand {
 
 #[derive(Subcommand, Debug)]
 enum StorySubcommand {
+    Archive {
+        #[arg(long)]
+        project: Option<String>,
+        story_number: i64,
+    },
+    Unarchive {
+        #[arg(long)]
+        project: Option<String>,
+        story_number: i64,
+    },
     Get {
         #[arg(long)]
         project: Option<String>,
@@ -135,6 +145,8 @@ enum StorySubcommand {
         /// Only list stories in the Icebox
         #[arg(long, conflicts_with = "iteration")]
         icebox: bool,
+        #[arg(long)]
+        archived: bool,
         #[arg(long)]
         limit: Option<u32>,
     },
@@ -214,6 +226,7 @@ enum StorySubcommand {
 impl StorySubcommand {
     fn project_slot(&mut self) -> &mut Option<String> {
         match self {
+            Self::Archive { project, .. } | Self::Unarchive { project, .. } => project,
             Self::Get { project, .. }
             | Self::List { project, .. }
             | Self::Create { project, .. }
@@ -555,7 +568,32 @@ async fn run() -> Result<(), (CliError, i32)> {
                 eprintln!("{warning}");
             }
             let blocker_action = story_cmd.command.blocker_action();
+            let archive_action = matches!(&story_cmd.command, StorySubcommand::Archive { .. });
             match story_cmd.command {
+                StorySubcommand::Archive {
+                    project,
+                    story_number,
+                }
+                | StorySubcommand::Unarchive {
+                    project,
+                    story_number,
+                } => {
+                    let project = require_project(project)?;
+                    let body = service
+                        .set_story_archived(&base_url, &project, story_number, archive_action)
+                        .await?;
+                    let output = if cli.json {
+                        serde_json::to_value(&body)
+                    } else {
+                        Ok(body.story)
+                    }
+                    .map_err(|e| (CliError::Json(e), EXIT_GENERAL))?;
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&output)
+                            .map_err(|e| (CliError::Json(e), EXIT_GENERAL))?
+                    );
+                }
                 StorySubcommand::Get {
                     project,
                     story_number,
@@ -583,6 +621,7 @@ async fn run() -> Result<(), (CliError, i32)> {
                     status,
                     iteration,
                     icebox,
+                    archived,
                     limit,
                 } => {
                     let project = require_project(project)?;
@@ -590,6 +629,7 @@ async fn run() -> Result<(), (CliError, i32)> {
                         status: status.map(|s| s.as_api_str().to_string()),
                         iteration_date_scope: iteration.map(|i| i.as_api_str().to_string()),
                         icebox,
+                        archived,
                         limit,
                     };
                     let body = service.list_stories(&base_url, &project, &filter).await?;
@@ -1032,6 +1072,16 @@ pub fn validate_base_url(raw: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn story_archive_commands_and_filter_parse() {
+        for action in ["archive", "unarchive"] {
+            let parsed = Cli::try_parse_from(["tm", "story", action, "42"]).unwrap();
+            assert!(matches!(parsed.command, Commands::Story(StoryCommand { command: StorySubcommand::Archive { story_number: 42, .. } | StorySubcommand::Unarchive { story_number: 42, .. } })));
+        }
+        let parsed = Cli::try_parse_from(["tm", "story", "list", "--archived"]).unwrap();
+        assert!(matches!(parsed.command, Commands::Story(StoryCommand { command: StorySubcommand::List { archived: true, .. } })));
+    }
 
     #[test]
     fn story_type_arg_accepts_release() {

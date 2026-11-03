@@ -5,6 +5,7 @@ import { createAuthHeaders, setupAccessBindings } from "./helpers/access-jwt";
 import { resetDatabase } from "./helpers/db";
 import { createDb } from "../src/infrastructure/db/client";
 import { iterationsTable } from "../src/infrastructure/db/schema/iterations";
+import { projectMembersTable } from "../src/infrastructure/db/schema/project-members";
 import { STORY_STATUS_CHANGED_CONCURRENTLY_ERROR } from "../src/domain/repositories/story-repository";
 import { D1StoryRepository } from "../src/infrastructure/db/repositories/d1-story-repository";
 import { storiesTable } from "../src/infrastructure/db/schema/stories";
@@ -164,6 +165,85 @@ describe("story routes", () => {
     return iterationId;
   };
 
+  it("archives, filters, protects and restores a story", async () => {
+    const projectId = await createProject();
+    const created = await fetchWithAuth(storiesApiPath(projectId), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        title: "Archive me",
+        description: "",
+        type: "feature",
+      }),
+    });
+    const { story } = (await created.json()) as {
+      story: { id: string; storyNumber: number };
+    };
+    const path = storyApiPath(projectId, String(story.storyNumber));
+    expect(
+      (await fetchWithAuth(`${path}/archive`, { method: "POST" })).status,
+    ).toBe(200);
+    const active = (await (
+      await fetchWithAuth(storiesApiPath(projectId))
+    ).json()) as { stories: unknown[] };
+    expect(active.stories).toHaveLength(0);
+    const archived = (await (
+      await fetchWithAuth(`${storiesApiPath(projectId)}?archived=only`)
+    ).json()) as { stories: { id: string }[] };
+    expect(archived.stories.map((s) => s.id)).toEqual([story.id]);
+    const update = await fetchWithAuth(path, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ title: "Changed" }),
+    });
+    expect(update.status).toBe(409);
+    const comment = await fetchWithAuth(`${path}/comments`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ body: "No" }),
+    });
+    expect(comment.status).toBe(409);
+    expect(
+      (await fetchWithAuth(`${path}/unarchive`, { method: "POST" })).status,
+    ).toBe(200);
+    const restored = (await (
+      await fetchWithAuth(storiesApiPath(projectId))
+    ).json()) as { stories: { id: string }[] };
+    expect(restored.stories.map((s) => s.id)).toEqual([story.id]);
+    await forceStatusForTest(story.id, "Started");
+    expect(
+      (await fetchWithAuth(`${path}/archive`, { method: "POST" })).status,
+    ).toBe(409);
+  });
+
+  it("does not allow a viewer to archive a story", async () => {
+    const projectId = await createProject();
+    const created = await fetchWithAuth(storiesApiPath(projectId), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        title: "Viewer test",
+        description: "",
+        type: "feature",
+      }),
+    });
+    const { story } = (await created.json()) as {
+      story: { storyNumber: number };
+    };
+    await createDb(env.DB)
+      .update(projectMembersTable)
+      .set({ role: "viewer" })
+      .where(eq(projectMembersTable.projectId, projectId));
+    expect(
+      (
+        await fetchWithAuth(
+          `${storyApiPath(projectId, String(story.storyNumber))}/archive`,
+          { method: "POST" },
+        )
+      ).status,
+    ).toBe(403);
+  });
+
   it("creates a story with title, description, type, status and labels", async () => {
     const projectId = await createProject();
 
@@ -193,6 +273,7 @@ describe("story routes", () => {
         storyNumber: 1,
         statusChangedAt: expect.any(String),
         completedAt: null,
+        archivedAt: null,
         storyPoint: 3,
         labels: ["auth", "backend"],
         epicId: null,
@@ -277,6 +358,7 @@ describe("story routes", () => {
         storyNumber: 1,
         statusChangedAt: expect.any(String),
         completedAt: null,
+        archivedAt: null,
         storyPoint: 8,
         labels: ["ui", "priority:high"],
         epicId: null,
@@ -558,6 +640,7 @@ describe("story routes", () => {
         storyNumber: 1,
         statusChangedAt: expect.any(String),
         completedAt: null,
+        archivedAt: null,
         storyPoint: null,
         labels: [],
         epicId: null,

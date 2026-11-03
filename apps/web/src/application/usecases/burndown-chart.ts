@@ -4,6 +4,7 @@ import {
   eq,
   gt,
   inArray,
+  isNull,
   lte,
   ne,
   notInArray,
@@ -101,6 +102,7 @@ async function sumCommittedScopeForIteration(
     .where(
       and(
         eq(storiesTable.iterationId, iterationId),
+        isNull(storiesTable.archivedAt),
         ne(storiesTable.status, "Rejected"),
       ),
     )
@@ -128,7 +130,12 @@ async function listIterationPointAggregates(
         ),
     })
     .from(storiesTable)
-    .where(inArray(storiesTable.iterationId, iterationIds))
+    .where(
+      and(
+        inArray(storiesTable.iterationId, iterationIds),
+        isNull(storiesTable.archivedAt),
+      ),
+    )
     .groupBy(storiesTable.iterationId)
     .all();
 
@@ -161,6 +168,7 @@ async function sumRemainingForIteration(
     .where(
       and(
         eq(storiesTable.iterationId, iterationId),
+        isNull(storiesTable.archivedAt),
         notInArray(storiesTable.status, ["Accepted", "Rejected"]),
       ),
     )

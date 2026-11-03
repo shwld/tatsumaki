@@ -70,6 +70,7 @@ function createMockRepository(options: {
     findById: async () => ok(null),
     delete: async () => ok(true),
     assignStory: async () => ok(true),
+    assignStoryForRebuild: async () => ok(true),
     unassignStory: async () => ok(true),
     updateUtilization: async () =>
       ok({

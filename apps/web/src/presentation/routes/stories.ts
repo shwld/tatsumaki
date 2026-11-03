@@ -56,6 +56,7 @@ import {
 } from "../../application/usecases/story-input";
 import { getPointScale } from "../../domain/entities/project";
 import { STORY_ATTACHMENT_NOT_FOUND_ERROR } from "../../domain/repositories/story-attachment-repository";
+import { STORY_COMMENT_ARCHIVED_ERROR } from "../../domain/repositories/story-comment-repository";
 import type { StoryAttachmentObjectStore } from "../../application/ports/story-attachment-object-store";
 import { D1StoryRepository } from "../../infrastructure/db/repositories/d1-story-repository";
 import { InMemoryStoryAttachmentObjectStore } from "../../infrastructure/storage/in-memory-story-attachment-object-store";
@@ -63,6 +64,7 @@ import { R2StoryAttachmentObjectStore } from "../../infrastructure/storage/r2-st
 import type { Env } from "../../index";
 import { requireProjectMembership } from "./project-membership";
 import { changeStoryBlocker } from "./stories/blocker-handlers";
+import { handleStoryArchive } from "./stories/archive-handler";
 import {
   STORY_TYPE_ERROR_MESSAGE,
   toCreateStoryErrorResponse,
@@ -101,6 +103,13 @@ export const storiesRoute = new Hono<Env>();
 const inMemoryAttachmentObjectStore = new InMemoryStoryAttachmentObjectStore();
 
 const MAX_STORY_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+storiesRoute.post("/projects/:projectId/stories/:storyNumber/archive", (c) =>
+  handleStoryArchive(c, true),
+);
+storiesRoute.post("/projects/:projectId/stories/:storyNumber/unarchive", (c) =>
+  handleStoryArchive(c, false),
+);
+
 const ALLOWED_STORY_ATTACHMENT_MIME_TYPES = new Set([
   "image/png",
   "image/jpeg",
@@ -161,6 +170,14 @@ storiesRoute.get("/projects/:projectId/stories", async (c) => {
   }
 
   const repository = new D1StoryRepository(c.env.DB);
+  const archived = c.req.query("archived");
+  if (
+    archived !== undefined &&
+    archived !== "include" &&
+    archived !== "only" &&
+    archived !== "exclude"
+  )
+    return c.json({ error: "Invalid archived filter" }, 400);
   const status = c.req.query("status");
   const query = c.req.query("q");
   const statusesRaw = c.req.query("statuses");
@@ -240,6 +257,7 @@ storiesRoute.get("/projects/:projectId/stories", async (c) => {
 
   const listInput: Parameters<typeof listStories>[1] = {
     projectId,
+    ...(archived ? { archived } : {}),
     ...(query ? { query } : {}),
     ...(status !== undefined ? { status } : {}),
     ...(statuses.length > 0 ? { statuses } : {}),
@@ -901,6 +919,8 @@ storiesRoute.post(
     if (!storyResult.value) {
       return c.json({ error: "Story not found" }, 404);
     }
+    if (storyResult.value.archivedAt)
+      return c.json({ error: "Archived stories are read-only" }, 409);
 
     let formData: FormData;
     try {
@@ -1053,6 +1073,8 @@ storiesRoute.delete(
     if (!storyResult.value) {
       return c.json({ error: "Story not found" }, 404);
     }
+    if (storyResult.value.archivedAt)
+      return c.json({ error: "Archived stories are read-only" }, 409);
 
     const repository = new D1StoryAttachmentRepository(c.env.DB);
     const objectStore = createStoryAttachmentObjectStore(
@@ -1136,6 +1158,8 @@ storiesRoute.post(
     });
 
     if (result.isErr()) {
+      if (result.error === STORY_COMMENT_ARCHIVED_ERROR)
+        return c.json({ error: "Archived stories are read-only" }, 409);
       return c.json({ error: "Failed to create comment" }, 500);
     }
 
@@ -1255,6 +1279,8 @@ storiesRoute.patch(
     });
 
     if (result.isErr()) {
+      if (result.error === STORY_COMMENT_ARCHIVED_ERROR)
+        return c.json({ error: "Archived stories are read-only" }, 409);
       if (result.error === UPDATE_COMMENT_NOT_FOUND) {
         return c.json({ error: "Comment not found" }, 404);
       }
@@ -1315,6 +1341,8 @@ storiesRoute.delete(
     });
 
     if (result.isErr()) {
+      if (result.error === STORY_COMMENT_ARCHIVED_ERROR)
+        return c.json({ error: "Archived stories are read-only" }, 409);
       if (result.error === DELETE_COMMENT_NOT_FOUND) {
         return c.json({ error: "Comment not found" }, 404);
       }

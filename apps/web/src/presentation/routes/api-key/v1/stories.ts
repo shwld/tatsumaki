@@ -5,6 +5,7 @@ import { requireApiKeyScope } from "../../../middleware/api-key-auth";
 import { requireProjectMembership } from "../../project-membership";
 import { changeStoryBlocker } from "../../stories/blocker-handlers";
 import { handleCliStoryUpdate } from "../../cli/v1/story-handlers";
+import { handleStoryArchive } from "../../stories/archive-handler";
 
 export const apiKeyV1StoriesRoute = new Hono<Env>();
 
@@ -34,6 +35,27 @@ async function requireApiKeyStoryEditor(c: Context<Env>, projectId: string) {
   }
 
   return membership;
+}
+
+for (const [action, archived] of [
+  ["archive", true],
+  ["unarchive", false],
+] as const) {
+  apiKeyV1StoriesRoute.post(
+    `/:projectId/stories/:storyNumber/${action}`,
+    requireApiKeyScope("story:write"),
+    async (c) => {
+      const editor = await requireApiKeyStoryEditor(
+        c,
+        c.req.param("projectId"),
+      );
+      if (!editor.ok) return editor.response;
+      return handleStoryArchive(c, archived, {
+        member: editor.member,
+        actorName: `API Key: ${c.get("apiKeyName")}`,
+      });
+    },
+  );
 }
 
 apiKeyV1StoriesRoute.patch(

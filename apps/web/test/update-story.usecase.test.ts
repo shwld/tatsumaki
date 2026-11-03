@@ -16,6 +16,7 @@ function buildStory(overrides?: Partial<Story>): Story {
     status: "Unstarted",
     statusChangedAt: "2026-03-27T00:00:00.000Z",
     completedAt: null,
+    archivedAt: null,
     storyPoint: null,
     labels: [],
     epicId: null,

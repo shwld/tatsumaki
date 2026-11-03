@@ -185,7 +185,11 @@ export class PlanningPokerDO {
         return Response.json({ error: "storyId is required" }, { status: 400 });
       }
       const storyRows = await db
-        .select({ id: storiesTable.id, title: storiesTable.title })
+        .select({
+          id: storiesTable.id,
+          title: storiesTable.title,
+          archivedAt: storiesTable.archivedAt,
+        })
         .from(storiesTable)
         .where(
           and(
@@ -196,6 +200,12 @@ export class PlanningPokerDO {
         .limit(1);
       if (storyRows.length === 0) {
         return Response.json({ error: "Story not found" }, { status: 404 });
+      }
+      if (storyRows[0].archivedAt !== null) {
+        return Response.json(
+          { error: "Archived stories are read-only" },
+          { status: 409 },
+        );
       }
       const now = new Date().toISOString();
       const current = session;

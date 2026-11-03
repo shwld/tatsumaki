@@ -844,6 +844,16 @@ const StoryCardWithInlineEdit = memo(function StoryCardWithInlineEdit({
 
 const StoryCard = memo(function StoryCard(props: StoryCardProps) {
   const { storyInlineEdit, ...rest } = props;
+  if (props.story.archivedAt) {
+    return (
+      <StoryCardStaticMeta
+        {...rest}
+        onStatusChange={undefined}
+        onSelect={undefined}
+        dragHandleProps={undefined}
+      />
+    );
+  }
   if (props.story.type === "release") {
     return (
       <StoryCardRelease
@@ -885,7 +895,7 @@ const SortableStoryItem = memo(function SortableStoryItem({
     isDragging,
     index,
     activeIndex,
-  } = useSortable({ id: story.id });
+  } = useSortable({ id: story.id, disabled: Boolean(story.archivedAt) });
   const { t } = useTranslation();
   const drag = useStoryDragState();
   const showInsertLine =

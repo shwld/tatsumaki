@@ -22,6 +22,7 @@ import {
   STORY_OWNER_NOT_PROJECT_MEMBER_ERROR,
   STORY_REPOSITORY_ERROR,
   STORY_STATUS_CHANGED_CONCURRENTLY_ERROR,
+  STORY_ARCHIVED_ERROR,
   STORY_REQUESTER_NOT_PROJECT_MEMBER_ERROR,
 } from "../../../domain/repositories/story-repository";
 import {
@@ -154,6 +155,9 @@ export function toCreateStoryErrorResponse(
 export function toUpdateStoryErrorResponse(
   error: UpdateStoryError,
 ): ErrorResponse {
+  if (error === STORY_ARCHIVED_ERROR) {
+    return { message: "Archived stories are read-only", status: 409 };
+  }
   if (error === NO_STORY_FIELDS_TO_UPDATE_ERROR) {
     return { message: "At least one field is required", status: 400 };
   }
@@ -257,6 +261,8 @@ export function toUpdateStoryErrorResponse(
 }
 
 export function toDeleteStoryErrorResponse(error: string): ErrorResponse {
+  if (error === STORY_ARCHIVED_ERROR)
+    return { message: "Archived stories are read-only", status: 409 };
   if (error === DELETE_STORY_NOT_FOUND_ERROR) {
     return { message: "Story not found", status: 404 };
   }

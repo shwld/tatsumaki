@@ -1,4 +1,5 @@
 import { useParams } from "react-router";
+import { useTranslation } from "react-i18next";
 import { ActorLabel } from "../components/actor-label";
 import { ProjectPage } from "../components/project-page";
 import { useProjectBootstrap } from "../hooks/use-project-bootstrap";
@@ -18,12 +19,20 @@ function formatDate(isoString: string): string {
   });
 }
 
-function getActionLabel(entry: ProjectHistoryEntry): string {
+function getActionLabel(
+  entry: ProjectHistoryEntry,
+  archiveLabel: string,
+  restoreLabel: string,
+): string {
   switch (entry.action) {
     case "created":
       return "作成";
     case "deleted":
       return "削除";
+    case "archived":
+      return archiveLabel;
+    case "unarchived":
+      return restoreLabel;
     case "field_changed": {
       const fieldLabels: Record<string, string> = {
         title: "タイトル",
@@ -45,6 +54,9 @@ function getChangeDescription(entry: ProjectHistoryEntry): string {
       return `「${entry.newValue ?? ""}」`;
     case "deleted":
       return `「${entry.oldValue ?? ""}」`;
+    case "archived":
+    case "unarchived":
+      return "";
     case "field_changed":
       if (entry.oldValue !== null && entry.newValue !== null) {
         return `${entry.oldValue} → ${entry.newValue}`;
@@ -65,6 +77,9 @@ function getActionBadgeColor(action: ProjectHistoryEntry["action"]): string {
       return "bg-green-100 text-green-800";
     case "deleted":
       return "bg-red-100 text-red-800";
+    case "archived":
+    case "unarchived":
+      return "bg-gray-100 text-gray-800";
     case "field_changed":
       return "bg-blue-100 text-blue-800";
   }
@@ -77,6 +92,7 @@ type HistoryEntryRowProps = {
 };
 
 function HistoryEntryRow({ entry, projectId, members }: HistoryEntryRowProps) {
+  const { t } = useTranslation();
   const storyTitle =
     entry.storyTitle ??
     (entry.action === "deleted" ? entry.oldValue : entry.newValue) ??
@@ -96,7 +112,11 @@ function HistoryEntryRow({ entry, projectId, members }: HistoryEntryRowProps) {
         <span
           className={`inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${getActionBadgeColor(entry.action)}`}
         >
-          {getActionLabel(entry)}
+          {getActionLabel(
+            entry,
+            t("storyAccordion.subHeader.archive"),
+            t("storyAccordion.detail.restore"),
+          )}
         </span>
       </td>
       <td className="px-4 py-3 text-sm">

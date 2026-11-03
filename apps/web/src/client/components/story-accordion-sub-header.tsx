@@ -1,10 +1,13 @@
 import { memo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { Dice5, Trash2, UserCircle, Users } from "lucide-react";
+import { Archive, Dice5, Trash2, UserCircle, Users } from "lucide-react";
+import { useToast } from "../contexts/toast-context";
+import { useStoryArchive } from "../hooks/use-story-archive";
 import { useStoryPatch } from "../hooks/use-story-patch";
 import type { ProjectMemberProfile } from "../types/project";
 import type { Story } from "../types/story";
 import { useMemberDisplayName } from "../hooks/use-member-display-name";
+import { canArchiveStory } from "../../domain/entities/story";
 import { Avatar } from "./avatar";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 
@@ -26,6 +29,7 @@ function StoryAccordionSubHeaderComponent({
   onOpenPoker,
 }: StoryAccordionSubHeaderProps) {
   const { t } = useTranslation();
+  const { showToast } = useToast();
   const memberName = useMemberDisplayName();
   const { patchStory, isSaving } = useStoryPatch(
     story.projectId,
@@ -53,6 +57,10 @@ function StoryAccordionSubHeaderComponent({
 
   const owners = memberOptions.filter((m) => story.ownerIds.includes(m.id));
   const requester = memberOptions.find((m) => m.id === story.requesterId);
+
+  const changeArchive = useStoryArchive(story, onStoryUpdated);
+
+  if (story.archivedAt) return null;
 
   return (
     <div className="flex items-center gap-2 px-3 py-1.5">
@@ -200,12 +208,44 @@ function StoryAccordionSubHeaderComponent({
         <Dice5 className="h-3.5 w-3.5" />
       </button>
 
+      <button
+        type="button"
+        title={
+          canArchiveStory(story.status)
+            ? t("storyAccordion.subHeader.archive")
+            : t("storyAccordion.subHeader.archiveUnavailable")
+        }
+        disabled={!canArchiveStory(story.status)}
+        className="ml-auto rounded p-1 text-gray-400 hover:text-gray-700 disabled:opacity-40"
+        onClick={() => {
+          void changeArchive(true)
+            .then(() =>
+              showToast("success", t("storyAccordion.subHeader.archived"), {
+                label: t("storyAccordion.subHeader.undo"),
+                run: () => {
+                  void changeArchive(false).catch(() =>
+                    showToast(
+                      "error",
+                      t("storyAccordion.subHeader.archiveFailed"),
+                    ),
+                  );
+                },
+              }),
+            )
+            .catch(() =>
+              showToast("error", t("storyAccordion.subHeader.archiveFailed")),
+            );
+        }}
+      >
+        <Archive className="h-3.5 w-3.5" />
+      </button>
+
       {/* Delete button */}
       {onDelete ? (
         <button
           type="button"
           title={t("storyAccordion.subHeader.deleteStory")}
-          className="ml-auto rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:text-gray-300"
+          className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:text-gray-300"
           disabled={isDeleting}
           onClick={() => onDelete(story)}
         >

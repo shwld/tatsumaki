@@ -8,6 +8,7 @@ import {
   storyQueryKeys,
   type StoryPanelQueryFilters,
 } from "./story-query-keys";
+import { parseArchivedSearch } from "../lib/archived-search";
 import { parseErrorMessage } from "../lib/parse-error-message";
 import { projectStoriesApiPath } from "../lib/story-routes";
 import type { PanelType } from "../lib/panel-visibility";
@@ -91,7 +92,9 @@ function panelBaseQuery(
 ): URLSearchParams {
   const query = new URLSearchParams();
   query.set("detail", "summary");
-  const normalizedSearch = filters.searchQuery.trim();
+  const { archived: archivedSearch, rest: normalizedSearch } =
+    parseArchivedSearch(filters.searchQuery);
+  if (archivedSearch) query.set("archived", "only");
   if (normalizedSearch) {
     query.set("q", normalizedSearch);
   }
@@ -107,6 +110,8 @@ function panelBaseQuery(
   if (filters.activeTypes.length > 0) {
     query.set("types", filters.activeTypes.join(","));
   }
+
+  if (archivedSearch) return query;
 
   if (panel === "Done") {
     query.set("statuses", "Accepted");
@@ -145,7 +150,9 @@ function currentAcceptedBaseQuery(
 ): URLSearchParams {
   const query = new URLSearchParams();
   query.set("detail", "summary");
-  const normalizedSearch = filters.searchQuery.trim();
+  const { archived: archivedSearch, rest: normalizedSearch } =
+    parseArchivedSearch(filters.searchQuery);
+  if (archivedSearch) query.set("archived", "only");
   if (normalizedSearch) {
     query.set("q", normalizedSearch);
   }
@@ -401,6 +408,9 @@ export function usePanelStoriesQuery({
   const queryClient = useQueryClient();
   const hasProject = Boolean(projectId);
   const baseEnabled = enabled && hasProject;
+  const { archived: archivedSearch } = parseArchivedSearch(filters.searchQuery);
+  // Archived stories are listed once, in the Backlog panel.
+  const panelEnabled = baseEnabled && !archivedSearch;
 
   const doneQueryKey = projectId
     ? storyQueryKeys.panelStories(
@@ -440,7 +450,7 @@ export function usePanelStoriesQuery({
 
   const done = useInfiniteQuery({
     queryKey: doneQueryKey,
-    enabled: baseEnabled,
+    enabled: panelEnabled,
     initialPageParam: 0,
     queryFn: ({ pageParam }) =>
       fetchPanelStoriesPage(
@@ -461,7 +471,7 @@ export function usePanelStoriesQuery({
 
   const current = useInfiniteQuery({
     queryKey: currentQueryKey,
-    enabled: baseEnabled,
+    enabled: panelEnabled,
     initialPageParam: 0,
     queryFn: ({ pageParam }) =>
       fetchPanelStoriesPage(
@@ -481,7 +491,7 @@ export function usePanelStoriesQuery({
   });
   const currentAccepted = useInfiniteQuery({
     queryKey: currentAcceptedQueryKey,
-    enabled: baseEnabled && Boolean(currentIterationId),
+    enabled: panelEnabled && Boolean(currentIterationId),
     initialPageParam: 0,
     queryFn: ({ pageParam }) =>
       fetchCurrentAcceptedStoriesPage(
@@ -522,7 +532,7 @@ export function usePanelStoriesQuery({
 
   const icebox = useInfiniteQuery({
     queryKey: iceboxQueryKey,
-    enabled: baseEnabled,
+    enabled: panelEnabled,
     initialPageParam: 0,
     queryFn: ({ pageParam }) =>
       fetchPanelStoriesPage(
@@ -680,6 +690,13 @@ export function usePanelStoriesQuery({
   };
 
   const applyStoryUpdate = (updatedStory: Story) => {
+    const { archived: archivedSearch } = parseArchivedSearch(
+      filters.searchQuery,
+    );
+    if ((updatedStory.archivedAt != null) !== archivedSearch) {
+      removeStory(updatedStory.id);
+      return;
+    }
     const shouldContainInDone = storyMatchesPanel(
       updatedStory,
       "Done",

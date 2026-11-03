@@ -24,6 +24,7 @@ function makeStory(overrides: Partial<Story> = {}): Story {
     status: "Unstarted",
     statusChangedAt: NOW,
     completedAt: null,
+    archivedAt: null,
     storyPoint: null,
     labels: [],
     epicId: null,
@@ -99,6 +100,7 @@ function createIterationRepository() {
     deleteFuture: vi.fn(async () => ok(0)),
     deleteAll: vi.fn(async () => ok(0)),
     assignStory,
+    assignStoryForRebuild: vi.fn(async () => ok(true)),
     unassignStory: vi.fn(async () => ok(true)),
     updateUtilization: vi.fn(async () =>
       ok({

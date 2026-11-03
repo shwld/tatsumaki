@@ -17,6 +17,7 @@ import {
   isValidSprintUtilizationPercent,
 } from "../../domain/entities/iteration";
 import { ITERATION_NOT_FOUND_ERROR } from "../../domain/repositories/iteration-repository";
+import { STORY_ARCHIVED_ERROR } from "../../domain/repositories/story-repository";
 import { D1IterationRepository } from "../../infrastructure/db/repositories/d1-iteration-repository";
 import type { Env } from "../../index";
 import { requireProjectMembership } from "./project-membership";
@@ -86,6 +87,9 @@ iterationsRoute.post(
     if (result.isErr()) {
       if (result.error === ITERATION_NOT_FOUND_ERROR) {
         return c.json({ error: "Iteration not found" }, 404);
+      }
+      if (result.error === STORY_ARCHIVED_ERROR) {
+        return c.json({ error: "Archived stories are read-only" }, 409);
       }
       return c.json({ error: "Failed to assign story" }, 500);
     }
@@ -258,6 +262,9 @@ iterationsRoute.delete(
     });
 
     if (result.isErr()) {
+      if (result.error === STORY_ARCHIVED_ERROR) {
+        return c.json({ error: "Archived stories are read-only" }, 409);
+      }
       return c.json({ error: "Failed to unassign story" }, 500);
     }
 

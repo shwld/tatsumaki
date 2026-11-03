@@ -1,6 +1,8 @@
 import { SELF, env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
 import { createDb } from "../src/infrastructure/db/client";
+import { storiesTable } from "../src/infrastructure/db/schema/stories";
 import { projectMembersTable } from "../src/infrastructure/db/schema/project-members";
 import { createAuthHeaders, setupAccessBindings } from "./helpers/access-jwt";
 import { resetDatabase } from "./helpers/db";
@@ -101,6 +103,27 @@ describe("planning poker routes", () => {
       updatedAt: now,
     });
   };
+
+  it("rejects starting a session for an archived story", async () => {
+    const auth = { sub: "github|owner", email: "owner@example.com" };
+    const projectId = await createProject(auth);
+    const storyId = await createStory(projectId, auth);
+    await createDb(env.DB)
+      .update(storiesTable)
+      .set({ archivedAt: new Date().toISOString() })
+      .where(eq(storiesTable.id, storyId));
+
+    const response = await fetchWithAuth(
+      sessionsApiPath(projectId),
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ storyId }),
+      },
+      auth,
+    );
+    expect(response.status).toBe(409);
+  });
 
   it("supports start, vote, reveal, and apply flow", async () => {
     const ownerUserId = "github|owner";

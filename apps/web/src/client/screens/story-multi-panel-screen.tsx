@@ -60,6 +60,7 @@ import {
   useKeyboardShortcuts,
   type KeyboardShortcut,
 } from "../hooks/use-keyboard-shortcuts";
+import { parseArchivedSearch } from "../lib/archived-search";
 import { useCurrentBacklogViewMode } from "../lib/current-backlog-view-mode";
 import { findCurrentIteration } from "../lib/current-iteration";
 import { usePanelStoriesQuery } from "../hooks/use-panel-stories-query";
@@ -399,6 +400,7 @@ export function StoryMultiPanelScreen() {
 
   // Advanced search params (from StorySearchBar)
   const searchQuery = searchParams.get("q") ?? "";
+  const { archived: isArchivedSearch } = parseArchivedSearch(searchQuery);
   const rawTypesParam = searchParams.get("types");
   const VALID_STORY_TYPES: readonly string[] = [
     "feature",
@@ -730,6 +732,7 @@ export function StoryMultiPanelScreen() {
     visibility.Current &&
     visibility.Backlog;
   const displayVisiblePanels = useMemo<DisplayPanelType[]>(() => {
+    if (isArchivedSearch) return ["Backlog"];
     const next: DisplayPanelType[] = [];
     for (const panel of visiblePanels) {
       if (panel === "Current" && shouldCombineCurrentBacklog) {
@@ -742,7 +745,7 @@ export function StoryMultiPanelScreen() {
       next.push(panel);
     }
     return next;
-  }, [shouldCombineCurrentBacklog, visiblePanels]);
+  }, [isArchivedSearch, shouldCombineCurrentBacklog, visiblePanels]);
   const toolbarDefaultPanel: CreateTargetPanel = displayVisiblePanels.some(
     (panel) => panel === "Current" || panel === "CurrentBacklogCombined",
   )
@@ -1754,7 +1757,11 @@ export function StoryMultiPanelScreen() {
       key={panel}
       panelType={panel === "CurrentBacklogCombined" ? "Backlog" : panel}
       panelLabelOverride={
-        panel === "CurrentBacklogCombined" ? "Current + Backlog" : undefined
+        isArchivedSearch
+          ? t("storyMultiPanelScreen.search.archived")
+          : panel === "CurrentBacklogCombined"
+            ? "Current + Backlog"
+            : undefined
       }
       panelTestIdOverride={panel}
       headerAction={(() => {

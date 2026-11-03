@@ -82,6 +82,10 @@ export function formatStoryTimelineSummary(
   if (entry.action === "deleted") {
     return english ? "Deleted the story" : "ストーリーを削除";
   }
+  if (entry.action === "archived")
+    return english ? "Archived the story" : "ストーリーをアーカイブ";
+  if (entry.action === "unarchived")
+    return english ? "Restored the story" : "ストーリーのアーカイブを解除";
 
   const fieldLabel = english
     ? TIMELINE_FIELD_LABELS_EN[entry.fieldName]

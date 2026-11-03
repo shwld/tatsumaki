@@ -1,4 +1,4 @@
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { err, ok, type Result } from "neverthrow";
 import { ulid } from "ulid";
 import type { Epic } from "../../../domain/entities/epic";
@@ -141,7 +141,13 @@ export class D1EpicRepository implements EpicRepository {
         total: sql<number>`count(${storiesTable.id})`,
       })
       .from(epicsTable)
-      .leftJoin(storiesTable, eq(storiesTable.epicId, epicsTable.id))
+      .leftJoin(
+        storiesTable,
+        and(
+          eq(storiesTable.epicId, epicsTable.id),
+          isNull(storiesTable.archivedAt),
+        ),
+      )
       .where(
         and(
           eq(epicsTable.projectId, input.projectId),
@@ -178,7 +184,13 @@ export class D1EpicRepository implements EpicRepository {
         total: sql<number>`count(${storiesTable.id})`,
       })
       .from(epicsTable)
-      .leftJoin(storiesTable, eq(storiesTable.epicId, epicsTable.id))
+      .leftJoin(
+        storiesTable,
+        and(
+          eq(storiesTable.epicId, epicsTable.id),
+          isNull(storiesTable.archivedAt),
+        ),
+      )
       .where(eq(epicsTable.projectId, projectId))
       .groupBy(epicsTable.id)
       .orderBy(asc(epicsTable.name))

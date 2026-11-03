@@ -19,6 +19,10 @@ export type StoryType = (typeof STORY_TYPES)[number];
 export type StoryPoint = number;
 export type StoryStatus = (typeof STORY_STATUSES)[number];
 
+export function canArchiveStory(status: StoryStatus): boolean {
+  return status === "Unstarted" || status === "Rejected";
+}
+
 export type StoryRelation = {
   id: string;
   storyNumber: number;
@@ -130,6 +134,7 @@ export type Story = {
   statusChangedAt: string;
   /** When status became Accepted; cleared when leaving Accepted. ISO timestamp. */
   completedAt: string | null;
+  archivedAt: string | null;
   storyPoint: StoryPoint | null;
   labels: string[];
   epicId: string | null;

@@ -9,6 +9,7 @@ import type {
   StoryRepository,
   StoryRepositoryError,
 } from "../../domain/repositories/story-repository";
+import { STORY_ARCHIVED_ERROR } from "../../domain/repositories/story-repository";
 import type {
   StoryActivityRepository,
   StoryActivityRepositoryError,
@@ -49,6 +50,7 @@ export async function deleteStory(
   if (!storyResult.value) {
     return err(STORY_NOT_FOUND_ERROR);
   }
+  if (storyResult.value.archivedAt !== null) return err(STORY_ARCHIVED_ERROR);
 
   const storyTitle = storyResult.value.title;
   const ownerIds = storyResult.value.ownerIds;

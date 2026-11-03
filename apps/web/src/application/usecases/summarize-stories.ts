@@ -21,6 +21,7 @@ export async function summarizeStories(
   repository: StoryRepository,
   input: {
     projectId: string;
+    archived?: "exclude" | "include" | "only";
     query?: string;
     status?: string;
     statuses?: string[];
@@ -85,6 +86,7 @@ export async function summarizeStories(
 
   return repository.summarize({
     projectId: input.projectId,
+    ...(input.archived ? { archived: input.archived } : {}),
     ...(input.query ? { query: input.query } : {}),
     ...(normalizedStatus !== undefined ? { status: normalizedStatus } : {}),
     ...(normalizedStatuses !== undefined

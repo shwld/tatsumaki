@@ -1,4 +1,4 @@
-import { and, desc, eq, lt, or, type SQL } from "drizzle-orm";
+import { and, desc, eq, lt, or, sql, type SQL } from "drizzle-orm";
 import { err, ok, type Result } from "neverthrow";
 import type { StoryComment } from "../../../domain/entities/story-timeline";
 import type {
@@ -8,6 +8,7 @@ import type {
 } from "../../../domain/repositories/story-comment-repository";
 import {
   STORY_COMMENT_NOT_FOUND_ERROR,
+  STORY_COMMENT_ARCHIVED_ERROR,
   STORY_COMMENT_REPOSITORY_ERROR,
 } from "../../../domain/repositories/story-comment-repository";
 import { createDb, type DbClient } from "../client";
@@ -33,7 +34,7 @@ function toStoryComment(row: CommentRow): StoryComment {
 export class D1StoryCommentRepository implements StoryCommentRepository {
   private readonly db: DbClient;
 
-  constructor(d1: D1Database) {
+  constructor(private readonly d1: D1Database) {
     this.db = createDb(d1);
   }
 
@@ -154,25 +155,28 @@ export class D1StoryCommentRepository implements StoryCommentRepository {
       if (!story) {
         return err(STORY_COMMENT_NOT_FOUND_ERROR);
       }
+      if (story.archivedAt !== null) return err(STORY_COMMENT_ARCHIVED_ERROR);
 
       const id = ulid();
       const now = new Date().toISOString();
 
-      await this.db.insert(storyTimelineEntriesTable).values({
-        id,
-        projectId,
-        storyId,
-        entryType: "comment",
-        actorUserId: input.userId,
-        actorName: input.actorName,
-        action: null,
-        fieldName: null,
-        oldValue: null,
-        newValue: null,
-        body: input.body,
-        createdAt: now,
-        updatedAt: now,
-      });
+      const inserted = await this.d1
+        .prepare(
+          "INSERT INTO story_timeline_entries (id, project_id, story_id, entry_type, actor_user_id, actor_name, body, created_at, updated_at) SELECT ?, ?, id, 'comment', ?, ?, ?, ?, ? FROM stories WHERE id = ? AND project_id = ? AND archived_at IS NULL",
+        )
+        .bind(
+          id,
+          projectId,
+          input.userId,
+          input.actorName,
+          input.body,
+          now,
+          now,
+          storyId,
+          projectId,
+        )
+        .run();
+      if (inserted.meta.changes !== 1) return err(STORY_COMMENT_ARCHIVED_ERROR);
 
       return ok({
         __typename: "StoryComment",
@@ -220,6 +224,21 @@ export class D1StoryCommentRepository implements StoryCommentRepository {
     }
   }
 
+  private async reasonNoRowChanged(
+    projectId: string,
+    commentId: string,
+  ): Promise<
+    | typeof STORY_COMMENT_ARCHIVED_ERROR
+    | typeof STORY_COMMENT_NOT_FOUND_ERROR
+    | typeof STORY_COMMENT_REPOSITORY_ERROR
+  > {
+    const latest = await this.findById(projectId, commentId);
+    if (latest.isErr()) return STORY_COMMENT_REPOSITORY_ERROR;
+    return latest.value
+      ? STORY_COMMENT_ARCHIVED_ERROR
+      : STORY_COMMENT_NOT_FOUND_ERROR;
+  }
+
   async update(
     projectId: string,
     commentId: string,
@@ -235,15 +254,20 @@ export class D1StoryCommentRepository implements StoryCommentRepository {
       }
 
       const now = new Date().toISOString();
-      await this.db
+      const changed = await this.db
         .update(storyTimelineEntriesTable)
         .set({ body: input.body, updatedAt: now })
         .where(
           and(
             eq(storyTimelineEntriesTable.id, commentId),
             eq(storyTimelineEntriesTable.entryType, "comment"),
+            sql`exists (select 1 from stories where id = ${storyTimelineEntriesTable.storyId} and archived_at is null)`,
           ),
-        );
+        )
+        .returning({ id: storyTimelineEntriesTable.id });
+      if (changed.length === 0) {
+        return err(await this.reasonNoRowChanged(projectId, commentId));
+      }
 
       return ok({
         ...existing.value,
@@ -268,14 +292,19 @@ export class D1StoryCommentRepository implements StoryCommentRepository {
         return err(STORY_COMMENT_NOT_FOUND_ERROR);
       }
 
-      await this.db
+      const changed = await this.db
         .delete(storyTimelineEntriesTable)
         .where(
           and(
             eq(storyTimelineEntriesTable.id, commentId),
             eq(storyTimelineEntriesTable.entryType, "comment"),
+            sql`exists (select 1 from stories where id = ${storyTimelineEntriesTable.storyId} and archived_at is null)`,
           ),
-        );
+        )
+        .returning({ id: storyTimelineEntriesTable.id });
+      if (changed.length === 0) {
+        return err(await this.reasonNoRowChanged(projectId, commentId));
+      }
 
       return ok(undefined);
     } catch {

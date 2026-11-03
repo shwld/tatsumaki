@@ -14,11 +14,16 @@ type Toast = {
   id: number;
   kind: ToastKind;
   message: string;
+  action?: { label: string; run: () => void };
 };
 
 type ToastContextValue = {
   toasts: Toast[];
-  showToast: (kind: ToastKind, message: string) => void;
+  showToast: (
+    kind: ToastKind,
+    message: string,
+    action?: Toast["action"],
+  ) => void;
 };
 
 const ToastContext = createContext<ToastContextValue | null>(null);
@@ -30,10 +35,13 @@ const TOAST_DURATION_MS = 4000;
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  const showToast = useCallback((kind: ToastKind, message: string) => {
-    const id = nextId++;
-    setToasts((prev) => [...prev, { id, kind, message }]);
-  }, []);
+  const showToast = useCallback(
+    (kind: ToastKind, message: string, action?: Toast["action"]) => {
+      const id = nextId++;
+      setToasts((prev) => [...prev, { id, kind, message, action }]);
+    },
+    [],
+  );
 
   return (
     <ToastContext.Provider value={{ toasts, showToast }}>
@@ -102,6 +110,18 @@ function ToastItem({
     >
       <span aria-hidden="true">{iconLabel}</span>
       <span>{toast.message}</span>
+      {toast.action ? (
+        <button
+          type="button"
+          onClick={() => {
+            toast.action?.run();
+            onDismiss(toast.id);
+          }}
+          className="underline"
+        >
+          {toast.action.label}
+        </button>
+      ) : null}
       <button
         type="button"
         className="ml-2 text-current opacity-60 hover:opacity-100"

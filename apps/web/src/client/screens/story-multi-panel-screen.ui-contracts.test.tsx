@@ -111,7 +111,9 @@ describe("StoryMultiPanelScreen UI contracts", () => {
 
     await userEvent.click(screen.getByTestId("advanced-search-toggle"));
     expect(
-      screen.getByPlaceholderText("Search titles and descriptions..."),
+      screen.getByPlaceholderText(
+        "Search titles and descriptions (is:archived for archived)...",
+      ),
     ).toBeInTheDocument();
     expect(screen.getByText("Type:")).toBeInTheDocument();
 
