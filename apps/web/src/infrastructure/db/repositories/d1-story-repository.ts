@@ -660,6 +660,75 @@ export class D1StoryRepository implements StoryRepository {
     return ok(undefined);
   }
 
+  // 検証と置換を 1 回の batch（単一トランザクション）で行い、検証時点と commit 時点の
+  // membership がずれても脱退済みメンバーを新規 owner として登録しない。
+  // 既存 owner は脱退済みでも保持する。
+  private async replaceOwners(
+    projectId: string,
+    storyId: string,
+    ownerIds: string[],
+  ): Promise<Result<void, StoryRepositoryError>> {
+    const uniqueOwnerIds = [...new Set(ownerIds)];
+    const currentOwnerIds = new Set(
+      (await this.listOwnerIdsByStoryIds([storyId])).get(storyId) ?? [],
+    );
+    const addedOwnerIds = uniqueOwnerIds.filter((ownerId) => {
+      return !currentOwnerIds.has(ownerId);
+    });
+
+    const addedAreAllMembers =
+      addedOwnerIds.length === 0
+        ? sql`1 = 1`
+        : sql`(select count(*) from ${projectMembersTable} where ${projectMembersTable.projectId} = ${projectId} and ${inArray(projectMembersTable.userId, addedOwnerIds)}) = ${addedOwnerIds.length}`;
+
+    const statements = [
+      this.db.delete(storyOwnersTable).where(
+        and(
+          eq(storyOwnersTable.storyId, storyId),
+          uniqueOwnerIds.length > 0
+            ? sql`${storyOwnersTable.userId} not in (${sql.join(
+                uniqueOwnerIds.map((ownerId) => sql`${ownerId}`),
+                sql`, `,
+              )})`
+            : sql`1 = 1`,
+          addedAreAllMembers,
+        ),
+      ),
+      ...(addedOwnerIds.length > 0
+        ? [
+            this.db.insert(storyOwnersTable).select(
+              this.db
+                .select({
+                  storyId: sql<string>`${storyId}`.as("story_id"),
+                  userId: projectMembersTable.userId,
+                  createdAt: sql<string>`CURRENT_TIMESTAMP`.as("created_at"),
+                  updatedAt: sql<string>`CURRENT_TIMESTAMP`.as("updated_at"),
+                })
+                .from(projectMembersTable)
+                .where(
+                  and(
+                    eq(projectMembersTable.projectId, projectId),
+                    inArray(projectMembersTable.userId, addedOwnerIds),
+                    addedAreAllMembers,
+                  ),
+                ),
+            ),
+          ]
+        : []),
+    ] as const;
+    await this.db.batch(statements as unknown as [(typeof statements)[0]]);
+
+    const stored = new Set(
+      (await this.listOwnerIdsByStoryIds([storyId])).get(storyId) ?? [],
+    );
+    const hasMissingOwner = addedOwnerIds.some((ownerId) => {
+      return !stored.has(ownerId);
+    });
+    return hasMissingOwner
+      ? err(STORY_OWNER_NOT_PROJECT_MEMBER_ERROR)
+      : ok(undefined);
+  }
+
   private async assertRequesterIsProjectMember(
     projectId: string,
     requesterId: string | null,
@@ -1056,19 +1125,13 @@ export class D1StoryRepository implements StoryRepository {
     }
 
     if (input.ownerIds !== undefined) {
-      await this.db
-        .delete(storyOwnersTable)
-        .where(eq(storyOwnersTable.storyId, input.id));
-
-      if (input.ownerIds.length > 0) {
-        await this.db.insert(storyOwnersTable).values(
-          input.ownerIds.map((ownerId) => {
-            return {
-              storyId: input.id,
-              userId: ownerId,
-            };
-          }),
-        );
+      const ownerReplacement = await this.replaceOwners(
+        input.projectId,
+        input.id,
+        input.ownerIds,
+      );
+      if (ownerReplacement.isErr()) {
+        return err(ownerReplacement.error);
       }
     }
 

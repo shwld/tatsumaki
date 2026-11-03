@@ -126,4 +126,23 @@ describe("D1StoryRepository.update owner membership", () => {
     expect(result.isOk()).toBe(true);
     expect(await storedOwnerIds()).toEqual([MEMBER_ID]);
   });
+
+  it("does not replace owners when a new owner left the project after validation", async () => {
+    const repository = new D1StoryRepository(env.DB) as unknown as {
+      replaceOwners(
+        projectId: string,
+        storyId: string,
+        ownerIds: string[],
+      ): Promise<{ isErr(): boolean; error?: unknown }>;
+    };
+
+    const result = await repository.replaceOwners(PROJECT_ID, STORY_ID, [
+      NEW_MEMBER_ID,
+      "github|left-after-validation",
+    ]);
+
+    expect(result.isErr()).toBe(true);
+    expect(result.error).toBe(STORY_OWNER_NOT_PROJECT_MEMBER_ERROR);
+    expect(await storedOwnerIds()).toEqual([FORMER_MEMBER_ID, MEMBER_ID]);
+  });
 });
