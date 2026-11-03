@@ -491,6 +491,15 @@ describe("Cloudflare self-hosting setup", () => {
     ).toThrow("bare hostname");
   });
 
+  it("accepts Punycode top-level domains", () => {
+    expect(() =>
+      validateSetupOptions({
+        ...baseOptions,
+        customDomain: "tatsumaki.xn--p1ai",
+      }),
+    ).not.toThrow();
+  });
+
   it("rejects a staging custom domain in production-only mode", () => {
     expect(() =>
       validateSetupOptions({
