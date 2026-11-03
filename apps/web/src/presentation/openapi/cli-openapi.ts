@@ -43,6 +43,10 @@ const StoryListQuerySchema = z.object({
       param: { name: "icebox", in: "query" },
       example: "true",
     }),
+  archived: z
+    .enum(["exclude", "include", "only"])
+    .optional()
+    .openapi({ param: { name: "archived", in: "query" } }),
   limit: z
     .string()
     .regex(/^[1-9][0-9]*$/)
@@ -61,6 +65,7 @@ export const StorySummarySchema = z
     status: z.string().openapi({ example: "Started" }),
     type: z.string().openapi({ example: "feature" }),
     isIcebox: z.boolean(),
+    archivedAt: z.string().nullable(),
   })
   .openapi("StorySummary");
 
@@ -111,6 +116,7 @@ const storyDetailExample = (
   epicId: null,
   iterationId: null,
   isIcebox: false,
+  archivedAt: null,
   ownerIds: [],
   requesterId: null,
   releaseDate: null,
@@ -538,6 +544,29 @@ export function buildCliOpenApiDoc() {
       story: storyDetailExample({ id: "01", storyNumber: 1, title: "x" }),
     }),
   );
+
+  for (const [operationId, action] of [
+    ["archiveStory", "archive"],
+    ["unarchiveStory", "unarchive"],
+  ] as const) {
+    const route = createRoute({
+      operationId,
+      method: "post",
+      path: `/programmatic-api/v1/projects/{projectId}/stories/{storyNumber}/${action}`,
+      request: { params: StoryByNumberParamsSchema },
+      responses: {
+        200: {
+          description: "Story archive state changed",
+          content: { "application/json": { schema: StoryGetResponseSchema } },
+        },
+        401: { description: "Unauthorized" },
+        403: { description: "Forbidden" },
+        404: { description: "Story not found" },
+        409: { description: "Invalid state or conflict" },
+      },
+    });
+    app.openapi(route, (c) => c.json({ story: storyDetailExample() }));
+  }
 
   const createStoryCommentRoute = createRoute({
     operationId: "createStoryComment",

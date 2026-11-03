@@ -4,6 +4,7 @@ import {
   desc,
   eq,
   inArray,
+  isNotNull,
   isNull,
   ne,
   or,
@@ -41,6 +42,7 @@ import {
   STORY_OWNER_NOT_PROJECT_MEMBER_ERROR,
   STORY_REPOSITORY_ERROR,
   STORY_STATUS_CHANGED_CONCURRENTLY_ERROR,
+  STORY_ARCHIVED_ERROR,
   STORY_REQUESTER_NOT_PROJECT_MEMBER_ERROR,
 } from "../../../domain/repositories/story-repository";
 import { todayIso } from "../../../shared/date/today-iso";
@@ -115,6 +117,7 @@ function toStory(
     status,
     statusChangedAt: row.statusChangedAt,
     completedAt: row.completedAt ?? null,
+    archivedAt: row.archivedAt,
     storyPoint,
     labels: parseLabels(row.labels),
     epicId: row.epicId,
@@ -155,6 +158,7 @@ function toStorySummary(row: StoryRow): Story {
     status,
     statusChangedAt: row.statusChangedAt,
     completedAt: row.completedAt ?? null,
+    archivedAt: row.archivedAt,
     storyPoint,
     labels: [],
     epicId: row.epicId,
@@ -175,6 +179,13 @@ function toStorySummary(row: StoryRow): Story {
 
 function buildListFilters(input: ListStoriesInput): SQL[] {
   const filters: SQL[] = [eq(storiesTable.projectId, input.projectId)];
+  if (input.archived !== "include") {
+    filters.push(
+      input.archived === "only"
+        ? isNotNull(storiesTable.archivedAt)
+        : isNull(storiesTable.archivedAt),
+    );
+  }
   const normalizedQuery = input.query?.trim().toLowerCase();
 
   if (input.status !== undefined) {
@@ -493,12 +504,22 @@ export class D1StoryRepository implements StoryRepository {
         this.db
           .select({ id: storyBlockersTable.blockedStoryId })
           .from(storyBlockersTable)
-          .where(inArray(storyBlockersTable.blockedStoryId, chunk))
+          .where(
+            and(
+              inArray(storyBlockersTable.blockedStoryId, chunk),
+              sql`exists (select 1 from stories where id = ${storyBlockersTable.blockingStoryId} and archived_at is null)`,
+            ),
+          )
           .all(),
         this.db
           .select({ id: storyBlockersTable.blockingStoryId })
           .from(storyBlockersTable)
-          .where(inArray(storyBlockersTable.blockingStoryId, chunk))
+          .where(
+            and(
+              inArray(storyBlockersTable.blockingStoryId, chunk),
+              sql`exists (select 1 from stories where id = ${storyBlockersTable.blockedStoryId} and archived_at is null)`,
+            ),
+          )
           .all(),
       ]);
       for (const row of blockedRows) {
@@ -540,6 +561,7 @@ export class D1StoryRepository implements StoryRepository {
         .where(
           and(
             eq(storiesTable.projectId, projectId),
+            isNull(storiesTable.archivedAt),
             inArray(storiesTable.id, chunk),
           ),
         )
@@ -590,6 +612,7 @@ export class D1StoryRepository implements StoryRepository {
       id,
       ...relatedIds,
     ]);
+    relationByStoryId.set(id, toStoryRelation(story));
 
     return this.attachStoryRelations(
       [story],
@@ -824,6 +847,10 @@ export class D1StoryRepository implements StoryRepository {
       return ok(null);
     }
 
+    if (current.archivedAt !== null) {
+      return err(STORY_ARCHIVED_ERROR);
+    }
+
     if (input.ownerIds !== undefined) {
       const ownerValidation = await this.assertOwnerIdsAreProjectMembers(
         input.projectId,
@@ -966,6 +993,7 @@ export class D1StoryRepository implements StoryRepository {
         and(
           eq(storiesTable.projectId, input.projectId),
           eq(storiesTable.id, input.id),
+          isNull(storiesTable.archivedAt),
           // Optimistic guard on the columns the Icebox invariant depends on.
           eq(storiesTable.status, current.status),
           eq(storiesTable.isIcebox, current.isIcebox),
@@ -991,7 +1019,7 @@ export class D1StoryRepository implements StoryRepository {
                 and(
                   eq(storiesTable.projectId, input.projectId),
                   ne(storiesTable.id, input.id),
-                  sql`exists (select 1 from ${storiesTable} as target where target.id = ${input.id} and target.status = ${current.status} and target.is_icebox = ${current.isIcebox})`,
+                  sql`exists (select 1 from ${storiesTable} as target where target.id = ${input.id} and target.status = ${current.status} and target.is_icebox = ${current.isIcebox} and target.archived_at is null)`,
                 ),
               ),
             updateQuery,
@@ -1178,6 +1206,7 @@ export class D1StoryRepository implements StoryRepository {
         and(
           eq(storiesTable.projectId, input.projectId),
           eq(storiesTable.iterationId, input.fromIterationId),
+          isNull(storiesTable.archivedAt),
           inArray(storiesTable.status, input.statuses),
         ),
       )
@@ -1352,6 +1381,7 @@ export class D1StoryRepository implements StoryRepository {
       .where(
         and(
           inArray(storiesTable.projectId, projectIds),
+          isNull(storiesTable.archivedAt),
           sql`exists (
             select 1
             from ${storyOwnersTable}

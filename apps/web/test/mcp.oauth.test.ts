@@ -577,6 +577,7 @@ describe("MCP OAuth", () => {
         description: "Fetch me description",
         status: "Unstarted",
         isIcebox: false,
+        archivedAt: null,
         storyPoint: 2,
         type: "feature",
         labels: [],
@@ -618,11 +619,43 @@ describe("MCP OAuth", () => {
         description: "Look me up by number description",
         status: "Unstarted",
         isIcebox: false,
+        archivedAt: null,
         storyPoint: null,
         type: "feature",
         labels: [],
       },
     });
+  });
+
+  it("archives, finds and restores stories through MCP", async () => {
+    const projectId = await createProject("Archive Project");
+    const storyId = await createStory(projectId, "Archived story");
+    const token = await issueMcpAccessToken();
+    const call = async (name: string, args: Record<string, unknown>) => {
+      const response = await fetchMcp(token, {
+        jsonrpc: "2.0",
+        id: name,
+        method: "tools/call",
+        params: { name, arguments: args },
+      });
+      const payload = (await parseMcpResult(response)) as {
+        result: { isError?: boolean; content: { text: string }[] };
+      };
+      expect(payload.result.isError).not.toBe(true);
+      return JSON.parse(payload.result.content[0]!.text);
+    };
+    expect(
+      (await call("archive_story", { projectId, storyId })).story.archivedAt,
+    ).toBeTruthy();
+    expect((await call("list_stories", { projectId })).stories).toHaveLength(0);
+    expect(
+      (await call("list_stories", { projectId, archived: "only" })).stories[0]
+        .id,
+    ).toBe(storyId);
+    expect(
+      (await call("unarchive_story", { projectId, storyNumber: 1 })).story
+        .archivedAt,
+    ).toBeNull();
   });
 
   it("returns an error when get_story is called with a non-existent storyNumber", async () => {

@@ -62,6 +62,7 @@ export type ReassignStoriesAcrossIterationsInput = {
 
 export type ListStoriesInput = {
   projectId: string;
+  archived?: "exclude" | "include" | "only";
   query?: string;
   status?: StoryStatus;
   statuses?: StoryStatus[];
@@ -108,6 +109,7 @@ export const STORY_REQUESTER_NOT_PROJECT_MEMBER_ERROR =
   "STORY_REQUESTER_NOT_PROJECT_MEMBER_ERROR" as const;
 export const STORY_STATUS_CHANGED_CONCURRENTLY_ERROR =
   "STORY_STATUS_CHANGED_CONCURRENTLY_ERROR" as const;
+export const STORY_ARCHIVED_ERROR = "STORY_ARCHIVED_ERROR" as const;
 export const STORY_EPIC_NOT_FOUND_ERROR = "STORY_EPIC_NOT_FOUND_ERROR" as const;
 
 export type StoryRepositoryError =
@@ -116,6 +118,7 @@ export type StoryRepositoryError =
   | typeof STORY_REQUESTER_NOT_PROJECT_MEMBER_ERROR
   | typeof STORY_EPIC_NOT_FOUND_ERROR
   | typeof STORY_STATUS_CHANGED_CONCURRENTLY_ERROR
+  | typeof STORY_ARCHIVED_ERROR
   | typeof INVALID_STORY_IS_ICEBOX_ERROR;
 
 export interface StoryRepository {

@@ -7,6 +7,7 @@ import {
 } from "../../../application/usecases/add-story-blocker";
 import { removeStoryBlocker } from "../../../application/usecases/remove-story-blocker";
 import type { Story } from "../../../domain/entities/story";
+import { STORY_ARCHIVED_ERROR } from "../../../domain/repositories/story-repository";
 import { D1StoryRepository } from "../../../infrastructure/db/repositories/d1-story-repository";
 import type { Env } from "../../../index";
 import { parseStoryNumberReference } from "../../lib/story-number-reference";
@@ -99,6 +100,8 @@ export async function changeStoryBlocker(
       : await removeStoryBlocker(repository, change);
   if (result.isErr()) {
     switch (result.error) {
+      case STORY_ARCHIVED_ERROR:
+        return fail({ error: "Archived stories are read-only" }, 409);
       case STORY_BLOCKS_ITSELF_ERROR:
         return fail({ error: "A story cannot block itself" }, 400);
       case STORY_BLOCKER_STORY_NOT_FOUND_ERROR:

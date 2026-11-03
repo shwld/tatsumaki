@@ -212,6 +212,20 @@ where
         }
     }
 
+    pub async fn set_story_archived(&self, base_url: &str, project: &str, story_number: i64, archived: bool) -> Result<StoryGetBody, (CliError, i32)> {
+        let mut token = self.ensure_access_token(base_url).await?;
+        let result = self.story_gateway.set_story_archived(project, story_number, archived, &token).await;
+        let result = match result {
+            Err(e) if crate::is_unauthorized(&e) => {
+                let mut cache = self.token_store.load().map_err(|err| (err, EXIT_AUTH))?;
+                token = self.refresh_access_token(base_url, &mut cache).await?;
+                self.story_gateway.set_story_archived(project, story_number, archived, &token).await
+            }
+            other => other,
+        };
+        result.map_err(|err| { let code = crate::exit_code_for_error(&err); (err, code) })
+    }
+
     pub async fn reorder_stories(&self, base_url: &str, project: &str, input: &StoryReorderInput) -> Result<StoryListBody, (CliError, i32)> {
         let mut token = self.ensure_access_token(base_url).await?;
         match self.story_gateway.reorder_stories(project, input, &token).await {

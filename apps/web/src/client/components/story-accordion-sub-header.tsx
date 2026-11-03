@@ -1,6 +1,11 @@
 import { memo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { Dice5, Trash2, UserCircle, Users } from "lucide-react";
+import { Archive, Dice5, Trash2, UserCircle, Users } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useToast } from "../contexts/toast-context";
+import { storyQueryKeys } from "../hooks/story-query-keys";
+import { projectStoriesApiPath } from "../lib/story-routes";
+import { parseErrorMessage } from "../lib/parse-error-message";
 import { useStoryPatch } from "../hooks/use-story-patch";
 import type { ProjectMemberProfile } from "../types/project";
 import type { Story } from "../types/story";
@@ -26,6 +31,8 @@ function StoryAccordionSubHeaderComponent({
   onOpenPoker,
 }: StoryAccordionSubHeaderProps) {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const { showToast } = useToast();
   const memberName = useMemberDisplayName();
   const { patchStory, isSaving } = useStoryPatch(
     story.projectId,
@@ -53,6 +60,27 @@ function StoryAccordionSubHeaderComponent({
 
   const owners = memberOptions.filter((m) => story.ownerIds.includes(m.id));
   const requester = memberOptions.find((m) => m.id === story.requesterId);
+
+  const changeArchive = async (archived: boolean) => {
+    const response = await fetch(
+      `${projectStoriesApiPath(story.projectId)}/${story.storyNumber}/${archived ? "archive" : "unarchive"}`,
+      { method: "POST" },
+    );
+    if (!response.ok) throw new Error(await parseErrorMessage(response));
+    const result = (await response.json()) as { story: Story };
+    onStoryUpdated?.(result.story);
+    await queryClient.invalidateQueries({
+      queryKey: storyQueryKeys.panelStoriesRoot(story.projectId),
+    });
+    await queryClient.invalidateQueries({
+      queryKey: storyQueryKeys.storyDetail(
+        story.projectId,
+        String(story.storyNumber),
+      ),
+    });
+  };
+
+  if (story.archivedAt) return null;
 
   return (
     <div className="flex items-center gap-2 px-3 py-1.5">
@@ -200,12 +228,44 @@ function StoryAccordionSubHeaderComponent({
         <Dice5 className="h-3.5 w-3.5" />
       </button>
 
+      <button
+        type="button"
+        title={
+          story.status === "Unstarted" || story.status === "Rejected"
+            ? t("storyAccordion.subHeader.archive")
+            : t("storyAccordion.subHeader.archiveUnavailable")
+        }
+        disabled={story.status !== "Unstarted" && story.status !== "Rejected"}
+        className="ml-auto rounded p-1 text-gray-400 hover:text-gray-700 disabled:opacity-40"
+        onClick={() => {
+          void changeArchive(true)
+            .then(() =>
+              showToast("success", t("storyAccordion.subHeader.archived"), {
+                label: t("storyAccordion.subHeader.undo"),
+                run: () => {
+                  void changeArchive(false).catch(() =>
+                    showToast(
+                      "error",
+                      t("storyAccordion.subHeader.archiveFailed"),
+                    ),
+                  );
+                },
+              }),
+            )
+            .catch(() =>
+              showToast("error", t("storyAccordion.subHeader.archiveFailed")),
+            );
+        }}
+      >
+        <Archive className="h-3.5 w-3.5" />
+      </button>
+
       {/* Delete button */}
       {onDelete ? (
         <button
           type="button"
           title={t("storyAccordion.subHeader.deleteStory")}
-          className="ml-auto rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:text-gray-300"
+          className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:text-gray-300"
           disabled={isDeleting}
           onClick={() => onDelete(story)}
         >

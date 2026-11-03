@@ -700,6 +700,103 @@ function StoryAccordionDetailComponent({
   const storyPointError = metadataFieldErrors.storyPoint ?? null;
   const titleError = metadataFieldErrors.title ?? null;
 
+  if (resolvedStory.archivedAt) {
+    return (
+      <div className="space-y-3 px-3 pb-3 pt-2">
+        <div className="flex items-center justify-between rounded border bg-gray-50 p-2 text-sm">
+          <span>{t("storyAccordion.detail.archived")}</span>
+          <button
+            type="button"
+            className="underline"
+            onClick={() => {
+              void fetch(
+                `${projectStoriesApiPath(story.projectId)}/${story.storyNumber}/unarchive`,
+                { method: "POST" },
+              )
+                .then(async (response) => {
+                  if (!response.ok)
+                    throw new Error(await parseErrorMessage(response));
+                  const result = (await response.json()) as { story: Story };
+                  syncStoryUpdate(result.story);
+                  onStoryUpdated?.(result.story);
+                  await queryClient.invalidateQueries({
+                    queryKey: storyQueryKeys.panelStoriesRoot(story.projectId),
+                  });
+                })
+                .catch(() =>
+                  showToast(
+                    "error",
+                    t("storyAccordion.subHeader.archiveFailed"),
+                  ),
+                );
+            }}
+          >
+            {t("storyAccordion.detail.restore")}
+          </button>
+        </div>
+        <p className="font-medium">{resolvedStory.title}</p>
+        <p className="text-sm">
+          {t("storyAccordion.detail.status")}:{" "}
+          {t(`storyAccordion.status.options.${resolvedStory.status}`)}
+        </p>
+        <p className="text-sm">
+          {t("storyAccordion.detail.points")}:{" "}
+          {resolvedStory.storyPoint ?? t("storyAccordion.detail.unset")}
+        </p>
+        <p className="text-sm">
+          {t("storyAccordion.detail.labels")}:{" "}
+          {resolvedStory.labels.join(", ") || "—"}
+        </p>
+        <MarkdownPreview content={resolvedStory.description} />
+        <h4>{t("storyAccordion.attachments.title")}</h4>
+        <ul>
+          {attachments.map((attachment) => (
+            <li key={attachment.id}>
+              <a
+                className="underline"
+                href={projectStoryAttachmentContentApiPath(
+                  story.projectId,
+                  String(story.storyNumber),
+                  attachment.id,
+                )}
+              >
+                {attachment.fileName}
+              </a>
+            </li>
+          ))}
+        </ul>
+        <h4>{t("storyAccordion.blockers.title")}</h4>
+        <p className="text-sm">
+          {t("storyAccordion.blockers.blockingThisStory")}:{" "}
+          {(resolvedStory.blockingStories ?? [])
+            .map((item) => `#${item.storyNumber} ${item.title}`)
+            .join(", ") || "—"}
+        </p>
+        <p className="text-sm">
+          {t("storyAccordion.blockers.blockedByThisStory")}:{" "}
+          {(resolvedStory.blockedStories ?? [])
+            .map((item) => `#${item.storyNumber} ${item.title}`)
+            .join(", ") || "—"}
+        </p>
+        <h4>{t("storyAccordion.timeline.title")}</h4>
+        <ul>
+          {timeline.map((entry) => (
+            <li key={entry.id}>
+              <span>{entry.actorName}: </span>
+              <MarkdownPreview
+                content={
+                  entry.entryType === "comment"
+                    ? entry.body
+                    : formatStoryTimelineSummary(entry, locale)
+                }
+              />
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3 px-3 pb-3 pt-2">
       <form

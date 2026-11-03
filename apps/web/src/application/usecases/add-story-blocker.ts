@@ -4,6 +4,7 @@ import type {
   StoryRepository,
   StoryRepositoryError,
 } from "../../domain/repositories/story-repository";
+import { STORY_ARCHIVED_ERROR } from "../../domain/repositories/story-repository";
 
 export const STORY_BLOCKS_ITSELF_ERROR = "STORY_BLOCKS_ITSELF_ERROR" as const;
 export const STORY_BLOCKER_CYCLE_ERROR = "STORY_BLOCKER_CYCLE_ERROR" as const;
@@ -74,6 +75,8 @@ export async function addStoryBlocker(
   if (!blockingStory.value || !blockedStory.value) {
     return err(STORY_BLOCKER_STORY_NOT_FOUND_ERROR);
   }
+  if (blockingStory.value.archivedAt || blockedStory.value.archivedAt)
+    return err(STORY_ARCHIVED_ERROR);
 
   const pairs = await repository.listBlockerPairs(input.projectId);
   if (pairs.isErr()) {

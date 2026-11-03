@@ -109,8 +109,18 @@ tm story list --project <project-id>
 tm story list --project <project-id> --status Unstarted
 tm story list --project <project-id> --iteration current
 tm story list --project <project-id> --icebox
+tm story list --project <project-id> --archived
 tm story list --project <project-id> --status Started --limit 10
 tm --json story list --project <project-id>
+```
+
+## Story archive
+
+Unstarted and rejected stories can be archived without deleting their history.
+
+```bash
+tm story archive --project <project-id> 95
+tm story unarchive --project <project-id> 95
 ```
 
 ## Story create

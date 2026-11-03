@@ -24,6 +24,7 @@ function makeStory(overrides: Partial<Story> = {}): Story {
     status: "Unstarted",
     statusChangedAt: NOW,
     completedAt: null,
+    archivedAt: null,
     storyPoint: null,
     labels: [],
     epicId: null,

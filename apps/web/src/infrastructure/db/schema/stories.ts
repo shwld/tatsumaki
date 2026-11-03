@@ -18,6 +18,7 @@ export const storiesTable = sqliteTable("stories", {
     .notNull()
     .default(sql`CURRENT_TIMESTAMP`),
   completedAt: text("completed_at"),
+  archivedAt: text("archived_at"),
   storyPoint: integer("story_point"),
   labels: text("labels").notNull().default("[]"),
   requesterId: text("requester_id"),

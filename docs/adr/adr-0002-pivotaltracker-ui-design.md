@@ -30,3 +30,7 @@ Adopt PivotalTracker as the sole reference for all UI/UX design decisions:
 ## Amendment: compact application header (story #307, 2026-09-13)
 
 At the user's explicit request, combine the application controls and story toolbar into one header: icon-only home link on the left, notification and account controls on the right. Hide the header while scrolling down and reveal it while scrolling up or returning to the top. Preserve keyboard access and keep it visible while its controls are in use. This exception changes header chrome only; panel structure and story workflows continue to follow the existing decision.
+
+## Amendment: story archives (story #330, 2026-11-03)
+
+Allow stories to be archived independently of their workflow status. PivotalTracker has no equivalent cancellation state, and deletion loses history while keeping obsolete stories in Icebox adds noise. Archived stories are excluded from normal panels and calculations, discoverable through search, and can be restored. Their details remain read-only while archived.

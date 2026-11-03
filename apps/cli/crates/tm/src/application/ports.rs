@@ -93,6 +93,7 @@ pub struct StoryListFilter {
     pub status: Option<String>,
     pub iteration_date_scope: Option<String>,
     pub icebox: bool,
+    pub archived: bool,
     pub limit: Option<u32>,
 }
 
@@ -167,6 +168,13 @@ pub trait StoryGateway {
         project: &str,
         story_number: i64,
         input: &StoryUpdateInput,
+        bearer_token: &str,
+    ) -> Result<StoryGetBody, CliError>;
+    async fn set_story_archived(
+        &self,
+        project: &str,
+        story_number: i64,
+        archived: bool,
         bearer_token: &str,
     ) -> Result<StoryGetBody, CliError>;
     async fn reorder_stories(
@@ -306,7 +314,10 @@ pub struct UploadSession {
 pub enum CreateUploadOutcome {
     Session(UploadSession),
     /// The tree equals the latest version; nothing was created.
-    Noop { artifact_id: String, version: i64 },
+    Noop {
+        artifact_id: String,
+        version: i64,
+    },
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]

@@ -126,6 +126,9 @@ impl StoryGateway for HttpStoryGateway {
     if filter.icebox {
       query.push(("icebox", "true".to_string()));
     }
+    if filter.archived {
+      query.push(("archived", "only".to_string()));
+    }
     if let Some(limit) = filter.limit {
       query.push(("limit", limit.to_string()));
     }
@@ -176,6 +179,13 @@ impl StoryGateway for HttpStoryGateway {
       .json(&story_update_payload(input))
       .send()
       .await?;
+    self.parse_story_response(response).await
+  }
+
+  async fn set_story_archived(&self, project: &str, story_number: i64, archived: bool, bearer_token: &str) -> Result<StoryGetBody, CliError> {
+    let action = if archived { "archive" } else { "unarchive" };
+    let url = format!("{}/programmatic-api/v1/projects/{project}/stories/{story_number}/{action}", self.base_url);
+    let response = self.client.post(url).bearer_auth(bearer_token).send().await?;
     self.parse_story_response(response).await
   }
 

@@ -2,6 +2,8 @@ export const STORY_ACTIVITY_ACTIONS = [
   "field_changed",
   "created",
   "deleted",
+  "archived",
+  "unarchived",
 ] as const;
 export const STORY_ACTIVITY_FIELDS = [
   "title",

@@ -20,9 +20,13 @@ import {
   toCreateStoryErrorResponse,
   toReorderStoriesErrorResponse,
 } from "../../stories/error-responses";
-import { STORY_COMMENT_NOT_FOUND_ERROR } from "../../../../domain/repositories/story-comment-repository";
+import {
+  STORY_COMMENT_NOT_FOUND_ERROR,
+  STORY_COMMENT_ARCHIVED_ERROR,
+} from "../../../../domain/repositories/story-comment-repository";
 import { getPointScale } from "../../../../domain/entities/project";
 import { changeStoryBlocker } from "../../stories/blocker-handlers";
+import { handleStoryArchive } from "../../stories/archive-handler";
 import {
   handleCliStoryUpdate,
   resolveStoryIdByNumber,
@@ -30,6 +34,12 @@ import {
 } from "./story-handlers";
 
 export const cliV1StoriesRoute = new Hono<Env>();
+cliV1StoriesRoute.post("/:projectId/stories/:storyNumber/archive", (c) =>
+  handleStoryArchive(c, true),
+);
+cliV1StoriesRoute.post("/:projectId/stories/:storyNumber/unarchive", (c) =>
+  handleStoryArchive(c, false),
+);
 
 cliV1StoriesRoute.get("/:projectId/stories/:storyNumber", async (c) => {
   const projectId = c.req.param("projectId");
@@ -68,6 +78,14 @@ cliV1StoriesRoute.get("/:projectId/stories", async (c) => {
   const status = c.req.query("status");
   const iterationDateScope = c.req.query("iterationDateScope");
   const iceboxRaw = c.req.query("icebox");
+  const archived = c.req.query("archived");
+  if (
+    archived !== undefined &&
+    archived !== "only" &&
+    archived !== "include" &&
+    archived !== "exclude"
+  )
+    return c.json({ error: "Invalid archived filter" }, 400);
   const limitRaw = c.req.query("limit");
 
   if (iceboxRaw !== undefined && iceboxRaw !== "true") {
@@ -99,6 +117,7 @@ cliV1StoriesRoute.get("/:projectId/stories", async (c) => {
   const storyRepository = new D1StoryRepository(c.env.DB);
   const result = await listStories(storyRepository, {
     projectId,
+    ...(archived ? { archived } : {}),
     ...(status !== undefined ? { status } : {}),
     ...(iterationDateScope === "current"
       ? { iterationDateScope: "current" as const }
@@ -252,6 +271,8 @@ cliV1StoriesRoute.post(
       body: payload.body,
     });
     if (result.isErr()) {
+      if (result.error === STORY_COMMENT_ARCHIVED_ERROR)
+        return c.json({ error: "Archived stories are read-only" }, 409);
       if (result.error === STORY_COMMENT_NOT_FOUND_ERROR) {
         return c.json({ error: "Story not found" }, 404);
       }

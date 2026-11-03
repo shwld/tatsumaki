@@ -6,10 +6,13 @@ export const STORY_COMMENT_REPOSITORY_ERROR =
 
 export const STORY_COMMENT_NOT_FOUND_ERROR =
   "STORY_COMMENT_NOT_FOUND_ERROR" as const;
+export const STORY_COMMENT_ARCHIVED_ERROR =
+  "STORY_COMMENT_ARCHIVED_ERROR" as const;
 
 export type StoryCommentRepositoryError =
   | typeof STORY_COMMENT_REPOSITORY_ERROR
-  | typeof STORY_COMMENT_NOT_FOUND_ERROR;
+  | typeof STORY_COMMENT_NOT_FOUND_ERROR
+  | typeof STORY_COMMENT_ARCHIVED_ERROR;
 
 export type StoryCommentListPage = {
   entries: StoryComment[];

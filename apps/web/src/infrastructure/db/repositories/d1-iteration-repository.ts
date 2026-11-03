@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import { err, ok, type Result } from "neverthrow";
 import { ulid } from "ulid";
 import {
@@ -146,7 +146,13 @@ export class D1IterationRepository implements IterationRepository {
         ),
       })
       .from(iterationsTable)
-      .leftJoin(storiesTable, eq(storiesTable.iterationId, iterationsTable.id))
+      .leftJoin(
+        storiesTable,
+        and(
+          eq(storiesTable.iterationId, iterationsTable.id),
+          isNull(storiesTable.archivedAt),
+        ),
+      )
       .leftJoin(
         iterationOverridesTable,
         and(
@@ -187,7 +193,13 @@ export class D1IterationRepository implements IterationRepository {
         ),
       })
       .from(iterationsTable)
-      .leftJoin(storiesTable, eq(storiesTable.iterationId, iterationsTable.id))
+      .leftJoin(
+        storiesTable,
+        and(
+          eq(storiesTable.iterationId, iterationsTable.id),
+          isNull(storiesTable.archivedAt),
+        ),
+      )
       .leftJoin(
         iterationOverridesTable,
         and(
@@ -233,7 +245,13 @@ export class D1IterationRepository implements IterationRepository {
         ),
       })
       .from(iterationsTable)
-      .leftJoin(storiesTable, eq(storiesTable.iterationId, iterationsTable.id))
+      .leftJoin(
+        storiesTable,
+        and(
+          eq(storiesTable.iterationId, iterationsTable.id),
+          isNull(storiesTable.archivedAt),
+        ),
+      )
       .leftJoin(
         iterationOverridesTable,
         and(
@@ -358,6 +376,7 @@ export class D1IterationRepository implements IterationRepository {
         and(
           eq(storiesTable.projectId, input.projectId),
           eq(storiesTable.id, input.storyId),
+          isNull(storiesTable.archivedAt),
         ),
       )
       .get();
@@ -373,7 +392,12 @@ export class D1IterationRepository implements IterationRepository {
         isIcebox: 0,
         updatedAt: sql`CURRENT_TIMESTAMP`,
       })
-      .where(eq(storiesTable.id, input.storyId));
+      .where(
+        and(
+          eq(storiesTable.id, input.storyId),
+          isNull(storiesTable.archivedAt),
+        ),
+      );
 
     return ok(true);
   }
@@ -388,6 +412,7 @@ export class D1IterationRepository implements IterationRepository {
         and(
           eq(storiesTable.projectId, input.projectId),
           eq(storiesTable.id, input.storyId),
+          isNull(storiesTable.archivedAt),
         ),
       )
       .get();
@@ -402,7 +427,12 @@ export class D1IterationRepository implements IterationRepository {
         iterationId: null,
         updatedAt: sql`CURRENT_TIMESTAMP`,
       })
-      .where(eq(storiesTable.id, input.storyId));
+      .where(
+        and(
+          eq(storiesTable.id, input.storyId),
+          isNull(storiesTable.archivedAt),
+        ),
+      );
 
     return ok(true);
   }

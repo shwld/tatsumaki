@@ -42,6 +42,7 @@ export type Story = {
   type: StoryType;
   status: StoryStatus;
   statusChangedAt: string;
+  archivedAt?: string | null;
   storyPoint: StoryPoint | null;
   labels: string[];
   iterationId: string | null;
@@ -76,7 +77,12 @@ export type StoryTimelineField =
   | "labels"
   | "story";
 
-export type ProjectHistoryAction = "field_changed" | "created" | "deleted";
+export type ProjectHistoryAction =
+  | "field_changed"
+  | "created"
+  | "deleted"
+  | "archived"
+  | "unarchived";
 
 export type ProjectHistoryEntry = {
   __typename: "ProjectHistoryEntry";
@@ -101,7 +107,9 @@ export type ProjectHistoryResponse = {
 export type StoryTimelineActivityAction =
   | "field_changed"
   | "created"
-  | "deleted";
+  | "deleted"
+  | "archived"
+  | "unarchived";
 
 export type StoryTimelineActivityEntry = {
   __typename: "StoryTimelineActivityEntry";

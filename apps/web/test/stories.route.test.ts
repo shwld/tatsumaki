@@ -164,6 +164,57 @@ describe("story routes", () => {
     return iterationId;
   };
 
+  it("archives, filters, protects and restores a story", async () => {
+    const projectId = await createProject();
+    const created = await fetchWithAuth(storiesApiPath(projectId), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        title: "Archive me",
+        description: "",
+        type: "feature",
+      }),
+    });
+    const { story } = (await created.json()) as {
+      story: { id: string; storyNumber: number };
+    };
+    const path = storyApiPath(projectId, String(story.storyNumber));
+    expect(
+      (await fetchWithAuth(`${path}/archive`, { method: "POST" })).status,
+    ).toBe(200);
+    const active = (await (
+      await fetchWithAuth(storiesApiPath(projectId))
+    ).json()) as { stories: unknown[] };
+    expect(active.stories).toHaveLength(0);
+    const archived = (await (
+      await fetchWithAuth(`${storiesApiPath(projectId)}?archived=only`)
+    ).json()) as { stories: { id: string }[] };
+    expect(archived.stories.map((s) => s.id)).toEqual([story.id]);
+    const update = await fetchWithAuth(path, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ title: "Changed" }),
+    });
+    expect(update.status).toBe(409);
+    const comment = await fetchWithAuth(`${path}/comments`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ body: "No" }),
+    });
+    expect(comment.status).toBe(409);
+    expect(
+      (await fetchWithAuth(`${path}/unarchive`, { method: "POST" })).status,
+    ).toBe(200);
+    const restored = (await (
+      await fetchWithAuth(storiesApiPath(projectId))
+    ).json()) as { stories: { id: string }[] };
+    expect(restored.stories.map((s) => s.id)).toEqual([story.id]);
+    await forceStatusForTest(story.id, "Started");
+    expect(
+      (await fetchWithAuth(`${path}/archive`, { method: "POST" })).status,
+    ).toBe(409);
+  });
+
   it("creates a story with title, description, type, status and labels", async () => {
     const projectId = await createProject();
 
@@ -193,6 +244,7 @@ describe("story routes", () => {
         storyNumber: 1,
         statusChangedAt: expect.any(String),
         completedAt: null,
+        archivedAt: null,
         storyPoint: 3,
         labels: ["auth", "backend"],
         epicId: null,
@@ -277,6 +329,7 @@ describe("story routes", () => {
         storyNumber: 1,
         statusChangedAt: expect.any(String),
         completedAt: null,
+        archivedAt: null,
         storyPoint: 8,
         labels: ["ui", "priority:high"],
         epicId: null,
@@ -558,6 +611,7 @@ describe("story routes", () => {
         storyNumber: 1,
         statusChangedAt: expect.any(String),
         completedAt: null,
+        archivedAt: null,
         storyPoint: null,
         labels: [],
         epicId: null,

@@ -91,7 +91,13 @@ function panelBaseQuery(
 ): URLSearchParams {
   const query = new URLSearchParams();
   query.set("detail", "summary");
-  const normalizedSearch = filters.searchQuery.trim();
+  const archivedSearch = /(?:^|\s)is:archived(?=\s|$)/i.test(
+    filters.searchQuery,
+  );
+  const normalizedSearch = filters.searchQuery
+    .replace(/(?:^|\s)is:archived(?=\s|$)/gi, " ")
+    .trim();
+  if (archivedSearch) query.set("archived", "only");
   if (normalizedSearch) {
     query.set("q", normalizedSearch);
   }
@@ -106,6 +112,11 @@ function panelBaseQuery(
   }
   if (filters.activeTypes.length > 0) {
     query.set("types", filters.activeTypes.join(","));
+  }
+
+  if (archivedSearch) {
+    if (panel !== "Backlog") query.set("statuses", "Accepted");
+    return query;
   }
 
   if (panel === "Done") {
@@ -145,7 +156,13 @@ function currentAcceptedBaseQuery(
 ): URLSearchParams {
   const query = new URLSearchParams();
   query.set("detail", "summary");
-  const normalizedSearch = filters.searchQuery.trim();
+  const archivedSearch = /(?:^|\s)is:archived(?=\s|$)/i.test(
+    filters.searchQuery,
+  );
+  const normalizedSearch = filters.searchQuery
+    .replace(/(?:^|\s)is:archived(?=\s|$)/gi, " ")
+    .trim();
+  if (archivedSearch) query.set("archived", "only");
   if (normalizedSearch) {
     query.set("q", normalizedSearch);
   }
@@ -680,6 +697,13 @@ export function usePanelStoriesQuery({
   };
 
   const applyStoryUpdate = (updatedStory: Story) => {
+    const archivedSearch = /(?:^|\s)is:archived(?=\s|$)/i.test(
+      filters.searchQuery,
+    );
+    if ((updatedStory.archivedAt != null) !== archivedSearch) {
+      removeStory(updatedStory.id);
+      return;
+    }
     const shouldContainInDone = storyMatchesPanel(
       updatedStory,
       "Done",

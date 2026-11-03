@@ -57,7 +57,8 @@ export const storyMultiPanelScreenJa = {
         "ツールバーのレイアウトアイコンから、表示するパネルを選んでください。",
     },
     search: {
-      placeholder: "タイトル・説明を検索...",
+      archived: "アーカイブ済み",
+      placeholder: "タイトル・説明を検索（is:archived でアーカイブ済み）...",
       clear: "クリア",
       save: "保存",
       cancel: "キャンセル",
@@ -215,7 +216,9 @@ export const storyMultiPanelScreenEn = {
       emptyPanels: "Choose panels to show from the layout icon in the toolbar.",
     },
     search: {
-      placeholder: "Search titles and descriptions...",
+      archived: "Archived",
+      placeholder:
+        "Search titles and descriptions (is:archived for archived)...",
       clear: "Clear",
       save: "Save",
       cancel: "Cancel",

@@ -133,6 +133,7 @@ function renderDetail(
     avatarUrl: string | null;
     gravatarUrl: string | null;
   }> = [],
+  story: Story = createStory(),
 ) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -142,7 +143,7 @@ function renderDetail(
       <AuthErrorProvider>
         <ToastProvider>
           <StoryAccordionDetail
-            story={createStory()}
+            story={story}
             mentionCandidates={mentionCandidates}
             onStoryUpdated={onStoryUpdated}
           />
@@ -187,6 +188,32 @@ describe("StoryAccordionDetail", () => {
     mockViewer.displayName = "Author";
     mockViewer.email = "author@example.com";
     mockProjectBootstrapData.projectLabels = [];
+  });
+
+  it("shows archived stories read-only and restores them", async () => {
+    const story = { ...createStory(), archivedAt: "2026-11-03T00:00:00.000Z" };
+    const updated = vi.fn();
+    const fetchMock = vi.fn(async (url: RequestInfo | URL) => {
+      if (String(url).endsWith("/unarchive"))
+        return new Response(
+          JSON.stringify({ story: { ...story, archivedAt: null } }),
+          { status: 200 },
+        );
+      return (
+        baselineFetchResponse(String(url)) ??
+        new Response(null, { status: 404 })
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderDetail(updated, [], story);
+    expect(screen.getByText("アーカイブ済み")).toBeInTheDocument();
+    expect(screen.queryByLabelText("タイトル")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "アーカイブ解除" }));
+    await waitFor(() =>
+      expect(updated).toHaveBeenCalledWith(
+        expect.objectContaining({ archivedAt: null }),
+      ),
+    );
   });
 
   it("shows status select with selectable statuses", () => {
