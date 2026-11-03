@@ -722,6 +722,15 @@ function StoryAccordionDetailComponent({
                   await queryClient.invalidateQueries({
                     queryKey: storyQueryKeys.panelStoriesRoot(story.projectId),
                   });
+                  await queryClient.invalidateQueries({
+                    queryKey: storyQueryKeys.storyTimeline(
+                      story.projectId,
+                      String(story.storyNumber),
+                    ),
+                  });
+                  await queryClient.invalidateQueries({
+                    queryKey: storyQueryKeys.projectHistory(story.projectId),
+                  });
                 })
                 .catch(() =>
                   showToast(
@@ -746,6 +755,24 @@ function StoryAccordionDetailComponent({
         <p className="text-sm">
           {t("storyAccordion.detail.labels")}:{" "}
           {resolvedStory.labels.join(", ") || "—"}
+        </p>
+        <p className="text-sm">
+          {t("storyAccordion.subHeader.owners")}:{" "}
+          {resolvedStory.ownerIds
+            .map(
+              (id) =>
+                memberOptionsResolved.find((member) => member.id === id)
+                  ?.displayName ?? id,
+            )
+            .join(", ") || "—"}
+        </p>
+        <p className="text-sm">
+          {t("storyAccordion.subHeader.requester")}:{" "}
+          {memberOptionsResolved.find(
+            (member) => member.id === resolvedStory.requesterId,
+          )?.displayName ??
+            resolvedStory.requesterId ??
+            "—"}
         </p>
         <MarkdownPreview content={resolvedStory.description} />
         <h4>{t("storyAccordion.attachments.title")}</h4>

@@ -78,6 +78,15 @@ function StoryAccordionSubHeaderComponent({
         String(story.storyNumber),
       ),
     });
+    await queryClient.invalidateQueries({
+      queryKey: storyQueryKeys.storyTimeline(
+        story.projectId,
+        String(story.storyNumber),
+      ),
+    });
+    await queryClient.invalidateQueries({
+      queryKey: storyQueryKeys.projectHistory(story.projectId),
+    });
   };
 
   if (story.archivedAt) return null;
