@@ -212,6 +212,26 @@ describe("StoryMultiPanelScreen UI contracts", () => {
     expect(stored.mode).toBe("combined");
   });
 
+  it("never renders split panels first when combined mode is persisted for the user", async () => {
+    localStorage.setItem(
+      "tatsumaki:current-backlog-view-mode:user-1",
+      JSON.stringify({ mode: "combined" }),
+    );
+    vi.stubGlobal("fetch", createStoryMultiPanelFetchMock());
+    const rendered: string[] = [];
+    const observer = new MutationObserver(() => {
+      if (screen.queryByTestId("panel-Current")) rendered.push("Current");
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    renderStoryMultiPanel();
+
+    expect(
+      await screen.findByTestId("panel-CurrentBacklogCombined"),
+    ).toBeInTheDocument();
+    observer.disconnect();
+    expect(rendered).toEqual([]);
+  });
+
   it("does not auto-select a story after inline create", async () => {
     const baseFetch = createStoryMultiPanelFetchMock();
     vi.stubGlobal(

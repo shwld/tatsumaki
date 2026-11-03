@@ -196,7 +196,7 @@ export function StoryMultiPanelScreen() {
   const { projectId } = useParams();
   const { notifySessionExpired } = useAuthError();
   const { showToast } = useToast();
-  const { user } = useCurrentUser();
+  const { user, isLoading: isUserLoading } = useCurrentUser();
   const { visibility, togglePanel, visiblePanels } = usePanelVisibility();
   const { mode: currentBacklogViewMode, toggleMode: toggleCurrentBacklogMode } =
     useCurrentBacklogViewMode(user?.id);
@@ -439,7 +439,8 @@ export function StoryMultiPanelScreen() {
   const iterations: Iteration[] = projectData?.iterations ?? [];
   const iterationOverrides = projectData?.iterationOverrides ?? [];
   const velocity = projectData?.velocity ?? 0;
-  const isBootstrapping = bootstrapQuery.isLoading;
+  // 表示モードは user 単位で保存されるため、user 確定前に描画すると split→combined の切替でレイアウトがシフトする
+  const isBootstrapping = bootstrapQuery.isLoading || isUserLoading;
 
   const currentIteration = useMemo(() => {
     return findCurrentIteration(iterations);
