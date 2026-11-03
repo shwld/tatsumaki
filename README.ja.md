@@ -22,12 +22,12 @@ tatsumaki is pre-1.0 software. It is suitable for evaluation, local development,
 
 ## Screenshots
 
-| Stories | Velocity |
-|---|---|
+| Stories                                                                                                | Velocity                                                                                           |
+| ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
 | ![Story backlog screenshot](apps/web/test/ui-screenshot/stories.spec.ts-snapshots/stories-backlog.png) | ![Velocity screenshot](apps/web/test/ui-screenshot/stories.spec.ts-snapshots/project-velocity.png) |
 
-| Project settings | API keys |
-|---|---|
+| Project settings                                                                                                    | API keys                                                                                                            |
+| ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | ![Project settings screenshot](apps/web/test/ui-screenshot/project-settings.spec.ts-snapshots/project-settings.png) | ![Project API keys screenshot](apps/web/test/ui-screenshot/project-settings.spec.ts-snapshots/project-api-keys.png) |
 
 ## 技術スタック
@@ -87,6 +87,15 @@ CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_ACCESS_TEAM_DOMAIN
 stagingは専用の `tatsumaki-staging` Worker、D1 database、KV namespace、R2 buckets、Durable Object storage、Access application、Access policyを使い、production dataを共有しません。
 
 Artifactのpreviewは `/artifact-content/<token>/...` から配信されます。このpathはAccessのloginを免除され、10分間有効な署名付きtokenだけで認可されます。setupコマンドは実行のたびに `ARTIFACT_CONTENT_SIGNING_KEY` を再生成するため、すでに開いているpreviewは再読み込みが必要です。鍵を手動でrotateするときは、新しい値を展開している間、古い値を `ARTIFACT_CONTENT_SIGNING_KEY_PREVIOUS` に設定します。
+
+Workerをカスタムドメインでも配信している場合は、`--custom-domain <host>`（stagingは `--staging-custom-domain <host>`）を指定します。setupコマンドが `https://<host>/artifact-content/*` のbypassも作成します。カスタムドメイン自体（DNS / route）は事前にWorkerへ割り当てておいてください。手動で設定する場合は、`<host>/artifact-content/*` だけをdestinationに持つAccessのself-hosted applicationを作り、`everyone` を含む `bypass` policyを付けます。確認は無効なtokenへのリクエストで行います。
+
+```bash
+curl -i https://<host>/artifact-content/invalid/index.html
+curl -i https://<host>/api/projects
+```
+
+前者は Access のログインへの 302 ではなく Worker の 404 を返し、後者は引き続き Access のログインへリダイレクトされる必要があります。
 
 既存環境でproductionへ触れずにstagingの作成・修復・再deployだけを行う場合は、`--staging-only` を使います。production resourceの検索、migration、deploy、変更は行いません。
 
@@ -159,10 +168,10 @@ bunx lefthook run pre-commit  # 正常終了すれば OK
 
 このリポジトリでは **lefthook** (Git hook) で品質ゲートを構成しています。
 
-| タイミング | フック | 実行内容 |
-|---|---|---|
+| タイミング      | フック         | 実行内容                                                                                                        |
+| --------------- | -------------- | --------------------------------------------------------------------------------------------------------------- |
 | `git commit` 時 | **pre-commit** | config-guard（設定ファイル保護 / 機密ファイル / 破壊的操作）+ 条件付き `lint:custom` + コードの自動フォーマット |
-| `git push` 時 | **pre-push** | config-guard（push差分の安全性検査）+ lint → openapi-check → test → typecheck（順次実行・fail-fast） |
+| `git push` 時   | **pre-push**   | config-guard（push差分の安全性検査）+ lint → openapi-check → test → typecheck（順次実行・fail-fast）            |
 
 ### 日常の開発ワークフロー
 

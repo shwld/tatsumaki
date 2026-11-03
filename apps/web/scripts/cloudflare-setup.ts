@@ -19,6 +19,8 @@ export type SetupOptions = {
   dryRun: boolean;
   namePrefix: string;
   stagingControlPlaneService?: string;
+  customDomain?: string;
+  stagingCustomDomain?: string;
 };
 
 export type EnvironmentPlan = {
@@ -131,6 +133,24 @@ export function validateSetupOptions(options: SetupOptions): void {
       );
     }
   }
+  if (options.customDomain && environmentSelection === "staging") {
+    throw new Error("--custom-domain requires the production environment.");
+  }
+  if (options.stagingCustomDomain && environmentSelection === "production") {
+    throw new Error(
+      "--staging-custom-domain requires --with-staging or --staging-only.",
+    );
+  }
+  for (const customDomain of [
+    options.customDomain,
+    options.stagingCustomDomain,
+  ]) {
+    if (customDomain && !isHostname(customDomain)) {
+      throw new Error(
+        `Custom domain must be a bare hostname (no scheme or path): ${customDomain}`,
+      );
+    }
+  }
   for (const email of options.allowEmails) {
     if (!email.includes("@"))
       throw new Error(`Invalid email address: ${email}`);
@@ -166,6 +186,21 @@ export function validateSetupOptions(options: SetupOptions): void {
   }
 }
 
+function customDomainFor(
+  plan: EnvironmentPlan,
+  options: SetupOptions,
+): string | undefined {
+  return plan.environment === "staging"
+    ? options.stagingCustomDomain
+    : options.customDomain;
+}
+
+function isHostname(value: string): boolean {
+  return /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i.test(
+    value,
+  );
+}
+
 export async function setupCloudflare(
   options: SetupOptions,
   dependencies: SetupDependencies = {},
@@ -186,6 +221,8 @@ export async function setupCloudflare(
       `R2: ${plan.storyAttachmentsBucket}, ${plan.userAvatarsBucket}, ${plan.artifactsBucket}`,
     );
     log(`Access: ${plan.accessName}`);
+    const customDomain = customDomainFor(plan, options);
+    if (customDomain) log(`Custom domain: ${customDomain}`);
     if (plan.environment === "staging" && options.stagingControlPlaneService) {
       log(`Control Plane: ${options.stagingControlPlaneService}`);
     }
@@ -292,6 +329,12 @@ export async function setupCloudflare(
         options.allowDomains,
       );
       await client.ensureArtifactContentBypass(plan, workerDomain);
+      const customDomain = customDomainFor(plan, options);
+      if (customDomain) {
+        await client.ensureArtifactContentBypass(plan, customDomain, {
+          nameSuffix: ` (${customDomain})`,
+        });
+      }
 
       await writeFile(
         secretPath,
@@ -519,8 +562,9 @@ class CloudflareClient {
   async ensureArtifactContentBypass(
     plan: EnvironmentPlan,
     domain: string,
+    { nameSuffix = "" }: { nameSuffix?: string } = {},
   ): Promise<AccessApplication> {
-    const name = `${plan.accessName} artifact content`;
+    const name = `${plan.accessName} artifact content${nameSuffix}`;
     const uri = `${domain}/artifact-content/*`;
     const applications = await this.listAll<AccessApplication>(
       "access/apps?per_page=100",

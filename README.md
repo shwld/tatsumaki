@@ -22,12 +22,12 @@ tatsumaki is pre-1.0 software. It is suitable for evaluation, local development,
 
 ## Screenshots
 
-| Stories | Velocity |
-|---|---|
+| Stories                                                                                                | Velocity                                                                                           |
+| ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
 | ![Story backlog screenshot](apps/web/test/ui-screenshot/stories.spec.ts-snapshots/stories-backlog.png) | ![Velocity screenshot](apps/web/test/ui-screenshot/stories.spec.ts-snapshots/project-velocity.png) |
 
-| Project settings | API keys |
-|---|---|
+| Project settings                                                                                                    | API keys                                                                                                            |
+| ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | ![Project settings screenshot](apps/web/test/ui-screenshot/project-settings.spec.ts-snapshots/project-settings.png) | ![Project API keys screenshot](apps/web/test/ui-screenshot/project-settings.spec.ts-snapshots/project-api-keys.png) |
 
 ## Tech Stack
@@ -87,6 +87,15 @@ CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_ACCESS_TEAM_DOMAIN
 Staging uses its own `tatsumaki-staging` Worker, D1 database, KV namespace, R2 buckets, Durable Object storage, Access application, and Access policy. It does not share production data.
 
 Artifact previews are served from `/artifact-content/<token>/...`, which is exempted from the Access login and authorized only by a 10-minute signed token. The setup command regenerates `ARTIFACT_CONTENT_SIGNING_KEY` on every run, so previews that are already open must be reloaded afterwards. To rotate the key by hand, set the old value as `ARTIFACT_CONTENT_SIGNING_KEY_PREVIOUS` while the new one rolls out.
+
+If the Worker is also served from a custom domain, pass `--custom-domain <host>` (and `--staging-custom-domain <host>` for staging). The setup command then creates a bypass for `https://<host>/artifact-content/*` as well; the custom domain itself (DNS / route) must already be attached to the Worker. To do it by hand, add a Cloudflare Access self-hosted application whose only destination is `<host>/artifact-content/*` with a `bypass` policy that includes `everyone`. To verify, request an invalid token:
+
+```bash
+curl -i https://<host>/artifact-content/invalid/index.html
+curl -i https://<host>/api/projects
+```
+
+The first must return the Worker's 404, not a 302 to the Access login; the second must still be redirected to the Access login.
 
 For an existing installation, use `--staging-only` to create, repair, or redeploy staging without looking up, migrating, deploying, or changing any production resource:
 
@@ -159,10 +168,10 @@ bunx lefthook run pre-commit
 
 This repository uses **lefthook** Git hooks for quality gates.
 
-| Timing | Hook | Checks |
-|---|---|---|
+| Timing       | Hook           | Checks                                                                                                                                   |
+| ------------ | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | `git commit` | **pre-commit** | config-guard for protected configuration, secret files, and destructive operations; conditional `lint:custom`; automatic code formatting |
-| `git push` | **pre-push** | config-guard for pushed diffs, then lint -> openapi-check -> test -> typecheck with fail-fast execution |
+| `git push`   | **pre-push**   | config-guard for pushed diffs, then lint -> openapi-check -> test -> typecheck with fail-fast execution                                  |
 
 ### Daily Development Workflow
 

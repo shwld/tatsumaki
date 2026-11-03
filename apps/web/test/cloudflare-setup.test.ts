@@ -460,6 +460,124 @@ describe("Cloudflare self-hosting setup", () => {
     ).toThrow("requires --with-staging or --staging-only");
   });
 
+  it("parses custom domains", () => {
+    expect(
+      parseArguments(
+        [
+          "--allow-email",
+          "a@example.com",
+          "--custom-domain",
+          "tatsumaki.example.com",
+          "--staging-custom-domain",
+          "staging.example.com",
+        ],
+        {},
+      ),
+    ).toEqual(
+      expect.objectContaining({
+        customDomain: "tatsumaki.example.com",
+        stagingCustomDomain: "staging.example.com",
+      }),
+    );
+  });
+
+  it("rejects custom domains that are not bare hostnames", () => {
+    expect(() =>
+      validateSetupOptions({
+        ...baseOptions,
+        customDomain: "https://tatsumaki.example.com/",
+      }),
+    ).toThrow("bare hostname");
+  });
+
+  it("rejects a staging custom domain in production-only mode", () => {
+    expect(() =>
+      validateSetupOptions({
+        ...baseOptions,
+        stagingCustomDomain: "staging.example.com",
+      }),
+    ).toThrow("requires --with-staging or --staging-only");
+  });
+
+  it("creates an artifact-content bypass for the custom domain idempotently", async () => {
+    const calls: Array<{ url: string; method: string; body?: unknown }> = [];
+    const bypassName = "tatsumaki artifact content (tatsumaki.example.com)";
+    const responses = [
+      envelope([]),
+      envelope({ uuid: "d1-id", name: "tatsumaki-db" }),
+      envelope([]),
+      envelope({ id: "kv-id", title: "tatsumaki-oauth-kv" }),
+      envelope({ buckets: [] }),
+      envelope({ id: "story-r2", name: "tatsumaki-story-attachments" }),
+      envelope({ buckets: [] }),
+      envelope({ id: "avatars-r2", name: "tatsumaki-user-avatars" }),
+      envelope({ buckets: [] }),
+      envelope({ id: "artifacts-r2", name: "tatsumaki-artifacts" }),
+      envelope({ subdomain: "account-subdomain" }),
+      envelope([{ id: "worker-id", name: "tatsumaki" }]),
+      envelope([
+        {
+          id: "app-id",
+          name: "tatsumaki",
+          aud: "access-aud",
+          destinations: [{ type: "worker", worker_id: "worker-id" }],
+        },
+      ]),
+      envelope([
+        {
+          id: "policy-id",
+          name: "tatsumaki allowed users",
+          decision: "allow",
+          include: [{ email: { email: "owner@example.com" } }],
+        },
+      ]),
+      envelope([
+        { id: "bypass-app-id", name: "tatsumaki artifact content" },
+        { id: "custom-bypass-id", name: bypassName },
+      ]),
+      envelope([
+        { id: "bypass-policy-id", name: "tatsumaki artifact content bypass" },
+      ]),
+      envelope([
+        { id: "bypass-app-id", name: "tatsumaki artifact content" },
+        { id: "custom-bypass-id", name: bypassName },
+      ]),
+      envelope([{ id: "custom-policy-id", name: `${bypassName} bypass` }]),
+    ];
+    const fetchMock = vi.fn(
+      async (input: string | URL | Request, init?: RequestInit) => {
+        calls.push({ url: input.toString(), method: init?.method ?? "GET" });
+        const response = responses.shift();
+        if (!response) throw new Error("Unexpected request");
+        return new Response(JSON.stringify(response), { status: 200 });
+      },
+    );
+    await setupCloudflare(
+      { ...baseOptions, customDomain: "tatsumaki.example.com" },
+      {
+        fetch: fetchMock as typeof fetch,
+        runCommand: async () => undefined,
+        log: () => undefined,
+      },
+    );
+
+    expect(responses).toHaveLength(0);
+    expect(calls).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          url: expect.stringContaining(
+            "/access/apps/custom-bypass-id/policies",
+          ),
+        }),
+      ]),
+    );
+    expect(
+      calls.filter(
+        (call) => call.method !== "GET" && call.url.includes("/access/"),
+      ),
+    ).toEqual([]);
+  });
+
   it("rejects selecting both staging modes", () => {
     expect(() =>
       validateSetupOptions({
