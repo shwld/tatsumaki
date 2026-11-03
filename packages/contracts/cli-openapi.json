@@ -758,6 +758,12 @@
                   "isIcebox": {
                     "type": "boolean"
                   },
+                  "ownerIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
                   "status": {
                     "$ref": "#/components/schemas/StoryStatus"
                   }

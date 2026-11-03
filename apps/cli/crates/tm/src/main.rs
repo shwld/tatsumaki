@@ -168,6 +168,10 @@ enum StorySubcommand {
         icebox: bool,
         #[arg(long, conflicts_with = "icebox")]
         no_icebox: bool,
+        #[arg(long = "owner", value_name = "USER_ID", conflicts_with = "clear_owners")]
+        owners: Vec<String>,
+        #[arg(long, conflicts_with = "owners")]
+        clear_owners: bool,
     },
     Status {
         #[arg(long)]
@@ -664,6 +668,8 @@ async fn run() -> Result<(), (CliError, i32)> {
                     clear_story_point,
                     icebox,
                     no_icebox,
+                    owners,
+                    clear_owners,
                 } => {
                     let project = require_project(project)?;
                     let input = StoryUpdateInput {
@@ -682,6 +688,13 @@ async fn run() -> Result<(), (CliError, i32)> {
                             Some(false)
                         } else {
                             None
+                        },
+                        owner_ids: if clear_owners {
+                            Some(Vec::new())
+                        } else if owners.is_empty() {
+                            None
+                        } else {
+                            Some(owners)
                         },
                     };
                     let body = service
@@ -714,6 +727,7 @@ async fn run() -> Result<(), (CliError, i32)> {
                         story_point: None,
                         status: Some(status.as_api_str().to_string()),
                         is_icebox: None,
+                        owner_ids: None,
                     };
                     let body = service
                         .update_story(&base_url, &project, story_number, &input)
@@ -1194,6 +1208,82 @@ mod tests {
         };
         assert_eq!(story_point, None);
         assert!(clear_story_point);
+    }
+
+    #[test]
+    fn story_update_accepts_multiple_owners() {
+        let parsed = Cli::try_parse_from([
+            "tm",
+            "story",
+            "update",
+            "--project",
+            "project-1",
+            "350",
+            "--owner",
+            "user-1",
+            "--owner",
+            "user-2",
+        ])
+        .expect("owners should be accepted");
+
+        let Commands::Story(StoryCommand {
+            command:
+                StorySubcommand::Update {
+                    owners,
+                    clear_owners,
+                    ..
+                },
+        }) = parsed.command
+        else {
+            panic!("expected story update command");
+        };
+        assert_eq!(owners, vec!["user-1".to_string(), "user-2".to_string()]);
+        assert!(!clear_owners);
+    }
+
+    #[test]
+    fn story_update_accepts_clear_owners() {
+        let parsed = Cli::try_parse_from([
+            "tm",
+            "story",
+            "update",
+            "--project",
+            "project-1",
+            "350",
+            "--clear-owners",
+        ])
+        .expect("clear owners should be accepted");
+
+        let Commands::Story(StoryCommand {
+            command:
+                StorySubcommand::Update {
+                    owners,
+                    clear_owners,
+                    ..
+                },
+        }) = parsed.command
+        else {
+            panic!("expected story update command");
+        };
+        assert!(owners.is_empty());
+        assert!(clear_owners);
+    }
+
+    #[test]
+    fn story_update_rejects_setting_and_clearing_owners_together() {
+        let result = Cli::try_parse_from([
+            "tm",
+            "story",
+            "update",
+            "--project",
+            "project-1",
+            "350",
+            "--owner",
+            "user-1",
+            "--clear-owners",
+        ]);
+
+        assert!(result.is_err());
     }
 
     #[test]
