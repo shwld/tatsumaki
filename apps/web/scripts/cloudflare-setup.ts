@@ -1,7 +1,7 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { domainToASCII, fileURLToPath } from "node:url";
+import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 
 const API_BASE_URL = "https://api.cloudflare.com/client/v4";
@@ -196,9 +196,62 @@ function customDomainFor(
   plan: EnvironmentPlan,
   options: SetupOptions,
 ): string | undefined {
-  return plan.environment === "staging"
-    ? options.stagingCustomDomain
-    : options.customDomain;
+  return (
+    plan.environment === "staging"
+      ? options.stagingCustomDomain
+      : options.customDomain
+  )?.toLowerCase();
+}
+
+function isDecodablePunycode(label: string): boolean {
+  // RFC 3492 section 6.2 decoder, used only to validate that the label decodes.
+  const input = label.slice(4);
+  const delimiter = input.lastIndexOf("-");
+  if (delimiter === 0) return false;
+  const base = 36;
+  const tMin = 1;
+  const tMax = 26;
+  let n = 128;
+  let bias = 72;
+  let i = 0;
+  let length = delimiter > 0 ? delimiter : 0;
+  let position = delimiter > 0 ? delimiter + 1 : 0;
+  if (position >= input.length) return false;
+  while (position < input.length) {
+    const previous = i;
+    let weight = 1;
+    for (let k = base; ; k += base) {
+      if (position >= input.length) return false;
+      const code = input.charCodeAt(position++);
+      const digit =
+        code >= 97 && code <= 122
+          ? code - 97
+          : code >= 48 && code <= 57
+            ? code - 22
+            : -1;
+      if (digit < 0) return false;
+      i += digit * weight;
+      const t = k <= bias ? tMin : k >= bias + tMax ? tMax : k - bias;
+      if (digit < t) break;
+      weight *= base - t;
+    }
+    length += 1;
+    let delta = Math.floor(
+      previous === 0 ? (i - previous) / 700 : (i - previous) / 2,
+    );
+    delta += Math.floor(delta / length);
+    let k = 0;
+    while (delta > ((base - tMin) * tMax) / 2) {
+      delta = Math.floor(delta / (base - tMin));
+      k += base;
+    }
+    bias = k + Math.floor(((base - tMin + 1) * delta) / (delta + 38));
+    n += Math.floor(i / length);
+    if (n < 0xa0 || n > 0x10ffff || (n >= 0xd800 && n <= 0xdfff)) return false;
+    i %= length;
+    i += 1;
+  }
+  return true;
 }
 
 function isHostname(value: string): boolean {
@@ -206,7 +259,11 @@ function isHostname(value: string): boolean {
   return (
     /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+([a-z]{2,}|xn--[a-z0-9-]{1,59})$/.test(
       host,
-    ) && domainToASCII(host) === host
+    ) &&
+    host
+      .split(".")
+      .filter((label) => label.startsWith("xn--"))
+      .every(isDecodablePunycode)
   );
 }
 

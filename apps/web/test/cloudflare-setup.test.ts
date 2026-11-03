@@ -607,7 +607,7 @@ describe("Cloudflare self-hosting setup", () => {
       },
     );
     await setupCloudflare(
-      { ...baseOptions, customDomain: "tatsumaki.example.com" },
+      { ...baseOptions, customDomain: "Tatsumaki.Example.com" },
       {
         fetch: fetchMock as typeof fetch,
         runCommand: async () => undefined,
