@@ -136,7 +136,10 @@ function toStory(
   };
 }
 
-function toStorySummary(row: StoryRow): Story {
+function toStorySummary(
+  row: StoryRow,
+  ownerIdsByStoryId: ReadonlyMap<string, string[]>,
+): Story {
   const rawStoryPoint = row.storyPoint;
   const storyPoint =
     typeof rawStoryPoint === "number" && Number.isInteger(rawStoryPoint)
@@ -164,7 +167,7 @@ function toStorySummary(row: StoryRow): Story {
     epicId: row.epicId,
     iterationId: row.iterationId ?? null,
     isIcebox: row.isIcebox === 1,
-    ownerIds: [],
+    ownerIds: ownerIdsByStoryId.get(row.id) ?? [],
     requesterId: row.requesterId,
     releaseDate: row.releaseDate ?? null,
     position: row.position,
@@ -1158,10 +1161,13 @@ export class D1StoryRepository implements StoryRepository {
     const stories = await pagedQuery.all();
 
     if (input.detailLevel === "summary") {
+      const ownerIdsByStoryId = await this.listOwnerIdsByStoryIds(
+        stories.map((story) => story.id),
+      );
       return ok(
         await this.enrichSummaryBlockFlags(
           stories.map((row) => {
-            return toStorySummary(row);
+            return toStorySummary(row, ownerIdsByStoryId);
           }),
         ),
       );

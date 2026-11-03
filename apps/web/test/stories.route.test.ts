@@ -505,7 +505,7 @@ describe("story routes", () => {
           title: "Summary target",
           description: "",
           labels: [],
-          ownerIds: [],
+          ownerIds: ["github|test-user"],
           isBlocked: false,
           isBlocking: false,
           blockingStories: [],
