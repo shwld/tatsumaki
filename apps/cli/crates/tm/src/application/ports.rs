@@ -44,6 +44,7 @@ pub struct StoryUpdateInput {
     pub story_point: Option<StoryPointUpdate>,
     pub status: Option<String>,
     pub is_icebox: Option<bool>,
+    pub owner_ids: Option<Vec<String>>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum StoryPointUpdate {

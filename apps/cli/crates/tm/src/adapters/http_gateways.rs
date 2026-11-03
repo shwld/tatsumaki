@@ -260,6 +260,9 @@ fn story_update_payload(input: &StoryUpdateInput) -> serde_json::Value {
   if let Some(is_icebox) = input.is_icebox {
     payload.insert("isIcebox".to_string(), is_icebox.into());
   }
+  if let Some(owner_ids) = &input.owner_ids {
+    payload.insert("ownerIds".to_string(), owner_ids.clone().into());
+  }
   payload.into()
 }
 
@@ -311,6 +314,7 @@ mod tests {
       story_point: None,
       status: None,
       is_icebox: None,
+      owner_ids: None,
     }
   }
 
@@ -342,6 +346,26 @@ mod tests {
     });
 
     assert_eq!(payload, serde_json::json!({ "storyPoint": null }));
+  }
+
+  #[test]
+  fn story_update_payload_sets_owner_ids() {
+    let payload = story_update_payload(&StoryUpdateInput {
+      owner_ids: Some(vec!["user-1".to_string(), "user-2".to_string()]),
+      ..empty_update()
+    });
+
+    assert_eq!(payload, serde_json::json!({ "ownerIds": ["user-1", "user-2"] }));
+  }
+
+  #[test]
+  fn story_update_payload_clears_owner_ids() {
+    let payload = story_update_payload(&StoryUpdateInput {
+      owner_ids: Some(vec![]),
+      ..empty_update()
+    });
+
+    assert_eq!(payload, serde_json::json!({ "ownerIds": [] }));
   }
 
   #[test]

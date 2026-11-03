@@ -147,6 +147,7 @@ const StoryUpdateBodySchema = z.object({
   storyPoint: z.number().int().nullable().optional(),
   labels: z.array(z.string()).optional(),
   isIcebox: z.boolean().optional(),
+  ownerIds: z.array(z.string()).optional(),
   status: StoryStatusEnumSchema.optional(),
 });
 const StoryCommentBodySchema = z.object({
