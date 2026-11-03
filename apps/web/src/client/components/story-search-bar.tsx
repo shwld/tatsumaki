@@ -267,7 +267,7 @@ export const StorySearchBar = memo(function StorySearchBar({
                     size="sm"
                   />
                   <span className="max-w-[8rem] truncate">
-                    {member.displayName}
+                    {memberName(member)}
                   </span>
                 </button>
               ))}

@@ -118,7 +118,7 @@ function StoryAccordionSubHeaderComponent({
                       gravatarUrl={member.gravatarUrl}
                       size="sm"
                     />
-                    <span className="truncate">{member.displayName}</span>
+                    <span className="truncate">{memberName(member)}</span>
                   </label>
                 );
               })}
@@ -184,7 +184,7 @@ function StoryAccordionSubHeaderComponent({
                   gravatarUrl={member.gravatarUrl}
                   size="sm"
                 />
-                <span className="truncate">{member.displayName}</span>
+                <span className="truncate">{memberName(member)}</span>
               </label>
             ))}
           </div>
