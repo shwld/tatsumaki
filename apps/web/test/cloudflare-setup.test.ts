@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, it, vi } from "vitest";
 import {
   buildEnvironmentPlans,
+  CloudflareClient,
   renderWranglerConfig,
   setupCloudflare,
   validateSetupOptions,
@@ -576,6 +577,41 @@ describe("Cloudflare self-hosting setup", () => {
         (call) => call.method !== "GET" && call.url.includes("/access/"),
       ),
     ).toEqual([]);
+  });
+
+  it("adopts a manually created custom-domain bypass by destination", async () => {
+    const calls: Array<{ url: string; method: string }> = [];
+    const responses = [
+      envelope([
+        {
+          id: "manual-id",
+          name: "my manual bypass",
+          destinations: [
+            { type: "public", uri: "tatsumaki.example.com/artifact-content/*" },
+          ],
+        },
+      ]),
+      envelope([
+        {
+          id: "p",
+          name: "tatsumaki artifact content (tatsumaki.example.com) bypass",
+        },
+      ]),
+    ];
+    const client = new CloudflareClient("account-id", "api-token", (async (
+      input: string | URL | Request,
+      init?: RequestInit,
+    ) => {
+      calls.push({ url: input.toString(), method: init?.method ?? "GET" });
+      return new Response(JSON.stringify(responses.shift()), { status: 200 });
+    }) as typeof fetch);
+    const application = await client.ensureArtifactContentBypass(
+      buildEnvironmentPlans("tatsumaki", "production")[0],
+      "tatsumaki.example.com",
+      { nameSuffix: " (tatsumaki.example.com)" },
+    );
+    expect(application.id).toBe("manual-id");
+    expect(calls.filter((call) => call.method === "POST")).toEqual([]);
   });
 
   it("rejects selecting both staging modes", () => {

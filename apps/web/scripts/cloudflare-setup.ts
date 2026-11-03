@@ -443,7 +443,7 @@ new_sqlite_classes = ["PlanningPokerDO"]
 `;
 }
 
-class CloudflareClient {
+export class CloudflareClient {
   constructor(
     private readonly accountId: string,
     private readonly token: string,
@@ -570,7 +570,14 @@ class CloudflareClient {
       "access/apps?per_page=100",
     );
     const application =
-      applications.find((candidate) => candidate.name === name) ??
+      applications.find(
+        (candidate) =>
+          candidate.name === name ||
+          candidate.destinations?.some(
+            (destination) =>
+              destination.type === "public" && destination.uri === uri,
+          ),
+      ) ??
       (await this.request<AccessApplication>("access/apps", {
         method: "POST",
         body: {
