@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "tatsumaki CLI API",
-    "version": "0.0.12"
+    "version": "0.0.13"
   },
   "components": {
     "schemas": {
@@ -277,11 +277,11 @@
         "properties": {
           "apiVersion": {
             "type": "string",
-            "example": "0.0.12"
+            "example": "0.0.13"
           },
           "minClientVersion": {
             "type": "string",
-            "example": "0.0.12"
+            "example": "0.0.13"
           }
         },
         "required": ["apiVersion", "minClientVersion"]
