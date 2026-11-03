@@ -301,6 +301,7 @@ export async function rebuildIterations(
 
   const allStoriesResult = await storyRepository.list({
     projectId: input.projectId,
+    archived: "include",
   });
   if (allStoriesResult.isErr()) {
     return err(allStoriesResult.error);
@@ -383,7 +384,7 @@ export async function rebuildIterations(
     if (!it) {
       continue;
     }
-    const assigned = await iterationRepository.assignStory({
+    const assigned = await iterationRepository.assignStoryForRebuild({
       projectId: input.projectId,
       iterationId: it.id,
       storyId: anchor.storyId,

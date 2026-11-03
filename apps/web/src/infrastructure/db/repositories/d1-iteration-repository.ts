@@ -19,6 +19,7 @@ import {
   ITERATION_NOT_FOUND_ERROR,
   ITERATION_REPOSITORY_ERROR,
 } from "../../../domain/repositories/iteration-repository";
+import { STORY_ARCHIVED_ERROR } from "../../../domain/repositories/story-repository";
 import { createDb, type DbClient } from "../client";
 import { iterationsTable } from "../schema/iterations";
 import { iterationOverridesTable } from "../schema/iteration-overrides";
@@ -368,24 +369,13 @@ export class D1IterationRepository implements IterationRepository {
       return err(ITERATION_NOT_FOUND_ERROR);
     }
 
-    // Verify story exists in same project
-    const story = await this.db
-      .select({ id: storiesTable.id })
-      .from(storiesTable)
-      .where(
-        and(
-          eq(storiesTable.projectId, input.projectId),
-          eq(storiesTable.id, input.storyId),
-          isNull(storiesTable.archivedAt),
-        ),
-      )
-      .get();
+    return this.updateStoryIteration(input, input.iterationId);
+  }
 
-    if (!story) {
-      return ok(false);
-    }
-
-    await this.db
+  async assignStoryForRebuild(
+    input: AssignStoryInput,
+  ): Promise<Result<boolean, IterationRepositoryError>> {
+    const updated = await this.db
       .update(storiesTable)
       .set({
         iterationId: input.iterationId,
@@ -394,25 +384,32 @@ export class D1IterationRepository implements IterationRepository {
       })
       .where(
         and(
+          eq(storiesTable.projectId, input.projectId),
           eq(storiesTable.id, input.storyId),
-          isNull(storiesTable.archivedAt),
         ),
-      );
+      )
+      .returning({ id: storiesTable.id });
 
-    return ok(true);
+    return ok(updated.length > 0);
   }
 
   async unassignStory(
     input: UnassignStoryInput,
   ): Promise<Result<boolean, IterationRepositoryError>> {
+    return this.updateStoryIteration(input, null);
+  }
+
+  private async updateStoryIteration(
+    input: UnassignStoryInput,
+    iterationId: string | null,
+  ): Promise<Result<boolean, IterationRepositoryError>> {
     const story = await this.db
-      .select({ id: storiesTable.id })
+      .select({ archivedAt: storiesTable.archivedAt })
       .from(storiesTable)
       .where(
         and(
           eq(storiesTable.projectId, input.projectId),
           eq(storiesTable.id, input.storyId),
-          isNull(storiesTable.archivedAt),
         ),
       )
       .get();
@@ -420,21 +417,27 @@ export class D1IterationRepository implements IterationRepository {
     if (!story) {
       return ok(false);
     }
+    if (story.archivedAt !== null) {
+      return err(STORY_ARCHIVED_ERROR);
+    }
 
-    await this.db
+    const updated = await this.db
       .update(storiesTable)
       .set({
-        iterationId: null,
+        iterationId,
+        ...(iterationId === null ? {} : { isIcebox: 0 }),
         updatedAt: sql`CURRENT_TIMESTAMP`,
       })
       .where(
         and(
+          eq(storiesTable.projectId, input.projectId),
           eq(storiesTable.id, input.storyId),
           isNull(storiesTable.archivedAt),
         ),
-      );
+      )
+      .returning({ id: storiesTable.id });
 
-    return ok(true);
+    return updated.length > 0 ? ok(true) : err(STORY_ARCHIVED_ERROR);
   }
 
   async updateUtilization(

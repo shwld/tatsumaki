@@ -1,6 +1,6 @@
 import { env } from "cloudflare:test";
 import { eq } from "drizzle-orm";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setStoryArchived } from "../src/application/usecases/set-story-archived";
 import { canArchiveStory } from "../src/domain/entities/story";
 import { createDb } from "../src/infrastructure/db/client";
@@ -248,5 +248,42 @@ describe("story archive filtering", () => {
       },
     );
     expect(result._unsafeUnwrap().iterationId).toBe("future");
+  });
+
+  describe("restoring across the JST/UTC date boundary", () => {
+    afterEach(() => vi.useRealTimers());
+
+    it("treats an iteration ending on the JST date as elapsed", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-11-09T23:00:00Z"));
+      const db = createDb(env.DB);
+      await db.insert(iterationsTable).values({
+        id: "ended-today-jst",
+        projectId,
+        iterationNumber: 1,
+        startDate: "2026-11-03",
+        endDate: "2026-11-10",
+      });
+      await db
+        .update(storiesTable)
+        .set({
+          iterationId: "ended-today-jst",
+          archivedAt: "2026-11-05T00:00:00Z",
+        })
+        .where(eq(storiesTable.id, "active"));
+      const stories = new D1StoryRepository(env.DB);
+      const result = await setStoryArchived(
+        stories,
+        new D1StoryArchiveRepository(env.DB),
+        {
+          projectId,
+          storyId: "active",
+          archived: false,
+          actorId: "user",
+          actorName: "User",
+        },
+      );
+      expect(result._unsafeUnwrap().iterationId).toBeNull();
+    });
   });
 });

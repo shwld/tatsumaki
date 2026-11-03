@@ -19,6 +19,7 @@ export const storyAccordionJa = {
     detail: {
       archived: "アーカイブ済み",
       restore: "アーカイブ解除",
+      restoreFailed: "アーカイブの解除に失敗しました",
       title: "タイトル",
       save: "保存",
       status: "ステータス",
@@ -129,6 +130,7 @@ export const storyAccordionEn = {
     detail: {
       archived: "Archived",
       restore: "Restore",
+      restoreFailed: "Failed to restore the story",
       title: "Title",
       save: "Save",
       status: "Status",

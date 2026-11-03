@@ -9,6 +9,7 @@ import { requireProjectMembership } from "../project-membership";
 export async function handleStoryArchive(
   c: Context<Env>,
   archived: boolean,
+  options?: { actorName?: string },
 ): Promise<Response> {
   const projectId = c.req.param("projectId") ?? "";
   const membership = await requireProjectMembership(c, projectId);
@@ -30,7 +31,7 @@ export async function handleStoryArchive(
       storyId: found.value.id,
       archived,
       actorId: user.id,
-      actorName: user.email ?? user.id,
+      actorName: options?.actorName ?? user.email ?? user.id,
     },
   );
   if (result.isErr()) {

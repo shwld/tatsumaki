@@ -1262,39 +1262,47 @@ export class D1StoryRepository implements StoryRepository {
       return a - b;
     });
 
-    for (let index = 0; index < input.orderedIds.length; index += 1) {
-      const storyId = input.orderedIds[index];
-      const newPosition = sortedSlots[index];
+    const moves = input.orderedIds.flatMap((storyId, index) => {
+      const toPosition = sortedSlots[index];
       const fromPosition = positionById.get(storyId) as number;
+      return fromPosition === toPosition
+        ? []
+        : [{ storyId, fromPosition, toPosition }];
+    });
 
-      if (fromPosition === newPosition) {
-        continue;
-      }
-
-      const changed = await this.db
-        .update(storiesTable)
-        .set({
-          position: newPosition,
-          updatedAt: sql`CURRENT_TIMESTAMP`,
-        })
-        .where(
-          and(
-            eq(storiesTable.projectId, input.projectId),
-            eq(storiesTable.id, storyId),
-            isNull(storiesTable.archivedAt),
+    if (moves.length > 0) {
+      // Every statement is guarded on the same condition so a concurrent
+      // archive of any reordered story leaves positions and history untouched.
+      const noneArchived = sql`not exists (select 1 from ${storiesTable} where ${storiesTable.projectId} = ${input.projectId} and ${inArray(storiesTable.id, input.orderedIds)} and ${storiesTable.archivedAt} is not null)`;
+      const [firstUpdate, ...rest] = moves.map((move) =>
+        this.db
+          .update(storiesTable)
+          .set({
+            position: move.toPosition,
+            updatedAt: sql`CURRENT_TIMESTAMP`,
+          })
+          .where(
+            and(
+              eq(storiesTable.projectId, input.projectId),
+              eq(storiesTable.id, move.storyId),
+              noneArchived,
+            ),
+          )
+          .returning({ id: storiesTable.id }),
+      );
+      const history = moves.map((move) =>
+        this.db
+          .insert(storyPriorityHistoryTable)
+          .select(
+            sql`select ${ulid()}, ${move.storyId}, ${move.fromPosition}, ${move.toPosition}, CURRENT_TIMESTAMP where ${noneArchived}`,
           ),
-        )
-        .returning({ id: storiesTable.id });
-
-      if (changed.length === 0)
-        return err(STORY_STATUS_CHANGED_CONCURRENTLY_ERROR);
-
-      await this.db.insert(storyPriorityHistoryTable).values({
-        id: ulid(),
-        storyId,
-        fromPosition,
-        toPosition: newPosition,
-      });
+      );
+      const [firstResult] = await this.db.batch([
+        firstUpdate,
+        ...rest,
+        ...history,
+      ]);
+      if (firstResult.length === 0) return err(STORY_ARCHIVED_ERROR);
     }
 
     const reordered = await this.db

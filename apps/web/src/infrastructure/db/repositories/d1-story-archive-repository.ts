@@ -2,6 +2,7 @@ import { err, ok, type Result } from "neverthrow";
 import { ulid } from "ulid";
 import type { StoryArchiveRepository } from "../../../application/usecases/set-story-archived";
 import type { Story } from "../../../domain/entities/story";
+import { todayIso } from "../../../shared/date/today-iso";
 
 export class D1StoryArchiveRepository implements StoryArchiveRepository {
   constructor(private readonly db: D1Database) {}
@@ -12,7 +13,8 @@ export class D1StoryArchiveRepository implements StoryArchiveRepository {
     actorId: string;
     actorName: string;
   }): Promise<Result<boolean, "STORY_ARCHIVE_ERROR">> {
-    const now = new Date().toISOString();
+    const nowDate = new Date();
+    const now = nowDate.toISOString();
     try {
       const results = await this.db.batch([
         this.db
@@ -23,7 +25,7 @@ export class D1StoryArchiveRepository implements StoryArchiveRepository {
             input.archived ? now : null,
             now,
             input.archived ? 1 : 0,
-            now.slice(0, 10),
+            todayIso(nowDate),
             input.story.projectId,
             input.story.id,
             input.story.status,

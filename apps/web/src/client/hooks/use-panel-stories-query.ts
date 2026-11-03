@@ -8,6 +8,7 @@ import {
   storyQueryKeys,
   type StoryPanelQueryFilters,
 } from "./story-query-keys";
+import { parseArchivedSearch } from "../lib/archived-search";
 import { parseErrorMessage } from "../lib/parse-error-message";
 import { projectStoriesApiPath } from "../lib/story-routes";
 import type { PanelType } from "../lib/panel-visibility";
@@ -91,12 +92,8 @@ function panelBaseQuery(
 ): URLSearchParams {
   const query = new URLSearchParams();
   query.set("detail", "summary");
-  const archivedSearch = /(?:^|\s)is:archived(?=\s|$)/i.test(
-    filters.searchQuery,
-  );
-  const normalizedSearch = filters.searchQuery
-    .replace(/(?:^|\s)is:archived(?=\s|$)/gi, " ")
-    .trim();
+  const { archived: archivedSearch, rest: normalizedSearch } =
+    parseArchivedSearch(filters.searchQuery);
   if (archivedSearch) query.set("archived", "only");
   if (normalizedSearch) {
     query.set("q", normalizedSearch);
@@ -156,12 +153,8 @@ function currentAcceptedBaseQuery(
 ): URLSearchParams {
   const query = new URLSearchParams();
   query.set("detail", "summary");
-  const archivedSearch = /(?:^|\s)is:archived(?=\s|$)/i.test(
-    filters.searchQuery,
-  );
-  const normalizedSearch = filters.searchQuery
-    .replace(/(?:^|\s)is:archived(?=\s|$)/gi, " ")
-    .trim();
+  const { archived: archivedSearch, rest: normalizedSearch } =
+    parseArchivedSearch(filters.searchQuery);
   if (archivedSearch) query.set("archived", "only");
   if (normalizedSearch) {
     query.set("q", normalizedSearch);
@@ -697,7 +690,7 @@ export function usePanelStoriesQuery({
   };
 
   const applyStoryUpdate = (updatedStory: Story) => {
-    const archivedSearch = /(?:^|\s)is:archived(?=\s|$)/i.test(
+    const { archived: archivedSearch } = parseArchivedSearch(
       filters.searchQuery,
     );
     if ((updatedStory.archivedAt != null) !== archivedSearch) {

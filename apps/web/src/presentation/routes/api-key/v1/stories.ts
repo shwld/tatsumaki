@@ -50,7 +50,9 @@ for (const [action, archived] of [
         c.req.param("projectId"),
       );
       if (!editor.ok) return editor.response;
-      return handleStoryArchive(c, archived);
+      return handleStoryArchive(c, archived, {
+        actorName: `API Key: ${c.get("apiKeyName")}`,
+      });
     },
   );
 }

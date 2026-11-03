@@ -18,6 +18,7 @@ import { useTranslation } from "react-i18next";
 import { useAuthError } from "../contexts/auth-error-context";
 import { useToast } from "../contexts/toast-context";
 import { storyQueryKeys } from "../hooks/story-query-keys";
+import { useStoryArchive } from "../hooks/use-story-archive";
 import { useCurrentUser } from "../hooks/use-current-user";
 import { userIdsEqual } from "../lib/user-ids-equal";
 import { useProjectBootstrap } from "../hooks/use-project-bootstrap";
@@ -100,6 +101,10 @@ function StoryAccordionDetailComponent({
       },
     },
   );
+  const restoreStory = useStoryArchive(story, (restored) => {
+    syncStoryUpdate(restored);
+    onStoryUpdated?.(restored);
+  });
   const { data: bootstrap } = useProjectBootstrap(story.projectId);
   const projectLabels = bootstrap?.projectLabels ?? [];
   const { user: viewer } = useCurrentUser();
@@ -709,35 +714,9 @@ function StoryAccordionDetailComponent({
             type="button"
             className="underline"
             onClick={() => {
-              void fetch(
-                `${projectStoriesApiPath(story.projectId)}/${story.storyNumber}/unarchive`,
-                { method: "POST" },
-              )
-                .then(async (response) => {
-                  if (!response.ok)
-                    throw new Error(await parseErrorMessage(response));
-                  const result = (await response.json()) as { story: Story };
-                  syncStoryUpdate(result.story);
-                  onStoryUpdated?.(result.story);
-                  await queryClient.invalidateQueries({
-                    queryKey: storyQueryKeys.panelStoriesRoot(story.projectId),
-                  });
-                  await queryClient.invalidateQueries({
-                    queryKey: storyQueryKeys.storyTimeline(
-                      story.projectId,
-                      String(story.storyNumber),
-                    ),
-                  });
-                  await queryClient.invalidateQueries({
-                    queryKey: storyQueryKeys.projectHistory(story.projectId),
-                  });
-                })
-                .catch(() =>
-                  showToast(
-                    "error",
-                    t("storyAccordion.subHeader.archiveFailed"),
-                  ),
-                );
+              void restoreStory(false).catch(() =>
+                showToast("error", t("storyAccordion.detail.restoreFailed")),
+              );
             }}
           >
             {t("storyAccordion.detail.restore")}

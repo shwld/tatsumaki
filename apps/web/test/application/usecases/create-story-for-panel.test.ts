@@ -100,6 +100,7 @@ function createIterationRepository() {
     deleteFuture: vi.fn(async () => ok(0)),
     deleteAll: vi.fn(async () => ok(0)),
     assignStory,
+    assignStoryForRebuild: vi.fn(async () => ok(true)),
     unassignStory: vi.fn(async () => ok(true)),
     updateUtilization: vi.fn(async () =>
       ok({

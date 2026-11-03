@@ -238,6 +238,7 @@ describe("rebuildIterations", () => {
     ];
 
     const assignStory = vi.fn(async () => ok(true));
+    const assignStoryForRebuild = vi.fn(async () => ok(true));
     const list = vi
       .fn()
       .mockResolvedValueOnce(ok(oldIterations))
@@ -252,6 +253,7 @@ describe("rebuildIterations", () => {
       deleteFuture: vi.fn(async () => ok(0)),
       deleteAll: vi.fn(async () => ok(oldIterations.length)),
       assignStory,
+      assignStoryForRebuild,
       unassignStory: vi.fn(async () => ok(true)),
       updateUtilization: vi.fn(async () =>
         ok({
@@ -306,16 +308,21 @@ describe("rebuildIterations", () => {
     );
 
     expect(result.isOk()).toBe(true);
-    expect(assignStory).toHaveBeenCalledWith({
+    expect(assignStoryForRebuild).toHaveBeenCalledWith({
       projectId: "project-1",
       iterationId: "it-new-1",
       storyId: "story-accepted",
     });
-    expect(assignStory).toHaveBeenCalledWith({
+    expect(assignStoryForRebuild).toHaveBeenCalledWith({
       projectId: "project-1",
       iterationId: "it-new-1",
       storyId: "story-started",
     });
-    expect(assignStory).toHaveBeenCalledTimes(2);
+    expect(assignStoryForRebuild).toHaveBeenCalledTimes(2);
+    expect(assignStory).not.toHaveBeenCalled();
+    expect(storyRepository.list).toHaveBeenCalledWith({
+      projectId: "project-1",
+      archived: "include",
+    });
   });
 });

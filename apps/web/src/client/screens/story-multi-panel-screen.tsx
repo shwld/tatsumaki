@@ -60,6 +60,7 @@ import {
   useKeyboardShortcuts,
   type KeyboardShortcut,
 } from "../hooks/use-keyboard-shortcuts";
+import { parseArchivedSearch } from "../lib/archived-search";
 import { useCurrentBacklogViewMode } from "../lib/current-backlog-view-mode";
 import { findCurrentIteration } from "../lib/current-iteration";
 import { usePanelStoriesQuery } from "../hooks/use-panel-stories-query";
@@ -399,7 +400,7 @@ export function StoryMultiPanelScreen() {
 
   // Advanced search params (from StorySearchBar)
   const searchQuery = searchParams.get("q") ?? "";
-  const isArchivedSearch = /(?:^|\s)is:archived(?=\s|$)/i.test(searchQuery);
+  const { archived: isArchivedSearch } = parseArchivedSearch(searchQuery);
   const rawTypesParam = searchParams.get("types");
   const VALID_STORY_TYPES: readonly string[] = [
     "feature",

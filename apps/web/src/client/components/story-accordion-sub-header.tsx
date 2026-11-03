@@ -1,15 +1,13 @@
 import { memo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Archive, Dice5, Trash2, UserCircle, Users } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "../contexts/toast-context";
-import { storyQueryKeys } from "../hooks/story-query-keys";
-import { projectStoriesApiPath } from "../lib/story-routes";
-import { parseErrorMessage } from "../lib/parse-error-message";
+import { useStoryArchive } from "../hooks/use-story-archive";
 import { useStoryPatch } from "../hooks/use-story-patch";
 import type { ProjectMemberProfile } from "../types/project";
 import type { Story } from "../types/story";
 import { useMemberDisplayName } from "../hooks/use-member-display-name";
+import { canArchiveStory } from "../../domain/entities/story";
 import { Avatar } from "./avatar";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 
@@ -31,7 +29,6 @@ function StoryAccordionSubHeaderComponent({
   onOpenPoker,
 }: StoryAccordionSubHeaderProps) {
   const { t } = useTranslation();
-  const queryClient = useQueryClient();
   const { showToast } = useToast();
   const memberName = useMemberDisplayName();
   const { patchStory, isSaving } = useStoryPatch(
@@ -61,33 +58,7 @@ function StoryAccordionSubHeaderComponent({
   const owners = memberOptions.filter((m) => story.ownerIds.includes(m.id));
   const requester = memberOptions.find((m) => m.id === story.requesterId);
 
-  const changeArchive = async (archived: boolean) => {
-    const response = await fetch(
-      `${projectStoriesApiPath(story.projectId)}/${story.storyNumber}/${archived ? "archive" : "unarchive"}`,
-      { method: "POST" },
-    );
-    if (!response.ok) throw new Error(await parseErrorMessage(response));
-    const result = (await response.json()) as { story: Story };
-    onStoryUpdated?.(result.story);
-    await queryClient.invalidateQueries({
-      queryKey: storyQueryKeys.panelStoriesRoot(story.projectId),
-    });
-    await queryClient.invalidateQueries({
-      queryKey: storyQueryKeys.storyDetail(
-        story.projectId,
-        String(story.storyNumber),
-      ),
-    });
-    await queryClient.invalidateQueries({
-      queryKey: storyQueryKeys.storyTimeline(
-        story.projectId,
-        String(story.storyNumber),
-      ),
-    });
-    await queryClient.invalidateQueries({
-      queryKey: storyQueryKeys.projectHistory(story.projectId),
-    });
-  };
+  const changeArchive = useStoryArchive(story, onStoryUpdated);
 
   if (story.archivedAt) return null;
 
@@ -240,11 +211,11 @@ function StoryAccordionSubHeaderComponent({
       <button
         type="button"
         title={
-          story.status === "Unstarted" || story.status === "Rejected"
+          canArchiveStory(story.status)
             ? t("storyAccordion.subHeader.archive")
             : t("storyAccordion.subHeader.archiveUnavailable")
         }
-        disabled={story.status !== "Unstarted" && story.status !== "Rejected"}
+        disabled={!canArchiveStory(story.status)}
         className="ml-auto rounded p-1 text-gray-400 hover:text-gray-700 disabled:opacity-40"
         onClick={() => {
           void changeArchive(true)

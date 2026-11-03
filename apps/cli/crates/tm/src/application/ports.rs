@@ -314,10 +314,7 @@ pub struct UploadSession {
 pub enum CreateUploadOutcome {
     Session(UploadSession),
     /// The tree equals the latest version; nothing was created.
-    Noop {
-        artifact_id: String,
-        version: i64,
-    },
+    Noop { artifact_id: String, version: i64 },
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]

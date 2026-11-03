@@ -1,5 +1,6 @@
 import type { Result } from "neverthrow";
 import type { Iteration, IterationOverride } from "../entities/iteration";
+import type { STORY_ARCHIVED_ERROR } from "./story-repository";
 
 export type CreateIterationInput = {
   projectId: string;
@@ -34,7 +35,8 @@ export const ITERATION_DATE_OVERLAP_ERROR =
 export type IterationRepositoryError =
   | typeof ITERATION_REPOSITORY_ERROR
   | typeof ITERATION_NOT_FOUND_ERROR
-  | typeof ITERATION_DATE_OVERLAP_ERROR;
+  | typeof ITERATION_DATE_OVERLAP_ERROR
+  | typeof STORY_ARCHIVED_ERROR;
 
 export interface IterationRepository {
   create(
@@ -62,6 +64,10 @@ export interface IterationRepository {
     projectId: string,
   ): Promise<Result<number, IterationRepositoryError>>;
   assignStory(
+    input: AssignStoryInput,
+  ): Promise<Result<boolean, IterationRepositoryError>>;
+  /** Rebuild remaps archived stories too, so it bypasses the read-only guard. */
+  assignStoryForRebuild(
     input: AssignStoryInput,
   ): Promise<Result<boolean, IterationRepositoryError>>;
   unassignStory(
