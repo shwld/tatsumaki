@@ -106,7 +106,7 @@ SELECT
   printf('${SEED_PREFIX}-project-%03d', i),
   1,
   date('now', '-17 days'),
-  date('now', '-4 days')
+  date('now', '-3 days')
 FROM n
 UNION ALL
 SELECT
@@ -114,7 +114,7 @@ SELECT
   printf('${SEED_PREFIX}-project-%03d', i),
   2,
   date('now', '-3 days'),
-  date('now', '+10 days')
+  date('now', '+11 days')
 FROM n
 ;
 
