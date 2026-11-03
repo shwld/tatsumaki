@@ -181,9 +181,6 @@ export function ProjectApiKeysScreen() {
   return (
     <ProjectPage title="APIキー管理">
       <div className="max-w-3xl">
-        {isLoading ? (
-          <p className="text-gray-600">APIキーを読み込み中...</p>
-        ) : null}
         {requestError ? (
           <p className="mt-3 text-sm text-red-600" role="alert">
             {requestError}
@@ -235,9 +232,11 @@ export function ProjectApiKeysScreen() {
             既存のAPIキー
           </h2>
 
-          {!isLoading && apiKeys.length === 0 ? (
+          {isLoading || apiKeys.length === 0 ? (
             <p className="mt-3 text-sm text-gray-600">
-              APIキーはまだありません。
+              {isLoading
+                ? "APIキーを読み込み中..."
+                : "APIキーはまだありません。"}
             </p>
           ) : null}
 
