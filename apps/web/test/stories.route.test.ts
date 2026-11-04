@@ -714,6 +714,15 @@ describe("story routes", () => {
         return story.id === blocked.id;
       })?.isBlocked,
     ).toBe(false);
+
+    const full = (await (
+      await fetchWithAuth(`${storiesApiPath(projectId)}?archived=include`)
+    ).json()) as { stories: Array<{ id: string; isBlocked: boolean }> };
+    expect(
+      full.stories.find((story) => {
+        return story.id === blocked.id;
+      })?.isBlocked,
+    ).toBe(false);
   });
 
   it("gets full story detail by id", async () => {

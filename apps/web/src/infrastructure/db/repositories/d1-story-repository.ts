@@ -381,6 +381,7 @@ export class D1StoryRepository implements StoryRepository {
       }),
     );
 
+    const activelyBlockedIds = new Set<string>();
     for (const row of blockerRows) {
       const blocking = storyById.get(row.blockingStoryId);
       const blocked = storyById.get(row.blockedStoryId);
@@ -399,6 +400,12 @@ export class D1StoryRepository implements StoryRepository {
           ...(blocked.blockingStories ?? []),
           blockingRelation,
         ];
+        if (
+          !blocking?.archivedAt &&
+          !isResolvedStoryStatus(blockingRelation.status)
+        ) {
+          activelyBlockedIds.add(blocked.id);
+        }
       }
 
       if (blocking) {
@@ -416,9 +423,7 @@ export class D1StoryRepository implements StoryRepository {
       story.blockedStories = (story.blockedStories ?? []).sort((a, b) => {
         return a.title.localeCompare(b.title);
       });
-      story.isBlocked = (story.blockingStories ?? []).some((blocker) => {
-        return !isResolvedStoryStatus(blocker.status);
-      });
+      story.isBlocked = activelyBlockedIds.has(story.id);
       story.isBlocking =
         !story.archivedAt &&
         !isResolvedStoryStatus(story.status) &&
