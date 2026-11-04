@@ -31,7 +31,8 @@ import { spaIndexHeaders } from "./presentation/spa-headers";
 import { PlanningPokerDO } from "./durable-objects/planning-poker-do";
 import { requireAccessAuth } from "./presentation/middleware/access-auth";
 import {
-  isAppEntitled,
+  getAppEntitlementDenial,
+  rejectBlockedUser,
   requireAppEntitlement,
 } from "./presentation/middleware/app-entitlement";
 import { devAuth } from "./presentation/middleware/dev-auth";
@@ -89,12 +90,13 @@ api.route("/", healthRoute);
 const protectedApi = new Hono<Env>();
 protectedApi.use("*", devAuth());
 protectedApi.use("*", requireAccessAuth());
+protectedApi.use("/invitation-links/*", rejectBlockedUser());
 protectedApi.route("/", invitationLinksRoute);
 protectedApi.use("*", async (c, next) => {
   if (
     /^(?:\/api)?\/projects\/[^/]+\/invitations\/[^/]+\/accept$/.test(c.req.path)
   ) {
-    return next();
+    return rejectBlockedUser()(c, next);
   }
   return requireAppEntitlement()(c, next);
 });
@@ -159,7 +161,7 @@ app.get(
       c.req.path === "/invite" ||
       /^\/projects\/[^/]+\/invitations\/[^/]+\/accept$/.test(c.req.path)
     ) {
-      return next();
+      return rejectBlockedUser()(c, next);
     }
     return requireAppEntitlement()(c, next);
   },
@@ -178,8 +180,9 @@ class McpOAuthApiHandler extends WorkerEntrypoint<OAuthBindings> {
       email: props.email,
     };
 
-    if (!(await isAppEntitled(this.env.DB, currentUser.id))) {
-      return new Response("Invitation required", { status: 403 });
+    const denial = await getAppEntitlementDenial(this.env.DB, currentUser.id);
+    if (denial) {
+      return Response.json(denial, { status: 403 });
     }
 
     const url = new URL(request.url);
@@ -219,8 +222,9 @@ const oauthDefaultHandler = {
       if (!currentUser) {
         return Response.redirect(new URL(ACCESS_LOGIN_PATH, request.url), 302);
       }
-      if (!(await isAppEntitled(env.DB, currentUser.id))) {
-        return new Response("Invitation required", { status: 403 });
+      const denial = await getAppEntitlementDenial(env.DB, currentUser.id);
+      if (denial) {
+        return Response.json(denial, { status: 403 });
       }
 
       const authRequest = await env.OAUTH_PROVIDER.parseAuthRequest(request);

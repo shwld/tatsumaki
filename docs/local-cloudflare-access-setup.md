@@ -125,7 +125,8 @@ ACCESS_TEAM_DOMAIN=<your-team>.cloudflareaccess.com
 
 - **AUD 不一致**: `.dev.vars` の `ACCESS_AUD` が Access Application の Audience tag と一致しているか確認
 - **TEAM_DOMAIN 不一致**: `ACCESS_TEAM_DOMAIN` が Zero Trust ダッシュボードのチーム名と一致しているか確認
-- **`INVITATION_REQUIRED`**: Access の認証は成功しているが、tatsumaki の招待をまだ受諾していない。Owner に単回利用招待リンクの再発行を依頼する
+- **`ONBOARDING_REQUIRED`**: Access の認証は成功しているが、tatsumaki の `users` 行がまだ無い(onboarding 未完了)。Owner に単回利用招待リンクの再発行を依頼する
+- **`ACCOUNT_BLOCKED`**: アカウントが運用者により停止されている(`users.access_status = 'blocked'`)。運用者に確認する
 
 ### JWT 検証エラー
 

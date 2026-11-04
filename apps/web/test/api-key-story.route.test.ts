@@ -2,6 +2,9 @@ import { SELF, env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createAuthHeaders, setupAccessBindings } from "./helpers/access-jwt";
 import { resetDatabase } from "./helpers/db";
+import { createDb } from "../src/infrastructure/db/client";
+import { usersTable } from "../src/infrastructure/db/schema";
+import { eq } from "drizzle-orm";
 
 describe("api-key story route", () => {
   beforeEach(async () => {
@@ -218,6 +221,27 @@ describe("api-key story route", () => {
     );
 
     expect(response.status).toBe(403);
+  });
+
+  it("rejects a key whose owner is blocked with ACCOUNT_BLOCKED", async () => {
+    const projectId = await createProject();
+    const story = await createStory(projectId);
+    const { rawKey } = await issueApiKey(projectId, ["story:write"]);
+    await createDb(env.DB)
+      .update(usersTable)
+      .set({ accessStatus: "blocked" })
+      .where(eq(usersTable.id, "github|test-user"));
+
+    const response = await SELF.fetch(
+      `https://localhost/api-key/v1/projects/${projectId}/stories/${story.storyNumber}`,
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json", "X-Api-Key": rawKey },
+        body: JSON.stringify({ title: "nope" }),
+      },
+    );
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ code: "ACCOUNT_BLOCKED" });
   });
 
   it("missing X-Api-Key returns 401", async () => {

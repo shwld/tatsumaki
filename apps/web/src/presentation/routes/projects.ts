@@ -491,10 +491,6 @@ projectsRoute.post(
     if (userResult.isErr()) {
       return c.json({ error: "Failed to create invited user" }, 500);
     }
-    const allowResult = await userRepository.allowAccess(currentUser.id);
-    if (allowResult.isErr() || !allowResult.value) {
-      return c.json({ error: "Failed to authorize invited user" }, 500);
-    }
 
     return c.json({
       member: memberResult.value,

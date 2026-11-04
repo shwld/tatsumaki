@@ -516,7 +516,7 @@ export class D1ProjectRepository implements ProjectRepository {
           .prepare(
             `INSERT INTO users (id, display_name, email, access_status)
              SELECT ?, ?, ?, 'allowed' FROM project_invitations WHERE ${valid}
-             ON CONFLICT(id) DO UPDATE SET access_status = 'allowed', updated_at = CURRENT_TIMESTAMP`,
+             ON CONFLICT(id) DO UPDATE SET updated_at = CURRENT_TIMESTAMP`,
           )
           .bind(input.userId, input.displayName, input.email, input.tokenHash),
         this.d1

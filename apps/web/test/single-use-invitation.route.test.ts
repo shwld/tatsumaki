@@ -245,4 +245,44 @@ describe("single-use invitation links", () => {
       ).status,
     ).toBe(403);
   });
+
+  it("blocked users are rejected on API routes and cannot be unblocked by accepting a link", async () => {
+    const { token } = await createProjectAndLink();
+    const headers = await accessHeaders(
+      "github|blocked",
+      "blocked@example.com",
+    );
+    await createDb(env.DB).insert(usersTable).values({
+      id: "github|blocked",
+      displayName: "blocked",
+      email: "blocked@example.com",
+      accessStatus: "blocked",
+    });
+
+    const me = await SELF.fetch("https://localhost/api/auth/me", { headers });
+    expect(me.status).toBe(403);
+    expect(await me.json()).toMatchObject({ code: "ACCOUNT_BLOCKED" });
+
+    const accept = await SELF.fetch(
+      "https://localhost/api/invitation-links/accept",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", ...headers },
+        body: JSON.stringify({ token }),
+      },
+    );
+    expect(accept.status).toBe(403);
+    const [row] = await createDb(env.DB)
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.id, "github|blocked"));
+    expect(row?.accessStatus).toBe("blocked");
+  });
+
+  it("users without a row get ONBOARDING_REQUIRED", async () => {
+    const headers = await accessHeaders("github|fresh", "fresh@example.com");
+    const me = await SELF.fetch("https://localhost/api/auth/me", { headers });
+    expect(me.status).toBe(403);
+    expect(await me.json()).toMatchObject({ code: "ONBOARDING_REQUIRED" });
+  });
 });
