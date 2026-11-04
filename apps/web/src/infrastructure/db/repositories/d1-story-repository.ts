@@ -24,6 +24,7 @@ import type {
 } from "../../../domain/entities/story";
 import {
   INVALID_STORY_IS_ICEBOX_ERROR,
+  isResolvedStoryStatus,
   resolveStoryIsIcebox,
   STORY_STATUSES,
 } from "../../../domain/entities/story";
@@ -415,8 +416,12 @@ export class D1StoryRepository implements StoryRepository {
       story.blockedStories = (story.blockedStories ?? []).sort((a, b) => {
         return a.title.localeCompare(b.title);
       });
-      story.isBlocked = (story.blockingStories?.length ?? 0) > 0;
-      story.isBlocking = (story.blockedStories?.length ?? 0) > 0;
+      story.isBlocked = (story.blockingStories ?? []).some((blocker) => {
+        return !isResolvedStoryStatus(blocker.status);
+      });
+      story.isBlocking =
+        !isResolvedStoryStatus(story.status) &&
+        (story.blockedStories?.length ?? 0) > 0;
     }
 
     return stories;
@@ -511,7 +516,7 @@ export class D1StoryRepository implements StoryRepository {
           .where(
             and(
               inArray(storyBlockersTable.blockedStoryId, chunk),
-              sql`exists (select 1 from stories where id = ${storyBlockersTable.blockingStoryId} and archived_at is null)`,
+              sql`exists (select 1 from stories where id = ${storyBlockersTable.blockingStoryId} and archived_at is null and status not in ('Accepted', 'Rejected'))`,
             ),
           )
           .all(),
@@ -536,7 +541,8 @@ export class D1StoryRepository implements StoryRepository {
 
     for (const story of stories) {
       story.isBlocked = blockedStoryIds.has(story.id);
-      story.isBlocking = blockingStoryIds.has(story.id);
+      story.isBlocking =
+        !isResolvedStoryStatus(story.status) && blockingStoryIds.has(story.id);
     }
     return stories;
   }

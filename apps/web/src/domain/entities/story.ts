@@ -23,6 +23,15 @@ export function canArchiveStory(status: StoryStatus): boolean {
   return status === "Unstarted" || status === "Rejected";
 }
 
+const RESOLVED_BLOCKER_STATUSES: readonly StoryStatus[] = [
+  "Accepted",
+  "Rejected",
+];
+
+export function isResolvedStoryStatus(status: StoryStatus): boolean {
+  return RESOLVED_BLOCKER_STATUSES.includes(status);
+}
+
 export type StoryRelation = {
   id: string;
   storyNumber: number;

@@ -575,6 +575,93 @@ describe("story routes", () => {
     );
   });
 
+  it.each([
+    "Accepted",
+    "Rejected",
+  ])("does not treat a %s blocker as blocking in summary and detail", async (resolvedStatus) => {
+    const projectId = await createProject();
+    const createStory = async (title: string) => {
+      const response = await fetchWithAuth(storiesApiPath(projectId), {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ title, description: "" }),
+      });
+      return (
+        (await response.json()) as {
+          story: { id: string; storyNumber: number };
+        }
+      ).story;
+    };
+    const blocker = await createStory("Blocker");
+    const otherBlocker = await createStory("Other blocker");
+    const blocked = await createStory("Blocked");
+    for (const blocking of [blocker, otherBlocker]) {
+      const response = await fetchWithAuth(
+        `${storyApiPath(projectId, String(blocked.storyNumber))}/blockers`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            relation: "blockedBy",
+            targetStoryId: blocking.id,
+          }),
+        },
+      );
+      expect(response.status).toBe(200);
+    }
+
+    const readFlags = async () => {
+      const summary = (await (
+        await fetchWithAuth(`${storiesApiPath(projectId)}?detail=summary`)
+      ).json()) as {
+        stories: Array<{
+          id: string;
+          isBlocked: boolean;
+          isBlocking: boolean;
+        }>;
+      };
+      const detail = (await (
+        await fetchWithAuth(
+          storyApiPath(projectId, String(blocked.storyNumber)),
+        )
+      ).json()) as { story: { isBlocked: boolean } };
+      const flagsOf = (id: string) => {
+        return summary.stories.find((story) => {
+          return story.id === id;
+        });
+      };
+      return {
+        blockedSummary: flagsOf(blocked.id)?.isBlocked,
+        blockedDetail: detail.story.isBlocked,
+        blockerIsBlocking: flagsOf(blocker.id)?.isBlocking,
+        otherBlockerIsBlocking: flagsOf(otherBlocker.id)?.isBlocking,
+      };
+    };
+
+    const setStatus = async (id: string, status: string) => {
+      await createDb(env.DB)
+        .update(storiesTable)
+        .set({ status })
+        .where(eq(storiesTable.id, id));
+    };
+
+    await setStatus(blocker.id, resolvedStatus);
+    expect(await readFlags()).toEqual({
+      blockedSummary: true,
+      blockedDetail: true,
+      blockerIsBlocking: false,
+      otherBlockerIsBlocking: true,
+    });
+
+    await setStatus(otherBlocker.id, resolvedStatus);
+    expect(await readFlags()).toEqual({
+      blockedSummary: false,
+      blockedDetail: false,
+      blockerIsBlocking: false,
+      otherBlockerIsBlocking: false,
+    });
+  });
+
   it("gets full story detail by id", async () => {
     const projectId = await createProject();
 
