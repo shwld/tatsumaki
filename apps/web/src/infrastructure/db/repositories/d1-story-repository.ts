@@ -11,6 +11,7 @@ import {
   sql,
   type SQL,
 } from "drizzle-orm";
+import type { BatchItem } from "drizzle-orm/batch";
 import { err, ok, type Result } from "neverthrow";
 import { ulid } from "ulid";
 import type {
@@ -660,73 +661,61 @@ export class D1StoryRepository implements StoryRepository {
     return ok(undefined);
   }
 
-  // 検証と置換を 1 回の batch（単一トランザクション）で行い、検証時点と commit 時点の
-  // membership がずれても脱退済みメンバーを新規 owner として登録しない。
-  // 既存 owner は脱退済みでも保持する。
-  private async replaceOwners(
+  // 既存 owner は脱退済みでも保持し、新規 owner だけを project member に限る。
+  // 判定は batch 内の SQL で行い、検証時点と commit 時点のずれを作らない。
+  private buildOwnerReplacementStatements(
     projectId: string,
     storyId: string,
+    current: { status: string; isIcebox: number },
     ownerIds: string[],
-  ): Promise<Result<void, StoryRepositoryError>> {
+  ) {
     const uniqueOwnerIds = [...new Set(ownerIds)];
-    const currentOwnerIds = new Set(
-      (await this.listOwnerIdsByStoryIds([storyId])).get(storyId) ?? [],
+    const storyUnchanged = sql`exists (select 1 from ${storiesTable} as target where target.id = ${storyId} and target.status = ${current.status} and target.is_icebox = ${current.isIcebox} and target.archived_at is null)`;
+    const everyOwnerIsCurrentOrMember = sql.join(
+      [
+        sql`1 = 1`,
+        ...uniqueOwnerIds.map((ownerId) => {
+          return sql`(${ownerId} in (select ${storyOwnersTable.userId} from ${storyOwnersTable} where ${storyOwnersTable.storyId} = ${storyId}) or ${ownerId} in (select ${projectMembersTable.userId} from ${projectMembersTable} where ${projectMembersTable.projectId} = ${projectId}))`;
+        }),
+      ],
+      sql` and `,
     );
-    const addedOwnerIds = uniqueOwnerIds.filter((ownerId) => {
-      return !currentOwnerIds.has(ownerId);
-    });
+    const guard = sql`${storyUnchanged} and ${everyOwnerIsCurrentOrMember}`;
 
-    const addedAreAllMembers =
-      addedOwnerIds.length === 0
-        ? sql`1 = 1`
-        : sql`(select count(*) from ${projectMembersTable} where ${projectMembersTable.projectId} = ${projectId} and ${inArray(projectMembersTable.userId, addedOwnerIds)}) = ${addedOwnerIds.length}`;
-
-    const statements = [
-      this.db.delete(storyOwnersTable).where(
-        and(
-          eq(storyOwnersTable.storyId, storyId),
-          uniqueOwnerIds.length > 0
-            ? sql`${storyOwnersTable.userId} not in (${sql.join(
-                uniqueOwnerIds.map((ownerId) => sql`${ownerId}`),
-                sql`, `,
-              )})`
-            : sql`1 = 1`,
-          addedAreAllMembers,
-        ),
+    const removeStatement = this.db.delete(storyOwnersTable).where(
+      and(
+        eq(storyOwnersTable.storyId, storyId),
+        uniqueOwnerIds.length > 0
+          ? sql`${storyOwnersTable.userId} not in (${sql.join(
+              uniqueOwnerIds.map((ownerId) => sql`${ownerId}`),
+              sql`, `,
+            )})`
+          : sql`1 = 1`,
+        guard,
       ),
-      ...(addedOwnerIds.length > 0
-        ? [
-            this.db.insert(storyOwnersTable).select(
-              this.db
-                .select({
-                  storyId: sql<string>`${storyId}`.as("story_id"),
-                  userId: projectMembersTable.userId,
-                  createdAt: sql<string>`CURRENT_TIMESTAMP`.as("created_at"),
-                  updatedAt: sql<string>`CURRENT_TIMESTAMP`.as("updated_at"),
-                })
-                .from(projectMembersTable)
-                .where(
-                  and(
-                    eq(projectMembersTable.projectId, projectId),
-                    inArray(projectMembersTable.userId, addedOwnerIds),
-                    addedAreAllMembers,
-                  ),
-                ),
-            ),
-          ]
-        : []),
-    ] as const;
-    await this.db.batch(statements as unknown as [(typeof statements)[0]]);
-
-    const stored = new Set(
-      (await this.listOwnerIdsByStoryIds([storyId])).get(storyId) ?? [],
     );
-    const hasMissingOwner = addedOwnerIds.some((ownerId) => {
-      return !stored.has(ownerId);
-    });
-    return hasMissingOwner
-      ? err(STORY_OWNER_NOT_PROJECT_MEMBER_ERROR)
-      : ok(undefined);
+    if (uniqueOwnerIds.length === 0) {
+      return [removeStatement];
+    }
+    const addStatement = this.db.insert(storyOwnersTable).select(
+      this.db
+        .select({
+          storyId: sql<string>`${storyId}`.as("story_id"),
+          userId: projectMembersTable.userId,
+          createdAt: sql<string>`CURRENT_TIMESTAMP`.as("created_at"),
+          updatedAt: sql<string>`CURRENT_TIMESTAMP`.as("updated_at"),
+        })
+        .from(projectMembersTable)
+        .where(
+          and(
+            eq(projectMembersTable.projectId, projectId),
+            inArray(projectMembersTable.userId, uniqueOwnerIds),
+            sql`not exists (select 1 from ${storyOwnersTable} where ${storyOwnersTable.storyId} = ${storyId} and ${storyOwnersTable.userId} = ${projectMembersTable.userId})`,
+            guard,
+          ),
+        ),
+    );
+    return [removeStatement, addStatement];
   }
 
   private async assertRequesterIsProjectMember(
@@ -923,15 +912,17 @@ export class D1StoryRepository implements StoryRepository {
       return err(STORY_ARCHIVED_ERROR);
     }
 
+    const currentOwnerIdSet = new Set(
+      input.ownerIds === undefined
+        ? []
+        : ((await this.listOwnerIdsByStoryIds([input.id])).get(input.id) ?? []),
+    );
     if (input.ownerIds !== undefined) {
       // 脱退済みメンバーが owner に残る状態は正常。検証するのは新規に追加される owner のみ。
-      const currentOwnerIds = new Set(
-        (await this.listOwnerIdsByStoryIds([input.id])).get(input.id) ?? [],
-      );
       const ownerValidation = await this.assertOwnerIdsAreProjectMembers(
         input.projectId,
         input.ownerIds.filter((ownerId) => {
-          return !currentOwnerIds.has(ownerId);
+          return !currentOwnerIdSet.has(ownerId);
         }),
       );
       if (ownerValidation.isErr()) {
@@ -1029,6 +1020,24 @@ export class D1StoryRepository implements StoryRepository {
       shouldClearIterationId = !assignedCurrentIteration;
     }
 
+    const ownerStatements =
+      input.ownerIds === undefined
+        ? []
+        : this.buildOwnerReplacementStatements(
+            input.projectId,
+            input.id,
+            current,
+            input.ownerIds,
+          );
+    const ownerIdsAreAllCurrentOwners =
+      input.ownerIds === undefined || input.ownerIds.length === 0
+        ? sql`1 = 1`
+        : sql.join(
+            [...new Set(input.ownerIds)].map((ownerId) => {
+              return sql`${ownerId} in (select ${storyOwnersTable.userId} from ${storyOwnersTable} where ${storyOwnersTable.storyId} = ${input.id})`;
+            }),
+            sql` and `,
+          );
     const shouldMoveToTop =
       input.moveToTop === true && current.isIcebox === 1 && !nextIsIcebox;
     const updateQuery = this.db
@@ -1078,34 +1087,64 @@ export class D1StoryRepository implements StoryRepository {
           current.iterationId === null
             ? isNull(storiesTable.iterationId)
             : eq(storiesTable.iterationId, current.iterationId),
+          // Owners are replaced before this statement in the same batch; the
+          // story only updates when that replacement took effect.
+          ownerIdsAreAllCurrentOwners,
         ),
       )
       .returning({ id: storiesTable.id });
 
-    // Shifting the others and moving the target must commit together, and the
-    // shift only applies while the optimistic guard on the target still holds.
-    const updatedRows = shouldMoveToTop
-      ? (
-          await this.db.batch([
-            this.db
-              .update(storiesTable)
-              .set({
-                position: sql`${storiesTable.position} + 1`,
-                updatedAt: sql`CURRENT_TIMESTAMP`,
-              })
-              .where(
-                and(
-                  eq(storiesTable.projectId, input.projectId),
-                  ne(storiesTable.id, input.id),
-                  sql`exists (select 1 from ${storiesTable} as target where target.id = ${input.id} and target.status = ${current.status} and target.is_icebox = ${current.isIcebox} and target.archived_at is null)`,
-                ),
+    // Owner replacement, the position shift and the story update must commit
+    // together, and each step only applies while the optimistic guard on the
+    // target still holds.
+    const shiftStatement = shouldMoveToTop
+      ? [
+          this.db
+            .update(storiesTable)
+            .set({
+              position: sql`${storiesTable.position} + 1`,
+              updatedAt: sql`CURRENT_TIMESTAMP`,
+            })
+            .where(
+              and(
+                eq(storiesTable.projectId, input.projectId),
+                ne(storiesTable.id, input.id),
+                sql`exists (select 1 from ${storiesTable} as target where target.id = ${input.id} and target.status = ${current.status} and target.is_icebox = ${current.isIcebox} and target.archived_at is null)`,
+                ownerIdsAreAllCurrentOwners,
               ),
-            updateQuery,
-          ])
-        )[1]
-      : await updateQuery;
+            ),
+        ]
+      : [];
+    const preStatements: BatchItem<"sqlite">[] = [
+      ...ownerStatements,
+      ...shiftStatement,
+    ];
+    const batchStatements: BatchItem<"sqlite">[] = [
+      ...preStatements,
+      updateQuery,
+    ];
+    const updatedRows =
+      preStatements.length === 0
+        ? await updateQuery
+        : ((
+            await this.db.batch(
+              batchStatements as [
+                BatchItem<"sqlite">,
+                ...BatchItem<"sqlite">[],
+              ],
+            )
+          )[preStatements.length] as { id: string }[]);
 
     if (updatedRows.length === 0) {
+      if (input.ownerIds !== undefined) {
+        const ownerRecheck = await this.assertOwnerIdsAreProjectMembers(
+          input.projectId,
+          input.ownerIds.filter((ownerId) => {
+            return !currentOwnerIdSet.has(ownerId);
+          }),
+        );
+        if (ownerRecheck.isErr()) return err(ownerRecheck.error);
+      }
       const latest = await this.db
         .select({ archivedAt: storiesTable.archivedAt })
         .from(storiesTable)
@@ -1122,17 +1161,6 @@ export class D1StoryRepository implements StoryRepository {
           ? STORY_STATUS_CHANGED_CONCURRENTLY_ERROR
           : STORY_REPOSITORY_ERROR,
       );
-    }
-
-    if (input.ownerIds !== undefined) {
-      const ownerReplacement = await this.replaceOwners(
-        input.projectId,
-        input.id,
-        input.ownerIds,
-      );
-      if (ownerReplacement.isErr()) {
-        return err(ownerReplacement.error);
-      }
     }
 
     const updated = await this.findByIdWithRelations(input.projectId, input.id);

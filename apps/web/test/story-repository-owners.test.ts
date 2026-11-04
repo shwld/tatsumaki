@@ -127,22 +127,45 @@ describe("D1StoryRepository.update owner membership", () => {
     expect(await storedOwnerIds()).toEqual([MEMBER_ID]);
   });
 
-  it("does not replace owners when a new owner left the project after validation", async () => {
-    const repository = new D1StoryRepository(env.DB) as unknown as {
-      replaceOwners(
-        projectId: string,
-        storyId: string,
-        ownerIds: string[],
-      ): Promise<{ isErr(): boolean; error?: unknown }>;
-    };
+  it("rejects a new owner who left the project and keeps story and owners unchanged", async () => {
+    const repository = new D1StoryRepository(env.DB);
+    await createDb(env.DB)
+      .delete(projectMembersTable)
+      .where(eq(projectMembersTable.userId, NEW_MEMBER_ID));
 
-    const result = await repository.replaceOwners(PROJECT_ID, STORY_ID, [
-      NEW_MEMBER_ID,
-      "github|left-after-validation",
-    ]);
+    const result = await repository.update({
+      projectId: PROJECT_ID,
+      id: STORY_ID,
+      title: "Changed",
+      ownerIds: [MEMBER_ID, NEW_MEMBER_ID],
+    });
 
-    expect(result.isErr()).toBe(true);
-    expect(result.error).toBe(STORY_OWNER_NOT_PROJECT_MEMBER_ERROR);
+    expect(result.isErr() && result.error).toBe(
+      STORY_OWNER_NOT_PROJECT_MEMBER_ERROR,
+    );
     expect(await storedOwnerIds()).toEqual([FORMER_MEMBER_ID, MEMBER_ID]);
+  });
+
+  it("does not duplicate owners when the same owner is submitted twice", async () => {
+    const result = await new D1StoryRepository(env.DB).update({
+      projectId: PROJECT_ID,
+      id: STORY_ID,
+      ownerIds: [MEMBER_ID, NEW_MEMBER_ID, NEW_MEMBER_ID],
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(await storedOwnerIds()).toEqual([MEMBER_ID, NEW_MEMBER_ID].sort());
+  });
+
+  it("clears all owners when an empty list is submitted", async () => {
+    const result = await new D1StoryRepository(env.DB).update({
+      projectId: PROJECT_ID,
+      id: STORY_ID,
+      title: "Changed",
+      ownerIds: [],
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(await storedOwnerIds()).toEqual([]);
   });
 });
