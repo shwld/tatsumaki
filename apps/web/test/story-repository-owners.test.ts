@@ -168,4 +168,28 @@ describe("D1StoryRepository.update owner membership", () => {
     expect(result.isOk()).toBe(true);
     expect(await storedOwnerIds()).toEqual([]);
   });
+
+  it("accepts more owners than a per-owner bind could fit in one D1 statement", async () => {
+    const owners = Array.from({ length: 60 }, (_, i) => `github|bulk-${i}`);
+    for (let i = 0; i < owners.length; i += 20) {
+      await createDb(env.DB)
+        .insert(projectMembersTable)
+        .values(
+          owners.slice(i, i + 20).map((userId) => ({
+            projectId: PROJECT_ID,
+            userId,
+            role: "member" as const,
+          })),
+        );
+    }
+
+    const result = await new D1StoryRepository(env.DB).update({
+      projectId: PROJECT_ID,
+      id: STORY_ID,
+      ownerIds: owners,
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(await storedOwnerIds()).toEqual([...owners].sort());
+  });
 });

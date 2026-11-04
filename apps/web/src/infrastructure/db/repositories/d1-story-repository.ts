@@ -662,39 +662,32 @@ export class D1StoryRepository implements StoryRepository {
   }
 
   // 既存 owner は脱退済みでも保持し、新規 owner だけを project member に限る。
-  // 判定は batch 内の SQL で行い、検証時点と commit 時点のずれを作らない。
+  // owner ID は JSON 配列 1 つの bind にまとめ、D1 の bind 数上限に人数が影響しないようにする。
   private buildOwnerReplacementStatements(
     projectId: string,
     storyId: string,
-    current: { status: string; isIcebox: number },
+    current: { status: string; isIcebox: number; iterationId: string | null },
     ownerIds: string[],
   ) {
-    const uniqueOwnerIds = [...new Set(ownerIds)];
-    const storyUnchanged = sql`exists (select 1 from ${storiesTable} as target where target.id = ${storyId} and target.status = ${current.status} and target.is_icebox = ${current.isIcebox} and target.archived_at is null)`;
-    const everyOwnerIsCurrentOrMember = sql.join(
-      [
-        sql`1 = 1`,
-        ...uniqueOwnerIds.map((ownerId) => {
-          return sql`(${ownerId} in (select ${storyOwnersTable.userId} from ${storyOwnersTable} where ${storyOwnersTable.storyId} = ${storyId}) or ${ownerId} in (select ${projectMembersTable.userId} from ${projectMembersTable} where ${projectMembersTable.projectId} = ${projectId}))`;
-        }),
-      ],
-      sql` and `,
-    );
+    const wantedOwnerIds = sql`select value from json_each(${JSON.stringify([...new Set(ownerIds)])})`;
+    const storyUnchanged = sql`exists (select 1 from ${storiesTable} as target where target.id = ${storyId} and target.status = ${current.status} and target.is_icebox = ${current.isIcebox} and ${
+      current.iterationId === null
+        ? sql`target.iteration_id is null`
+        : sql`target.iteration_id = ${current.iterationId}`
+    } and target.archived_at is null)`;
+    const everyOwnerIsCurrentOrMember = sql`not exists (select 1 from (${wantedOwnerIds}) as wanted where wanted.value not in (select ${storyOwnersTable.userId} from ${storyOwnersTable} where ${storyOwnersTable.storyId} = ${storyId}) and wanted.value not in (select ${projectMembersTable.userId} from ${projectMembersTable} where ${projectMembersTable.projectId} = ${projectId}))`;
     const guard = sql`${storyUnchanged} and ${everyOwnerIsCurrentOrMember}`;
 
-    const removeStatement = this.db.delete(storyOwnersTable).where(
-      and(
-        eq(storyOwnersTable.storyId, storyId),
-        uniqueOwnerIds.length > 0
-          ? sql`${storyOwnersTable.userId} not in (${sql.join(
-              uniqueOwnerIds.map((ownerId) => sql`${ownerId}`),
-              sql`, `,
-            )})`
-          : sql`1 = 1`,
-        guard,
-      ),
-    );
-    if (uniqueOwnerIds.length === 0) {
+    const removeStatement = this.db
+      .delete(storyOwnersTable)
+      .where(
+        and(
+          eq(storyOwnersTable.storyId, storyId),
+          sql`${storyOwnersTable.userId} not in (${wantedOwnerIds})`,
+          guard,
+        ),
+      );
+    if (ownerIds.length === 0) {
       return [removeStatement];
     }
     const addStatement = this.db.insert(storyOwnersTable).select(
@@ -709,7 +702,7 @@ export class D1StoryRepository implements StoryRepository {
         .where(
           and(
             eq(projectMembersTable.projectId, projectId),
-            inArray(projectMembersTable.userId, uniqueOwnerIds),
+            sql`${projectMembersTable.userId} in (${wantedOwnerIds})`,
             sql`not exists (select 1 from ${storyOwnersTable} where ${storyOwnersTable.storyId} = ${storyId} and ${storyOwnersTable.userId} = ${projectMembersTable.userId})`,
             guard,
           ),
@@ -1032,12 +1025,7 @@ export class D1StoryRepository implements StoryRepository {
     const ownerIdsAreAllCurrentOwners =
       input.ownerIds === undefined || input.ownerIds.length === 0
         ? sql`1 = 1`
-        : sql.join(
-            [...new Set(input.ownerIds)].map((ownerId) => {
-              return sql`${ownerId} in (select ${storyOwnersTable.userId} from ${storyOwnersTable} where ${storyOwnersTable.storyId} = ${input.id})`;
-            }),
-            sql` and `,
-          );
+        : sql`not exists (select 1 from json_each(${JSON.stringify([...new Set(input.ownerIds)])}) as wanted where wanted.value not in (select ${storyOwnersTable.userId} from ${storyOwnersTable} where ${storyOwnersTable.storyId} = ${input.id}))`;
     const shouldMoveToTop =
       input.moveToTop === true && current.isIcebox === 1 && !nextIsIcebox;
     const updateQuery = this.db
