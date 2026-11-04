@@ -420,6 +420,7 @@ export class D1StoryRepository implements StoryRepository {
         return !isResolvedStoryStatus(blocker.status);
       });
       story.isBlocking =
+        !story.archivedAt &&
         !isResolvedStoryStatus(story.status) &&
         (story.blockedStories?.length ?? 0) > 0;
     }
@@ -542,7 +543,9 @@ export class D1StoryRepository implements StoryRepository {
     for (const story of stories) {
       story.isBlocked = blockedStoryIds.has(story.id);
       story.isBlocking =
-        !isResolvedStoryStatus(story.status) && blockingStoryIds.has(story.id);
+        !story.archivedAt &&
+        !isResolvedStoryStatus(story.status) &&
+        blockingStoryIds.has(story.id);
     }
     return stories;
   }

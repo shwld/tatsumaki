@@ -662,6 +662,60 @@ describe("story routes", () => {
     });
   });
 
+  it("does not report an archived blocking story as isBlocking", async () => {
+    const projectId = await createProject();
+    const createStory = async (title: string) => {
+      const response = await fetchWithAuth(storiesApiPath(projectId), {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ title, description: "" }),
+      });
+      return (
+        (await response.json()) as {
+          story: { id: string; storyNumber: number };
+        }
+      ).story;
+    };
+    const blocker = await createStory("Blocker");
+    const blocked = await createStory("Blocked");
+    const setBlocker = await fetchWithAuth(
+      `${storyApiPath(projectId, String(blocked.storyNumber))}/blockers`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          relation: "blockedBy",
+          targetStoryId: blocker.id,
+        }),
+      },
+    );
+    expect(setBlocker.status).toBe(200);
+    await createDb(env.DB)
+      .update(storiesTable)
+      .set({ archivedAt: "2026-11-04T00:00:00.000Z" })
+      .where(eq(storiesTable.id, blocker.id));
+
+    const summary = (await (
+      await fetchWithAuth(
+        `${storiesApiPath(projectId)}?archived=only&detail=summary`,
+      )
+    ).json()) as { stories: Array<{ id: string; isBlocking: boolean }> };
+    expect(
+      summary.stories.find((story) => {
+        return story.id === blocker.id;
+      })?.isBlocking,
+    ).toBe(false);
+
+    const active = (await (
+      await fetchWithAuth(`${storiesApiPath(projectId)}?detail=summary`)
+    ).json()) as { stories: Array<{ id: string; isBlocked: boolean }> };
+    expect(
+      active.stories.find((story) => {
+        return story.id === blocked.id;
+      })?.isBlocked,
+    ).toBe(false);
+  });
+
   it("gets full story detail by id", async () => {
     const projectId = await createProject();
 
