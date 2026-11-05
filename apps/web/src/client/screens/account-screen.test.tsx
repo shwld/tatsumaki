@@ -22,6 +22,18 @@ const defaultNotificationSettings = {
   updatedAt: "2024-01-01T00:00:00.000Z",
 };
 
+const defaultEntitlementResponse = {
+  entitlement: {
+    billingAccountId: "github|test-user",
+    plan: "free",
+    state: "active",
+    limits: { maxOwnedProjects: 0 },
+    validUntil: null,
+    revision: 1,
+    cache: { maxAgeSeconds: 60, staleIfErrorSeconds: 300 },
+  },
+};
+
 describe("AccountScreen", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn());
@@ -42,6 +54,7 @@ describe("AccountScreen", () => {
         }),
       )
       .mockResolvedValueOnce(buildJsonResponse(defaultNotificationSettings))
+      .mockResolvedValueOnce(buildJsonResponse(defaultEntitlementResponse))
       .mockResolvedValueOnce(
         buildJsonResponse({
           id: "github|test-user",
@@ -100,6 +113,7 @@ describe("AccountScreen", () => {
         }),
       )
       .mockResolvedValueOnce(buildJsonResponse(defaultNotificationSettings))
+      .mockResolvedValueOnce(buildJsonResponse(defaultEntitlementResponse))
       .mockResolvedValueOnce(
         buildJsonResponse(
           {
@@ -150,6 +164,9 @@ describe("AccountScreen", () => {
     fetchMock.mockResolvedValueOnce(
       buildJsonResponse(defaultNotificationSettings),
     );
+    fetchMock.mockResolvedValueOnce(
+      buildJsonResponse(defaultEntitlementResponse),
+    );
 
     render(
       <MemoryRouter initialEntries={["/account"]}>
@@ -184,6 +201,7 @@ describe("AccountScreen", () => {
         }),
       )
       .mockResolvedValueOnce(buildJsonResponse(defaultNotificationSettings))
+      .mockResolvedValueOnce(buildJsonResponse(defaultEntitlementResponse))
       .mockResolvedValueOnce(
         buildJsonResponse({
           ...defaultNotificationSettings,
@@ -233,5 +251,97 @@ describe("AccountScreen", () => {
         },
       );
     });
+  });
+  const renderWithEntitlement = (entitlementResponse: Response) => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock
+      .mockResolvedValueOnce(
+        buildJsonResponse({
+          id: "github|test-user",
+          displayName: "tester",
+          email: "tester@example.com",
+        }),
+      )
+      .mockResolvedValueOnce(buildJsonResponse(defaultNotificationSettings))
+      .mockResolvedValueOnce(entitlementResponse);
+
+    render(
+      <MemoryRouter initialEntries={["/account"]}>
+        <AuthErrorProvider>
+          <Routes>
+            <Route path="/account" element={<AccountScreen />} />
+          </Routes>
+        </AuthErrorProvider>
+      </MemoryRouter>,
+    );
+  };
+
+  const entitlementWith = (overrides: Record<string, unknown>) =>
+    buildJsonResponse({
+      entitlement: {
+        ...defaultEntitlementResponse.entitlement,
+        ...overrides,
+      },
+    });
+
+  it("shows the free plan and upgrade guidance", async () => {
+    renderWithEntitlement(buildJsonResponse(defaultEntitlementResponse));
+
+    expect(await screen.findByText("Free")).toBeInTheDocument();
+    expect(screen.getByText("有効")).toBeInTheDocument();
+    expect(screen.getByText("0 件")).toBeInTheDocument();
+    expect(
+      screen.getByText(/プロジェクトを作成するには Pro が必要です/),
+    ).toBeInTheDocument();
+  });
+
+  it("shows validUntil and ownership guidance during grace", async () => {
+    renderWithEntitlement(
+      entitlementWith({
+        plan: "pro",
+        state: "grace",
+        limits: { maxOwnedProjects: null },
+        validUntil: "2026-12-31T00:00:00.000Z",
+      }),
+    );
+
+    expect(await screen.findByText("支払い猶予中")).toBeInTheDocument();
+    expect(screen.getByText("上限なし")).toBeInTheDocument();
+    expect(screen.getByText("期限")).toBeInTheDocument();
+    expect(
+      screen.getByText(/オーナーとしての権限と既存データの編集は引き続き可能/),
+    ).toBeInTheDocument();
+  });
+
+  it("shows resume guidance when restricted", async () => {
+    renderWithEntitlement(
+      entitlementWith({ plan: "pro", state: "restricted" }),
+    );
+
+    expect(await screen.findByText("制限中")).toBeInTheDocument();
+    expect(screen.getByText(/支払いを再開すると/)).toBeInTheDocument();
+  });
+
+  it("falls back when the entitlement is temporarily unavailable", async () => {
+    renderWithEntitlement(
+      buildJsonResponse(
+        { error: "Entitlement is temporarily unavailable" },
+        503,
+      ),
+    );
+
+    expect(
+      await screen.findByText(/プラン情報を一時的に取得できません/),
+    ).toBeInTheDocument();
+    expect(screen.getByDisplayValue("tester")).toBeInTheDocument();
+  });
+
+  it("routes an entitlement 401 through session recovery", async () => {
+    renderWithEntitlement(buildJsonResponse({ error: "Unauthorized" }, 401));
+
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(
+      screen.queryByText(/プラン情報を一時的に取得できません/),
+    ).not.toBeInTheDocument();
   });
 });
