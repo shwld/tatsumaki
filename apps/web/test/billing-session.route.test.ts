@@ -106,4 +106,22 @@ describe("billing checkout and portal routes", () => {
 
     expect(response.status).toBe(503);
   });
+
+  it("rejects session URLs outside the Stripe hosts", async () => {
+    const response = await buildApp().request(
+      "https://tatsumaki.example/billing/portal",
+      { method: "POST" },
+      buildBindings({
+        CONTROL_PLANE: {
+          getEntitlement: vi.fn(),
+          createCheckoutSession: vi.fn(),
+          createPortalSession: vi.fn(async () => ({
+            url: "https://evil.example/p",
+          })),
+        },
+      }),
+    );
+
+    expect(response.status).toBe(503);
+  });
 });

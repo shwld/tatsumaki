@@ -161,4 +161,28 @@ describe("BillingStatusSection actions", () => {
     ).toBeVisible();
     expect(fetch).toHaveBeenCalledTimes(2);
   });
+
+  it("keeps polling after a transient entitlement failure", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(
+        json({ entitlement: entitlement(), checkoutEnabled: true }),
+      )
+      .mockResolvedValueOnce(json({ error: "x" }, 503))
+      .mockResolvedValueOnce(
+        json({
+          entitlement: entitlement({ plan: "pro", maxOwnedProjects: null }),
+          checkoutEnabled: true,
+        }),
+      );
+    renderSection("/account?checkout=success");
+
+    await screen.findByText("お支払いの反映を確認しています...");
+    await vi.advanceTimersByTimeAsync(2000);
+    await vi.advanceTimersByTimeAsync(2000);
+
+    expect(
+      await screen.findByText("Pro プランへのアップグレードが完了しました。"),
+    ).toBeVisible();
+  });
 });

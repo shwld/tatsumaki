@@ -70,13 +70,23 @@ export function BillingStatusSection() {
         notifySessionExpired();
         return;
       }
+      const hasNextAttempt =
+        returnedFromCheckout && attempt + 1 < CHECKOUT_POLL_MAX_ATTEMPTS;
       if (result === "unavailable") {
+        if (hasNextAttempt) {
+          timer = setTimeout(
+            () => void run(attempt + 1),
+            CHECKOUT_POLL_INTERVAL_MS,
+          );
+          return;
+        }
+        setPollTimedOut(returnedFromCheckout);
         setState({ status: "unavailable" });
         return;
       }
       setState({ status: "ready", ...result });
       if (!returnedFromCheckout || result.entitlement.plan === "pro") return;
-      if (attempt + 1 >= CHECKOUT_POLL_MAX_ATTEMPTS) {
+      if (!hasNextAttempt) {
         setPollTimedOut(true);
         return;
       }

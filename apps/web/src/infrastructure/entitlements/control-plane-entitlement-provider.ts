@@ -16,7 +16,17 @@ export interface ControlPlaneRpc {
   }): Promise<unknown>;
 }
 
-const sessionSchema = z.object({ url: z.url() });
+const STRIPE_SESSION_HOSTS = new Set([
+  "checkout.stripe.com",
+  "billing.stripe.com",
+]);
+
+const sessionSchema = z.object({
+  url: z.url().refine((value) => {
+    const url = new URL(value);
+    return url.protocol === "https:" && STRIPE_SESSION_HOSTS.has(url.hostname);
+  }),
+});
 
 export const parseSessionResponse = (response: unknown): { url: string } =>
   sessionSchema.parse(response);
