@@ -93,18 +93,10 @@ api.route("/", healthRoute);
 const protectedApi = new Hono<Env>();
 protectedApi.use("*", devAuth());
 protectedApi.use("*", requireAccessAuth());
-protectedApi.use("/invitation-links/*", rejectBlockedUser());
 protectedApi.use("/onboarding", rejectBlockedUser());
 protectedApi.route("/", onboardingRoute);
+protectedApi.use("*", requireAppEntitlement());
 protectedApi.route("/", invitationLinksRoute);
-protectedApi.use("*", async (c, next) => {
-  if (
-    /^(?:\/api)?\/projects\/[^/]+\/invitations\/[^/]+\/accept$/.test(c.req.path)
-  ) {
-    return rejectBlockedUser()(c, next);
-  }
-  return requireAppEntitlement()(c, next);
-});
 protectedApi.route("/", authRoute);
 protectedApi.route("/", projectsRoute);
 protectedApi.route("/", storiesRoute);

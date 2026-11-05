@@ -54,7 +54,7 @@ describe("single-use invitation links", () => {
     await setupAccessBindings(env);
   });
 
-  it("stores only the token hash and atomically bootstraps the first user", async () => {
+  it("stores only the token hash and joins an onboarded user to the project", async () => {
     const { projectId, invitationId, token } = await createProjectAndLink();
     const stored = await createDb(env.DB)
       .select()
@@ -70,7 +70,10 @@ describe("single-use invitation links", () => {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          ...(await accessHeaders("github|new-user", "new@example.com")),
+          ...(await createAuthHeaders({
+            sub: "github|new-user",
+            email: "new@example.com",
+          })),
         },
         body: JSON.stringify({ token }),
       },
@@ -86,7 +89,10 @@ describe("single-use invitation links", () => {
     expect(user?.accessStatus).toBe("allowed");
 
     const listResponse = await SELF.fetch("https://localhost/api/projects", {
-      headers: await accessHeaders("github|new-user", "new@example.com"),
+      headers: await createAuthHeaders({
+        sub: "github|new-user",
+        email: "new@example.com",
+      }),
     });
     expect(listResponse.status).toBe(200);
     expect(await listResponse.json()).toMatchObject({
@@ -101,7 +107,10 @@ describe("single-use invitation links", () => {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          ...(await accessHeaders(sub, `${sub}@example.com`)),
+          ...(await createAuthHeaders({
+            sub: sub,
+            email: `${sub}@example.com`,
+          })),
         },
         body: JSON.stringify({ token }),
       });
@@ -126,7 +135,10 @@ describe("single-use invitation links", () => {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          ...(await accessHeaders("revoked-user", "revoked@example.com")),
+          ...(await createAuthHeaders({
+            sub: "revoked-user",
+            email: "revoked@example.com",
+          })),
         },
         body: JSON.stringify({ token }),
       },
@@ -134,7 +146,7 @@ describe("single-use invitation links", () => {
     expect(accept.status).toBe(410);
   });
 
-  it("rejects expired links without creating a user", async () => {
+  it("rejects expired links", async () => {
     const { invitationId, token } = await createProjectAndLink();
     await createDb(env.DB)
       .update(projectInvitationsTable)
@@ -147,22 +159,18 @@ describe("single-use invitation links", () => {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          ...(await accessHeaders("expired-user", "expired@example.com")),
+          ...(await createAuthHeaders({
+            sub: "expired-user",
+            email: "expired@example.com",
+          })),
         },
         body: JSON.stringify({ token }),
       },
     );
     expect(accept.status).toBe(410);
-    expect(
-      await createDb(env.DB)
-        .select()
-        .from(usersTable)
-        .where(eq(usersTable.id, "expired-user"))
-        .get(),
-    ).toBeUndefined();
   });
 
-  it("keeps targeted invitations usable for a first-time user", async () => {
+  it("keeps targeted invitations usable for an onboarded user", async () => {
     const ownerHeaders = await createAuthHeaders();
     const projectResponse = await SELF.fetch("https://localhost/api/projects", {
       method: "POST",
@@ -184,10 +192,10 @@ describe("single-use invitation links", () => {
       invitation: { id: string };
     };
 
-    const targetHeaders = await accessHeaders(
-      "target-user",
-      "target@example.com",
-    );
+    const targetHeaders = await createAuthHeaders({
+      sub: "target-user",
+      email: "target@example.com",
+    });
     const acceptPage = await SELF.fetch(
       `https://localhost/projects/${project.id}/invitations/${invitation.id}/accept`,
       { headers: targetHeaders },
@@ -214,6 +222,28 @@ describe("single-use invitation links", () => {
       .where(eq(usersTable.id, "target-user"))
       .get();
     expect(user?.accessStatus).toBe("allowed");
+  });
+
+  it("requires onboarding before accepting an invitation link", async () => {
+    const { token } = await createProjectAndLink();
+    const headers = await accessHeaders("not-onboarded", "no@example.com");
+    const accept = await SELF.fetch(
+      "https://localhost/api/invitation-links/accept",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", ...headers },
+        body: JSON.stringify({ token }),
+      },
+    );
+    expect(accept.status).toBe(403);
+    expect(await accept.json()).toMatchObject({ code: "ONBOARDING_REQUIRED" });
+    expect(
+      await createDb(env.DB)
+        .select()
+        .from(usersTable)
+        .where(eq(usersTable.id, "not-onboarded"))
+        .get(),
+    ).toBeUndefined();
   });
 
   it("blocks uninvited users from browser, API, CLI, and OAuth entry points", async () => {

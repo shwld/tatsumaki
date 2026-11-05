@@ -15,7 +15,7 @@ export function ProjectListScreen() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [loadedEmpty, setLoadedEmpty] = useState(false);
+  const [projectsLoaded, setProjectsLoaded] = useState(false);
   const [participateOnly, setParticipateOnly] = useState(false);
   const [forbidden, setForbidden] = useState<string | null>(null);
   const retryRequestRef = useRef<null | (() => Promise<void>)>(null);
@@ -45,11 +45,11 @@ export function ProjectListScreen() {
 
         const data = (await response.json()) as ProjectsResponse;
         if (!ignore) {
-          const loaded = Array.isArray(data.projects)
+          const list = Array.isArray(data.projects)
             ? (data.projects as Project[])
             : [];
-          setProjects(loaded);
-          setLoadedEmpty(loaded.length === 0);
+          setProjects(list);
+          setProjectsLoaded(true);
         }
       } catch {
         if (!ignore) {
@@ -70,7 +70,7 @@ export function ProjectListScreen() {
   }, []);
 
   useEffect(() => {
-    if (!loadedEmpty) return;
+    if (!projectsLoaded) return;
     let ignore = false;
     fetch("/api/billing/entitlement")
       .then(async (response) => {
@@ -86,7 +86,7 @@ export function ProjectListScreen() {
     return () => {
       ignore = true;
     };
-  }, [loadedEmpty]);
+  }, [projectsLoaded]);
 
   if (forbidden) {
     return (
