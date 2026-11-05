@@ -1,6 +1,7 @@
 import type { MiddlewareHandler } from "hono";
 import type { Env } from "../../index";
 import { D1ProjectApiKeyRepository } from "../../infrastructure/db/repositories/d1-project-api-key-repository";
+import { getAppEntitlementDenial } from "./app-entitlement";
 import { hashApiKey } from "../../application/services/api-key-hasher";
 
 export const API_KEY_HEADER = "X-Api-Key";
@@ -31,6 +32,11 @@ export function requireApiKeyAuth(): MiddlewareHandler<Env> {
     }
 
     const apiKey = result.value;
+
+    const denial = await getAppEntitlementDenial(c.env.DB, apiKey.ownerUserId);
+    if (denial) {
+      return c.json(denial, 403);
+    }
 
     c.set("currentUser", { id: apiKey.ownerUserId });
     c.set("apiKeyScopes", apiKey.scopes);

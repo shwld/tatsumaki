@@ -28,7 +28,7 @@ function toUser(row: UserRow): User {
     displayName: row.displayName,
     email: row.email,
     avatarUrl: row.avatarUrl ?? null,
-    accessStatus: row.accessStatus === "allowed" ? "allowed" : "pending",
+    accessStatus: row.accessStatus === "allowed" ? "allowed" : "blocked",
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -111,17 +111,6 @@ export class D1UserRepository implements UserRepository {
       .where(eq(usersTable.id, input.id))
       .returning();
 
-    return ok(updated ? toUser(updated) : null);
-  }
-
-  async allowAccess(
-    id: string,
-  ): Promise<Result<User | null, UserRepositoryError>> {
-    const [updated] = await this.db
-      .update(usersTable)
-      .set({ accessStatus: "allowed", updatedAt: new Date().toISOString() })
-      .where(eq(usersTable.id, id))
-      .returning();
     return ok(updated ? toUser(updated) : null);
   }
 
