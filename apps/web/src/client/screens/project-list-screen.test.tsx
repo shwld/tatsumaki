@@ -140,6 +140,11 @@ describe("ProjectListScreen", () => {
         buildJsonResponse({
           projects: [{ id: "p1", name: "My Project", sprintDurationDays: 14 }],
         }),
+      )
+      .mockResolvedValueOnce(
+        buildJsonResponse({
+          entitlement: { limits: { maxOwnedProjects: null } },
+        }),
       );
 
     render(
@@ -164,7 +169,7 @@ describe("ProjectListScreen", () => {
     await waitFor(() => {
       expect(screen.getByText("My Project")).toBeInTheDocument();
     });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
   });
 
   it("shows retry button on network error and recovers after retry", async () => {
@@ -174,6 +179,11 @@ describe("ProjectListScreen", () => {
       .mockResolvedValueOnce(
         buildJsonResponse({
           projects: [{ id: "p1", name: "My Project", sprintDurationDays: 14 }],
+        }),
+      )
+      .mockResolvedValueOnce(
+        buildJsonResponse({
+          entitlement: { limits: { maxOwnedProjects: null } },
         }),
       );
 
@@ -199,6 +209,6 @@ describe("ProjectListScreen", () => {
     await waitFor(() => {
       expect(screen.getByText("My Project")).toBeInTheDocument();
     });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
   });
 });
