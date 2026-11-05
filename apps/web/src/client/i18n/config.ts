@@ -2,6 +2,10 @@ import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import { actorLabelEn, actorLabelJa } from "../components/actor-label.i18n";
 import { errorRetryEn, errorRetryJa } from "../components/error-retry.i18n";
+import {
+  billingStatusSectionEn,
+  billingStatusSectionJa,
+} from "../components/billing-status-section.i18n";
 import { layoutEn, layoutJa } from "../components/layout.i18n";
 import {
   permissionDeniedEn,
@@ -81,6 +85,7 @@ i18n.use(initReactI18next).init({
     ja: {
       common: {
         ...layoutJa,
+        ...billingStatusSectionJa,
         ...permissionDeniedJa,
         ...errorRetryJa,
         ...actorLabelJa,
@@ -105,6 +110,7 @@ i18n.use(initReactI18next).init({
     en: {
       common: {
         ...layoutEn,
+        ...billingStatusSectionEn,
         ...permissionDeniedEn,
         ...errorRetryEn,
         ...actorLabelEn,

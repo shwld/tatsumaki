@@ -5,6 +5,7 @@ import { useAuthError } from "../contexts/auth-error-context";
 import { isAuthError } from "../lib/api-error";
 import { parseErrorMessage } from "../lib/parse-error-message";
 import { Avatar } from "../components/avatar";
+import { BillingStatusSection } from "../components/billing-status-section";
 import { DeleteAccountDialog } from "../components/delete-account-dialog";
 
 type AccountResponse = CurrentUser & {
@@ -529,6 +530,8 @@ export function AccountScreen() {
               {isSavingNotifications ? "保存中..." : "通知設定を保存する"}
             </button>
           </form>
+          <BillingStatusSection />
+
           <section className="space-y-4 rounded-2xl border border-red-200 bg-white p-6 shadow-sm">
             <div className="space-y-1">
               <h2 className="text-lg font-semibold text-red-700">危険な操作</h2>
