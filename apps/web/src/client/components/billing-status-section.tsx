@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Entitlement } from "../../domain/entities/entitlement";
+import { useAuthError } from "../contexts/auth-error-context";
+import { isAuthError } from "../lib/api-error";
 
 type LoadState =
   | { status: "loading" }
@@ -17,6 +19,7 @@ const formatValidUntil = (value: string, language: string): string => {
 
 export function BillingStatusSection() {
   const { t, i18n } = useTranslation();
+  const { notifySessionExpired } = useAuthError();
   const [state, setState] = useState<LoadState>({ status: "loading" });
 
   useEffect(() => {
@@ -25,6 +28,10 @@ export function BillingStatusSection() {
       try {
         const response = await fetch("/api/billing/entitlement");
         if (!response.ok) {
+          if (!ignore && isAuthError(response.status)) {
+            notifySessionExpired();
+            return;
+          }
           if (!ignore) setState({ status: "unavailable" });
           return;
         }
@@ -44,7 +51,7 @@ export function BillingStatusSection() {
     return () => {
       ignore = true;
     };
-  }, []);
+  }, [notifySessionExpired]);
 
   return (
     <section

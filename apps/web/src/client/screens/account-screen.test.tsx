@@ -335,4 +335,13 @@ describe("AccountScreen", () => {
     ).toBeInTheDocument();
     expect(screen.getByDisplayValue("tester")).toBeInTheDocument();
   });
+
+  it("routes an entitlement 401 through session recovery", async () => {
+    renderWithEntitlement(buildJsonResponse({ error: "Unauthorized" }, 401));
+
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(
+      screen.queryByText(/プラン情報を一時的に取得できません/),
+    ).not.toBeInTheDocument();
+  });
 });
