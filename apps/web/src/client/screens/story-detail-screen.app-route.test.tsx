@@ -43,6 +43,16 @@ describe("App story detail route", () => {
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
         const url = String(input);
+        if (url === "/api/onboarding") {
+          return new Response(
+            JSON.stringify({
+              completed: true,
+              email: null,
+              challenge: { kind: "disabled", siteKey: null },
+            }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          );
+        }
         if (url.includes("/api/auth/me")) {
           return new Response(
             JSON.stringify({ id: "u1", displayName: "User" }),

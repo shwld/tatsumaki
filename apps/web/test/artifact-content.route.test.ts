@@ -384,14 +384,14 @@ describe("artifact content serving", () => {
       expect(csp).not.toContain("'unsafe-inline'");
     });
 
-    it("limits frames, and their later navigations, to /artifact-content/", () => {
+    it("limits frames, and their later navigations, to /artifact-content/ and Turnstile", () => {
       const csp =
         spaIndexHeaders("https://localhost")["Content-Security-Policy"] ?? "";
       const frameSrc =
         csp.split(";").find((part) => part.trim().startsWith("frame-src")) ??
         "";
       expect(frameSrc.trim()).toBe(
-        "frame-src https://localhost/artifact-content/",
+        "frame-src https://localhost/artifact-content/ https://challenges.cloudflare.com",
       );
     });
   });

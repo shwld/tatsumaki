@@ -83,7 +83,12 @@ describe("ProjectListScreen", () => {
           403,
         ),
       )
-      .mockResolvedValueOnce(buildJsonResponse({ projects: [] }));
+      .mockResolvedValueOnce(buildJsonResponse({ projects: [] }))
+      .mockResolvedValueOnce(
+        buildJsonResponse({
+          entitlement: { limits: { maxOwnedProjects: null } },
+        }),
+      );
 
     render(
       <MemoryRouter initialEntries={["/projects"]}>
@@ -122,7 +127,7 @@ describe("ProjectListScreen", () => {
         screen.getByText("プロジェクトがまだありません"),
       ).toBeInTheDocument();
     });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it("shows retry button on 500 error and recovers after retry", async () => {

@@ -15,6 +15,8 @@ export function ProjectListScreen() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [loadedEmpty, setLoadedEmpty] = useState(false);
+  const [participateOnly, setParticipateOnly] = useState(false);
   const [forbidden, setForbidden] = useState<string | null>(null);
   const retryRequestRef = useRef<null | (() => Promise<void>)>(null);
 
@@ -43,9 +45,11 @@ export function ProjectListScreen() {
 
         const data = (await response.json()) as ProjectsResponse;
         if (!ignore) {
-          setProjects(
-            Array.isArray(data.projects) ? (data.projects as Project[]) : [],
-          );
+          const loaded = Array.isArray(data.projects)
+            ? (data.projects as Project[])
+            : [];
+          setProjects(loaded);
+          setLoadedEmpty(loaded.length === 0);
         }
       } catch {
         if (!ignore) {
@@ -64,6 +68,25 @@ export function ProjectListScreen() {
       ignore = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!loadedEmpty) return;
+    let ignore = false;
+    fetch("/api/billing/entitlement")
+      .then(async (response) => {
+        if (!response.ok) return;
+        const data = (await response.json()) as {
+          entitlement?: { limits?: { maxOwnedProjects?: number | null } };
+        };
+        if (!ignore) {
+          setParticipateOnly(data.entitlement?.limits?.maxOwnedProjects === 0);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      ignore = true;
+    };
+  }, [loadedEmpty]);
 
   if (forbidden) {
     return (
@@ -88,18 +111,21 @@ export function ProjectListScreen() {
           <h1 className="text-2xl font-bold text-gray-900">
             {t("projectListScreen.title")}
           </h1>
-          <Link
-            className="text-sm font-medium text-blue-700"
-            to="/projects/new"
-          >
-            + {t("projectListScreen.newProject")}
-          </Link>
+          {participateOnly ? null : (
+            <Link
+              className="text-sm font-medium text-blue-700"
+              to="/projects/new"
+            >
+              + {t("projectListScreen.newProject")}
+            </Link>
+          )}
         </div>
         <ProjectListContent
           projects={projects}
           isLoading={isLoading}
           error={error}
           onRetry={retryRequestRef.current ?? undefined}
+          participateOnly={participateOnly}
         />
       </div>
     </main>

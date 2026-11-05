@@ -228,9 +228,10 @@ describe("single-use invitation links", () => {
         })
       ).status,
     ).toBeOneOf([401, 403]);
+    // The SPA shell is served so the client can show the onboarding screen.
     expect(
       (await SELF.fetch("https://localhost/projects", { headers })).status,
-    ).toBe(403);
+    ).not.toBe(403);
     const invitePage = await SELF.fetch("https://localhost/invite", {
       headers,
     });

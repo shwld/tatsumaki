@@ -22,6 +22,7 @@ import { projectHistoryRoute } from "./presentation/routes/project-history";
 import { savedFiltersRoute } from "./presentation/routes/saved-filters";
 import { projectApiKeysRoute } from "./presentation/routes/project-api-keys";
 import { apiKeyRoute } from "./presentation/routes/api-key";
+import { onboardingRoute } from "./presentation/routes/onboarding";
 import { billingRoute } from "./presentation/routes/billing";
 import { invitationLinksRoute } from "./presentation/routes/invitation-links";
 import { artifactContentRoute } from "./presentation/routes/artifact-content/routes";
@@ -60,6 +61,8 @@ export type Bindings = {
   PLANNING_POKER_DO: DurableObjectNamespace;
   CONTROL_PLANE?: ControlPlaneRpc;
   ENTITLEMENT_MODE?: string;
+  TURNSTILE_SITE_KEY?: string;
+  TURNSTILE_SECRET_KEY?: string;
 };
 
 export type Env = {
@@ -91,6 +94,8 @@ const protectedApi = new Hono<Env>();
 protectedApi.use("*", devAuth());
 protectedApi.use("*", requireAccessAuth());
 protectedApi.use("/invitation-links/*", rejectBlockedUser());
+protectedApi.use("/onboarding", rejectBlockedUser());
+protectedApi.route("/", onboardingRoute);
 protectedApi.route("/", invitationLinksRoute);
 protectedApi.use("*", async (c, next) => {
   if (
@@ -156,15 +161,7 @@ app.get(
   "*",
   devAuth(),
   requireAccessAuth({ redirectOnFailure: true }),
-  async (c, next) => {
-    if (
-      c.req.path === "/invite" ||
-      /^\/projects\/[^/]+\/invitations\/[^/]+\/accept$/.test(c.req.path)
-    ) {
-      return rejectBlockedUser()(c, next);
-    }
-    return requireAppEntitlement()(c, next);
-  },
+  rejectBlockedUser(),
   serveSpaIndex,
 );
 

@@ -7,9 +7,14 @@
  * The only frames the app embeds are artifact previews, so frames (and any
  * later navigation of them, e.g. an artifact sending its own iframe elsewhere)
  * are limited to /artifact-content/ too.
+ *
+ * Turnstile (onboarding) is the only third-party script and frame:
+ * https://developers.cloudflare.com/turnstile/reference/content-security-policy/
  */
+const TURNSTILE_ORIGIN = "https://challenges.cloudflare.com";
+
 export function spaIndexHeaders(origin: string): Record<string, string> {
   return {
-    "Content-Security-Policy": `script-src ${origin}/assets/; frame-src ${origin}/artifact-content/; object-src 'none'; base-uri 'self'`,
+    "Content-Security-Policy": `script-src ${origin}/assets/ ${TURNSTILE_ORIGIN}; frame-src ${origin}/artifact-content/ ${TURNSTILE_ORIGIN}; object-src 'none'; base-uri 'self'`,
   };
 }

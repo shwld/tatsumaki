@@ -9,6 +9,7 @@ type ProjectListContentProps = {
   isLoading: boolean;
   error: string | null;
   onRetry?: () => Promise<void>;
+  participateOnly?: boolean;
 };
 
 export function ProjectListContent({
@@ -16,6 +17,7 @@ export function ProjectListContent({
   isLoading,
   error,
   onRetry,
+  participateOnly = false,
 }: ProjectListContentProps) {
   const { t } = useTranslation();
 
@@ -32,6 +34,22 @@ export function ProjectListContent({
       <p className="mt-4 text-sm text-red-600" role="alert">
         {error}
       </p>
+    );
+  }
+
+  if (projects.length === 0 && participateOnly) {
+    return (
+      <div className="mt-6 rounded-lg border border-dashed border-gray-300 bg-gray-50 p-5 text-center sm:p-6">
+        <p className="text-base font-medium text-gray-900">
+          {t("projectListContent.participateOnly.title")}
+        </p>
+        <p className="mt-2 text-sm text-gray-600">
+          {t("projectListContent.participateOnly.proGuidance")}
+        </p>
+        <p className="mt-2 text-sm text-gray-600">
+          {t("projectListContent.participateOnly.inviteGuidance")}
+        </p>
+      </div>
     );
   }
 
