@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { TurnstileWidget } from "../components/turnstile-widget";
+import { SUPPORTED_LANGUAGES } from "../i18n/config";
 import type { OnboardingState } from "../types/onboarding";
 
 const ONBOARDING_ACTION = "onboarding";
@@ -14,7 +15,9 @@ export function OnboardingScreen({
   state,
   onCompleted,
 }: OnboardingScreenProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const [widgetAttempt, setWidgetAttempt] = useState(0);
+  const [widgetFailed, setWidgetFailed] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -70,6 +73,23 @@ export function OnboardingScreen({
         onSubmit={handleSubmit}
         className="space-y-4 rounded-lg border border-gray-200 bg-white p-6 shadow-sm"
       >
+        <div className="flex justify-end gap-3 text-xs">
+          {SUPPORTED_LANGUAGES.map((language) => (
+            <button
+              key={language}
+              type="button"
+              aria-pressed={i18n.language === language}
+              className={
+                i18n.language === language
+                  ? "font-semibold text-gray-900"
+                  : "text-blue-700 hover:underline"
+              }
+              onClick={() => void i18n.changeLanguage(language)}
+            >
+              {language === "ja" ? "日本語" : "English"}
+            </button>
+          ))}
+        </div>
         <h1 className="text-xl font-semibold text-gray-900">
           {t("onboardingScreen.title")}
         </h1>
@@ -84,11 +104,29 @@ export function OnboardingScreen({
         {state.challenge.kind === "enabled" ? (
           // Remount after a failed attempt: a Turnstile token is single use.
           <TurnstileWidget
-            key={error ?? "initial"}
+            key={`${widgetAttempt}:${error ?? ""}`}
             siteKey={state.challenge.siteKey}
             action={ONBOARDING_ACTION}
             onToken={setToken}
+            onError={() => setWidgetFailed(true)}
           />
+        ) : null}
+        {widgetFailed ? (
+          <div className="space-y-2" role="alert">
+            <p className="text-sm text-red-600">
+              {t("onboardingScreen.widgetError")}
+            </p>
+            <button
+              type="button"
+              className="text-sm font-medium text-blue-700 hover:underline"
+              onClick={() => {
+                setWidgetFailed(false);
+                setWidgetAttempt((attempt) => attempt + 1);
+              }}
+            >
+              {t("onboardingScreen.widgetRetry")}
+            </button>
+          </div>
         ) : null}
         <label className="flex items-start gap-2 text-sm text-gray-800">
           <input

@@ -94,6 +94,16 @@ export const mockPriorityHistoryResponse = {
 };
 
 export const mockAuthMe = async (page: Page) => {
+  await page.route("**/api/billing/entitlement", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        entitlement: { limits: { maxOwnedProjects: null } },
+      }),
+    });
+  });
+
   await page.route("**/api/onboarding", async (route) => {
     await route.fulfill({
       status: 200,

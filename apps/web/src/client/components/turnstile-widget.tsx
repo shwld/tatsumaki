@@ -50,16 +50,20 @@ type TurnstileWidgetProps = {
   siteKey: string;
   action: string;
   onToken: (token: string | null) => void;
+  onError?: () => void;
 };
 
 export function TurnstileWidget({
   siteKey,
   action,
   onToken,
+  onError,
 }: TurnstileWidgetProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const onTokenRef = useRef(onToken);
   onTokenRef.current = onToken;
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
 
   useEffect(() => {
     let widgetId: string | null = null;
@@ -73,10 +77,16 @@ export function TurnstileWidget({
           action,
           callback: (token) => onTokenRef.current(token),
           "expired-callback": () => onTokenRef.current(null),
-          "error-callback": () => onTokenRef.current(null),
+          "error-callback": () => {
+            onTokenRef.current(null);
+            onErrorRef.current?.();
+          },
         });
       })
-      .catch(() => onTokenRef.current(null));
+      .catch(() => {
+        onTokenRef.current(null);
+        onErrorRef.current?.();
+      });
 
     return () => {
       cancelled = true;

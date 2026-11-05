@@ -49,9 +49,19 @@ export function OnboardingGate({ children }: { children: ReactNode }) {
   }
   if (gate.kind === "error") {
     return (
-      <p className="p-4 text-sm text-red-600" role="alert">
-        {t("onboardingScreen.loadError")}
-      </p>
+      <div className="p-4 text-sm" role="alert">
+        <p className="text-red-600">{t("onboardingScreen.loadError")}</p>
+        <button
+          type="button"
+          className="mt-2 font-medium text-blue-700 hover:underline"
+          onClick={() => {
+            setGate({ kind: "loading" });
+            void load(() => false);
+          }}
+        >
+          {t("onboardingScreen.retry")}
+        </button>
+      </div>
     );
   }
   return null;

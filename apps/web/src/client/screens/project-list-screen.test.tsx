@@ -21,7 +21,13 @@ describe("ProjectListScreen", () => {
   });
 
   it("shows empty state and navigates to create screen in one click", async () => {
-    vi.mocked(fetch).mockResolvedValue(buildJsonResponse({ projects: [] }));
+    vi.mocked(fetch).mockImplementation(async (input) =>
+      String(input) === "/api/billing/entitlement"
+        ? buildJsonResponse({
+            entitlement: { limits: { maxOwnedProjects: null } },
+          })
+        : buildJsonResponse({ projects: [] }),
+    );
 
     render(
       <MemoryRouter initialEntries={["/projects"]}>
@@ -40,7 +46,9 @@ describe("ProjectListScreen", () => {
       ).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole("link", { name: "プロジェクトを作成" }));
+    fireEvent.click(
+      await screen.findByRole("link", { name: "プロジェクトを作成" }),
+    );
 
     await waitFor(() => {
       expect(

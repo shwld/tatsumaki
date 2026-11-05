@@ -99,3 +99,27 @@ describe("OnboardingGate", () => {
     expect(screen.queryByText("app")).toBeNull();
   });
 });
+
+describe("OnboardingGate retry", () => {
+  it("retries loading the onboarding state after a failure", async () => {
+    let calls = 0;
+    mockFetch(() =>
+      ++calls === 1
+        ? new Response("boom", { status: 500 })
+        : Response.json({
+            completed: true,
+            email: null,
+            challenge: { kind: "disabled", siteKey: null },
+          }),
+    );
+    render(
+      <OnboardingGate>
+        <p>app</p>
+      </OnboardingGate>,
+    );
+    await userEvent.click(
+      await screen.findByRole("button", { name: "再試行" }),
+    );
+    expect(await screen.findByText("app")).toBeInTheDocument();
+  });
+});

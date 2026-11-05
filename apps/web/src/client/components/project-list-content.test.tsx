@@ -92,7 +92,7 @@ describe("ProjectListContent", () => {
           projects={[]}
           isLoading={false}
           error={null}
-          participateOnly
+          creation="denied"
         />
       </MemoryRouter>,
     );

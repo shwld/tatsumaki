@@ -16,7 +16,9 @@ export function ProjectListScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [projectsLoaded, setProjectsLoaded] = useState(false);
-  const [participateOnly, setParticipateOnly] = useState(false);
+  const [creation, setCreation] = useState<"allowed" | "denied" | "unknown">(
+    "unknown",
+  );
   const [forbidden, setForbidden] = useState<string | null>(null);
   const retryRequestRef = useRef<null | (() => Promise<void>)>(null);
 
@@ -79,7 +81,11 @@ export function ProjectListScreen() {
           entitlement?: { limits?: { maxOwnedProjects?: number | null } };
         };
         if (!ignore) {
-          setParticipateOnly(data.entitlement?.limits?.maxOwnedProjects === 0);
+          setCreation(
+            data.entitlement?.limits?.maxOwnedProjects === 0
+              ? "denied"
+              : "allowed",
+          );
         }
       })
       .catch(() => undefined);
@@ -111,7 +117,7 @@ export function ProjectListScreen() {
           <h1 className="text-2xl font-bold text-gray-900">
             {t("projectListScreen.title")}
           </h1>
-          {participateOnly ? null : (
+          {creation !== "allowed" ? null : (
             <Link
               className="text-sm font-medium text-blue-700"
               to="/projects/new"
@@ -125,7 +131,7 @@ export function ProjectListScreen() {
           isLoading={isLoading}
           error={error}
           onRetry={retryRequestRef.current ?? undefined}
-          participateOnly={participateOnly}
+          creation={creation}
         />
       </div>
     </main>
