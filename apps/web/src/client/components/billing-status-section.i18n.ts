@@ -21,6 +21,19 @@ export const billingStatusSectionJa = {
       unlimited: "上限なし",
       count: "{{count}} 件",
     },
+    actions: {
+      upgrade: "Pro にアップグレード",
+      manage: "支払いを管理",
+      resume: "支払いを再開",
+      upgradeComingSoon: "Pro プランは準備中です。",
+      error: "処理を開始できませんでした。時間をおいてもう一度お試しください。",
+    },
+    checkout: {
+      waiting: "お支払いの反映を確認しています...",
+      delayed:
+        "お支払いの反映に時間がかかっています。しばらくしてからこのページを再読み込みしてください。",
+      completed: "Pro プランへのアップグレードが完了しました。",
+    },
     validUntil: "期限",
     guidance: {
       freeActive:
@@ -59,6 +72,19 @@ export const billingStatusSectionEn = {
       label: "Projects you can own",
       unlimited: "Unlimited",
       count: "{{count}}",
+    },
+    actions: {
+      upgrade: "Upgrade to Pro",
+      manage: "Manage payment",
+      resume: "Resume payment",
+      upgradeComingSoon: "The Pro plan is coming soon.",
+      error: "Could not start the request. Please try again in a moment.",
+    },
+    checkout: {
+      waiting: "Confirming your payment...",
+      delayed:
+        "Your payment is taking longer than expected to apply. Please reload this page in a moment.",
+      completed: "Your upgrade to Pro is complete.",
     },
     validUntil: "Valid until",
     guidance: {

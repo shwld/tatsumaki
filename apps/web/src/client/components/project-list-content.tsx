@@ -46,6 +46,12 @@ export function ProjectListContent({
         <p className="mt-2 text-sm text-gray-600">
           {t("projectListContent.participateOnly.proGuidance")}
         </p>
+        <Link
+          className="mt-2 inline-block text-sm font-medium text-blue-700"
+          to="/account"
+        >
+          {t("projectListContent.participateOnly.upgradeAction")}
+        </Link>
         <p className="mt-2 text-sm text-gray-600">
           {t("projectListContent.participateOnly.inviteGuidance")}
         </p>

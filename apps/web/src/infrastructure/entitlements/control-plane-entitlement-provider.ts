@@ -4,7 +4,32 @@ import type { Entitlement } from "../../domain/entities/entitlement";
 
 export interface ControlPlaneRpc {
   getEntitlement(input: { billingAccountId: string }): Promise<unknown>;
+  createCheckoutSession(input: {
+    billingAccountId: string;
+    requestId: string;
+    successUrl: string;
+    cancelUrl: string;
+  }): Promise<unknown>;
+  createPortalSession(input: {
+    billingAccountId: string;
+    returnUrl: string;
+  }): Promise<unknown>;
 }
+
+const STRIPE_SESSION_HOSTS = new Set([
+  "checkout.stripe.com",
+  "billing.stripe.com",
+]);
+
+const sessionSchema = z.object({
+  url: z.url().refine((value) => {
+    const url = new URL(value);
+    return url.protocol === "https:" && STRIPE_SESSION_HOSTS.has(url.hostname);
+  }),
+});
+
+export const parseSessionResponse = (response: unknown): { url: string } =>
+  sessionSchema.parse(response);
 
 const entitlementSchema = z.object({
   billingAccountId: z.string().min(1),
@@ -22,7 +47,9 @@ const entitlementSchema = z.object({
 });
 
 export class ControlPlaneEntitlementProvider implements EntitlementProvider {
-  constructor(private readonly controlPlane: ControlPlaneRpc) {}
+  constructor(
+    private readonly controlPlane: Pick<ControlPlaneRpc, "getEntitlement">,
+  ) {}
 
   async getEntitlement(billingAccountId: string): Promise<Entitlement> {
     const response = await this.controlPlane.getEntitlement({

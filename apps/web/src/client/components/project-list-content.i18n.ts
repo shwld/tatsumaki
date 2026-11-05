@@ -11,6 +11,7 @@ export const projectListContentJa = {
       title: "参加しているプロジェクトがありません",
       proGuidance:
         "無料プランではプロジェクトを作成できません。プロジェクトを作成するには Pro プランが必要です。",
+      upgradeAction: "アカウントでプランを確認する",
       inviteGuidance:
         "既存のプロジェクトに参加するには、プロジェクトのオーナーに招待リンクの発行を依頼してください。受け取った招待リンクを開くと参加できます。",
     },
@@ -29,6 +30,7 @@ export const projectListContentEn = {
       title: "You have not joined any projects yet",
       proGuidance:
         "The free plan cannot create projects. Creating a project requires the Pro plan.",
+      upgradeAction: "View your plan in Account",
       inviteGuidance:
         "To join an existing project, ask its owner for an invitation link, then open the link you receive.",
     },

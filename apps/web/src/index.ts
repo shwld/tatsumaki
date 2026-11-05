@@ -61,6 +61,7 @@ export type Bindings = {
   PLANNING_POKER_DO: DurableObjectNamespace;
   CONTROL_PLANE?: ControlPlaneRpc;
   ENTITLEMENT_MODE?: string;
+  CHECKOUT_ENABLED?: string;
   TURNSTILE_SITE_KEY?: string;
   TURNSTILE_SECRET_KEY?: string;
 };

@@ -25,6 +25,7 @@ describe("billing entitlement route", () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
+      checkoutEnabled: false,
       entitlement: {
         billingAccountId: "github|self-hosted-user",
         plan: "unlimited",
@@ -35,5 +36,16 @@ describe("billing entitlement route", () => {
         cache: { maxAgeSeconds: 3600, staleIfErrorSeconds: 86400 },
       },
     });
+  });
+
+  it("rejects checkout and portal requests when no Control Plane is bound", async () => {
+    const headers = await createAuthHeaders({ sub: "github|self-hosted-user" });
+    for (const path of ["checkout", "portal"]) {
+      const response = await SELF.fetch(
+        `https://localhost/api/billing/${path}`,
+        { method: "POST", headers },
+      );
+      expect(response.status).toBe(409);
+    }
   });
 });

@@ -66,6 +66,8 @@ The non-secret **build/process** variables `CONTROL_PLANE_SERVICE`, `CLOUDFLARE_
 
 Onboarding uses Cloudflare Turnstile ([ADR-0011](../../../../docs/adr/adr-0011-open-registration-free-plan.md)). Set `TURNSTILE_SITE_KEY` as a Worker variable and `TURNSTILE_SECRET_KEY` as a Worker secret, and allow `challenges.cloudflare.com` for the widget (the app already sends the matching CSP). With `ENTITLEMENT_MODE=control-plane`, onboarding is refused until both are set. Self-hosted deployments without `ENTITLEMENT_MODE` may leave them unset and skip the challenge.
 
+The account screen shows the Pro upgrade button only when the Worker variable `CHECKOUT_ENABLED="true"` is set together with `ENTITLEMENT_MODE=control-plane`; enable it only after the Control Plane has its own `CHECKOUT_ENABLED` turned on per its runbook. Checkout and Portal redirect URLs use the request origin, which must equal the Control Plane `HOSTED_APP_ORIGIN`.
+
 For official production, select `tatsumaki-control-plane-production`; never select the staging backend. In Cloudflare Workers Builds for the production app, add all three variables under **Build variables and secrets**, using the IDs of the existing production D1 database and OAuth KV namespace. Keep using the package deploy commands. A direct `wrangler deploy` bypasses this selection. Runtime dashboard Variables alone do not configure the build. Do not enable production build variables for unrelated preview branches. Never commit these account-specific IDs.
 
 From the repository root, build and inspect without remote migration or deployment:

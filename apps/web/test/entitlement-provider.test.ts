@@ -78,7 +78,11 @@ describe("createEntitlementProvider", () => {
       createEntitlementProvider({
         ...bindings,
         ENTITLEMENT_MODE: "control-plane",
-        CONTROL_PLANE: { getEntitlement: vi.fn() },
+        CONTROL_PLANE: {
+          getEntitlement: vi.fn(),
+          createCheckoutSession: vi.fn(),
+          createPortalSession: vi.fn(),
+        },
       }),
     ).toBeInstanceOf(ControlPlaneEntitlementProvider);
   });
