@@ -84,4 +84,23 @@ describe("ProjectListContent", () => {
       screen.getByText("スプリント期間: 14日間（2週間）"),
     ).toBeInTheDocument();
   });
+
+  it("explains Pro and how to get invited for participate-only users", () => {
+    render(
+      <MemoryRouter>
+        <ProjectListContent
+          projects={[]}
+          isLoading={false}
+          error={null}
+          creation="denied"
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText(/Pro プランが必要/)).toBeInTheDocument();
+    expect(screen.getByText(/招待リンクの発行を依頼/)).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "プロジェクトを作成" }),
+    ).toBeNull();
+  });
 });

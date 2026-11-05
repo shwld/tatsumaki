@@ -35,6 +35,10 @@ import {
 } from "../screens/artifact-screens.i18n";
 import { loginScreenEn, loginScreenJa } from "../screens/login-screen.i18n";
 import {
+  onboardingScreenEn,
+  onboardingScreenJa,
+} from "../screens/onboarding-screen.i18n";
+import {
   projectCreateScreenEn,
   projectCreateScreenJa,
 } from "../screens/project-create-screen.i18n";
@@ -82,6 +86,7 @@ i18n.use(initReactI18next).init({
         ...actorLabelJa,
         ...projectNavJa,
         ...loginScreenJa,
+        ...onboardingScreenJa,
         ...projectListScreenJa,
         ...projectListContentJa,
         ...projectListItemJa,
@@ -105,6 +110,7 @@ i18n.use(initReactI18next).init({
         ...actorLabelEn,
         ...projectNavEn,
         ...loginScreenEn,
+        ...onboardingScreenEn,
         ...projectListScreenEn,
         ...projectListContentEn,
         ...projectListItemEn,

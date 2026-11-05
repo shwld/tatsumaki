@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Navigate, Route, Routes, useNavigate } from "react-router";
 
 import { Layout } from "./components/layout";
+import { OnboardingGate } from "./components/onboarding-gate";
 import { AuthErrorProvider } from "./contexts/auth-error-context";
 import { ToastProvider } from "./contexts/toast-context";
 import { popReturnTo } from "./lib/api-error";
@@ -53,105 +54,107 @@ export function App() {
           <AuthErrorProvider>
             <ToastProvider>
               <ReturnToRedirect />
-              <Layout>
-                <Routes>
-                  <Route
-                    path="/invite"
-                    element={<SingleUseInvitationAcceptScreen />}
-                  />
-                  <Route
-                    path="/projects/new"
-                    element={<ProjectCreateScreen />}
-                  />
-                  <Route path="/projects" element={<ProjectListScreen />} />
-                  <Route
-                    path="/projects/:projectId/members"
-                    element={<ProjectMembersScreen />}
-                  />
-                  <Route
-                    path="/projects/:projectId/invitations/:invitationId/accept"
-                    element={<ProjectInvitationAcceptScreen />}
-                  />
-                  <Route
-                    path="/projects/:projectId/settings"
-                    element={<ProjectSettingsScreen />}
-                  />
-                  <Route
-                    path="/projects/:projectId/api-keys"
-                    element={<ProjectApiKeysScreen />}
-                  />
-                  <Route
-                    path="/projects/:projectId/velocity"
-                    element={<ProjectVelocityScreen />}
-                  />{" "}
-                  <Route
-                    path="/projects/:projectId/history"
-                    element={<ProjectHistoryScreen />}
-                  />
-                  <Route
-                    path="/projects/:projectId/artifacts"
-                    element={<ArtifactListScreen />}
-                  />
-                  <Route
-                    path="/projects/:projectId/artifacts/:artifactId"
-                    element={<ArtifactDetailScreen />}
-                  />
-                  <Route
-                    path="/projects/:projectId/artifacts/:artifactId/versions/:version"
-                    element={<ArtifactDetailScreen />}
-                  />
-                  <Route path="/account" element={<AccountScreen />} />
-                  <Route
-                    path="/projects/:projectId/stories"
-                    element={<StoryMultiPanelScreen />}
-                  />
-                  <Route
-                    path="/projects/:projectId/stories/:storyNumber"
-                    element={<StoryDetailScreen />}
-                  />
-                  <Route
-                    path="/projects/:projectId/planning-poker"
-                    element={<NotFoundScreen />}
-                  />
-                  <Route
-                    path="/projects/:projectId/stories/new"
-                    element={<Navigate to=".." replace />}
-                  />
-                  <Route
-                    path="/projects/:projectId/stories/:storyNumber/edit"
-                    element={<StoryEditScreen />}
-                  />
-                  {/* Legacy redirects — single-line for lint-screenshot-coverage */}
-                  <Route
-                    path="/projects/:projectId/stories/panels"
-                    element={<Navigate to=".." replace />}
-                  />
-                  <Route
-                    path="/projects/:projectId/stories/backlog"
-                    element={<Navigate to=".." replace />}
-                  />
-                  <Route
-                    path="/projects/:projectId/stories/board"
-                    element={<Navigate to=".." replace />}
-                  />
-                  <Route
-                    path="/my-work"
-                    element={<Navigate to="/projects" replace />}
-                  />
-                  <Route
-                    path="/stories/*"
-                    element={<Navigate to="/projects" replace />}
-                  />
-                  <Route
-                    path="/"
-                    element={<Navigate to="/projects" replace />}
-                  />
-                  <Route
-                    path="*"
-                    element={<Navigate to="/projects" replace />}
-                  />
-                </Routes>
-              </Layout>
+              <OnboardingGate>
+                <Layout>
+                  <Routes>
+                    <Route
+                      path="/invite"
+                      element={<SingleUseInvitationAcceptScreen />}
+                    />
+                    <Route
+                      path="/projects/new"
+                      element={<ProjectCreateScreen />}
+                    />
+                    <Route path="/projects" element={<ProjectListScreen />} />
+                    <Route
+                      path="/projects/:projectId/members"
+                      element={<ProjectMembersScreen />}
+                    />
+                    <Route
+                      path="/projects/:projectId/invitations/:invitationId/accept"
+                      element={<ProjectInvitationAcceptScreen />}
+                    />
+                    <Route
+                      path="/projects/:projectId/settings"
+                      element={<ProjectSettingsScreen />}
+                    />
+                    <Route
+                      path="/projects/:projectId/api-keys"
+                      element={<ProjectApiKeysScreen />}
+                    />
+                    <Route
+                      path="/projects/:projectId/velocity"
+                      element={<ProjectVelocityScreen />}
+                    />{" "}
+                    <Route
+                      path="/projects/:projectId/history"
+                      element={<ProjectHistoryScreen />}
+                    />
+                    <Route
+                      path="/projects/:projectId/artifacts"
+                      element={<ArtifactListScreen />}
+                    />
+                    <Route
+                      path="/projects/:projectId/artifacts/:artifactId"
+                      element={<ArtifactDetailScreen />}
+                    />
+                    <Route
+                      path="/projects/:projectId/artifacts/:artifactId/versions/:version"
+                      element={<ArtifactDetailScreen />}
+                    />
+                    <Route path="/account" element={<AccountScreen />} />
+                    <Route
+                      path="/projects/:projectId/stories"
+                      element={<StoryMultiPanelScreen />}
+                    />
+                    <Route
+                      path="/projects/:projectId/stories/:storyNumber"
+                      element={<StoryDetailScreen />}
+                    />
+                    <Route
+                      path="/projects/:projectId/planning-poker"
+                      element={<NotFoundScreen />}
+                    />
+                    <Route
+                      path="/projects/:projectId/stories/new"
+                      element={<Navigate to=".." replace />}
+                    />
+                    <Route
+                      path="/projects/:projectId/stories/:storyNumber/edit"
+                      element={<StoryEditScreen />}
+                    />
+                    {/* Legacy redirects — single-line for lint-screenshot-coverage */}
+                    <Route
+                      path="/projects/:projectId/stories/panels"
+                      element={<Navigate to=".." replace />}
+                    />
+                    <Route
+                      path="/projects/:projectId/stories/backlog"
+                      element={<Navigate to=".." replace />}
+                    />
+                    <Route
+                      path="/projects/:projectId/stories/board"
+                      element={<Navigate to=".." replace />}
+                    />
+                    <Route
+                      path="/my-work"
+                      element={<Navigate to="/projects" replace />}
+                    />
+                    <Route
+                      path="/stories/*"
+                      element={<Navigate to="/projects" replace />}
+                    />
+                    <Route
+                      path="/"
+                      element={<Navigate to="/projects" replace />}
+                    />
+                    <Route
+                      path="*"
+                      element={<Navigate to="/projects" replace />}
+                    />
+                  </Routes>
+                </Layout>
+              </OnboardingGate>
             </ToastProvider>
           </AuthErrorProvider>
         }

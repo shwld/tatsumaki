@@ -21,7 +21,13 @@ describe("ProjectListScreen", () => {
   });
 
   it("shows empty state and navigates to create screen in one click", async () => {
-    vi.mocked(fetch).mockResolvedValue(buildJsonResponse({ projects: [] }));
+    vi.mocked(fetch).mockImplementation(async (input) =>
+      String(input) === "/api/billing/entitlement"
+        ? buildJsonResponse({
+            entitlement: { limits: { maxOwnedProjects: null } },
+          })
+        : buildJsonResponse({ projects: [] }),
+    );
 
     render(
       <MemoryRouter initialEntries={["/projects"]}>
@@ -40,7 +46,9 @@ describe("ProjectListScreen", () => {
       ).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole("link", { name: "プロジェクトを作成" }));
+    fireEvent.click(
+      await screen.findByRole("link", { name: "プロジェクトを作成" }),
+    );
 
     await waitFor(() => {
       expect(
@@ -83,7 +91,12 @@ describe("ProjectListScreen", () => {
           403,
         ),
       )
-      .mockResolvedValueOnce(buildJsonResponse({ projects: [] }));
+      .mockResolvedValueOnce(buildJsonResponse({ projects: [] }))
+      .mockResolvedValueOnce(
+        buildJsonResponse({
+          entitlement: { limits: { maxOwnedProjects: null } },
+        }),
+      );
 
     render(
       <MemoryRouter initialEntries={["/projects"]}>
@@ -122,7 +135,7 @@ describe("ProjectListScreen", () => {
         screen.getByText("プロジェクトがまだありません"),
       ).toBeInTheDocument();
     });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it("shows retry button on 500 error and recovers after retry", async () => {
@@ -134,6 +147,11 @@ describe("ProjectListScreen", () => {
       .mockResolvedValueOnce(
         buildJsonResponse({
           projects: [{ id: "p1", name: "My Project", sprintDurationDays: 14 }],
+        }),
+      )
+      .mockResolvedValueOnce(
+        buildJsonResponse({
+          entitlement: { limits: { maxOwnedProjects: null } },
         }),
       );
 
@@ -159,7 +177,7 @@ describe("ProjectListScreen", () => {
     await waitFor(() => {
       expect(screen.getByText("My Project")).toBeInTheDocument();
     });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
   });
 
   it("shows retry button on network error and recovers after retry", async () => {
@@ -169,6 +187,11 @@ describe("ProjectListScreen", () => {
       .mockResolvedValueOnce(
         buildJsonResponse({
           projects: [{ id: "p1", name: "My Project", sprintDurationDays: 14 }],
+        }),
+      )
+      .mockResolvedValueOnce(
+        buildJsonResponse({
+          entitlement: { limits: { maxOwnedProjects: null } },
         }),
       );
 
@@ -194,6 +217,6 @@ describe("ProjectListScreen", () => {
     await waitFor(() => {
       expect(screen.getByText("My Project")).toBeInTheDocument();
     });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
   });
 });

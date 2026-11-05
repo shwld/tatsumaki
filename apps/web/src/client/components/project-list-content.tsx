@@ -9,6 +9,7 @@ type ProjectListContentProps = {
   isLoading: boolean;
   error: string | null;
   onRetry?: () => Promise<void>;
+  creation?: "allowed" | "denied" | "unknown";
 };
 
 export function ProjectListContent({
@@ -16,6 +17,7 @@ export function ProjectListContent({
   isLoading,
   error,
   onRetry,
+  creation = "allowed",
 }: ProjectListContentProps) {
   const { t } = useTranslation();
 
@@ -35,6 +37,22 @@ export function ProjectListContent({
     );
   }
 
+  if (projects.length === 0 && creation === "denied") {
+    return (
+      <div className="mt-6 rounded-lg border border-dashed border-gray-300 bg-gray-50 p-5 text-center sm:p-6">
+        <p className="text-base font-medium text-gray-900">
+          {t("projectListContent.participateOnly.title")}
+        </p>
+        <p className="mt-2 text-sm text-gray-600">
+          {t("projectListContent.participateOnly.proGuidance")}
+        </p>
+        <p className="mt-2 text-sm text-gray-600">
+          {t("projectListContent.participateOnly.inviteGuidance")}
+        </p>
+      </div>
+    );
+  }
+
   if (projects.length === 0) {
     return (
       <div className="mt-6 rounded-lg border border-dashed border-gray-300 bg-gray-50 p-5 text-center sm:p-6">
@@ -44,12 +62,14 @@ export function ProjectListContent({
         <p className="mt-2 text-sm text-gray-600">
           {t("projectListContent.empty.description")}
         </p>
-        <Link
-          className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-md bg-blue-700 px-4 py-3 text-base font-semibold text-white transition hover:bg-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 sm:w-auto"
-          to="/projects/new"
-        >
-          {t("projectListContent.empty.action")}
-        </Link>
+        {creation === "allowed" ? (
+          <Link
+            className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-md bg-blue-700 px-4 py-3 text-base font-semibold text-white transition hover:bg-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 sm:w-auto"
+            to="/projects/new"
+          >
+            {t("projectListContent.empty.action")}
+          </Link>
+        ) : null}
       </div>
     );
   }
