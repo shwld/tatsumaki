@@ -81,7 +81,9 @@ export function BillingStatusSection() {
           return;
         }
         setPollTimedOut(returnedFromCheckout);
-        setState({ status: "unavailable" });
+        setState((previous) =>
+          previous.status === "ready" ? previous : { status: "unavailable" },
+        );
         return;
       }
       setState({ status: "ready", ...result });

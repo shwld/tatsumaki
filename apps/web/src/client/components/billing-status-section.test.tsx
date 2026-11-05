@@ -185,4 +185,20 @@ describe("BillingStatusSection actions", () => {
       await screen.findByText("Pro プランへのアップグレードが完了しました。"),
     ).toBeVisible();
   });
+
+  it("keeps the last entitlement when the final poll fails", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(
+        json({ entitlement: entitlement(), checkoutEnabled: true }),
+      )
+      .mockResolvedValue(json({ error: "x" }, 503));
+    renderSection("/account?checkout=success");
+
+    await screen.findByText("お支払いの反映を確認しています...");
+    await vi.advanceTimersByTimeAsync(2000 * 15);
+
+    expect(await screen.findByText(/反映に時間がかかっています/)).toBeVisible();
+    expect(screen.getByText("Free")).toBeVisible();
+  });
 });
