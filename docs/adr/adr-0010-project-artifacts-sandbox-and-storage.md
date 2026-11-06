@@ -52,7 +52,7 @@ story #302 は、CLI で登録した build 済み directory を project 配下�
 
 ### 4. Execution sandbox と content serving
 
-**採用: opaque origin sandbox（別 origin 配信は採用しない）**
+**採用: opaque origin sandbox（別 origin 配信は採用しない）** — 2026-11-06 に別 site 配信を [ADR-0012](adr-0012-artifact-content-separate-site.md) で採用した。本節は `ARTIFACT_CONTENT_ORIGIN` 未設定の self-hosting の既定として有効のまま。
 
 - Web は `<iframe sandbox="allow-scripts" referrerpolicy="no-referrer" src="/artifact-content/:token/<entrypoint>">` で表示する。`allow-same-origin` は併用しない（lint/test で固定）。
 - content route は **すべての response** に以下を付与する。
@@ -199,3 +199,7 @@ README の R2 bucket 記述、setup script（3 つ目の bucket、`ARTIFACT_CONT
 - https://developers.cloudflare.com/workers/platform/limits/
 - https://developers.cloudflare.com/r2/platform/limits/
 - https://developers.cloudflare.com/workers/examples/security-headers/
+
+### 2026-11-06 (story #329)
+
+- §4 の「別 origin を採用しない」は [ADR-0012](adr-0012-artifact-content-separate-site.md) で改訂した。別 site 配信を設定した環境では本体 host の `/artifact-content/*` を 404 とし、Access bypass を作らない。公式ホスト版は未設定なら preview を無効にする。
