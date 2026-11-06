@@ -502,7 +502,14 @@ export async function setupCloudflare(
           env: wranglerEnv,
         },
       );
-      log(`Ready: https://${workerDomain}`);
+      const readyHost =
+        contentDomain && customDomain ? customDomain : workerDomain;
+      log(`Ready: https://${readyHost}`);
+      if (contentDomain && customDomain) {
+        log(
+          `Artifact previews work only on https://${customDomain}; they are blocked on https://${workerDomain}.`,
+        );
+      }
     } finally {
       await rm(temporaryDirectory, { recursive: true, force: true });
     }
