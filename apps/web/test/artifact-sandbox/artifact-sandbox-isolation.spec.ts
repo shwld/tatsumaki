@@ -155,7 +155,7 @@ async function openFreshProbe(
 ): Promise<Frame> {
   const token = await issuePreviewToken(projectId, artifactId, 1);
   await page.goto(
-    parentUrl({ src: token.contentPath, sandbox: "allow-scripts" }),
+    parentUrl({ src: token.contentUrl, sandbox: "allow-scripts" }),
   );
   await page.waitForFunction(() => document.querySelector("iframe") !== null);
   const frame = sandboxedFrame(page);
@@ -240,7 +240,7 @@ test.describe("artifact isolation in a real browser", () => {
 
     const token = await issuePreviewToken(projectId, artifactId, 1);
     await page.goto(
-      parentUrl({ src: token.contentPath, sandbox: "allow-scripts" }),
+      parentUrl({ src: token.contentUrl, sandbox: "allow-scripts" }),
     );
     const frame = await waitForProbe(page);
 
@@ -438,7 +438,7 @@ test.describe("artifact isolation in a real browser", () => {
     const { canaryHits } = await installParentRoutes(page);
     const token = await issuePreviewToken(projectId, artifactId, 1);
     await page.goto(
-      parentUrl({ src: token.contentPath, sandbox: "allow-scripts" }),
+      parentUrl({ src: token.contentUrl, sandbox: "allow-scripts" }),
     );
     const frame = await waitForProbe(page);
     await frame.evaluate(
@@ -481,7 +481,7 @@ test.describe("artifact isolation in a real browser", () => {
     await installParentRoutes(page);
     const token = await issuePreviewToken(projectId, artifactId, 1);
     await page.goto(
-      parentUrl({ src: token.contentPath, sandbox: "allow-scripts" }),
+      parentUrl({ src: token.contentUrl, sandbox: "allow-scripts" }),
     );
     await waitForProbe(page);
 

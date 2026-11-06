@@ -26,6 +26,10 @@ import { onboardingRoute } from "./presentation/routes/onboarding";
 import { billingRoute } from "./presentation/routes/billing";
 import { invitationLinksRoute } from "./presentation/routes/invitation-links";
 import { artifactContentRoute } from "./presentation/routes/artifact-content/routes";
+import {
+  resolveSpaContentOrigin,
+  routeByContentHost,
+} from "./presentation/artifact-content-host";
 import { artifactPreviewTokenRoute } from "./presentation/routes/artifacts/preview-token";
 import { createArtifactReadRoutes } from "./presentation/routes/artifacts/routes";
 import { isRateLimited } from "./presentation/rate-limit";
@@ -55,6 +59,7 @@ export type Bindings = {
   ARTIFACT_CONTENT_SIGNING_KEY?: string;
   ARTIFACT_CONTENT_SIGNING_KEY_PREVIOUS?: string;
   ARTIFACT_CONTENT_ORIGIN?: string;
+  ARTIFACT_APP_ORIGIN?: string;
   OAUTH_KV?: KVNamespace;
   ACCESS_AUD?: string;
   ACCESS_TEAM_DOMAIN?: string;
@@ -150,7 +155,10 @@ async function serveSpaIndex(c: Context<Env>) {
     status: response.status,
     headers: {
       ...Object.fromEntries(response.headers),
-      ...spaIndexHeaders(new URL(c.req.url).origin),
+      ...spaIndexHeaders(
+        new URL(c.req.url).origin,
+        resolveSpaContentOrigin(c.env),
+      ),
     },
   });
 }
@@ -274,6 +282,9 @@ function isMcpOAuthEnabled(env: Bindings): env is OAuthBindings {
 
 export default {
   async fetch(request: Request, env: Bindings, ctx: ExecutionContext) {
+    const contentHostResponse = routeByContentHost(request, env, ctx);
+    if (contentHostResponse) return contentHostResponse;
+
     if (!isMcpOAuthEnabled(env)) {
       return app.fetch(request, env, ctx);
     }

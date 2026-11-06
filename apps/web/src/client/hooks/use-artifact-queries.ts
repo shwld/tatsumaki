@@ -134,7 +134,7 @@ export function useIssuePreviewToken(
         );
       }
       const body = (await response.json()) as ArtifactPreviewToken;
-      return { expiresAt: body.expiresAt, contentPath: body.contentPath };
+      return { expiresAt: body.expiresAt, contentUrl: body.contentUrl };
     },
   });
 }

@@ -5,7 +5,7 @@ import { D1ArtifactRepository } from "../../../infrastructure/db/repositories/d1
 import type { Env } from "../../../index";
 import { ARTIFACT_CONTENT_PATH_PREFIX } from "../artifact-content/routes";
 import { requireArtifactAccess } from "./access";
-import { isArtifactPreviewEnabled } from "./preview-policy";
+import { resolveArtifactContentConfig } from "./preview-policy";
 import { artifactErrorResponse } from "./responses";
 import { signingKeysFrom } from "./signing-keys";
 
@@ -18,7 +18,8 @@ export const artifactPreviewTokenRoute = new Hono<Env>();
 artifactPreviewTokenRoute.post(
   "/projects/:projectId/artifacts/:artifactId/versions/:version/preview-token",
   async (c) => {
-    if (!isArtifactPreviewEnabled(c.env, c.req.url)) {
+    const config = resolveArtifactContentConfig(c.env);
+    if (config.mode === "disabled") {
       return c.json(
         {
           error: "Artifact preview is not available in this environment",
@@ -64,13 +65,19 @@ artifactPreviewTokenRoute.post(
     if (result.isErr()) return artifactErrorResponse(c, result.error);
 
     const { token, expiresAt, entrypoint } = result.value;
+    const contentPath = `${ARTIFACT_CONTENT_PATH_PREFIX}${token}/${entrypoint
+      .split("/")
+      .map(encodeURIComponent)
+      .join("/")}`;
+    const contentOrigin =
+      config.mode === "split"
+        ? config.contentOrigin
+        : new URL(c.req.url).origin;
     return c.json({
       token,
       expiresAt: expiresAt.toISOString(),
-      contentPath: `${ARTIFACT_CONTENT_PATH_PREFIX}${token}/${entrypoint
-        .split("/")
-        .map(encodeURIComponent)
-        .join("/")}`,
+      contentPath,
+      contentUrl: `${contentOrigin}${contentPath}`,
     });
   },
 );

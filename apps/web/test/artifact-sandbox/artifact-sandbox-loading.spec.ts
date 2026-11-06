@@ -32,14 +32,17 @@ test.describe("a published site in the sandboxed preview", () => {
     const metadata = await recordFetchMetadata(context, page);
     const failed: string[] = [];
     const consoleErrors: string[] = [];
-    page.on("requestfailed", (request) => failed.push(request.url()));
+    page.on("requestfailed", (request) => {
+      if (request.failure()?.errorText !== "net::ERR_ABORTED")
+        failed.push(request.url());
+    });
     page.on("console", (message) => {
       if (message.type() === "error") consoleErrors.push(message.text());
     });
 
     const token = await issuePreviewToken(projectId, artifactId, 1);
     await page.goto(
-      parentUrl({ src: token.contentPath, sandbox: "allow-scripts" }),
+      parentUrl({ src: token.contentUrl, sandbox: "allow-scripts" }),
     );
 
     const frame = page.frameLocator("#artifact-frame");
@@ -58,11 +61,13 @@ test.describe("a published site in the sandboxed preview", () => {
     // What the content route receives for each kind of request. This is the
     // evidence for the Fetch Metadata rule in ADR-0010: the sandboxed document
     // is an opaque origin, so its subresources are cross-site while the
-    // iframe navigation itself comes from the (same-origin) embedding page.
+    // iframe navigation itself comes from the embedding page, which is on
+    // another site than the content (ADR-0012).
+    await expect.poll(() => metadata.byFile().has("helper.js")).toBe(true);
     const observed = metadata.byFile();
     expect(observed.get("index.html")).toMatchObject({
       dest: "iframe",
-      site: "same-origin",
+      site: "cross-site",
     });
     for (const [file, dest, mode] of [
       ["classic.js", "script", "no-cors"],
@@ -103,7 +108,7 @@ test.describe("a published site in the sandboxed preview", () => {
     });
     const token = await issuePreviewToken(projectId, artifactId, 1);
     await page.goto(
-      parentUrl({ src: token.contentPath, sandbox: "allow-scripts" }),
+      parentUrl({ src: token.contentUrl, sandbox: "allow-scripts" }),
     );
     await expect(
       page.frameLocator("#artifact-frame").locator("html"),
@@ -144,7 +149,7 @@ test.describe("a published site in the sandboxed preview", () => {
 
     const v1 = await issuePreviewToken(projectId, artifactId, 1);
     await page.goto(
-      parentUrl({ src: v1.contentPath, sandbox: "allow-scripts" }),
+      parentUrl({ src: v1.contentUrl, sandbox: "allow-scripts" }),
     );
     await expect(
       page.frameLocator("#artifact-frame").locator("#styled"),
@@ -152,7 +157,7 @@ test.describe("a published site in the sandboxed preview", () => {
 
     const v2 = await issuePreviewToken(projectId, artifactId, 2);
     await page.goto(
-      parentUrl({ src: v2.contentPath, sandbox: "allow-scripts" }),
+      parentUrl({ src: v2.contentUrl, sandbox: "allow-scripts" }),
     );
     await expect(
       page.frameLocator("#artifact-frame").locator("#styled"),

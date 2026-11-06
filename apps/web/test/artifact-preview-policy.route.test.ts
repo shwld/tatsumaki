@@ -5,9 +5,11 @@ import type { Bindings, Env } from "../src/index";
 import type { CurrentUser } from "../src/presentation/middleware/access-auth";
 import { artifactContentRoute } from "../src/presentation/routes/artifact-content/routes";
 import { artifactPreviewTokenRoute } from "../src/presentation/routes/artifacts/preview-token";
+import { routeByContentHost } from "../src/presentation/artifact-content-host";
 import {
   isArtifactPreviewEnabled,
   isValidArtifactContentOrigin,
+  resolveArtifactContentConfig,
 } from "../src/presentation/routes/artifacts/preview-policy";
 
 const APP = "https://tatsumaki.example";
@@ -67,6 +69,11 @@ describe("isValidArtifactContentOrigin", () => {
   });
 });
 
+const SPLIT = {
+  ARTIFACT_APP_ORIGIN: APP,
+  ARTIFACT_CONTENT_ORIGIN: "https://content.example",
+};
+
 describe("artifact preview fail-closed (ADR-0012 §5)", () => {
   it("disables preview on the official host without a content origin", async () => {
     const response = await requestToken({ ENTITLEMENT_MODE: "control-plane" });
@@ -79,11 +86,28 @@ describe("artifact preview fail-closed (ADR-0012 §5)", () => {
     expect(content.status).toBe(404);
   });
 
-  it("disables preview when the content origin is invalid", async () => {
+  it.each([
+    [
+      "a subdomain of the app",
+      { ARTIFACT_CONTENT_ORIGIN: "https://content.tatsumaki.example" },
+    ],
+    [
+      "a missing app origin",
+      {
+        ARTIFACT_APP_ORIGIN: undefined,
+        ARTIFACT_CONTENT_ORIGIN: "https://content.example",
+      },
+    ],
+    [
+      "an http content origin",
+      { ...SPLIT, ARTIFACT_CONTENT_ORIGIN: "http://content.example" },
+    ],
+  ])("disables preview for %s in every mode", async (_name, vars) => {
     for (const mode of [undefined, "control-plane"]) {
       const response = await requestToken({
         ENTITLEMENT_MODE: mode,
-        ARTIFACT_CONTENT_ORIGIN: "https://content.tatsumaki.example",
+        ARTIFACT_APP_ORIGIN: APP,
+        ...vars,
       });
       expect(await response.json()).toMatchObject({
         code: "ARTIFACT_PREVIEW_DISABLED",
@@ -92,22 +116,91 @@ describe("artifact preview fail-closed (ADR-0012 §5)", () => {
   });
 
   it("keeps the self-hosting behavior when unset", async () => {
-    expect(isArtifactPreviewEnabled({}, APP)).toBe(true);
+    expect(isArtifactPreviewEnabled({})).toBe(true);
     const response = await requestToken({ ENTITLEMENT_MODE: undefined });
     expect(await response.json()).not.toMatchObject({
       code: "ARTIFACT_PREVIEW_DISABLED",
     });
   });
 
-  it("enables preview on the official host with a valid content origin", async () => {
+  it("enables preview on the official host with valid origins", () => {
     expect(
-      isArtifactPreviewEnabled(
-        {
-          ENTITLEMENT_MODE: "control-plane",
-          ARTIFACT_CONTENT_ORIGIN: "https://content.example",
-        },
-        APP,
-      ),
+      isArtifactPreviewEnabled({ ENTITLEMENT_MODE: "control-plane", ...SPLIT }),
     ).toBe(true);
+  });
+});
+
+describe("resolveArtifactContentConfig", () => {
+  it("allows plain http only for loopback hosts", () => {
+    expect(
+      resolveArtifactContentConfig({
+        ARTIFACT_APP_ORIGIN: "http://127.0.0.1:8788",
+        ARTIFACT_CONTENT_ORIGIN: "http://localhost:8788",
+      }),
+    ).toEqual({
+      mode: "split",
+      appOrigin: "http://127.0.0.1:8788",
+      contentOrigin: "http://localhost:8788",
+    });
+  });
+});
+
+describe("content host routing (ADR-0012 §2)", () => {
+  const ctx = { waitUntil() {}, passThroughOnException() {} } as never;
+  const route = (url: string, overrides: Partial<Bindings>) =>
+    routeByContentHost(new Request(url), bindings(overrides), ctx);
+
+  it("serves nothing but /artifact-content/ on the content host", async () => {
+    for (const path of [
+      "/",
+      "/api/projects",
+      "/login",
+      "/oauth/token",
+      "/assets/x.js",
+    ]) {
+      const response = await route(`https://content.example${path}`, SPLIT);
+      expect(response?.status).toBe(404);
+      expect(response?.headers.get("set-cookie")).toBeNull();
+    }
+  });
+
+  it("does not hand the content host to the app (no SPA, auth or session)", async () => {
+    const response = await route(
+      "https://content.example/artifact-content/bad/index.html",
+      SPLIT,
+    );
+    expect(response?.status).toBe(404);
+    expect(response?.headers.get("content-security-policy")).toContain(
+      `frame-ancestors ${APP}`,
+    );
+  });
+
+  it("returns 404 for /artifact-content/ on the app host", async () => {
+    const response = await route(`${APP}/artifact-content/t/index.html`, SPLIT);
+    expect(response?.status).toBe(404);
+  });
+
+  it("leaves other app host paths to the app", () => {
+    expect(route(`${APP}/api/projects`, SPLIT)).toBeNull();
+  });
+
+  it("changes nothing when unset", () => {
+    expect(route(`${APP}/artifact-content/t/index.html`, {})).toBeNull();
+    expect(route("https://content.example/", {})).toBeNull();
+  });
+
+  it("ignores cookies and never sets one on the content host", async () => {
+    const response = await routeByContentHost(
+      new Request("https://content.example/artifact-content/bad/index.html", {
+        headers: {
+          Cookie: "CF_Authorization=secret",
+          "Sec-Fetch-Dest": "iframe",
+        },
+      }),
+      bindings(SPLIT),
+      ctx,
+    );
+    expect(response?.status).toBe(404);
+    expect(response?.headers.get("set-cookie")).toBeNull();
   });
 });

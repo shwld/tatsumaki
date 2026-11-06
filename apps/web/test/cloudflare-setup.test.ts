@@ -254,6 +254,86 @@ describe("Cloudflare self-hosting setup", () => {
     );
   });
 
+  it("attaches the content domain and skips the Access bypass (ADR-0012)", async () => {
+    const calls: Array<{ url: string; method: string; body?: unknown }> = [];
+    const responses = [
+      envelope([]),
+      envelope({ uuid: "d1-id", name: "tatsumaki-db" }),
+      envelope([]),
+      envelope({ id: "kv-id", title: "tatsumaki-oauth-kv" }),
+      envelope({ buckets: [] }),
+      envelope({ id: "story-r2", name: "tatsumaki-story-attachments" }),
+      envelope({ buckets: [] }),
+      envelope({ id: "avatars-r2", name: "tatsumaki-user-avatars" }),
+      envelope({ buckets: [] }),
+      envelope({ id: "artifacts-r2", name: "tatsumaki-artifacts" }),
+      envelope({ subdomain: "account-subdomain" }),
+      envelope([{ id: "worker-id", name: "tatsumaki" }]),
+      envelope([]),
+      envelope({ id: "app-id", name: "tatsumaki", aud: "access-aud" }),
+      envelope([]),
+      envelope({ id: "policy-id", name: "tatsumaki allowed users" }),
+      // zone lookup: the full host has no zone, its parent does
+      envelope([]),
+      envelope([{ id: "zone-id", name: "content.example" }]),
+      envelope({}),
+    ];
+    const fetchMock = vi.fn(
+      async (input: string | URL | Request, init?: RequestInit) => {
+        calls.push({
+          url: input.toString(),
+          method: init?.method ?? "GET",
+          body:
+            typeof init?.body === "string" ? JSON.parse(init.body) : undefined,
+        });
+        const response = responses.shift();
+        if (!response) throw new Error("Unexpected request");
+        return new Response(JSON.stringify(response), { status: 200 });
+      },
+    );
+    let generatedSecrets = "";
+    await setupCloudflare(
+      { ...baseOptions, contentDomain: "app.content.example" },
+      {
+        fetch: fetchMock as typeof fetch,
+        runCommand: async (command) => {
+          if (command.includes("bulk"))
+            generatedSecrets = await readFile(command[5], "utf8");
+        },
+        log: () => undefined,
+      },
+    );
+
+    expect(responses).toHaveLength(0);
+    expect(calls.some((call) => call.url.includes("artifact content"))).toBe(
+      false,
+    );
+    expect(calls.at(-1)).toMatchObject({
+      method: "PUT",
+      url: expect.stringContaining("/workers/domains"),
+      body: {
+        environment: "production",
+        hostname: "app.content.example",
+        service: "tatsumaki",
+        zone_id: "zone-id",
+      },
+    });
+    expect(JSON.parse(generatedSecrets)).toMatchObject({
+      ARTIFACT_CONTENT_ORIGIN: "https://app.content.example",
+      ARTIFACT_APP_ORIGIN: "https://tatsumaki.account-subdomain.workers.dev",
+    });
+  });
+
+  it("rejects a content domain on the same site as the custom domain", () => {
+    expect(() =>
+      validateSetupOptions({
+        ...baseOptions,
+        customDomain: "tatsumaki.example.com",
+        contentDomain: "content.tatsumaki.example.com",
+      }),
+    ).toThrow(/different registrable domain/);
+  });
+
   it("reuses exact-name resources without issuing create requests", async () => {
     const responses = [
       envelope([{ uuid: "d1-id", name: "tatsumaki-db" }]),

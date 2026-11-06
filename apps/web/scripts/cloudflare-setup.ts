@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
+import { isValidArtifactContentOrigin } from "../src/presentation/routes/artifacts/preview-policy";
 import { hostedRateLimits } from "./hosted-rate-limits";
 
 const API_BASE_URL = "https://api.cloudflare.com/client/v4";
@@ -22,6 +23,8 @@ export type SetupOptions = {
   stagingControlPlaneService?: string;
   customDomain?: string;
   stagingCustomDomain?: string;
+  contentDomain?: string;
+  stagingContentDomain?: string;
 };
 
 export type EnvironmentPlan = {
@@ -148,13 +151,37 @@ export function validateSetupOptions(options: SetupOptions): void {
       "--staging-custom-domain requires --with-staging or --staging-only.",
     );
   }
+  if (options.contentDomain && environmentSelection === "staging") {
+    throw new Error("--content-domain requires the production environment.");
+  }
+  if (options.stagingContentDomain && environmentSelection === "production") {
+    throw new Error(
+      "--staging-content-domain requires --with-staging or --staging-only.",
+    );
+  }
   for (const customDomain of [
     options.customDomain,
     options.stagingCustomDomain,
+    options.contentDomain,
+    options.stagingContentDomain,
   ]) {
     if (customDomain && !isHostname(customDomain)) {
       throw new Error(
-        `Custom domain must be a bare hostname (no scheme or path): ${customDomain}`,
+        `Domain must be a bare hostname (no scheme or path): ${customDomain}`,
+      );
+    }
+  }
+  for (const [contentDomain, appDomain] of [
+    [options.contentDomain, options.customDomain],
+    [options.stagingContentDomain, options.stagingCustomDomain],
+  ]) {
+    if (
+      contentDomain &&
+      appDomain &&
+      !isValidArtifactContentOrigin(`https://${contentDomain}`, appDomain)
+    ) {
+      throw new Error(
+        `Content domain ${contentDomain} must be on a different registrable domain than ${appDomain} (ADR-0012).`,
       );
     }
   }
@@ -201,6 +228,17 @@ function customDomainFor(
     plan.environment === "staging"
       ? options.stagingCustomDomain
       : options.customDomain
+  )?.toLowerCase();
+}
+
+function contentDomainFor(
+  plan: EnvironmentPlan,
+  options: SetupOptions,
+): string | undefined {
+  return (
+    plan.environment === "staging"
+      ? options.stagingContentDomain
+      : options.contentDomain
   )?.toLowerCase();
 }
 
@@ -290,6 +328,8 @@ export async function setupCloudflare(
     log(`Access: ${plan.accessName}`);
     const customDomain = customDomainFor(plan, options);
     if (customDomain) log(`Custom domain: ${customDomain}`);
+    const contentDomain = contentDomainFor(plan, options);
+    if (contentDomain) log(`Artifact content domain: ${contentDomain}`);
     if (plan.environment === "staging" && options.stagingControlPlaneService) {
       log(`Control Plane: ${options.stagingControlPlaneService}`);
     }
@@ -395,12 +435,27 @@ export async function setupCloudflare(
         options.allowEmails,
         options.allowDomains,
       );
-      await client.ensureArtifactContentBypass(plan, workerDomain);
       const customDomain = customDomainFor(plan, options);
-      if (customDomain) {
-        await client.ensureArtifactContentBypass(plan, customDomain, {
-          nameSuffix: ` (${customDomain})`,
-        });
+      const contentDomain = contentDomainFor(plan, options);
+      if (contentDomain) {
+        // ADR-0012 §4: the content site is outside Access and authorized by
+        // its capability token alone, so no bypass application is created.
+        const appHost = customDomain ?? workerDomain;
+        if (
+          !isValidArtifactContentOrigin(`https://${contentDomain}`, appHost)
+        ) {
+          throw new Error(
+            `Content domain ${contentDomain} must be on a different registrable domain than ${appHost} (ADR-0012).`,
+          );
+        }
+        await client.ensureWorkerCustomDomain(plan.workerName, contentDomain);
+      } else {
+        await client.ensureArtifactContentBypass(plan, workerDomain);
+        if (customDomain) {
+          await client.ensureArtifactContentBypass(plan, customDomain, {
+            nameSuffix: ` (${customDomain})`,
+          });
+        }
       }
 
       await writeFile(
@@ -410,6 +465,12 @@ export async function setupCloudflare(
             ACCESS_AUD: application.aud,
             ACCESS_TEAM_DOMAIN: teamDomain,
             ARTIFACT_CONTENT_SIGNING_KEY: generateSigningKey(),
+            ...(contentDomain
+              ? {
+                  ARTIFACT_CONTENT_ORIGIN: `https://${contentDomain}`,
+                  ARTIFACT_APP_ORIGIN: `https://${customDomain ?? workerDomain}`,
+                }
+              : {}),
           },
           null,
           2,
@@ -576,6 +637,40 @@ export class CloudflareClient {
         "Cloudflare Workers subdomain is not enabled for this account.",
       );
     return result.subdomain;
+  }
+
+  /**
+   * Attaches `hostname` to the Worker as a custom domain. The zone must be in
+   * this account; the hostname is looked up under its longest matching zone.
+   */
+  async ensureWorkerCustomDomain(
+    workerName: string,
+    hostname: string,
+  ): Promise<void> {
+    const labels = hostname.split(".");
+    for (let start = 0; start <= labels.length - 2; start += 1) {
+      const candidate = labels.slice(start).join(".");
+      const zones = (
+        await this.requestEnvelope<Array<{ id: string; name: string }>>(
+          `/zones?name=${encodeURIComponent(candidate)}&account.id=${this.accountId}`,
+        )
+      ).result;
+      const zone = zones.find((entry) => entry.name === candidate);
+      if (!zone) continue;
+      await this.request("workers/domains", {
+        method: "PUT",
+        body: {
+          environment: "production",
+          hostname,
+          service: workerName,
+          zone_id: zone.id,
+        },
+      });
+      return;
+    }
+    throw new Error(
+      `No Cloudflare zone in this account covers ${hostname}. Add the domain to Cloudflare first.`,
+    );
   }
 
   async getWorkerId(name: string): Promise<string> {
@@ -801,20 +896,20 @@ export class CloudflareClient {
     path: string,
     options: { method?: string; body?: unknown } = {},
   ): Promise<ApiEnvelope<T>> {
-    const response = await this.fetchImplementation(
-      `${API_BASE_URL}/accounts/${this.accountId}/${path}`,
-      {
-        method: options.method ?? "GET",
-        headers: {
-          Authorization: `Bearer ${this.token}`,
-          ...(options.body === undefined
-            ? {}
-            : { "Content-Type": "application/json" }),
-        },
-        body:
-          options.body === undefined ? undefined : JSON.stringify(options.body),
+    const url = path.startsWith("/")
+      ? `${API_BASE_URL}${path}`
+      : `${API_BASE_URL}/accounts/${this.accountId}/${path}`;
+    const response = await this.fetchImplementation(url, {
+      method: options.method ?? "GET",
+      headers: {
+        Authorization: `Bearer ${this.token}`,
+        ...(options.body === undefined
+          ? {}
+          : { "Content-Type": "application/json" }),
       },
-    );
+      body:
+        options.body === undefined ? undefined : JSON.stringify(options.body),
+    });
     const envelope = (await response.json()) as ApiEnvelope<T>;
     if (!response.ok || !envelope.success) {
       const message = envelope.errors

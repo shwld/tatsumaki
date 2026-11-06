@@ -97,6 +97,18 @@ curl -i https://<host>/api/projects
 
 前者は Access のログインへの 302 ではなく Worker の 404 を返し、後者は引き続き Access のログインへリダイレクトされる必要があります。
 
+### Artifact content を別 site から配信する（公開運用では推奨）
+
+追加の設定をしない場合、previewはアプリ自身のhostからsandbox付きiframeで配信されます。この場合、無限ループするArtifactは、iframeがアプリと同じブラウザprocessで動くため、閲覧したmemberのタブを固めることがあります。これを防ぐには、アプリとは**別のregistrable domain**（アプリのdomainのサブドメインは不可）からcontentを配信します。
+
+```bash
+... bun apps/web/scripts/setup-cloudflare.ts --allow-email you@example.com --content-domain content.example.net
+```
+
+domainのzoneは同じCloudflare accountにある必要があります。setupコマンドは、そのdomainを同じWorkerへ割り当て、`ARTIFACT_CONTENT_ORIGIN`（`https://<content domain>`）と `ARTIFACT_APP_ORIGIN`（contentをframeできる唯一のorigin、つまりアプリのorigin）を設定し、`/artifact-content/*` のAccess bypassは作りません。`ARTIFACT_CONTENT_ORIGIN` を設定すると、content hostは `/artifact-content/*` だけを処理し、アプリのhostはそのpathに404を返します。content domainは他の用途に使わないでください。2つの変数のどちらかが不正だとpreviewは無効になります。手動で設定する場合は、Workerのvariableとして追加します。
+
+公式ホスト版（`ENTITLEMENT_MODE=control-plane`）では、両方を設定するまでpreviewは無効のままです。
+
 既存環境でproductionへ触れずにstagingの作成・修復・再deployだけを行う場合は、`--staging-only` を使います。production resourceの検索、migration、deploy、変更は行いません。
 
 ```bash

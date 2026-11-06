@@ -22,5 +22,5 @@ export type ArtifactVersion = {
 
 export type ArtifactPreviewToken = {
   expiresAt: string;
-  contentPath: string;
+  contentUrl: string;
 };

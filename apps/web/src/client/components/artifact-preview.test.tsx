@@ -48,7 +48,7 @@ function renderPreview() {
 }
 
 const tokenResponse = (path: string, expiresAt: string) =>
-  json({ token: "SECRET", expiresAt, contentPath: path });
+  json({ token: "SECRET", expiresAt, contentUrl: path });
 
 describe("ArtifactPreview", () => {
   beforeEach(() => {

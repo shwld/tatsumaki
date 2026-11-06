@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import { spaIndexHeaders } from "../../../src/presentation/spa-headers";
-import { BASE_URL } from "./server";
+import { BASE_URL, CONTENT_BASE_URL } from "./server";
 
 /**
  * The page that embeds the artifact, served from the Worker's own origin with
@@ -94,7 +94,7 @@ export async function installParentRoutes(page: Page): Promise<{
     route.fulfill({
       status: 200,
       contentType: "text/html; charset=utf-8",
-      headers: spaIndexHeaders(BASE_URL),
+      headers: spaIndexHeaders(BASE_URL, CONTENT_BASE_URL),
       body: PARENT_HTML,
     }),
   );

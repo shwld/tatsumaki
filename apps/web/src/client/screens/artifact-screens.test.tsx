@@ -69,13 +69,13 @@ const baseRoutes = (): Routes => ({
     json({
       token: "T",
       expiresAt: new Date(Date.now() + 600_000).toISOString(),
-      contentPath: "/artifact-content/two/index.html",
+      contentUrl: "/artifact-content/two/index.html",
     }),
   "POST /api/projects/p1/artifacts/art-1/versions/1/preview-token": () =>
     json({
       token: "T",
       expiresAt: new Date(Date.now() + 600_000).toISOString(),
-      contentPath: "/artifact-content/one/index.html",
+      contentUrl: "/artifact-content/one/index.html",
     }),
 });
 
@@ -225,7 +225,7 @@ describe("artifact screens", () => {
           json({
             token: "T",
             expiresAt: new Date(Date.now() + 600_000).toISOString(),
-            contentPath: "/artifact-content/three/index.html",
+            contentUrl: "/artifact-content/three/index.html",
           }),
       });
       renderAt("/projects/p1/artifacts/art-1");

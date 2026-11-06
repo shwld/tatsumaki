@@ -3,7 +3,7 @@ import { readArtifactContent } from "../../../application/usecases/artifacts/art
 import { D1ArtifactRepository } from "../../../infrastructure/db/repositories/d1-artifact-repository";
 import { R2ArtifactObjectStore } from "../../../infrastructure/storage/r2-artifact-object-store";
 import type { Env } from "../../../index";
-import { isArtifactPreviewEnabled } from "../artifacts/preview-policy";
+import { resolveArtifactContentConfig } from "../artifacts/preview-policy";
 import { signingKeysFrom } from "../artifacts/signing-keys";
 import {
   artifactContentDeniedHeaders,
@@ -25,11 +25,13 @@ export const artifactContentRoute = new Hono<Env>();
 
 artifactContentRoute.get("/artifact-content/*", async (c) => {
   const origin = new URL(c.req.url).origin;
+  const config = resolveArtifactContentConfig(c.env);
+  const frameAncestor = config.mode === "split" ? config.appOrigin : origin;
   const deny = () =>
     new Response("Not found", {
       status: 404,
       headers: {
-        ...artifactContentDeniedHeaders(origin),
+        ...artifactContentDeniedHeaders(origin, frameAncestor),
         "Content-Type": "text/plain; charset=utf-8",
       },
     });
@@ -40,7 +42,9 @@ artifactContentRoute.get("/artifact-content/*", async (c) => {
   if (
     !match ||
     !keys ||
-    !isArtifactPreviewEnabled(c.env, c.req.url) ||
+    config.mode === "disabled" ||
+    // Split mode: the app host must not serve content (ADR-0012 §2).
+    (config.mode === "split" && origin !== config.contentOrigin) ||
     !c.env.ARTIFACTS ||
     !isAllowedArtifactContentFetch(c.req.raw.headers)
   ) {
@@ -71,7 +75,7 @@ artifactContentRoute.get("/artifact-content/*", async (c) => {
   return new Response(result.value.object.body, {
     headers: {
       ...artifactContentHeaders(
-        origin,
+        frameAncestor,
         `${origin}${ARTIFACT_CONTENT_PATH_PREFIX}${token}/`,
       ),
       "Content-Type": result.value.contentType,

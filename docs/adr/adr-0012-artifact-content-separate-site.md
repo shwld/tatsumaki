@@ -23,7 +23,7 @@ ADR-0011 により、公式ホスト版は自由登録になる。登録者は p
 
 - content は、アプリ本体とは **別の registrable domain**（別 eTLD+1）から配信する。サブドメインは同一 site なので process が分離されず、採用しない。
 - 同じ Worker を、content 用 domain にも割り当てる。Worker は `Host` で振り分ける。別 Worker は立てない（deploy・secret・R2 binding の二重管理を避ける）。
-- 設定は環境変数 `ARTIFACT_CONTENT_ORIGIN`（scheme と host のみ。例 `https://content.example`）。値の検証は setup script と起動時の双方で行い、本体 origin と同一 host、または一方が他方のサブドメインである値は拒否する。
+- 設定は環境変数 `ARTIFACT_CONTENT_ORIGIN`（scheme と host のみ。例 `https://content.example`）と、本体 origin を示す `ARTIFACT_APP_ORIGIN`。content host のリクエストは session を持たず本体 origin を知る手段がないため、`frame-ancestors` と検証のために後者を必須とする。値の検証は setup script と起動時の双方で行い、どちらかが不正、または同一 host、または一方が他方のサブドメインである場合は preview を無効にする。http は loopback host（browser test 用）に限る。
 - content domain の具体名は運用で決め、ADR には書かない。content domain は他の用途に使わず、本体 domain と cookie を共有しない。
 
 ### 2. Host による振り分け
@@ -83,3 +83,8 @@ ADR-0011 により、公式ホスト版は自由登録になる。登録者は p
 - capability token は content host の URL path に入る。log での redact は従来どおり必須。
 - WebKit の process 分離は保証できない。#321 の結果を残余リスクとして追記する。
 - ADR-0010 は有効なまま、§4 に本 ADR への参照を追記する。
+
+## Amendment 2026-11-06 (story #319 implementation)
+
+- 実 browser テストは、本体を `127.0.0.1`、content を `localhost` に置く（browser は別 site として扱う）。headless Chromium で site isolation を有効にするため `--site-per-process` を付け、Local Network Access のチェックは無効にする（テストの親ページが Playwright の応答で、loopback の content へ向かうため）。3,000ms の busy loop 中の親ページのタイマー遅延は、同一 site 構成の 2,991ms から 2ms になった。
+- 別 site では本体と content が cross-site になり、`Sec-Fetch-Site` だけでは「本体が script として読み込む」要求と「sandbox された artifact の subresource」を区別できない。`/artifact-content/*` の Fetch Metadata による拒否（ADR-0010 §5）は未設定時（同一 host）の防御として残り、別 site 構成では本体の CSP（`script-src` に content origin を含めない）が障壁になる。
