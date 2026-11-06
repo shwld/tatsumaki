@@ -135,7 +135,33 @@ export function OnboardingScreen({
             checked={acceptedTerms}
             onChange={(event) => setAcceptedTerms(event.target.checked)}
           />
-          <span>{t("onboardingScreen.terms")}</span>
+          <span>
+            {t("onboardingScreen.terms")}
+            {state.termsUrl || state.privacyUrl ? (
+              <span className="ml-2 inline-flex gap-3">
+                {state.termsUrl ? (
+                  <a
+                    href={state.termsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-700 hover:underline"
+                  >
+                    {t("onboardingScreen.termsLink")}
+                  </a>
+                ) : null}
+                {state.privacyUrl ? (
+                  <a
+                    href={state.privacyUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-700 hover:underline"
+                  >
+                    {t("onboardingScreen.privacyLink")}
+                  </a>
+                ) : null}
+              </span>
+            ) : null}
+          </span>
         </label>
         {challengeUnavailable ? (
           <p className="text-sm text-red-600" role="alert">

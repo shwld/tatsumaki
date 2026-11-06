@@ -5,6 +5,8 @@ export type CreateUserInput = {
   id: string;
   displayName: string;
   email: string;
+  termsAcceptedAt?: string;
+  termsVersion?: string;
 };
 
 export type UpdateUserInput = {

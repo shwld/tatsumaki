@@ -5,5 +5,7 @@ export type OnboardingChallenge =
 export type OnboardingState = {
   completed: boolean;
   email: string | null;
+  termsUrl: string | null;
+  privacyUrl: string | null;
   challenge: OnboardingChallenge;
 };
