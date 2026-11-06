@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { hostedRateLimits } from "./hosted-rate-limits";
 
 const configSchema = z
   .object({
@@ -82,6 +83,7 @@ export function createDeploymentConfig(
     throw new Error(
       "CLOUDFLARE_OAUTH_KV_NAMESPACE_ID is required when OAUTH_KV has no id.",
     );
+  const hosted = hostedRateLimits(String(config.name));
   return {
     ...config,
     d1_databases: d1Databases,
@@ -92,6 +94,12 @@ export function createDeploymentConfig(
         (binding) => binding.binding !== "CONTROL_PLANE",
       ),
       { binding: "CONTROL_PLANE", service },
+    ],
+    ratelimits: [
+      ...((config.ratelimits as { name: string }[] | undefined) ?? []).filter(
+        (limiter) => !hosted.some((entry) => entry.name === limiter.name),
+      ),
+      ...hosted,
     ],
   };
 }

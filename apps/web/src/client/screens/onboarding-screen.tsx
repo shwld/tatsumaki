@@ -50,6 +50,7 @@ export function OnboardingScreen({
         code?: string;
       };
       setToken(null);
+      setWidgetAttempt((attempt) => attempt + 1);
       setError(
         body.code === "CHALLENGE_FAILED"
           ? t("onboardingScreen.challengeFailed")
@@ -57,10 +58,13 @@ export function OnboardingScreen({
             ? t("onboardingScreen.termsRequired")
             : body.code === "ONBOARDING_UNAVAILABLE"
               ? t("onboardingScreen.unavailable")
-              : t("onboardingScreen.submitError"),
+              : body.code === "RATE_LIMITED"
+                ? t("onboardingScreen.rateLimited")
+                : t("onboardingScreen.submitError"),
       );
     } catch {
       setToken(null);
+      setWidgetAttempt((attempt) => attempt + 1);
       setError(t("onboardingScreen.submitError"));
     } finally {
       setSubmitting(false);

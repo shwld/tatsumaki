@@ -39,6 +39,28 @@ describe("project api keys management routes", () => {
     return payload.project.id;
   };
 
+  it("rate limits API key issuance when the limiter denies", async () => {
+    const projectId = await createProject();
+    const mutable = env as unknown as { API_KEY_RATE_LIMITER?: RateLimit };
+    mutable.API_KEY_RATE_LIMITER = {
+      limit: async () => ({ success: false }),
+    };
+    try {
+      const response = await fetchWithAuth(
+        `https://localhost/api/projects/${projectId}/api-keys`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ name: "CI Key" }),
+        },
+      );
+      expect(response.status).toBe(429);
+      expect(await response.json()).toMatchObject({ code: "RATE_LIMITED" });
+    } finally {
+      delete mutable.API_KEY_RATE_LIMITER;
+    }
+  });
+
   it("owner can issue an API key", async () => {
     const projectId = await createProject();
 

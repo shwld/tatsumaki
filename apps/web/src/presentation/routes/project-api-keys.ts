@@ -10,6 +10,7 @@ import {
 } from "../../application/usecases/revoke-project-api-key";
 import { listProjectApiKeys } from "../../application/usecases/list-project-api-keys";
 import { requireProjectMembership } from "./project-membership";
+import { isRateLimited } from "../rate-limit";
 import {
   API_KEY_NAME_REQUIRED_ERROR,
   API_KEY_INVALID_SCOPE_ERROR,
@@ -47,6 +48,18 @@ projectApiKeysRoute.post("/projects/:projectId/api-keys", async (c) => {
 
   if (membership.member.role !== "owner") {
     return c.json({ error: "Only project owners can issue API keys." }, 403);
+  }
+
+  if (
+    await isRateLimited(c.env.API_KEY_RATE_LIMITER, [`user:${currentUser.id}`])
+  ) {
+    return c.json(
+      {
+        error: "Too many API key requests. Try again later.",
+        code: "RATE_LIMITED",
+      },
+      429,
+    );
   }
 
   let body: unknown;

@@ -13,6 +13,7 @@ export const onboardingScreenJa = {
     retry: "再試行",
     challengeFailed: "bot 確認に失敗しました。もう一度お試しください。",
     termsRequired: "利用規約への同意が必要です。",
+    rateLimited: "試行回数が多すぎます。しばらくしてからお試しください。",
     unavailable:
       "現在登録を受け付けていません。時間をおいてもう一度お試しください。",
     submitError: "利用開始の処理に失敗しました。",
@@ -36,6 +37,7 @@ export const onboardingScreenEn = {
     retry: "Retry",
     challengeFailed: "Bot verification failed. Please try again.",
     termsRequired: "You need to accept the terms.",
+    rateLimited: "Too many attempts. Please try again later.",
     unavailable: "Registration is unavailable right now. Please try later.",
     submitError: "Failed to complete onboarding.",
     widgetError: "Could not load the bot verification.",

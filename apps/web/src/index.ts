@@ -66,6 +66,8 @@ export type Bindings = {
   PRIVACY_URL?: string;
   TURNSTILE_SITE_KEY?: string;
   TURNSTILE_SECRET_KEY?: string;
+  ONBOARDING_RATE_LIMITER?: RateLimit;
+  API_KEY_RATE_LIMITER?: RateLimit;
 };
 
 export type Env = {

@@ -9,6 +9,7 @@ import {
 import { D1UserRepository } from "../../infrastructure/db/repositories/d1-user-repository";
 import type { Env } from "../../index";
 import { resolveOnboardingChallenge } from "../onboarding-challenge";
+import { isRateLimited } from "../rate-limit";
 
 export const onboardingRoute = new Hono<Env>();
 
@@ -41,8 +42,22 @@ onboardingRoute.post("/onboarding", async (c) => {
   }
 
   const currentUser = c.get("currentUser");
+  const remoteIp = c.req.header("CF-Connecting-IP");
+  const repository = new D1UserRepository(c.env.DB);
+  const existing = await repository.findById(currentUser.id);
+  if (existing.isOk() && existing.value) {
+    return c.json({ completed: true });
+  }
+  if (
+    await isRateLimited(c.env.ONBOARDING_RATE_LIMITER, [
+      `user:${currentUser.id}`,
+      ...(remoteIp ? [`ip:${remoteIp}`] : []),
+    ])
+  ) {
+    return c.json({ error: "Too many attempts.", code: "RATE_LIMITED" }, 429);
+  }
   const result = await completeOnboarding(
-    new D1UserRepository(c.env.DB),
+    repository,
     resolveOnboardingChallenge(c.env).challenge,
     {
       id: currentUser.id,
@@ -51,7 +66,7 @@ onboardingRoute.post("/onboarding", async (c) => {
       turnstileToken:
         typeof body.turnstileToken === "string" ? body.turnstileToken : "",
       hostname: new URL(c.req.url).hostname,
-      remoteIp: c.req.header("CF-Connecting-IP"),
+      remoteIp,
     },
   );
 

@@ -101,6 +101,8 @@ describe("Cloudflare self-hosting setup", () => {
     expect(config).toContain('binding = "CONTROL_PLANE"');
     expect(config).toContain('service = "tatsumaki-control-plane-staging"');
     expect(config).toContain('ENTITLEMENT_MODE = "control-plane"');
+    expect(config).toContain('name = "ONBOARDING_RATE_LIMITER"');
+    expect(config).toContain('name = "API_KEY_RATE_LIMITER"');
   });
 
   it("does not contact Cloudflare or run commands in dry-run mode", async () => {
