@@ -460,6 +460,11 @@ export async function setupCloudflare(
             nameSuffix: ` (${customDomain})`,
           });
         }
+        // `secret bulk` leaves omitted secrets untouched, so a previous
+        // --content-domain run would keep serving from the old content host.
+        for (const name of ["ARTIFACT_CONTENT_ORIGIN", "ARTIFACT_APP_ORIGIN"]) {
+          await client.deleteWorkerSecretIfPresent(plan.workerName, name);
+        }
       }
 
       await writeFile(
@@ -675,6 +680,21 @@ export class CloudflareClient {
     throw new Error(
       `No Cloudflare zone in this account covers ${hostname}. Add the domain to Cloudflare first.`,
     );
+  }
+
+  async deleteWorkerSecretIfPresent(
+    workerName: string,
+    secretName: string,
+  ): Promise<void> {
+    try {
+      await this.request(
+        `workers/scripts/${encodeURIComponent(workerName)}/secrets/${encodeURIComponent(secretName)}`,
+        { method: "DELETE" },
+      );
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("(404)")) return;
+      throw error;
+    }
   }
 
   async getWorkerId(name: string): Promise<string> {

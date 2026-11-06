@@ -155,6 +155,9 @@ describe("Cloudflare self-hosting setup", () => {
       envelope({ id: "bypass-app-id", name: "tatsumaki artifact content" }),
       envelope([]),
       envelope({ id: "bypass-policy-id" }),
+      // secrets left over from a previous --content-domain run are removed
+      envelope({}),
+      envelope({}),
     ];
     const fetchMock = vi.fn(
       async (input: string | URL | Request, init?: RequestInit) => {
@@ -400,6 +403,9 @@ describe("Cloudflare self-hosting setup", () => {
       envelope([
         bypassPolicy("bypass-policy-id", "tatsumaki artifact content bypass"),
       ]),
+      // secrets left over from a previous --content-domain run are removed
+      envelope({}),
+      envelope({}),
     ];
     const methods: string[] = [];
     const fetchMock = vi.fn(
@@ -418,19 +424,12 @@ describe("Cloudflare self-hosting setup", () => {
     });
 
     expect(responses).toHaveLength(0);
-    expect(methods).toEqual([
-      "GET",
-      "GET",
-      "GET",
-      "GET",
-      "GET",
-      "GET",
-      "GET",
-      "GET",
-      "GET",
-      "GET",
-      "GET",
+    // Only reads, plus removal of leftover content-origin secrets.
+    expect(methods.filter((method) => method !== "GET")).toEqual([
+      "DELETE",
+      "DELETE",
     ]);
+    expect(methods.slice(0, -2).every((method) => method === "GET")).toBe(true);
   });
 
   it("provisions staging-only without touching production resources", async () => {
@@ -466,6 +465,9 @@ describe("Cloudflare self-hosting setup", () => {
       }),
       envelope([]),
       envelope({ id: "bypass-policy-id" }),
+      // secrets left over from a previous --content-domain run are removed
+      envelope({}),
+      envelope({}),
     ];
     const fetchMock = vi.fn(
       async (input: string | URL | Request, init?: RequestInit) => {
@@ -697,6 +699,9 @@ describe("Cloudflare self-hosting setup", () => {
         ),
       ]),
       envelope([bypassPolicy("custom-policy-id", `${bypassName} bypass`)]),
+      // secrets left over from a previous --content-domain run are removed
+      envelope({}),
+      envelope({}),
     ];
     const fetchMock = vi.fn(
       async (input: string | URL | Request, init?: RequestInit) => {
