@@ -26,6 +26,20 @@ const configSchema = z
   })
   .passthrough();
 
+// Account-unique namespace IDs; limits apply to the official hosted deployment only.
+const HOSTED_RATE_LIMITS = [
+  {
+    name: "ONBOARDING_RATE_LIMITER",
+    namespace_id: "3590001",
+    simple: { limit: 5, period: 60 },
+  },
+  {
+    name: "API_KEY_RATE_LIMITER",
+    namespace_id: "3590002",
+    simple: { limit: 10, period: 60 },
+  },
+];
+
 type DeploymentOverrides = {
   controlPlaneService?: string;
   d1DatabaseId?: string;
@@ -92,6 +106,13 @@ export function createDeploymentConfig(
         (binding) => binding.binding !== "CONTROL_PLANE",
       ),
       { binding: "CONTROL_PLANE", service },
+    ],
+    ratelimits: [
+      ...((config.ratelimits as { name: string }[] | undefined) ?? []).filter(
+        (limiter) =>
+          !HOSTED_RATE_LIMITS.some((hosted) => hosted.name === limiter.name),
+      ),
+      ...HOSTED_RATE_LIMITS,
     ],
   };
 }

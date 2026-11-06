@@ -67,6 +67,41 @@ describe("onboarding route", () => {
     expect(row?.termsVersion).toBe(TERMS_VERSION);
   });
 
+  it("rejects repeated onboarding attempts once the limiter denies", async () => {
+    const seen: string[] = [];
+    (
+      mutableEnv as { ONBOARDING_RATE_LIMITER?: RateLimit }
+    ).ONBOARDING_RATE_LIMITER = {
+      limit: async ({ key }) => {
+        seen.push(key);
+        return { success: false };
+      },
+    };
+    try {
+      const response = await post("github|limited-1", { acceptedTerms: true });
+      expect(response.status).toBe(429);
+      expect(await response.json()).toMatchObject({ code: "RATE_LIMITED" });
+      expect(seen).toContain("user:github|limited-1");
+      expect(await userRows("github|limited-1")).toHaveLength(0);
+    } finally {
+      delete (mutableEnv as { ONBOARDING_RATE_LIMITER?: RateLimit })
+        .ONBOARDING_RATE_LIMITER;
+    }
+  });
+
+  it("completes onboarding when the limiter allows", async () => {
+    (
+      mutableEnv as { ONBOARDING_RATE_LIMITER?: RateLimit }
+    ).ONBOARDING_RATE_LIMITER = { limit: async () => ({ success: true }) };
+    try {
+      const response = await post("github|limited-2", { acceptedTerms: true });
+      expect(response.status).toBe(200);
+    } finally {
+      delete (mutableEnv as { ONBOARDING_RATE_LIMITER?: RateLimit })
+        .ONBOARDING_RATE_LIMITER;
+    }
+  });
+
   it("exposes configured terms and privacy URLs", async () => {
     (mutableEnv as { TERMS_URL?: string; PRIVACY_URL?: string }).TERMS_URL =
       "https://example.com/terms";

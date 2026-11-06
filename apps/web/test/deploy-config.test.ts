@@ -28,6 +28,10 @@ describe("deployment configuration", () => {
       services: [
         { binding: "CONTROL_PLANE", service: "control-plane-production" },
       ],
+      ratelimits: [
+        expect.objectContaining({ name: "ONBOARDING_RATE_LIMITER" }),
+        expect.objectContaining({ name: "API_KEY_RATE_LIMITER" }),
+      ],
     });
     expect(base).not.toHaveProperty("services");
   });

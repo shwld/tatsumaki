@@ -57,7 +57,9 @@ export function OnboardingScreen({
             ? t("onboardingScreen.termsRequired")
             : body.code === "ONBOARDING_UNAVAILABLE"
               ? t("onboardingScreen.unavailable")
-              : t("onboardingScreen.submitError"),
+              : body.code === "RATE_LIMITED"
+                ? t("onboardingScreen.rateLimited")
+                : t("onboardingScreen.submitError"),
       );
     } catch {
       setToken(null);
