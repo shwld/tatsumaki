@@ -5,6 +5,7 @@ import { D1ArtifactRepository } from "../../../infrastructure/db/repositories/d1
 import type { Env } from "../../../index";
 import { ARTIFACT_CONTENT_PATH_PREFIX } from "../artifact-content/routes";
 import { requireArtifactAccess } from "./access";
+import { isArtifactPreviewEnabled } from "./preview-policy";
 import { artifactErrorResponse } from "./responses";
 import { signingKeysFrom } from "./signing-keys";
 
@@ -17,6 +18,16 @@ export const artifactPreviewTokenRoute = new Hono<Env>();
 artifactPreviewTokenRoute.post(
   "/projects/:projectId/artifacts/:artifactId/versions/:version/preview-token",
   async (c) => {
+    if (!isArtifactPreviewEnabled(c.env, c.req.url)) {
+      return c.json(
+        {
+          error: "Artifact preview is not available in this environment",
+          code: "ARTIFACT_PREVIEW_DISABLED",
+        },
+        404,
+      );
+    }
+
     const projectId = c.req.param("projectId");
     const access = await requireArtifactAccess(c, projectId, { write: false });
     if (!access.ok) return access.response;
