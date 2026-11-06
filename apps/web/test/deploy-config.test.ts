@@ -31,6 +31,7 @@ describe("deployment configuration", () => {
       ratelimits: [
         expect.objectContaining({ name: "ONBOARDING_RATE_LIMITER" }),
         expect.objectContaining({ name: "API_KEY_RATE_LIMITER" }),
+        expect.objectContaining({ name: "OAUTH_REGISTER_RATE_LIMITER" }),
       ],
     });
     expect(base).not.toHaveProperty("services");
@@ -46,7 +47,7 @@ describe("deployment configuration", () => {
       ).map((limiter) => limiter.namespace_id);
     const production = ids("tatsumaki");
     const staging = ids("tatsumaki-staging");
-    expect(new Set(production).size).toBe(2);
+    expect(new Set(production).size).toBe(3);
     expect(production.filter((id) => staging.includes(id))).toEqual([]);
   });
 

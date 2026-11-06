@@ -23,6 +23,37 @@ describe("MCP OAuth", () => {
     await clearOAuthKv();
   });
 
+  it("rate-limits anonymous client registration by IP", async () => {
+    const seen: string[] = [];
+    const mutable = env as unknown as {
+      OAUTH_REGISTER_RATE_LIMITER?: RateLimit;
+    };
+    mutable.OAUTH_REGISTER_RATE_LIMITER = {
+      limit: async ({ key }) => {
+        seen.push(key);
+        return { success: false };
+      },
+    };
+    try {
+      const response = await SELF.fetch("https://localhost/oauth/register", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "cf-connecting-ip": "203.0.113.7",
+        },
+        body: JSON.stringify({
+          client_name: "Anon",
+          redirect_uris: ["https://claude.example/callback"],
+          token_endpoint_auth_method: "none",
+        }),
+      });
+      expect(response.status).toBe(429);
+      expect(seen).toEqual(["ip:203.0.113.7"]);
+    } finally {
+      delete mutable.OAUTH_REGISTER_RATE_LIMITER;
+    }
+  });
+
   it("exposes OAuth metadata and challenges unauthenticated MCP requests", async () => {
     const metadataResponse = await SELF.fetch(
       "https://localhost/.well-known/oauth-authorization-server",

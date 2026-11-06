@@ -28,6 +28,7 @@ import { invitationLinksRoute } from "./presentation/routes/invitation-links";
 import { artifactContentRoute } from "./presentation/routes/artifact-content/routes";
 import { artifactPreviewTokenRoute } from "./presentation/routes/artifacts/preview-token";
 import { createArtifactReadRoutes } from "./presentation/routes/artifacts/routes";
+import { isRateLimited } from "./presentation/rate-limit";
 import { spaIndexHeaders } from "./presentation/spa-headers";
 import { PlanningPokerDO } from "./durable-objects/planning-poker-do";
 import { requireAccessAuth } from "./presentation/middleware/access-auth";
@@ -68,6 +69,7 @@ export type Bindings = {
   TURNSTILE_SECRET_KEY?: string;
   ONBOARDING_RATE_LIMITER?: RateLimit;
   API_KEY_RATE_LIMITER?: RateLimit;
+  OAUTH_REGISTER_RATE_LIMITER?: RateLimit;
 };
 
 export type Env = {
@@ -270,9 +272,22 @@ function isMcpOAuthEnabled(env: Bindings): env is OAuthBindings {
 }
 
 export default {
-  fetch(request: Request, env: Bindings, ctx: ExecutionContext) {
+  async fetch(request: Request, env: Bindings, ctx: ExecutionContext) {
     if (!isMcpOAuthEnabled(env)) {
       return app.fetch(request, env, ctx);
+    }
+
+    if (
+      request.method === "POST" &&
+      new URL(request.url).pathname === "/oauth/register" &&
+      (await isRateLimited(env.OAUTH_REGISTER_RATE_LIMITER, [
+        `ip:${request.headers.get("cf-connecting-ip") ?? "unknown"}`,
+      ]))
+    ) {
+      return Response.json(
+        { error: "rate_limited", error_description: "Too many registrations" },
+        { status: 429 },
+      );
     }
 
     return createOAuthProvider(request).fetch(request, env, ctx);

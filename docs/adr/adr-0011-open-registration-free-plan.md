@@ -50,6 +50,7 @@ The goal is to open registration to anyone on the official hosted service, keep 
 ### Abuse surface
 
 - Rate-limit registration and API key issuance.
+- `/oauth/register` (dynamic client registration) is anonymous: workers-oauth-provider 0.10.3 performs no caller authentication, and public clients (`token_endpoint_auth_method: none`, used by the `tm` CLI) are allowed. Source: https://github.com/cloudflare/workers-oauth-provider (`handleClientRegistration` in `dist/oauth-provider.js`; `disallowPublicClientRegistration` option). It is therefore rate-limited per client IP with `OAUTH_REGISTER_RATE_LIMITER` (hosted only; HTTP 429).
 - Opening Access also exposes the paths that bypass it (`/api-key`, programmatic API, `/artifact-content`, OAuth authorize). For each, the rollout story must confirm the authentication method, anonymous access, origin isolation, and upload size and count limits before the production Access policy is widened.
 
 ## Consequences
