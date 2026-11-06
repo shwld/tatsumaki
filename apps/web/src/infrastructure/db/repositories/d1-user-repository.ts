@@ -28,6 +28,8 @@ function toUser(row: UserRow): User {
     displayName: row.displayName,
     email: row.email,
     avatarUrl: row.avatarUrl ?? null,
+    termsAcceptedAt: row.termsAcceptedAt ?? null,
+    termsVersion: row.termsVersion ?? null,
     accessStatus: row.accessStatus === "allowed" ? "allowed" : "blocked",
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -85,6 +87,8 @@ export class D1UserRepository implements UserRepository {
         id: input.id,
         displayName: input.displayName,
         email: input.email,
+        termsAcceptedAt: input.termsAcceptedAt ?? null,
+        termsVersion: input.termsVersion ?? null,
       })
       .returning();
 

@@ -23,6 +23,8 @@ onboardingRoute.get("/onboarding", async (c) => {
   return c.json({
     completed: found.value !== null,
     email: c.get("currentUser").email ?? null,
+    termsUrl: c.env.TERMS_URL?.trim() || null,
+    privacyUrl: c.env.PRIVACY_URL?.trim() || null,
     challenge: {
       kind: challenge.kind,
       siteKey,

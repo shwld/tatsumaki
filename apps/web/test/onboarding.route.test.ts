@@ -1,6 +1,7 @@
 import { SELF, env } from "cloudflare:test";
 import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { TERMS_VERSION } from "../src/application/usecases/complete-onboarding";
 import { createDb } from "../src/infrastructure/db/client";
 import { usersTable } from "../src/infrastructure/db/schema/users";
 import { createAccessJwt, setupAccessBindings } from "./helpers/access-jwt";
@@ -62,6 +63,27 @@ describe("onboarding route", () => {
     expect(response.status).toBe(200);
     const [row] = await userRows("github|new-2");
     expect(row?.accessStatus).toBe("allowed");
+    expect(row?.termsAcceptedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(row?.termsVersion).toBe(TERMS_VERSION);
+  });
+
+  it("exposes configured terms and privacy URLs", async () => {
+    (mutableEnv as { TERMS_URL?: string; PRIVACY_URL?: string }).TERMS_URL =
+      "https://example.com/terms";
+    (mutableEnv as { TERMS_URL?: string; PRIVACY_URL?: string }).PRIVACY_URL =
+      "https://example.com/privacy";
+    try {
+      const response = await SELF.fetch("https://localhost/api/onboarding", {
+        headers: await accessHeaders("github|new-5", "new-5@example.com"),
+      });
+      expect(await response.json()).toMatchObject({
+        termsUrl: "https://example.com/terms",
+        privacyUrl: "https://example.com/privacy",
+      });
+    } finally {
+      delete (mutableEnv as { TERMS_URL?: string }).TERMS_URL;
+      delete (mutableEnv as { PRIVACY_URL?: string }).PRIVACY_URL;
+    }
   });
 
   it("requires accepting the terms", async () => {

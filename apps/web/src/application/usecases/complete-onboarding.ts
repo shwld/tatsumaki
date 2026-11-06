@@ -12,6 +12,8 @@ import {
 
 export const ONBOARDING_ACTION = "onboarding";
 
+export const TERMS_VERSION = "2026-11-06";
+
 export const ONBOARDING_EMAIL_REQUIRED_ERROR =
   "ONBOARDING_EMAIL_REQUIRED_ERROR" as const;
 export const ONBOARDING_TERMS_NOT_ACCEPTED_ERROR =
@@ -82,5 +84,7 @@ export async function completeOnboarding(
     id: input.id,
     displayName: deriveInitialDisplayName(input.id, email.value),
     email: email.value,
+    termsAcceptedAt: new Date().toISOString(),
+    termsVersion: TERMS_VERSION,
   });
 }

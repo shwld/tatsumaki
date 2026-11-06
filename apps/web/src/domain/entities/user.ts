@@ -4,6 +4,8 @@ export type User = {
   displayName: string;
   email: string;
   avatarUrl: string | null;
+  termsAcceptedAt: string | null;
+  termsVersion: string | null;
   accessStatus: "allowed" | "blocked";
   createdAt: string;
   updatedAt: string;
