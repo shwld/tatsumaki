@@ -89,6 +89,29 @@ describe("onboarding route", () => {
     }
   });
 
+  it("does not charge the limiter for already onboarded users", async () => {
+    expect(
+      (await post("github|limited-3", { acceptedTerms: true })).status,
+    ).toBe(200);
+    let calls = 0;
+    (
+      mutableEnv as { ONBOARDING_RATE_LIMITER?: RateLimit }
+    ).ONBOARDING_RATE_LIMITER = {
+      limit: async () => {
+        calls += 1;
+        return { success: false };
+      },
+    };
+    try {
+      const response = await post("github|limited-3", { acceptedTerms: true });
+      expect(response.status).toBe(200);
+      expect(calls).toBe(0);
+    } finally {
+      delete (mutableEnv as { ONBOARDING_RATE_LIMITER?: RateLimit })
+        .ONBOARDING_RATE_LIMITER;
+    }
+  });
+
   it("completes onboarding when the limiter allows", async () => {
     (
       mutableEnv as { ONBOARDING_RATE_LIMITER?: RateLimit }

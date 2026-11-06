@@ -43,6 +43,11 @@ onboardingRoute.post("/onboarding", async (c) => {
 
   const currentUser = c.get("currentUser");
   const remoteIp = c.req.header("CF-Connecting-IP");
+  const repository = new D1UserRepository(c.env.DB);
+  const existing = await repository.findById(currentUser.id);
+  if (existing.isOk() && existing.value) {
+    return c.json({ completed: true });
+  }
   if (
     await isRateLimited(c.env.ONBOARDING_RATE_LIMITER, [
       `user:${currentUser.id}`,
@@ -52,7 +57,7 @@ onboardingRoute.post("/onboarding", async (c) => {
     return c.json({ error: "Too many attempts.", code: "RATE_LIMITED" }, 429);
   }
   const result = await completeOnboarding(
-    new D1UserRepository(c.env.DB),
+    repository,
     resolveOnboardingChallenge(c.env).challenge,
     {
       id: currentUser.id,

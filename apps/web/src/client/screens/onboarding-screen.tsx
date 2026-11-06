@@ -50,6 +50,7 @@ export function OnboardingScreen({
         code?: string;
       };
       setToken(null);
+      setWidgetAttempt((attempt) => attempt + 1);
       setError(
         body.code === "CHALLENGE_FAILED"
           ? t("onboardingScreen.challengeFailed")
@@ -63,6 +64,7 @@ export function OnboardingScreen({
       );
     } catch {
       setToken(null);
+      setWidgetAttempt((attempt) => attempt + 1);
       setError(t("onboardingScreen.submitError"));
     } finally {
       setSubmitting(false);
