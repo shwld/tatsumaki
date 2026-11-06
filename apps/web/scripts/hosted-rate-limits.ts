@@ -11,6 +11,7 @@ function namespaceId(workerName: string, binding: string): string {
 const LIMITS = [
   { name: "ONBOARDING_RATE_LIMITER", limit: 5, period: 60 },
   { name: "API_KEY_RATE_LIMITER", limit: 10, period: 60 },
+  { name: "OAUTH_REGISTER_RATE_LIMITER", limit: 10, period: 60 },
 ];
 
 export function hostedRateLimits(workerName: string) {
