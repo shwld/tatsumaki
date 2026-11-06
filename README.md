@@ -73,6 +73,7 @@ The API token needs these account permissions:
 - Workers R2 Storage Write
 - Workers Scripts Write
 - Access: Apps and Policies Write
+- Zone Read (account-level Zone permission; only with `--custom-domain` or `--content-domain`, to find the zone to attach the domain to)
 
 The setup command reads the token only from the environment and never writes account IDs, resource IDs, Access values, or secrets into the repository.
 
