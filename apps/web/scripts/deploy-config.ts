@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { hostedRateLimits } from "./hosted-rate-limits";
 
 const configSchema = z
   .object({
@@ -25,20 +26,6 @@ const configSchema = z
       .optional(),
   })
   .passthrough();
-
-// Account-unique namespace IDs; limits apply to the official hosted deployment only.
-const HOSTED_RATE_LIMITS = [
-  {
-    name: "ONBOARDING_RATE_LIMITER",
-    namespace_id: "3590001",
-    simple: { limit: 5, period: 60 },
-  },
-  {
-    name: "API_KEY_RATE_LIMITER",
-    namespace_id: "3590002",
-    simple: { limit: 10, period: 60 },
-  },
-];
 
 type DeploymentOverrides = {
   controlPlaneService?: string;
@@ -96,6 +83,7 @@ export function createDeploymentConfig(
     throw new Error(
       "CLOUDFLARE_OAUTH_KV_NAMESPACE_ID is required when OAUTH_KV has no id.",
     );
+  const hosted = hostedRateLimits(String(config.name));
   return {
     ...config,
     d1_databases: d1Databases,
@@ -109,10 +97,9 @@ export function createDeploymentConfig(
     ],
     ratelimits: [
       ...((config.ratelimits as { name: string }[] | undefined) ?? []).filter(
-        (limiter) =>
-          !HOSTED_RATE_LIMITS.some((hosted) => hosted.name === limiter.name),
+        (limiter) => !hosted.some((entry) => entry.name === limiter.name),
       ),
-      ...HOSTED_RATE_LIMITS,
+      ...hosted,
     ],
   };
 }

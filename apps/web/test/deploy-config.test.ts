@@ -36,6 +36,20 @@ describe("deployment configuration", () => {
     expect(base).not.toHaveProperty("services");
   });
 
+  it("derives distinct limiter namespaces per Worker", () => {
+    const ids = (name: string) =>
+      (
+        createDeploymentConfig(
+          { ...base, name },
+          { controlPlaneService: "control-plane-production" },
+        ).ratelimits as { namespace_id: string }[]
+      ).map((limiter) => limiter.namespace_id);
+    const production = ids("tatsumaki");
+    const staging = ids("tatsumaki-staging");
+    expect(new Set(production).size).toBe(2);
+    expect(production.filter((id) => staging.includes(id))).toEqual([]);
+  });
+
   it("keeps unrelated services and replaces the selected binding without duplicates", () => {
     const result = createDeploymentConfig(
       {

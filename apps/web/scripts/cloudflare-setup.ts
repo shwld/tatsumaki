@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
+import { hostedRateLimits } from "./hosted-rate-limits";
 
 const API_BASE_URL = "https://api.cloudflare.com/client/v4";
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
@@ -459,7 +460,16 @@ ENTITLEMENT_MODE = "control-plane"
 [[services]]
 binding = "CONTROL_PLANE"
 service = ${toml(controlPlaneService)}
-`
+${hostedRateLimits(plan.workerName)
+  .map(
+    (limiter) => `
+[[ratelimits]]
+name = ${toml(limiter.name)}
+namespace_id = ${toml(limiter.namespace_id)}
+simple = { limit = ${limiter.simple.limit}, period = ${limiter.simple.period} }
+`,
+  )
+  .join("")}`
     : "";
   return `"$schema" = ${toml(join(WEB_DIR, "node_modules/wrangler/config-schema.json"))}
 name = ${toml(plan.workerName)}
