@@ -54,6 +54,7 @@ export type Bindings = {
   ARTIFACTS?: R2Bucket;
   ARTIFACT_CONTENT_SIGNING_KEY?: string;
   ARTIFACT_CONTENT_SIGNING_KEY_PREVIOUS?: string;
+  ARTIFACT_CONTENT_ORIGIN?: string;
   OAUTH_KV?: KVNamespace;
   ACCESS_AUD?: string;
   ACCESS_TEAM_DOMAIN?: string;

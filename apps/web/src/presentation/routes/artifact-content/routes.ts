@@ -3,6 +3,7 @@ import { readArtifactContent } from "../../../application/usecases/artifacts/art
 import { D1ArtifactRepository } from "../../../infrastructure/db/repositories/d1-artifact-repository";
 import { R2ArtifactObjectStore } from "../../../infrastructure/storage/r2-artifact-object-store";
 import type { Env } from "../../../index";
+import { isArtifactPreviewEnabled } from "../artifacts/preview-policy";
 import { signingKeysFrom } from "../artifacts/signing-keys";
 import {
   artifactContentDeniedHeaders,
@@ -39,6 +40,7 @@ artifactContentRoute.get("/artifact-content/*", async (c) => {
   if (
     !match ||
     !keys ||
+    !isArtifactPreviewEnabled(c.env, c.req.url) ||
     !c.env.ARTIFACTS ||
     !isAllowedArtifactContentFetch(c.req.raw.headers)
   ) {
