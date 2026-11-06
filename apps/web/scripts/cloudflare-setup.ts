@@ -438,8 +438,9 @@ export async function setupCloudflare(
       const customDomain = customDomainFor(plan, options);
       const contentDomain = contentDomainFor(plan, options);
       if (contentDomain) {
-        // ADR-0012 §4: the content site is outside Access and authorized by
-        // its capability token alone, so no bypass application is created.
+        // ADR-0012 §4: authorized by the capability token alone. The Worker's
+        // Access application protects every hostname of the Worker, so the
+        // token path of the content host needs its own bypass.
         const appHost = customDomain ?? workerDomain;
         if (
           !isValidArtifactContentOrigin(`https://${contentDomain}`, appHost)
@@ -449,6 +450,9 @@ export async function setupCloudflare(
           );
         }
         await client.ensureWorkerCustomDomain(plan.workerName, contentDomain);
+        await client.ensureArtifactContentBypass(plan, contentDomain, {
+          nameSuffix: ` (${contentDomain})`,
+        });
       } else {
         await client.ensureArtifactContentBypass(plan, workerDomain);
         if (customDomain) {

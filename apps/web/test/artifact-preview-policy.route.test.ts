@@ -74,6 +74,32 @@ const SPLIT = {
   ARTIFACT_CONTENT_ORIGIN: "https://content.example",
 };
 
+describe("isValidArtifactContentOrigin sibling hosts", () => {
+  it("rejects a sibling subdomain of the same registrable domain", () => {
+    expect(
+      isValidArtifactContentOrigin(
+        "https://content.example.com",
+        "app.example.com",
+      ),
+    ).toBe(false);
+  });
+
+  it("treats a public suffix like workers.dev as a boundary", () => {
+    expect(
+      isValidArtifactContentOrigin(
+        "https://content.workers.dev",
+        "app.acct.workers.dev",
+      ),
+    ).toBe(true);
+    expect(
+      isValidArtifactContentOrigin(
+        "https://content.acct.workers.dev",
+        "app.acct.workers.dev",
+      ),
+    ).toBe(false);
+  });
+});
+
 describe("artifact preview fail-closed (ADR-0012 §5)", () => {
   it("disables preview on the official host without a content origin", async () => {
     const response = await requestToken({ ENTITLEMENT_MODE: "control-plane" });

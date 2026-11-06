@@ -105,7 +105,7 @@ curl -i https://<host>/api/projects
 ... bun apps/web/scripts/setup-cloudflare.ts --allow-email you@example.com --content-domain content.example.net
 ```
 
-domainのzoneは同じCloudflare accountにある必要があります。setupコマンドは、そのdomainを同じWorkerへ割り当て、`ARTIFACT_CONTENT_ORIGIN`（`https://<content domain>`）と `ARTIFACT_APP_ORIGIN`（contentをframeできる唯一のorigin、つまりアプリのorigin）を設定し、`/artifact-content/*` のAccess bypassは作りません。`ARTIFACT_CONTENT_ORIGIN` を設定すると、content hostは `/artifact-content/*` だけを処理し、アプリのhostはそのpathに404を返します。content domainは他の用途に使わないでください。2つの変数のどちらかが不正だとpreviewは無効になります。手動で設定する場合は、Workerのvariableとして追加します。
+domainのzoneは同じCloudflare accountにある必要があります。setupコマンドは、そのdomainを同じWorkerへ割り当て、`ARTIFACT_CONTENT_ORIGIN`（`https://<content domain>`）と `ARTIFACT_APP_ORIGIN`（contentをframeできる唯一のorigin、つまりアプリのorigin）を設定し、content domainの `/artifact-content/*` だけにAccess bypassを作ります（Workerを保護するAccess applicationがcapability URLを遮るため）。`ARTIFACT_CONTENT_ORIGIN` を設定すると、content hostは `/artifact-content/*` だけを処理し、アプリのhostはそのpathに404を返します。content domainは他の用途に使わないでください。2つの変数のどちらかが不正だとpreviewは無効になります。手動で設定する場合は、Workerのvariableとして追加します。
 
 公式ホスト版（`ENTITLEMENT_MODE=control-plane`）では、両方を設定するまでpreviewは無効のままです。
 

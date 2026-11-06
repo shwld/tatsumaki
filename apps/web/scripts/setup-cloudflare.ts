@@ -21,7 +21,7 @@ Options:
   --staging-custom-domain <host>
                            Same, for the staging custom domain
   --content-domain <host>  Serve artifact previews from this domain (a different registrable domain
-                           from the app, in your zone); no Access bypass is created for it
+                           from the app, in your zone); its /artifact-content/* is bypassed in Access
   --staging-content-domain <host>
                            Same, for staging
   --name-prefix <name>     Resource name prefix (default: tatsumaki)

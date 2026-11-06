@@ -254,7 +254,7 @@ describe("Cloudflare self-hosting setup", () => {
     );
   });
 
-  it("attaches the content domain and skips the Access bypass (ADR-0012)", async () => {
+  it("attaches the content domain and bypasses Access for its token path (ADR-0012)", async () => {
     const calls: Array<{ url: string; method: string; body?: unknown }> = [];
     const responses = [
       envelope([]),
@@ -277,6 +277,10 @@ describe("Cloudflare self-hosting setup", () => {
       envelope([]),
       envelope([{ id: "zone-id", name: "content.example" }]),
       envelope({}),
+      envelope([]),
+      envelope({ id: "content-bypass-id", name: "x" }),
+      envelope([]),
+      envelope({ id: "content-policy-id" }),
     ];
     const fetchMock = vi.fn(
       async (input: string | URL | Request, init?: RequestInit) => {
@@ -305,10 +309,19 @@ describe("Cloudflare self-hosting setup", () => {
     );
 
     expect(responses).toHaveLength(0);
-    expect(calls.some((call) => call.url.includes("artifact content"))).toBe(
-      false,
+    expect(calls).toContainEqual(
+      expect.objectContaining({
+        method: "POST",
+        body: expect.objectContaining({
+          destinations: [
+            { type: "public", uri: "app.content.example/artifact-content/*" },
+          ],
+        }),
+      }),
     );
-    expect(calls.at(-1)).toMatchObject({
+    expect(
+      calls.find((call) => call.url.includes("/workers/domains")),
+    ).toMatchObject({
       method: "PUT",
       url: expect.stringContaining("/workers/domains"),
       body: {

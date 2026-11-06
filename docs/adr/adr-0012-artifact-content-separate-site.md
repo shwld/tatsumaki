@@ -43,8 +43,8 @@ ADR-0011 により、公式ホスト版は自由登録になる。登録者は p
 
 ### 4. Cloudflare Access
 
-- content domain は Access の対象外とする。bypass application は要らない。認可は capability token のみで、ADR-0010 §4 の決定は変わらない。
-- `ARTIFACT_CONTENT_ORIGIN` の設定時、setup script は `/artifact-content/*` の bypass application を作らない。本体 host の同 path は 404 を返すので、既存の bypass が残っていても害はない。
+- 認可は capability token のみで、ADR-0010 §4 の決定は変わらない。
+- Worker を保護する Access application は、Worker のどの hostname 経由でも保護する（Cloudflare docs）。そのため content host の `/artifact-content/*` にも bypass application が必要で、setup script は content domain 用に作る（Amendment 2026-11-06）。本体 host の同 path は 404 を返すので、本体側の既存 bypass は残っても害はない。
 - 未設定の self-hosting では、ADR-0010 の bypass application を従来どおり使う。
 
 ### 5. 未設定の環境の既定
@@ -88,3 +88,6 @@ ADR-0011 により、公式ホスト版は自由登録になる。登録者は p
 
 - 実 browser テストは、本体を `127.0.0.1`、content を `localhost` に置く（browser は別 site として扱う）。headless Chromium で site isolation を有効にするため `--site-per-process` を付け、Local Network Access のチェックは無効にする（テストの親ページが Playwright の応答で、loopback の content へ向かうため）。3,000ms の busy loop 中の親ページのタイマー遅延は、同一 site 構成の 2,991ms から 2ms になった。
 - 別 site では本体と content が cross-site になり、`Sec-Fetch-Site` だけでは「本体が script として読み込む」要求と「sandbox された artifact の subresource」を区別できない。`/artifact-content/*` の Fetch Metadata による拒否（ADR-0010 §5）は未設定時（同一 host）の防御として残り、別 site 構成では本体の CSP（`script-src` に content origin を含めない）が障壁になる。
+- 「別 site」の判定は public suffix list に基づく registrable domain の比較とする（`tldts`）。`app.example.com` と `content.example.com` は同一 site なので拒否する。loopback host など registrable domain を持たない host は完全一致で比較する。
+- Access: 当初の「content domain は Access の対象外で bypass 不要」を改め、content domain の `/artifact-content/*` に bypass application を作る（上記 §4）。
+

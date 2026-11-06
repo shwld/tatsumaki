@@ -124,7 +124,7 @@ async function mockArtifactApi(page: Page, setup: Setup = {}) {
           expiresAt:
             setup.tokenExpiresAt ??
             new Date(Date.now() + 600_000).toISOString(),
-          contentPath: "/artifact-content/t/index.html",
+          contentUrl: "/artifact-content/t/index.html",
         }),
       ),
   );

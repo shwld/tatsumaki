@@ -1,3 +1,4 @@
+import { getDomain } from "tldts";
 import type { Bindings } from "../../../index";
 
 type PreviewPolicyEnv = Pick<
@@ -7,8 +8,20 @@ type PreviewPolicyEnv = Pick<
 
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
-const isSameSiteHost = (a: string, b: string): boolean =>
-  a === b || a.endsWith(`.${b}`) || b.endsWith(`.${a}`);
+/**
+ * Browsers define a site by the registrable domain (public suffix list), so
+ * sibling hosts such as app.example.com and content.example.com share a site.
+ * Hosts without a registrable domain (localhost, IP addresses) are compared
+ * exactly.
+ */
+export const isSameSiteHost = (a: string, b: string): boolean => {
+  const registrableA = getDomain(a, { allowPrivateDomains: true });
+  const registrableB = getDomain(b, { allowPrivateDomains: true });
+  if (registrableA && registrableB && registrableA === registrableB) {
+    return true;
+  }
+  return a === b || a.endsWith(`.${b}`) || b.endsWith(`.${a}`);
+};
 
 const parseOrigin = (value: string | undefined): URL | null => {
   if (!value) return null;

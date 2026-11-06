@@ -105,7 +105,7 @@ Without further configuration, previews are served from the app's own host in a 
 ... bun apps/web/scripts/setup-cloudflare.ts --allow-email you@example.com --content-domain content.example.net
 ```
 
-The domain's zone must be in the same Cloudflare account. The setup command attaches the domain to the same Worker, sets `ARTIFACT_CONTENT_ORIGIN` (`https://<content domain>`) and `ARTIFACT_APP_ORIGIN` (the app's origin, the only origin allowed to frame the content), and does not create the `/artifact-content/*` Access bypass. Once `ARTIFACT_CONTENT_ORIGIN` is set, the content host serves only `/artifact-content/*` and the app host returns 404 for that path. Use the content domain for nothing else. Both variables must be valid; if either is wrong, previews are disabled. To set them by hand, add them as Worker variables.
+The domain's zone must be in the same Cloudflare account. The setup command attaches the domain to the same Worker, sets `ARTIFACT_CONTENT_ORIGIN` (`https://<content domain>`) and `ARTIFACT_APP_ORIGIN` (the app's origin, the only origin allowed to frame the content), and creates an Access bypass for `https://<content domain>/artifact-content/*` only (the Worker's Access application would otherwise intercept the capability URL). Once `ARTIFACT_CONTENT_ORIGIN` is set, the content host serves only `/artifact-content/*` and the app host returns 404 for that path. Use the content domain for nothing else. Both variables must be valid; if either is wrong, previews are disabled. To set them by hand, add them as Worker variables.
 
 On the official hosted deployment (`ENTITLEMENT_MODE=control-plane`), previews stay disabled until both are set.
 
