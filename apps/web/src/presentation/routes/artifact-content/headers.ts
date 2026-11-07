@@ -34,7 +34,7 @@ const DISABLED_FEATURES = [
  * rest of the tatsumaki origin (ADR-0010 §2, §4).
  */
 export function artifactContentSecurityPolicy(
-  origin: string,
+  frameAncestor: string,
   contentBase: string,
 ): string {
   return [
@@ -50,17 +50,17 @@ export function artifactContentSecurityPolicy(
     "object-src 'none'",
     "base-uri 'none'",
     "worker-src 'none'",
-    `frame-ancestors ${origin}`,
+    `frame-ancestors ${frameAncestor}`,
   ].join("; ");
 }
 
 export function artifactContentHeaders(
-  origin: string,
+  frameAncestor: string,
   contentBase: string,
 ): Record<string, string> {
   return {
     "Content-Security-Policy": artifactContentSecurityPolicy(
-      origin,
+      frameAncestor,
       contentBase,
     ),
     "X-Content-Type-Options": "nosniff",
@@ -76,8 +76,9 @@ export function artifactContentHeaders(
 /** Restrictive headers for requests that never got as far as a valid token. */
 export function artifactContentDeniedHeaders(
   origin: string,
+  frameAncestor: string,
 ): Record<string, string> {
-  return artifactContentHeaders(origin, `${origin}/artifact-content/`);
+  return artifactContentHeaders(frameAncestor, `${origin}/artifact-content/`);
 }
 
 /**

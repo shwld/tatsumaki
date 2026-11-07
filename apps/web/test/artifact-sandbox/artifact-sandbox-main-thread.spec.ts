@@ -10,11 +10,14 @@ import {
 import { installParentRoutes, parentUrl } from "./support/parent";
 
 /**
- * ADR-0010 accepts that a busy loop in the artifact may freeze the tab that
- * embeds it. This does not assert a verdict; it measures and records it, so the
- * ADR states what a real browser does and a later change in Chromium shows up.
+ * ADR-0012: the artifact is served from another site, so a busy loop in it
+ * must not freeze the page that embeds it. ADR-0010 measured a ~3s freeze
+ * when both were the same site.
  */
-test("measures how much an artifact's busy loop delays the embedding page", async ({
+const BUSY_LOOP_MS = 3000;
+const MAX_PARENT_DELAY_MS = 1000;
+
+test("an artifact busy loop does not freeze the embedding page", async ({
   page,
 }, testInfo) => {
   const projectId = await createProject("sandbox main thread");
@@ -28,7 +31,7 @@ test("measures how much an artifact's busy loop delays the embedding page", asyn
   await installParentRoutes(page);
   const token = await issuePreviewToken(projectId, artifactId, 1);
   await page.goto(
-    parentUrl({ src: token.contentPath, sandbox: "allow-scripts" }),
+    parentUrl({ src: token.contentUrl, sandbox: "allow-scripts" }),
   );
   const frame = page
     .frames()
@@ -69,15 +72,11 @@ test("measures how much an artifact's busy loop delays the embedding page", asyn
   const report = {
     browser: testInfo.project.name,
     headless: true,
-    busyLoopMs: 3000,
+    busyLoopMs: BUSY_LOOP_MS,
     embeddingPageMaxTimerDelayMs: {
       idle: Math.round(idle.max),
       withBusyLoop: Math.round(spinning.max),
     },
-    verdict:
-      spinning.max > 1500
-        ? "the embedding page was frozen for about as long as the loop ran (same process)"
-        : "the embedding page stayed responsive (the sandboxed frame ran in another process)",
   };
   console.log(`main thread measurement: ${JSON.stringify(report)}`);
   mkdirSync("test-results", { recursive: true });
@@ -90,7 +89,9 @@ test("measures how much an artifact's busy loop delays the embedding page", asyn
     description: JSON.stringify(report),
   });
 
-  // Sanity only: the measurement itself must have worked.
   expect(idle.samples).toBeGreaterThan(10);
   expect(idle.max).toBeLessThan(500);
+  // The loop ran for 3s; a frozen parent would report about that delay.
+  expect(spinning.samples).toBeGreaterThan(10);
+  expect(spinning.max).toBeLessThan(MAX_PARENT_DELAY_MS);
 });

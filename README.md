@@ -73,6 +73,7 @@ The API token needs these account permissions:
 - Workers R2 Storage Write
 - Workers Scripts Write
 - Access: Apps and Policies Write
+- Zone Read (account-level Zone permission; only with `--custom-domain` or `--content-domain`, to find the zone to attach the domain to)
 
 The setup command reads the token only from the environment and never writes account IDs, resource IDs, Access values, or secrets into the repository.
 
@@ -96,6 +97,18 @@ curl -i https://<host>/api/projects
 ```
 
 The first must return the Worker's 404, not a 302 to the Access login; the second must still be redirected to the Access login.
+
+### Serving artifact content from a separate site (recommended for public deployments)
+
+Without further configuration, previews are served from the app's own host in a sandboxed iframe. An artifact that runs an endless loop can then freeze the tab of the member who views it, because the iframe shares the app's browser process. To prevent that, serve content from a domain on a **different registrable domain** (not a subdomain of the app's domain):
+
+```bash
+... bun apps/web/scripts/setup-cloudflare.ts --allow-email you@example.com --content-domain content.example.net
+```
+
+The domain's zone must be in the same Cloudflare account. The setup command attaches the domain to the same Worker, sets `ARTIFACT_CONTENT_ORIGIN` (`https://<content domain>`) and `ARTIFACT_APP_ORIGIN` (the app's origin, the only origin allowed to frame the content), and creates an Access bypass for `https://<content domain>/artifact-content/*` only (the Worker's Access application would otherwise intercept the capability URL). Once `ARTIFACT_CONTENT_ORIGIN` is set, the content host serves only `/artifact-content/*` and the app host returns 404 for that path. Use the content domain for nothing else. Both variables must be valid; if either is wrong, previews are disabled. To set them by hand, add them as Worker variables.
+
+On the official hosted deployment (`ENTITLEMENT_MODE=control-plane`), previews stay disabled until both are set.
 
 For an existing installation, use `--staging-only` to create, repair, or redeploy staging without looking up, migrating, deploying, or changing any production resource:
 

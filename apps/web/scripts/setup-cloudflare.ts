@@ -20,6 +20,10 @@ Options:
   --custom-domain <host>   Also bypass Access for /artifact-content/* on this production custom domain
   --staging-custom-domain <host>
                            Same, for the staging custom domain
+  --content-domain <host>  Serve artifact previews from this domain (a different registrable domain
+                           from the app, in your zone); its /artifact-content/* is bypassed in Access
+  --staging-content-domain <host>
+                           Same, for staging
   --name-prefix <name>     Resource name prefix (default: tatsumaki)
   --dry-run                Print the plan without contacting Cloudflare
   --help                   Show this help
@@ -58,6 +62,10 @@ export function parseArguments(
       options.customDomain = requiredValue(args, ++index, argument);
     else if (argument === "--staging-custom-domain")
       options.stagingCustomDomain = requiredValue(args, ++index, argument);
+    else if (argument === "--content-domain")
+      options.contentDomain = requiredValue(args, ++index, argument);
+    else if (argument === "--staging-content-domain")
+      options.stagingContentDomain = requiredValue(args, ++index, argument);
     else if (argument === "--staging-control-plane-service")
       options.stagingControlPlaneService = requiredValue(
         args,

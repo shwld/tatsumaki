@@ -155,6 +155,9 @@ describe("Cloudflare self-hosting setup", () => {
       envelope({ id: "bypass-app-id", name: "tatsumaki artifact content" }),
       envelope([]),
       envelope({ id: "bypass-policy-id" }),
+      // secrets left over from a previous --content-domain run are removed
+      envelope({}),
+      envelope({}),
     ];
     const fetchMock = vi.fn(
       async (input: string | URL | Request, init?: RequestInit) => {
@@ -254,6 +257,99 @@ describe("Cloudflare self-hosting setup", () => {
     );
   });
 
+  it("attaches the content domain and bypasses Access for its token path (ADR-0012)", async () => {
+    const calls: Array<{ url: string; method: string; body?: unknown }> = [];
+    const responses = [
+      envelope([]),
+      envelope({ uuid: "d1-id", name: "tatsumaki-db" }),
+      envelope([]),
+      envelope({ id: "kv-id", title: "tatsumaki-oauth-kv" }),
+      envelope({ buckets: [] }),
+      envelope({ id: "story-r2", name: "tatsumaki-story-attachments" }),
+      envelope({ buckets: [] }),
+      envelope({ id: "avatars-r2", name: "tatsumaki-user-avatars" }),
+      envelope({ buckets: [] }),
+      envelope({ id: "artifacts-r2", name: "tatsumaki-artifacts" }),
+      envelope({ subdomain: "account-subdomain" }),
+      envelope([{ id: "worker-id", name: "tatsumaki" }]),
+      envelope([]),
+      envelope({ id: "app-id", name: "tatsumaki", aud: "access-aud" }),
+      envelope([]),
+      envelope({ id: "policy-id", name: "tatsumaki allowed users" }),
+      // zone lookup: the full host has no zone, its parent does
+      envelope([]),
+      envelope([{ id: "zone-id", name: "content.example" }]),
+      envelope({}),
+      envelope([]),
+      envelope({ id: "content-bypass-id", name: "x" }),
+      envelope([]),
+      envelope({ id: "content-policy-id" }),
+    ];
+    const fetchMock = vi.fn(
+      async (input: string | URL | Request, init?: RequestInit) => {
+        calls.push({
+          url: input.toString(),
+          method: init?.method ?? "GET",
+          body:
+            typeof init?.body === "string" ? JSON.parse(init.body) : undefined,
+        });
+        const response = responses.shift();
+        if (!response) throw new Error("Unexpected request");
+        return new Response(JSON.stringify(response), { status: 200 });
+      },
+    );
+    let generatedSecrets = "";
+    await setupCloudflare(
+      { ...baseOptions, contentDomain: "app.content.example" },
+      {
+        fetch: fetchMock as typeof fetch,
+        runCommand: async (command) => {
+          if (command.includes("bulk"))
+            generatedSecrets = await readFile(command[5], "utf8");
+        },
+        log: () => undefined,
+      },
+    );
+
+    expect(responses).toHaveLength(0);
+    expect(calls).toContainEqual(
+      expect.objectContaining({
+        method: "POST",
+        body: expect.objectContaining({
+          destinations: [
+            { type: "public", uri: "app.content.example/artifact-content/*" },
+          ],
+        }),
+      }),
+    );
+    expect(
+      calls.find((call) => call.url.includes("/workers/domains")),
+    ).toMatchObject({
+      method: "PUT",
+      url: expect.stringContaining("/workers/domains"),
+      body: {
+        environment: "production",
+        hostname: "app.content.example",
+        service: "tatsumaki",
+        zone_id: "zone-id",
+      },
+    });
+    expect(JSON.parse(generatedSecrets)).toMatchObject({
+      ARTIFACT_CONTENT_ORIGIN: "https://app.content.example",
+      ARTIFACT_APP_ORIGIN: "https://tatsumaki.account-subdomain.workers.dev",
+    });
+  });
+
+  it("rejects a content domain on the same site as the custom domain", () => {
+    expect(() =>
+      validateSetupOptions({
+        ...baseOptions,
+        customDomain: "tatsumaki.example.com",
+        contentDomain: "content.tatsumaki.example.com",
+      }),
+    ).toThrow(/different registrable domain/);
+  });
+
   it("reuses exact-name resources without issuing create requests", async () => {
     const responses = [
       envelope([{ uuid: "d1-id", name: "tatsumaki-db" }]),
@@ -307,6 +403,9 @@ describe("Cloudflare self-hosting setup", () => {
       envelope([
         bypassPolicy("bypass-policy-id", "tatsumaki artifact content bypass"),
       ]),
+      // secrets left over from a previous --content-domain run are removed
+      envelope({}),
+      envelope({}),
     ];
     const methods: string[] = [];
     const fetchMock = vi.fn(
@@ -325,19 +424,12 @@ describe("Cloudflare self-hosting setup", () => {
     });
 
     expect(responses).toHaveLength(0);
-    expect(methods).toEqual([
-      "GET",
-      "GET",
-      "GET",
-      "GET",
-      "GET",
-      "GET",
-      "GET",
-      "GET",
-      "GET",
-      "GET",
-      "GET",
+    // Only reads, plus removal of leftover content-origin secrets.
+    expect(methods.filter((method) => method !== "GET")).toEqual([
+      "DELETE",
+      "DELETE",
     ]);
+    expect(methods.slice(0, -2).every((method) => method === "GET")).toBe(true);
   });
 
   it("provisions staging-only without touching production resources", async () => {
@@ -373,6 +465,9 @@ describe("Cloudflare self-hosting setup", () => {
       }),
       envelope([]),
       envelope({ id: "bypass-policy-id" }),
+      // secrets left over from a previous --content-domain run are removed
+      envelope({}),
+      envelope({}),
     ];
     const fetchMock = vi.fn(
       async (input: string | URL | Request, init?: RequestInit) => {
@@ -604,6 +699,9 @@ describe("Cloudflare self-hosting setup", () => {
         ),
       ]),
       envelope([bypassPolicy("custom-policy-id", `${bypassName} bypass`)]),
+      // secrets left over from a previous --content-domain run are removed
+      envelope({}),
+      envelope({}),
     ];
     const fetchMock = vi.fn(
       async (input: string | URL | Request, init?: RequestInit) => {

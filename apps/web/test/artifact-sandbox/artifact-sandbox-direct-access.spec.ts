@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import path from "node:path";
 import {
   BASE_URL,
+  CONTENT_BASE_URL,
   contentUrl,
   createProject,
   issuePreviewToken,
@@ -35,6 +36,37 @@ test.describe("reaching the content route without the preview iframe", () => {
       .artifactId;
     siteArtifact = (await publishSite(projectId, site, { title: "site" }))
       .artifactId;
+  });
+
+  test("host split: the app host serves no content and the content host serves nothing else", async ({
+    page,
+  }) => {
+    const token = await issuePreviewToken(projectId, siteArtifact, 1);
+    expect(token.contentUrl).toBe(contentUrl(token.token, "index.html"));
+    const asDocument = { "Sec-Fetch-Dest": "document" };
+
+    const onApp = await page.request.get(`${BASE_URL}${token.contentPath}`, {
+      headers: asDocument,
+    });
+    expect(onApp.status()).toBe(404);
+
+    for (const path of ["/", "/api/health", "/login", "/projects/x"]) {
+      const onContent = await page.request.get(`${CONTENT_BASE_URL}${path}`);
+      expect(onContent.status(), path).toBe(404);
+      expect(onContent.headers()["set-cookie"], path).toBeUndefined();
+    }
+
+    // The app's cookie belongs to another host and is never sent here.
+    await page
+      .context()
+      .addCookies([{ name: "app_session", value: "secret", url: BASE_URL }]);
+    const served = await page.request.get(token.contentUrl, {
+      headers: asDocument,
+    });
+    expect(served.status()).toBe(200);
+    expect(served.headers()["set-cookie"]).toBeUndefined();
+    const cookiesForContent = await page.context().cookies(CONTENT_BASE_URL);
+    expect(cookiesForContent).toEqual([]);
   });
 
   test("a content URL opened as a page of its own is still sandboxed by its headers", async ({
@@ -94,12 +126,12 @@ test.describe("reaching the content route without the preview iframe", () => {
     );
     const asDocument = { "Sec-Fetch-Dest": "document" };
     const denied = [
-      `${BASE_URL}/artifact-content/`,
-      `${BASE_URL}/artifact-content/not-a-token/index.html`,
+      `${CONTENT_BASE_URL}/artifact-content/`,
+      `${CONTENT_BASE_URL}/artifact-content/not-a-token/index.html`,
       contentUrl(inSignature, "index.html"),
       contentUrl(inPayload, "index.html"),
       contentUrl(token.token, "missing.html"),
-      `${BASE_URL}/artifact-content/${token.token}`,
+      `${CONTENT_BASE_URL}/artifact-content/${token.token}`,
     ];
 
     const bodies = new Set<string>();
@@ -182,7 +214,10 @@ test.describe("reaching the content route without the preview iframe", () => {
     const token = await issuePreviewToken(projectId, siteArtifact, 1);
     const scriptUrl = contentUrl(token.token, "classic.js");
 
-    // The app's own CSP (production headers) refuses the script outright ...
+    // The app's own CSP (production headers) refuses the script outright. With
+    // a separate content site the app is cross-site to it, so Fetch Metadata can
+    // no longer tell the app from the sandboxed document: the CSP is the barrier
+    // (the same-host Fetch Metadata rule is covered in artifact-content.route.test.ts).
     await page.goto(
       parentUrl({
         src: contentUrl(token.token, "index.html"),
@@ -210,48 +245,6 @@ test.describe("reaching the content route without the preview iframe", () => {
           v.blocked.includes("/artifact-content/"),
       ),
     ).toBe(true);
-    expect(
-      await page.evaluate(
-        () =>
-          (window as unknown as { __classicLoaded?: boolean }).__classicLoaded,
-      ),
-    ).toBeUndefined();
-
-    // ... and even without that CSP the route itself answers 404, because a
-    // same-origin script request is not what an artifact's iframe sends.
-    await page.goto(
-      parentUrl({
-        src: contentUrl(token.token, "index.html"),
-        sandbox: "allow-scripts",
-        control: true,
-      }),
-    );
-    const outcomes = await page.evaluate(async (url) => {
-      const script = await new Promise<string>((resolve) => {
-        const element = document.createElement("script");
-        element.src = url;
-        element.onload = () => resolve("loaded");
-        element.onerror = () => resolve("refused");
-        document.head.appendChild(element);
-      });
-      const image = await new Promise<string>((resolve) => {
-        const element = new Image();
-        element.onload = () => resolve("loaded");
-        element.onerror = () => resolve("refused");
-        element.src = url.replace("classic.js", "pixel.png");
-      });
-      const fetched = await fetch(url).then(
-        (response) => String(response.status),
-        () => "refused",
-      );
-      return { script, image, fetched };
-    }, scriptUrl);
-
-    expect(outcomes).toEqual({
-      script: "refused",
-      image: "refused",
-      fetched: "404",
-    });
     expect(
       await page.evaluate(
         () =>

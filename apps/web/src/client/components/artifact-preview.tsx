@@ -115,7 +115,7 @@ export function ArtifactPreview({
   return (
     <iframe
       title={t("artifactScreens.preview.title", { title, version })}
-      src={issue.data.contentPath}
+      src={issue.data.contentUrl}
       sandbox="allow-scripts"
       referrerPolicy="no-referrer"
       allow=""

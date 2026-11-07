@@ -43,7 +43,12 @@ const SUBRESOURCE: Record<string, string> = {
   "Sec-Fetch-Site": "cross-site",
 };
 
-type PreviewToken = { token: string; expiresAt: string; contentPath: string };
+type PreviewToken = {
+  token: string;
+  expiresAt: string;
+  contentPath: string;
+  contentUrl: string;
+};
 
 describe("artifact content serving", () => {
   let projectId: string;
@@ -103,6 +108,7 @@ describe("artifact content serving", () => {
       expect(body.contentPath).toBe(
         `/artifact-content/${body.token}/index.html`,
       );
+      expect(body.contentUrl).toBe(`https://localhost${body.contentPath}`);
       expect(new Date(body.expiresAt).getTime()).toBeGreaterThan(Date.now());
     });
 
@@ -393,6 +399,17 @@ describe("artifact content serving", () => {
       expect(frameSrc.trim()).toBe(
         "frame-src https://localhost/artifact-content/ https://challenges.cloudflare.com",
       );
+    });
+
+    it("frames only the content origin when a content site is set", () => {
+      const csp =
+        spaIndexHeaders("https://localhost", "https://content.example")[
+          "Content-Security-Policy"
+        ] ?? "";
+      expect(csp).toContain(
+        "frame-src https://content.example/artifact-content/ https://challenges.cloudflare.com",
+      );
+      expect(csp).not.toContain("frame-src https://localhost");
     });
   });
 });

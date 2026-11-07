@@ -13,8 +13,15 @@
  */
 const TURNSTILE_ORIGIN = "https://challenges.cloudflare.com";
 
-export function spaIndexHeaders(origin: string): Record<string, string> {
+/**
+ * `contentOrigin` is where artifact previews are served from: the app origin
+ * itself unless a separate site is configured (ADR-0012 §3).
+ */
+export function spaIndexHeaders(
+  origin: string,
+  contentOrigin: string = origin,
+): Record<string, string> {
   return {
-    "Content-Security-Policy": `script-src ${origin}/assets/ ${TURNSTILE_ORIGIN}; frame-src ${origin}/artifact-content/ ${TURNSTILE_ORIGIN}; object-src 'none'; base-uri 'self'`,
+    "Content-Security-Policy": `script-src ${origin}/assets/ ${TURNSTILE_ORIGIN}; frame-src ${contentOrigin}/artifact-content/ ${TURNSTILE_ORIGIN}; object-src 'none'; base-uri 'self'`,
   };
 }

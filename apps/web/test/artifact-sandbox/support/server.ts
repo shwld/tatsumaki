@@ -7,6 +7,13 @@ import { sha256Hex } from "../../../src/domain/artifacts/sha256";
 export const BASE_URL =
   process.env.ARTIFACT_SANDBOX_URL ?? "http://127.0.0.1:8788";
 
+/**
+ * Artifact content is served from a different site than the app (ADR-0012):
+ * "localhost" and "127.0.0.1" are distinct sites for the browser.
+ */
+export const CONTENT_BASE_URL =
+  process.env.ARTIFACT_SANDBOX_CONTENT_URL ?? "http://localhost:8788";
+
 export type SiteFile = { path: string; body: Buffer };
 
 /** Reads a fixture directory into upload files with `/`-separated paths. */
@@ -115,6 +122,7 @@ export type PreviewToken = {
   token: string;
   expiresAt: string;
   contentPath: string;
+  contentUrl: string;
 };
 
 export async function issuePreviewToken(
@@ -137,7 +145,7 @@ export async function issuePreviewToken(
 /** URL of a file inside the content route for an issued token. */
 export function contentUrl(token: string, filePath: string): string {
   const encoded = filePath.split("/").map(encodeURIComponent).join("/");
-  return `${BASE_URL}/artifact-content/${token}/${encoded}`;
+  return `${CONTENT_BASE_URL}/artifact-content/${token}/${encoded}`;
 }
 
 /**
@@ -152,7 +160,7 @@ export function rawGet(
   body: string;
   headers: http.IncomingHttpHeaders;
 }> {
-  const url = new URL(BASE_URL);
+  const url = new URL(CONTENT_BASE_URL);
   return new Promise((resolve, reject) => {
     const request = http.request(
       {
