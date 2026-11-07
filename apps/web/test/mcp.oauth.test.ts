@@ -6,6 +6,7 @@ import { createDb } from "../src/infrastructure/db/client";
 import { iterationsTable } from "../src/infrastructure/db/schema/iterations";
 import { projectMembersTable } from "../src/infrastructure/db/schema/project-members";
 import { createAuthHeaders, setupAccessBindings } from "./helpers/access-jwt";
+import { submitConsent } from "./helpers/cli-auth";
 import { resetDatabase } from "./helpers/db";
 
 type ClientRegistrationResponse = {
@@ -99,6 +100,153 @@ describe("MCP OAuth", () => {
     expect(response.headers.get("www-authenticate")).toContain(
       `resource_metadata="https://localhost/.well-known/oauth-protected-resource/programmatic-api/mcp"`,
     );
+  });
+
+  describe("authorization consent", () => {
+    async function buildAuthorizeUrl() {
+      const clientId = await registerClient();
+      const url = new URL("https://localhost/oauth/authorize");
+      url.searchParams.set("response_type", "code");
+      url.searchParams.set("client_id", clientId);
+      url.searchParams.set("redirect_uri", "https://claude.example/callback");
+      url.searchParams.set("scope", "mcp");
+      url.searchParams.set("state", "state-consent");
+      url.searchParams.set(
+        "code_challenge",
+        await createCodeChallenge("test-verifier-123456789"),
+      );
+      url.searchParams.set("code_challenge_method", "S256");
+      return url;
+    }
+
+    async function loadNonce(
+      url: URL,
+      identity?: Parameters<typeof createAuthHeaders>[0],
+    ) {
+      const page = await SELF.fetch(url, {
+        headers: await createAuthHeaders(identity),
+        redirect: "manual",
+      });
+      expect(page.status).toBe(200);
+      const html = await page.text();
+      expect(html).toContain("Claude Code");
+      return /name="nonce" value="([^"]+)"/.exec(html)?.[1] ?? "";
+    }
+
+    async function postDecision(
+      fields: Record<string, string>,
+      options: {
+        origin?: string;
+        identity?: Parameters<typeof createAuthHeaders>[0];
+      } = {},
+    ) {
+      return SELF.fetch("https://localhost/oauth/authorize", {
+        method: "POST",
+        headers: {
+          ...(await createAuthHeaders(options.identity)),
+          origin: options.origin ?? "https://localhost",
+          "content-type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams(fields).toString(),
+        redirect: "manual",
+      });
+    }
+
+    it("shows the consent page without issuing a code", async () => {
+      const url = await buildAuthorizeUrl();
+      const response = await SELF.fetch(url, {
+        headers: await createAuthHeaders(),
+        redirect: "manual",
+      });
+      expect(response.status).toBe(200);
+      expect(response.headers.get("x-frame-options")).toBe("DENY");
+      expect(response.headers.get("location")).toBeNull();
+    });
+
+    it("redirects with access_denied and no code when denied", async () => {
+      const response = await submitConsent(await buildAuthorizeUrl(), "deny");
+      expect(response.status).toBe(302);
+      const redirect = new URL(response.headers.get("location") ?? "");
+      expect(redirect.origin).toBe("https://claude.example");
+      expect(redirect.searchParams.get("error")).toBe("access_denied");
+      expect(redirect.searchParams.get("state")).toBe("state-consent");
+      expect(redirect.searchParams.get("code")).toBeNull();
+    });
+
+    it("rejects unsupported scopes before showing the consent page", async () => {
+      const url = await buildAuthorizeUrl();
+      for (const scope of ["mcp admin", "constructor"]) {
+        url.searchParams.set("scope", scope);
+        const response = await SELF.fetch(url, {
+          headers: await createAuthHeaders(),
+          redirect: "manual",
+        });
+        expect(response.status).toBe(302);
+        const redirect = new URL(response.headers.get("location") ?? "");
+        expect(redirect.origin).toBe("https://claude.example");
+        expect(redirect.searchParams.get("error")).toBe("invalid_scope");
+        expect(redirect.searchParams.get("state")).toBe("state-consent");
+      }
+    });
+
+    it("rejects invalid authorize requests on the consent page", async () => {
+      const url = await buildAuthorizeUrl();
+      url.searchParams.set("redirect_uri", "https://evil.example/callback");
+      const response = await SELF.fetch(url, {
+        headers: await createAuthHeaders(),
+        redirect: "manual",
+      });
+      expect(response.status).toBe(400);
+    });
+
+    it("rejects missing, cross-origin, replayed and other-user decisions", async () => {
+      const url = await buildAuthorizeUrl();
+
+      expect((await postDecision({ decision: "approve" })).status).toBe(400);
+      expect(
+        (await postDecision({ nonce: "unknown", decision: "approve" })).status,
+      ).toBe(400);
+
+      const crossOriginNonce = await loadNonce(url);
+      expect(
+        (
+          await postDecision(
+            { nonce: crossOriginNonce, decision: "approve" },
+            { origin: "https://evil.example" },
+          )
+        ).status,
+      ).toBe(403);
+
+      const otherUser = {
+        sub: "github|other-user",
+        email: "other@example.com",
+      };
+      const stolenNonce = await loadNonce(url);
+      expect(
+        (
+          await postDecision(
+            { nonce: stolenNonce, decision: "approve" },
+            { identity: otherUser },
+          )
+        ).status,
+      ).toBe(403);
+      expect(
+        (await postDecision({ nonce: stolenNonce, decision: "approve" }))
+          .status,
+      ).toBe(400);
+
+      const nonce = await loadNonce(url);
+      const approved = await postDecision({ nonce, decision: "approve" });
+      expect(approved.status).toBe(302);
+      expect(
+        new URL(approved.headers.get("location") ?? "").searchParams.get(
+          "code",
+        ),
+      ).toBeTruthy();
+      expect((await postDecision({ nonce, decision: "approve" })).status).toBe(
+        400,
+      );
+    });
   });
 
   it("authorizes via Access and scopes list_stories to the authenticated user", async () => {
@@ -1098,10 +1246,7 @@ async function issueAccessTokenForResource(resource: string) {
   authorizeUrl.searchParams.set("code_challenge_method", "S256");
   authorizeUrl.searchParams.set("resource", resource);
 
-  const authorizeResponse = await SELF.fetch(authorizeUrl, {
-    headers: await createAuthHeaders(),
-    redirect: "manual",
-  });
+  const authorizeResponse = await submitConsent(authorizeUrl, "approve");
 
   expect(authorizeResponse.status).toBe(302);
   const redirectUrl = new URL(authorizeResponse.headers.get("location") ?? "");

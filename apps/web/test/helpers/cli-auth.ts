@@ -2,6 +2,34 @@ import { SELF } from "cloudflare:test";
 import { expect } from "vitest";
 import { createAuthHeaders } from "./access-jwt";
 
+/** Loads the consent page for an authorize URL and submits the decision. */
+export async function submitConsent(
+  authorizeUrl: URL,
+  decision: "approve" | "deny",
+  identity?: Parameters<typeof createAuthHeaders>[0],
+) {
+  const headers = await createAuthHeaders(identity);
+  const consentPage = await SELF.fetch(authorizeUrl, {
+    headers,
+    redirect: "manual",
+  });
+  expect(consentPage.status).toBe(200);
+  const nonce = /name="nonce" value="([^"]+)"/.exec(
+    await consentPage.text(),
+  )?.[1];
+  expect(nonce).toBeTruthy();
+  return SELF.fetch("https://localhost/oauth/authorize", {
+    method: "POST",
+    headers: {
+      ...headers,
+      origin: "https://localhost",
+      "content-type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({ nonce: nonce ?? "", decision }).toString(),
+    redirect: "manual",
+  });
+}
+
 /** Runs the OAuth authorization-code flow and returns a CLI access token. */
 export async function issueAccessToken(
   identity?: Parameters<typeof createAuthHeaders>[0],
@@ -45,10 +73,11 @@ export async function issueAccessToken(
     "https://localhost/programmatic-api/v1",
   );
 
-  const authorizeResponse = await SELF.fetch(authorizeUrl, {
-    headers: await createAuthHeaders(identity),
-    redirect: "manual",
-  });
+  const authorizeResponse = await submitConsent(
+    authorizeUrl,
+    "approve",
+    identity,
+  );
   expect(authorizeResponse.status).toBe(302);
   const redirectUrl = new URL(authorizeResponse.headers.get("location") ?? "");
   const code = redirectUrl.searchParams.get("code");
