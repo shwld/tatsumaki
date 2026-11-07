@@ -66,6 +66,17 @@ async function resolveAuthRequest(
 ) {
   const request = new Request(`${origin}/oauth/authorize${search}`);
   const authRequest = await env.OAUTH_PROVIDER.parseAuthRequest(request);
+  const unsupportedScope = authRequest.scope.find(
+    (scope) => !(scope in SCOPE_DESCRIPTIONS),
+  );
+  if (unsupportedScope) {
+    throw new AuthorizationError("invalid_scope", {
+      description: `Unsupported scope: ${unsupportedScope}`,
+      redirectUri: authRequest.redirectUri,
+      state: authRequest.state,
+      issuer: authRequest.issuer,
+    });
+  }
   const client = await env.OAUTH_PROVIDER.lookupClient(authRequest.clientId);
   return { authRequest, client };
 }
@@ -96,7 +107,7 @@ export async function renderConsentPage(
   const scopeItems = scopes
     .map(
       (scope) =>
-        `<li><code>${escapeHtml(scope)}</code> — ${escapeHtml(SCOPE_DESCRIPTIONS[scope] ?? "不明な権限")}</li>`,
+        `<li><code>${escapeHtml(scope)}</code> — ${escapeHtml(SCOPE_DESCRIPTIONS[scope] ?? "")}</li>`,
     )
     .join("");
 

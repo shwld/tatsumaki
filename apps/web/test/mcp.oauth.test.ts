@@ -173,6 +173,16 @@ describe("MCP OAuth", () => {
       expect(redirect.searchParams.get("code")).toBeNull();
     });
 
+    it("rejects unsupported scopes before showing the consent page", async () => {
+      const url = await buildAuthorizeUrl();
+      url.searchParams.set("scope", "mcp admin");
+      const response = await SELF.fetch(url, {
+        headers: await createAuthHeaders(),
+        redirect: "manual",
+      });
+      expect(response.status).toBe(400);
+    });
+
     it("rejects invalid authorize requests on the consent page", async () => {
       const url = await buildAuthorizeUrl();
       url.searchParams.set("redirect_uri", "https://evil.example/callback");
