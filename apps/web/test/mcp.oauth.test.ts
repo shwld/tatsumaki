@@ -175,12 +175,18 @@ describe("MCP OAuth", () => {
 
     it("rejects unsupported scopes before showing the consent page", async () => {
       const url = await buildAuthorizeUrl();
-      url.searchParams.set("scope", "mcp admin");
-      const response = await SELF.fetch(url, {
-        headers: await createAuthHeaders(),
-        redirect: "manual",
-      });
-      expect(response.status).toBe(400);
+      for (const scope of ["mcp admin", "constructor"]) {
+        url.searchParams.set("scope", scope);
+        const response = await SELF.fetch(url, {
+          headers: await createAuthHeaders(),
+          redirect: "manual",
+        });
+        expect(response.status).toBe(302);
+        const redirect = new URL(response.headers.get("location") ?? "");
+        expect(redirect.origin).toBe("https://claude.example");
+        expect(redirect.searchParams.get("error")).toBe("invalid_scope");
+        expect(redirect.searchParams.get("state")).toBe("state-consent");
+      }
     });
 
     it("rejects invalid authorize requests on the consent page", async () => {

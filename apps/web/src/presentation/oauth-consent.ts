@@ -55,8 +55,15 @@ function errorPage(message: string, status = 400) {
   );
 }
 
-function describeAuthorizationError(error: unknown) {
-  return error instanceof AuthorizationError ? error.description : null;
+function authorizationErrorResponse(error: unknown) {
+  if (!(error instanceof AuthorizationError)) return null;
+  if (!error.redirectUri) return errorPage(error.description);
+  const redirect = new URL(error.redirectUri);
+  redirect.searchParams.set("error", error.code);
+  redirect.searchParams.set("error_description", error.description);
+  if (error.state) redirect.searchParams.set("state", error.state);
+  if (error.issuer) redirect.searchParams.set("iss", error.issuer);
+  return Response.redirect(redirect.toString(), 302);
 }
 
 async function resolveAuthRequest(
@@ -67,7 +74,7 @@ async function resolveAuthRequest(
   const request = new Request(`${origin}/oauth/authorize${search}`);
   const authRequest = await env.OAUTH_PROVIDER.parseAuthRequest(request);
   const unsupportedScope = authRequest.scope.find(
-    (scope) => !(scope in SCOPE_DESCRIPTIONS),
+    (scope) => !Object.hasOwn(SCOPE_DESCRIPTIONS, scope),
   );
   if (unsupportedScope) {
     throw new AuthorizationError("invalid_scope", {
@@ -91,8 +98,8 @@ export async function renderConsentPage(
   try {
     resolved = await resolveAuthRequest(env, url.search, url.origin);
   } catch (error) {
-    const description = describeAuthorizationError(error);
-    if (description) return errorPage(description);
+    const response = authorizationErrorResponse(error);
+    if (response) return response;
     throw error;
   }
   const { authRequest, client } = resolved;
@@ -184,8 +191,8 @@ export async function handleConsentDecision(
       url.origin,
     ));
   } catch (error) {
-    const description = describeAuthorizationError(error);
-    if (description) return errorPage(description);
+    const response = authorizationErrorResponse(error);
+    if (response) return response;
     throw error;
   }
 
