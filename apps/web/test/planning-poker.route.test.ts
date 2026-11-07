@@ -354,3 +354,33 @@ describe("planning poker routes", () => {
     expect(replacePayload.session.status).toBe("Open");
   });
 });
+
+describe("planning poker websocket origin", () => {
+  it("allows same-origin and missing Origin, rejects others", async () => {
+    const { isAllowedWebSocketOrigin } = await import(
+      "../src/presentation/routes/planning-poker"
+    );
+    const url =
+      "https://app.example.com/api/projects/p/planning-poker/sessions/active/ws";
+    expect(isAllowedWebSocketOrigin(undefined, url)).toBe(true);
+    expect(isAllowedWebSocketOrigin("https://app.example.com", url)).toBe(true);
+    expect(isAllowedWebSocketOrigin("https://evil.example.com", url)).toBe(
+      false,
+    );
+    expect(isAllowedWebSocketOrigin("http://app.example.com", url)).toBe(false);
+    expect(isAllowedWebSocketOrigin("null", url)).toBe(false);
+  });
+
+  it("returns 403 for a cross-origin handshake before membership checks", async () => {
+    await resetDatabase(env.DB);
+    await setupAccessBindings(env);
+    const headers = new Headers(await createAuthHeaders());
+    headers.set("Upgrade", "websocket");
+    headers.set("Origin", "https://evil.example.com");
+    const response = await SELF.fetch(
+      "https://localhost/api/projects/p/planning-poker/sessions/active/ws",
+      { headers },
+    );
+    expect(response.status).toBe(403);
+  });
+});

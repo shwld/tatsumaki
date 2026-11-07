@@ -10,6 +10,16 @@ function getStub(c: Context<Env>, projectId: string) {
   return c.env.PLANNING_POKER_DO.get(id);
 }
 
+// ブラウザは WebSocket ハンドシェイクに必ず Origin を付けるため、Cookie 認証での
+// cross-site hijacking はここで拒否する。Origin 欠落は非ブラウザクライアントとして許可する。
+export function isAllowedWebSocketOrigin(
+  origin: string | undefined,
+  requestUrl: string,
+): boolean {
+  if (origin === undefined) return true;
+  return origin === new URL(requestUrl).origin;
+}
+
 async function proxy(c: Context<Env>, path: string, init?: RequestInit) {
   const projectId = c.req.param("projectId");
   if (!projectId) {
@@ -90,6 +100,9 @@ planningPokerRoute.get(
     const projectId = c.req.param("projectId");
     if (!projectId) {
       return c.json({ error: "Project not found" }, 404);
+    }
+    if (!isAllowedWebSocketOrigin(c.req.header("origin"), c.req.url)) {
+      return c.json({ error: "Forbidden origin" }, 403);
     }
     const membership = await requireProjectMembership(c, projectId);
     if (!membership.ok) return membership.response;
