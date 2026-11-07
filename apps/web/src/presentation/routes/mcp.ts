@@ -793,7 +793,7 @@ function createMcpServer({ db, currentUser }: McpRequestContext): McpServer {
             name: currentUser.email ?? currentUser.id,
           },
         },
-        { notificationRepository },
+        { notificationRepository, projectRepository },
       );
 
       if (result.isErr()) {

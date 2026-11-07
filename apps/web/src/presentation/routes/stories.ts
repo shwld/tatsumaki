@@ -540,19 +540,6 @@ storiesRoute.patch("/projects/:projectId/stories/bulk-labels", async (c) => {
   return c.json({ stories: result.value });
 });
 
-async function sha256Hex(text: string): Promise<string> {
-  const digest = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(text),
-  );
-  return [...new Uint8Array(digest)]
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-// 更新は通知作成より先に確定するため、通知作成が失敗して 500 を返した場合でも
-// 同じ description で PATCH を再送すれば通知を作り直せる。dedupeKey が description の
-// 内容で決まるので、再送しても通知は重複しない。
 storiesRoute.patch("/projects/:projectId/stories/:storyNumber", async (c) => {
   const projectId = c.req.param("projectId");
   const membership = await requireProjectMembership(c, projectId);
@@ -615,37 +602,12 @@ storiesRoute.patch("/projects/:projectId/stories/:storyNumber", async (c) => {
       allowedStoryPoints,
       ...parsed.value,
     },
-    { notificationRepository },
+    { notificationRepository, projectRepository: membership.repository },
   );
 
   if (result.isErr()) {
     const response = toUpdateStoryErrorResponse(result.error);
     return c.json({ error: response.message }, response.status);
-  }
-
-  if (parsed.value.description !== undefined) {
-    const membersResult = await membership.repository.listMembers(projectId);
-    if (membersResult.isErr()) {
-      return c.json({ error: "Failed to resolve project members" }, 500);
-    }
-
-    const mentionResult = await createMentionNotifications(
-      new D1NotificationRepository(c.env.DB),
-      {
-        projectId,
-        storyId: result.value.id,
-        storyTitle: result.value.title,
-        actorUserId: c.get("currentUser").id,
-        actorName: c.get("currentUser").email ?? c.get("currentUser").id,
-        sourceType: "story_description",
-        sourceId: `${result.value.id}:${await sha256Hex(result.value.description)}`,
-        text: result.value.description,
-        memberUserIds: membersResult.value.map((member) => member.userId),
-      },
-    );
-    if (mentionResult.isErr()) {
-      return c.json({ error: "Failed to create mention notifications" }, 500);
-    }
   }
 
   return c.json({ story: result.value });

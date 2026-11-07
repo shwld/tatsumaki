@@ -98,7 +98,7 @@ export async function handleCliStoryUpdate(
         name: actorName,
       },
     },
-    { notificationRepository },
+    { notificationRepository, projectRepository },
   );
 
   if (result.isErr()) {

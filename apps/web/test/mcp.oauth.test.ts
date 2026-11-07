@@ -451,6 +451,35 @@ describe("MCP OAuth", () => {
     expect(payload.result?.content?.[0]?.text).toContain("Invalid story order");
   });
 
+  it("creates description mention notifications once through update_story", async () => {
+    const projectId = await createProject("Mention Project");
+    const storyId = await createStory(projectId, "Mention story");
+    const countMentions = await addMemberAndCountMentions(projectId);
+    const accessToken = await issueMcpAccessToken();
+    const callUpdate = async (args: Record<string, unknown>) => {
+      const response = await fetchMcp(accessToken, {
+        jsonrpc: "2.0",
+        id: "update-story-mention",
+        method: "tools/call",
+        params: {
+          name: "update_story",
+          arguments: { projectId, storyId, ...args },
+        },
+      });
+      const payload = (await parseMcpResult(response)) as {
+        result?: { isError?: boolean };
+      };
+      expect(payload.result?.isError).not.toBe(true);
+    };
+
+    await callUpdate({ title: "Renamed" });
+    expect(await countMentions()).toBe(0);
+    await callUpdate({ description: "hi @github|mentioned" });
+    expect(await countMentions()).toBe(1);
+    await callUpdate({ description: "hi @github|mentioned" });
+    expect(await countMentions()).toBe(1);
+  });
+
   it("updates a story status through update_story_status and returns the updated story", async () => {
     const projectId = await createProject("Status Project");
     const storyId = await createStory(projectId, "Ship status update", {
@@ -1176,4 +1205,20 @@ async function parseMcpResult(response: Response) {
     .join("\n");
 
   return JSON.parse(data);
+}
+
+async function addMemberAndCountMentions(projectId: string) {
+  await env.DB.prepare(
+    "insert into project_members (project_id, user_id, role) values (?, ?, ?)",
+  )
+    .bind(projectId, "github|mentioned", "member")
+    .run();
+  return async () => {
+    const row = await env.DB.prepare(
+      "select count(*) as n from notifications where project_id = ? and recipient_user_id = ? and kind = 'mention'",
+    )
+      .bind(projectId, "github|mentioned")
+      .first<{ n: number }>();
+    return row?.n ?? 0;
+  };
 }
