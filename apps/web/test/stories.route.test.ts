@@ -1,12 +1,13 @@
 import { SELF, env } from "cloudflare:test";
 import { and, eq, sql } from "drizzle-orm";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createAuthHeaders, setupAccessBindings } from "./helpers/access-jwt";
 import { resetDatabase } from "./helpers/db";
 import { createDb } from "../src/infrastructure/db/client";
 import { iterationsTable } from "../src/infrastructure/db/schema/iterations";
 import { projectMembersTable } from "../src/infrastructure/db/schema/project-members";
 import { STORY_STATUS_CHANGED_CONCURRENTLY_ERROR } from "../src/domain/repositories/story-repository";
+import { D1NotificationRepository } from "../src/infrastructure/db/repositories/d1-notification-repository";
 import { D1StoryRepository } from "../src/infrastructure/db/repositories/d1-story-repository";
 import { storiesTable } from "../src/infrastructure/db/schema/stories";
 import { storyTimelineEntriesTable } from "../src/infrastructure/db/schema/story-timeline";
@@ -409,6 +410,76 @@ describe("story routes", () => {
       story: { storyPoint: number | null };
     };
     expect(payload.story.storyPoint).toBe(13);
+  });
+
+  it("recreates description mention notifications on retry without duplicates", async () => {
+    const projectId = await createProject();
+    const db = env.DB as {
+      prepare: (sql: string) => {
+        bind: (...values: Array<string | number | null>) => {
+          run: () => Promise<unknown>;
+        };
+      };
+    };
+    await db
+      .prepare(
+        "insert into project_members (project_id, user_id, role) values (?, ?, ?)",
+      )
+      .bind(projectId, "github|mentioned", "member")
+      .run();
+
+    const createResponse = await fetchWithAuth(storiesApiPath(projectId), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        title: "Mention retry",
+        description: "",
+        type: "feature",
+        status: "Unstarted",
+        storyPoint: 1,
+        labels: [],
+      }),
+    });
+    const created = (await createResponse.json()) as {
+      story: { storyNumber: number };
+    };
+    const patch = () =>
+      fetchWithAuth(
+        storyApiPath(projectId, String(created.story.storyNumber)),
+        {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ description: "hi @github|mentioned" }),
+        },
+      );
+    const countMentions = async () => {
+      const response = await fetchWithAuth(
+        `https://localhost/api/auth/me/notifications?projectId=${projectId}&kinds=mention&limit=10`,
+        {},
+        { sub: "github|mentioned", email: "mentioned@example.com" },
+      );
+      const json = (await response.json()) as { notifications: unknown[] };
+      return json.notifications.length;
+    };
+
+    const spy = vi
+      .spyOn(D1NotificationRepository.prototype, "createMany")
+      .mockImplementationOnce(async () => {
+        const { err } = await import("neverthrow");
+        return err("NOTIFICATION_REPOSITORY_ERROR" as never);
+      });
+    try {
+      const failed = await patch();
+      expect(failed.status).toBe(500);
+      expect(await countMentions()).toBe(0);
+    } finally {
+      spy.mockRestore();
+    }
+
+    expect((await patch()).status).toBe(200);
+    expect(await countMentions()).toBe(1);
+    expect((await patch()).status).toBe(200);
+    expect(await countMentions()).toBe(1);
   });
 
   it("notifies assignees when a tracked story field changes", async () => {
