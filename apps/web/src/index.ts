@@ -42,6 +42,10 @@ import {
   requireAppEntitlement,
 } from "./presentation/middleware/app-entitlement";
 import { devAuth } from "./presentation/middleware/dev-auth";
+import {
+  handleConsentDecision,
+  renderConsentPage,
+} from "./presentation/oauth-consent";
 import { ACCESS_LOGIN_PATH } from "./presentation/cloudflare-access";
 import {
   getCurrentUserFromAccessRequest,
@@ -232,21 +236,13 @@ const oauthDefaultHandler = {
         return Response.json(denial, { status: 403 });
       }
 
-      const authRequest = await env.OAUTH_PROVIDER.parseAuthRequest(request);
-      const { redirectTo } = await env.OAUTH_PROVIDER.completeAuthorization({
-        request: authRequest,
-        userId: currentUser.id,
-        metadata: {
-          email: currentUser.email ?? null,
-        },
-        scope: authRequest.scope.length > 0 ? authRequest.scope : ["mcp"],
-        props: {
-          id: currentUser.id,
-          ...(currentUser.email ? { email: currentUser.email } : {}),
-        },
-      });
-
-      return Response.redirect(redirectTo, 302);
+      if (request.method === "POST") {
+        return handleConsentDecision(request, env, currentUser);
+      }
+      if (request.method === "GET") {
+        return renderConsentPage(request, env, currentUser);
+      }
+      return new Response("Method not allowed", { status: 405 });
     }
 
     return app.fetch(request, env, ctx);
