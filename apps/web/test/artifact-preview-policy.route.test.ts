@@ -206,13 +206,34 @@ describe("content host routing (ADR-0012 §2)", () => {
     expect(response?.status).toBe(404);
   });
 
-  it("leaves other app host paths to the app", () => {
-    expect(route(`${APP}/api/projects`, SPLIT)).toBeNull();
+  it("leaves other app host paths to the app", async () => {
+    const assets = {
+      fetch: async () => new Response("Not found", { status: 404 }),
+    };
+    expect(
+      await route(`${APP}/api/projects`, { ...SPLIT, ASSETS: assets as never }),
+    ).toBeNull();
   });
 
-  it("changes nothing when unset", () => {
-    expect(route(`${APP}/artifact-content/t/index.html`, {})).toBeNull();
-    expect(route("https://content.example/", {})).toBeNull();
+  it("serves static assets from the asset binding on the app host only", async () => {
+    const assets = {
+      fetch: async (request: Request) =>
+        new URL(request.url).pathname === "/assets/app.js"
+          ? new Response("bundle", { status: 200 })
+          : new Response("Not found", { status: 404 }),
+    };
+    const overrides = { ...SPLIT, ASSETS: assets as never };
+    const served = await route(`${APP}/assets/app.js`, overrides);
+    expect(served?.status).toBe(200);
+    expect(await route(`${APP}/`, overrides)).toBeNull();
+    expect(
+      (await route("https://content.example/assets/app.js", overrides))?.status,
+    ).toBe(404);
+  });
+
+  it("changes nothing when unset", async () => {
+    expect(await route(`${APP}/artifact-content/t/index.html`, {})).toBeNull();
+    expect(await route("https://content.example/", {})).toBeNull();
   });
 
   it("ignores cookies and never sets one on the content host", async () => {

@@ -380,6 +380,7 @@ export async function setupCloudflare(
           plan.environment === "staging"
             ? options.stagingControlPlaneService
             : undefined,
+          Boolean(contentDomainFor(plan, options)),
         ),
         { mode: 0o600 },
       );
@@ -527,7 +528,9 @@ export function renderWranglerConfig(
   d1Id: string,
   kvId: string,
   controlPlaneService?: string,
+  splitContentHost = false,
 ): string {
+  const runWorkerFirst = splitContentHost ? "true" : '["/", "/index.html"]';
   const toml = (value: string) => JSON.stringify(value);
   const controlPlaneBinding = controlPlaneService
     ? `
@@ -558,7 +561,7 @@ keep_vars = true
 [assets]
 directory = ${toml(join(WEB_DIR, "dist/client"))}
 binding = "ASSETS"
-run_worker_first = ["/", "/index.html"]
+run_worker_first = ${runWorkerFirst}
 
 [[d1_databases]]
 binding = "DB"
