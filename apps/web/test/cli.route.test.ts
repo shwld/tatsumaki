@@ -52,6 +52,49 @@ describe("cli route", () => {
     );
   });
 
+  it("creates description mention notifications once when updating via CLI", async () => {
+    const accessToken = await issueAccessTokenForCliV1();
+    const projectId = await createProject();
+    const countMentions = await addMemberAndCountMentions(projectId);
+    const createResponse = await SELF.fetch(
+      `https://localhost/programmatic-api/v1/projects/${projectId}/stories`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${accessToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ title: "Mention", type: "feature" }),
+      },
+    );
+    const created = (await createResponse.json()) as {
+      story: { storyNumber: number };
+    };
+    const patch = (body: Record<string, unknown>) =>
+      SELF.fetch(
+        `https://localhost/programmatic-api/v1/projects/${projectId}/stories/${created.story.storyNumber}`,
+        {
+          method: "PATCH",
+          headers: {
+            authorization: `Bearer ${accessToken}`,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify(body),
+        },
+      );
+
+    expect((await patch({ title: "Renamed" })).status).toBe(200);
+    expect(await countMentions()).toBe(0);
+    expect((await patch({ description: "hi @github|mentioned" })).status).toBe(
+      200,
+    );
+    expect(await countMentions()).toBe(1);
+    expect((await patch({ description: "hi @github|mentioned" })).status).toBe(
+      200,
+    );
+    expect(await countMentions()).toBe(1);
+  });
+
   it("supports CLI story write/read flow", async () => {
     const accessToken = await issueAccessTokenForCliV1();
     const projectId = await createProject();
@@ -670,3 +713,19 @@ async function createProject() {
 }
 
 const issueAccessTokenForCliV1 = () => issueAccessToken();
+
+async function addMemberAndCountMentions(projectId: string) {
+  await env.DB.prepare(
+    "insert into project_members (project_id, user_id, role) values (?, ?, ?)",
+  )
+    .bind(projectId, "github|mentioned", "member")
+    .run();
+  return async () => {
+    const row = await env.DB.prepare(
+      "select count(*) as n from notifications where project_id = ? and recipient_user_id = ? and kind = 'mention'",
+    )
+      .bind(projectId, "github|mentioned")
+      .first<{ n: number }>();
+    return row?.n ?? 0;
+  };
+}

@@ -34,6 +34,12 @@ import {
 } from "./story-input";
 import type { StoryActivityField } from "../../domain/entities/story-timeline";
 import { createAssigneeStoryActivityNotifications } from "./create-assignee-story-activity-notifications";
+import { createMentionNotifications } from "./create-mention-notifications";
+import { sha256Hex } from "../../domain/artifacts/sha256";
+import type {
+  ProjectRepository,
+  ProjectRepositoryError,
+} from "../../domain/repositories/project-repository";
 import type {
   NotificationRepository,
   NotificationRepositoryError,
@@ -76,7 +82,8 @@ export type UpdateStoryError =
   | EstimateRequiredError
   | StoryActivityRepositoryError
   | StoryRepositoryError
-  | NotificationRepositoryError;
+  | NotificationRepositoryError
+  | ProjectRepositoryError;
 
 type StoryUpdateActor = {
   id: string;
@@ -183,6 +190,7 @@ export async function updateStory(
   },
   options?: {
     notificationRepository?: NotificationRepository;
+    projectRepository?: Pick<ProjectRepository, "listMembers">;
   },
 ): Promise<Result<Story, UpdateStoryError>> {
   const hasUpdates =
@@ -371,6 +379,39 @@ export async function updateStory(
     );
     if (notifyResult.isErr()) {
       return err(notifyResult.error);
+    }
+  }
+
+  // 更新は通知作成より先に確定するため、通知作成が失敗してエラーを返した場合でも
+  // 同じ description で再送すれば通知を作り直せる。dedupeKey が description の
+  // 内容で決まるので、再送しても通知は重複しない。
+  if (
+    input.description !== undefined &&
+    options?.notificationRepository &&
+    options.projectRepository
+  ) {
+    const membersResult = await options.projectRepository.listMembers(
+      input.projectId,
+    );
+    if (membersResult.isErr()) {
+      return err(membersResult.error);
+    }
+    const mentionResult = await createMentionNotifications(
+      options.notificationRepository,
+      {
+        projectId: input.projectId,
+        storyId: result.value.id,
+        storyTitle: result.value.title,
+        actorUserId: input.actor.id,
+        actorName: input.actor.name,
+        sourceType: "story_description",
+        sourceId: `${result.value.id}:${await sha256Hex(result.value.description)}`,
+        text: result.value.description,
+        memberUserIds: membersResult.value.map((member) => member.userId),
+      },
+    );
+    if (mentionResult.isErr()) {
+      return err(mentionResult.error);
     }
   }
 

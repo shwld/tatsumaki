@@ -34,6 +34,7 @@ import {
   INVALID_STORY_TITLE_ERROR,
   INVALID_STORY_TYPE_ERROR,
 } from "../../../application/usecases/story-input";
+import { PROJECT_REPOSITORY_ERROR } from "../../../domain/repositories/project-repository";
 import { NOTIFICATION_REPOSITORY_ERROR } from "../../../domain/repositories/notification-repository";
 import {
   INVALID_STORY_IS_ICEBOX_ERROR,
@@ -255,6 +256,10 @@ export function toUpdateStoryErrorResponse(
 
   if (error === NOTIFICATION_REPOSITORY_ERROR) {
     return { message: "Failed to create notifications", status: 500 };
+  }
+
+  if (error === PROJECT_REPOSITORY_ERROR) {
+    return { message: "Failed to resolve project members", status: 500 };
   }
 
   return { message: "Unexpected error", status: 500 };
