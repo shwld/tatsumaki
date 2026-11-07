@@ -4,14 +4,13 @@ import {
   type OAuthHelpers,
 } from "@cloudflare/workers-oauth-provider";
 
-const CONSENT_TTL_SECONDS = 600;
-const CONSENT_KEY_PREFIX = "oauth-consent:";
+const CONSENT_TTL_MS = 600_000;
 
 type ConsentRecord = { userId: string; search: string };
 
 type ConsentUser = { id: string; email?: string | null };
 
-type ConsentEnv = { OAUTH_KV: KVNamespace; OAUTH_PROVIDER: OAuthHelpers };
+type ConsentEnv = { DB: D1Database; OAUTH_PROVIDER: OAuthHelpers };
 
 const SCOPE_DESCRIPTIONS: Record<string, string> = {
   mcp: "tatsumaki のプロジェクト・ストーリーの閲覧と操作（あなたの権限の範囲内）",
@@ -106,10 +105,15 @@ export async function renderConsentPage(
   const scopes = authRequest.scope.length > 0 ? authRequest.scope : ["mcp"];
 
   const nonce = crypto.randomUUID();
-  const record: ConsentRecord = { userId: user.id, search: url.search };
-  await env.OAUTH_KV.put(CONSENT_KEY_PREFIX + nonce, JSON.stringify(record), {
-    expirationTtl: CONSENT_TTL_SECONDS,
-  });
+  const now = Date.now();
+  await env.DB.batch([
+    env.DB.prepare(
+      "DELETE FROM oauth_consent_nonces WHERE expires_at <= ?",
+    ).bind(now),
+    env.DB.prepare(
+      "INSERT INTO oauth_consent_nonces (nonce, user_id, search, expires_at) VALUES (?, ?, ?, ?)",
+    ).bind(nonce, user.id, url.search, now + CONSENT_TTL_MS),
+  ]);
 
   const scopeItems = scopes
     .map(
@@ -169,16 +173,18 @@ export async function handleConsentDecision(
     return errorPage("不正なリクエストです。");
   }
 
-  const key = CONSENT_KEY_PREFIX + nonce;
-  const stored = await env.OAUTH_KV.get(key);
-  if (!stored) {
+  const row = await env.DB.prepare(
+    "DELETE FROM oauth_consent_nonces WHERE nonce = ? AND expires_at > ? RETURNING user_id, search",
+  )
+    .bind(nonce, Date.now())
+    .first<{ user_id: string; search: string }>();
+  if (!row) {
     return errorPage(
       "承認の有効期限が切れました。最初からやり直してください。",
     );
   }
-  await env.OAUTH_KV.delete(key);
 
-  const record = JSON.parse(stored) as ConsentRecord;
+  const record: ConsentRecord = { userId: row.user_id, search: row.search };
   if (record.userId !== user.id) {
     return errorPage("不正なリクエストです。", 403);
   }
