@@ -249,6 +249,52 @@ describe("MCP OAuth", () => {
     });
   });
 
+  describe("concurrent consent decisions", () => {
+    it("issues an authorization code once for simultaneous approvals of one nonce", async () => {
+      const clientId = await registerClient();
+      const url = new URL("https://localhost/oauth/authorize");
+      url.searchParams.set("response_type", "code");
+      url.searchParams.set("client_id", clientId);
+      url.searchParams.set("redirect_uri", "https://claude.example/callback");
+      url.searchParams.set("scope", "mcp");
+      url.searchParams.set("state", "state-concurrent");
+      url.searchParams.set(
+        "code_challenge",
+        await createCodeChallenge("test-verifier-123456789"),
+      );
+      url.searchParams.set("code_challenge_method", "S256");
+      const headers = await createAuthHeaders();
+      const page = await SELF.fetch(url, { headers, redirect: "manual" });
+      const nonce = /name="nonce" value="([^"]+)"/.exec(await page.text())?.[1];
+      expect(nonce).toBeTruthy();
+
+      const responses = await Promise.all(
+        Array.from({ length: 5 }, () =>
+          SELF.fetch("https://localhost/oauth/authorize", {
+            method: "POST",
+            headers: {
+              ...headers,
+              origin: "https://localhost",
+              "content-type": "application/x-www-form-urlencoded",
+            },
+            body: new URLSearchParams({
+              nonce: nonce ?? "",
+              decision: "approve",
+            }).toString(),
+            redirect: "manual",
+          }),
+        ),
+      );
+      const issued = responses.filter(
+        (r) =>
+          r.status === 302 &&
+          new URL(r.headers.get("location") ?? "").searchParams.has("code"),
+      );
+      expect(issued).toHaveLength(1);
+      expect(responses.filter((r) => r.status === 400)).toHaveLength(4);
+    });
+  });
+
   it("authorizes via Access and scopes list_stories to the authenticated user", async () => {
     const ownProjectId = await createProject("Alpha Project");
     await createStory(ownProjectId, "Visible story");
