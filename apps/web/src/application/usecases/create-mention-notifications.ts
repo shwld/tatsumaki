@@ -1,6 +1,7 @@
 import { ulid } from "ulid";
 import { ok, type Result } from "neverthrow";
 import type {
+  CreateNotificationInput,
   NotificationRepository,
   NotificationRepositoryError,
   NotificationSourceType,
@@ -40,24 +41,25 @@ function buildDefaultMessage(params: {
 
 export type CreateMentionNotificationsError = NotificationRepositoryError;
 
-export async function createMentionNotifications(
-  notificationRepository: NotificationRepository,
-  input: {
-    projectId: string;
-    storyId: string;
-    storyTitle: string;
-    actorUserId: string;
-    actorName: string;
-    sourceType: NotificationSourceType;
-    sourceId: string;
-    text: string;
-    memberUserIds: string[];
-    createdAt?: string;
-  },
-): Promise<Result<void, CreateMentionNotificationsError>> {
+export type BuildMentionNotificationsInput = {
+  projectId: string;
+  storyId: string;
+  storyTitle: string;
+  actorUserId: string;
+  actorName: string;
+  sourceType: NotificationSourceType;
+  sourceId: string;
+  text: string;
+  memberUserIds: string[];
+  createdAt?: string;
+};
+
+export function buildMentionNotifications(
+  input: BuildMentionNotificationsInput,
+): CreateNotificationInput[] {
   const mentionedUserIds = extractMentionedUserIds(input.text);
   if (mentionedUserIds.size === 0) {
-    return ok(undefined);
+    return [];
   }
 
   const memberSet = new Set(input.memberUserIds);
@@ -65,33 +67,38 @@ export async function createMentionNotifications(
     (userId) => userId !== input.actorUserId && memberSet.has(userId),
   );
 
-  if (recipientUserIds.length === 0) {
-    return ok(undefined);
-  }
-
   const now = input.createdAt ?? new Date().toISOString();
   const message = buildDefaultMessage({
     sourceType: input.sourceType,
     text: input.text,
   });
 
-  return notificationRepository.createMany(
-    recipientUserIds.map((recipientUserId) => ({
-      id: ulid(),
-      projectId: input.projectId,
-      recipientUserId,
-      actorUserId: input.actorUserId,
-      actorName: input.actorName,
-      storyId: input.storyId,
-      storyTitleSnapshot: input.storyTitle,
-      invitationId: null,
-      kind: "mention" as const,
-      message,
-      sourceType: input.sourceType,
-      sourceId: input.sourceId,
-      dedupeKey: `mention:${input.sourceType}:${input.sourceId}:${recipientUserId}`,
-      createdAt: now,
-      updatedAt: now,
-    })),
-  );
+  return recipientUserIds.map((recipientUserId) => ({
+    id: ulid(),
+    projectId: input.projectId,
+    recipientUserId,
+    actorUserId: input.actorUserId,
+    actorName: input.actorName,
+    storyId: input.storyId,
+    storyTitleSnapshot: input.storyTitle,
+    invitationId: null,
+    kind: "mention" as const,
+    message,
+    sourceType: input.sourceType,
+    sourceId: input.sourceId,
+    dedupeKey: `mention:${input.sourceType}:${input.sourceId}:${recipientUserId}`,
+    createdAt: now,
+    updatedAt: now,
+  }));
+}
+
+export async function createMentionNotifications(
+  notificationRepository: NotificationRepository,
+  input: BuildMentionNotificationsInput,
+): Promise<Result<void, CreateMentionNotificationsError>> {
+  const rows = buildMentionNotifications(input);
+  if (rows.length === 0) {
+    return ok(undefined);
+  }
+  return notificationRepository.createMany(rows);
 }

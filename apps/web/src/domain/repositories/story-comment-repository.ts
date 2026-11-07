@@ -1,5 +1,6 @@
 import type { Result } from "neverthrow";
 import type { StoryComment } from "../entities/story-timeline";
+import type { CreateNotificationInput } from "./notification-repository";
 
 export const STORY_COMMENT_REPOSITORY_ERROR =
   "STORY_COMMENT_REPOSITORY_ERROR" as const;
@@ -37,7 +38,13 @@ export interface StoryCommentRepository {
   create(
     projectId: string,
     storyId: string,
-    input: { userId: string; actorName: string; body: string },
+    input: {
+      userId: string;
+      actorName: string;
+      body: string;
+      /** コメントと同一トランザクションで保存する通知。失敗時はコメントも保存されない。 */
+      notifications?: (comment: StoryComment) => CreateNotificationInput[];
+    },
   ): Promise<Result<StoryComment, StoryCommentRepositoryError>>;
 
   update(

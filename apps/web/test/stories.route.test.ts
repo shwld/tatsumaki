@@ -2763,6 +2763,82 @@ describe("story routes", () => {
     return `${storyCommentsApiPath(projectId, storyId)}/${commentId}`;
   }
 
+  it("saves comment and mention notifications atomically so a failed post can be resent", async () => {
+    const projectId = await createProject();
+    const db = env.DB as {
+      prepare: (sql: string) => {
+        bind: (...values: Array<string | number | null>) => {
+          run: () => Promise<unknown>;
+        };
+      };
+    };
+    await db
+      .prepare(
+        "insert into project_members (project_id, user_id, role) values (?, ?, ?)",
+      )
+      .bind(projectId, "github|mentioned", "member")
+      .run();
+    const createResponse = await fetchWithAuth(storiesApiPath(projectId), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        title: "Comment retry",
+        description: "",
+        type: "feature",
+        status: "Unstarted",
+        storyPoint: 1,
+        labels: [],
+      }),
+    });
+    const created = (await createResponse.json()) as {
+      story: { storyNumber: number };
+    };
+    const commentsPath = storyCommentsApiPath(
+      projectId,
+      String(created.story.storyNumber),
+    );
+    const post = () =>
+      fetchWithAuth(commentsPath, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ body: "hi @github|mentioned" }),
+      });
+    const countComments = async () => {
+      const response = await fetchWithAuth(
+        storyTimelineApiPath(projectId, String(created.story.storyNumber)),
+      );
+      const json = (await response.json()) as {
+        timeline: { entryType: string }[];
+      };
+      return json.timeline.filter((entry) => entry.entryType === "comment")
+        .length;
+    };
+    const countMentions = async () => {
+      const response = await fetchWithAuth(
+        `https://localhost/api/auth/me/notifications?projectId=${projectId}&kinds=mention&limit=10`,
+        {},
+        { sub: "github|mentioned", email: "mentioned@example.com" },
+      );
+      return ((await response.json()) as { notifications: unknown[] })
+        .notifications.length;
+    };
+
+    const spy = vi
+      .spyOn(env.DB, "batch")
+      .mockRejectedValueOnce(new Error("injected batch failure"));
+    try {
+      expect((await post()).status).toBe(500);
+    } finally {
+      spy.mockRestore();
+    }
+    expect(await countComments()).toBe(0);
+    expect(await countMentions()).toBe(0);
+
+    expect((await post()).status).toBe(201);
+    expect(await countComments()).toBe(1);
+    expect(await countMentions()).toBe(1);
+  });
+
   it("creates, updates, and deletes a comment on a story", async () => {
     const projectId = await createProject({
       sub: "github|comment-author",

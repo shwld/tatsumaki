@@ -10,33 +10,27 @@ import type {
 export type CreateAssigneeCommentNotificationsError =
   NotificationRepositoryError;
 
-export async function createAssigneeCommentNotifications(
-  notificationRepository: NotificationRepository,
-  input: {
-    projectId: string;
-    storyId: string;
-    storyTitle: string;
-    ownerIds: string[];
-    actorUserId: string;
-    actorName: string;
-    commentId: string;
-    commentBody: string;
-    createdAt: string;
-  },
-): Promise<Result<void, CreateAssigneeCommentNotificationsError>> {
-  if (input.ownerIds.length === 0) {
-    return ok(undefined);
-  }
+export type BuildAssigneeCommentNotificationsInput = {
+  projectId: string;
+  storyId: string;
+  storyTitle: string;
+  ownerIds: string[];
+  actorUserId: string;
+  actorName: string;
+  commentId: string;
+  commentBody: string;
+  createdAt: string;
+};
 
+export function buildAssigneeCommentNotifications(
+  input: BuildAssigneeCommentNotificationsInput,
+): CreateNotificationInput[] {
   const mentioned = extractMentionedUserIds(input.commentBody);
   const recipients = input.ownerIds.filter(
     (userId) => userId !== input.actorUserId && !mentioned.has(userId),
   );
-  if (recipients.length === 0) {
-    return ok(undefined);
-  }
 
-  const rows: CreateNotificationInput[] = recipients.map((recipientUserId) => ({
+  return recipients.map((recipientUserId) => ({
     id: ulid(),
     projectId: input.projectId,
     recipientUserId,
@@ -45,14 +39,23 @@ export async function createAssigneeCommentNotifications(
     storyId: input.storyId,
     storyTitleSnapshot: input.storyTitle,
     invitationId: null,
-    kind: "comment_added",
+    kind: "comment_added" as const,
     message: "担当ストーリーにコメントが追加されました",
-    sourceType: "comment",
+    sourceType: "comment" as const,
     sourceId: input.commentId,
     dedupeKey: `assignee_comment:${input.commentId}:${recipientUserId}`,
     createdAt: input.createdAt,
     updatedAt: input.createdAt,
   }));
+}
 
+export async function createAssigneeCommentNotifications(
+  notificationRepository: NotificationRepository,
+  input: BuildAssigneeCommentNotificationsInput,
+): Promise<Result<void, CreateAssigneeCommentNotificationsError>> {
+  const rows = buildAssigneeCommentNotifications(input);
+  if (rows.length === 0) {
+    return ok(undefined);
+  }
   return notificationRepository.createMany(rows);
 }
