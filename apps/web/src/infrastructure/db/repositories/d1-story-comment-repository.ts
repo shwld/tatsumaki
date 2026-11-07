@@ -11,6 +11,7 @@ import {
   STORY_COMMENT_ARCHIVED_ERROR,
   STORY_COMMENT_REPOSITORY_ERROR,
 } from "../../../domain/repositories/story-comment-repository";
+import type { CreateNotificationInput } from "../../../domain/repositories/notification-repository";
 import { createDb, type DbClient } from "../client";
 import { storiesTable } from "../schema/stories";
 import { storyTimelineEntriesTable } from "../schema/story-timeline";
@@ -138,7 +139,12 @@ export class D1StoryCommentRepository implements StoryCommentRepository {
   async create(
     projectId: string,
     storyId: string,
-    input: { userId: string; actorName: string; body: string },
+    input: {
+      userId: string;
+      actorName: string;
+      body: string;
+      notifications?: (comment: StoryComment) => CreateNotificationInput[];
+    },
   ): Promise<Result<StoryComment, StoryCommentRepositoryError>> {
     try {
       const story = await this.db
@@ -160,7 +166,18 @@ export class D1StoryCommentRepository implements StoryCommentRepository {
       const id = ulid();
       const now = new Date().toISOString();
 
-      const inserted = await this.d1
+      const comment: StoryComment = {
+        __typename: "StoryComment",
+        id,
+        storyId,
+        userId: input.userId,
+        actorName: input.actorName,
+        body: input.body,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      const insertComment = this.d1
         .prepare(
           "INSERT INTO story_timeline_entries (id, project_id, story_id, entry_type, actor_user_id, actor_name, body, created_at, updated_at) SELECT ?, ?, id, 'comment', ?, ?, ?, ?, ? FROM stories WHERE id = ? AND project_id = ? AND archived_at IS NULL",
         )
@@ -174,20 +191,40 @@ export class D1StoryCommentRepository implements StoryCommentRepository {
           now,
           storyId,
           projectId,
-        )
-        .run();
-      if (inserted.meta.changes !== 1) return err(STORY_COMMENT_ARCHIVED_ERROR);
+        );
+      const insertNotifications = (input.notifications?.(comment) ?? []).map(
+        (n) =>
+          this.d1
+            .prepare(
+              "INSERT OR IGNORE INTO notifications (id, project_id, recipient_user_id, actor_user_id, actor_name, story_id, story_title_snapshot, invitation_id, kind, message, source_type, source_id, dedupe_key, created_at, updated_at) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM story_timeline_entries WHERE id = ?)",
+            )
+            .bind(
+              n.id,
+              n.projectId,
+              n.recipientUserId,
+              n.actorUserId,
+              n.actorName,
+              n.storyId,
+              n.storyTitleSnapshot,
+              n.invitationId,
+              n.kind,
+              n.message,
+              n.sourceType,
+              n.sourceId,
+              n.dedupeKey,
+              n.createdAt,
+              n.updatedAt,
+              id,
+            ),
+      );
+      const [inserted] = await this.d1.batch([
+        insertComment,
+        ...insertNotifications,
+      ]);
+      if (inserted?.meta.changes !== 1)
+        return err(STORY_COMMENT_ARCHIVED_ERROR);
 
-      return ok({
-        __typename: "StoryComment",
-        id,
-        storyId,
-        userId: input.userId,
-        actorName: input.actorName,
-        body: input.body,
-        createdAt: now,
-        updatedAt: now,
-      });
+      return ok(comment);
     } catch {
       return err(STORY_COMMENT_REPOSITORY_ERROR);
     }

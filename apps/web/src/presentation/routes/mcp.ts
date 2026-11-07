@@ -4,7 +4,6 @@ import {
   WebStandardStreamableHTTPServerTransport,
 } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { createAssigneeCommentNotifications } from "../../application/usecases/create-assignee-comment-notifications";
 import { createStory } from "../../application/usecases/create-story";
 import { createStoryComment } from "../../application/usecases/create-story-comment";
 import { getProject } from "../../application/usecases/get-project";
@@ -967,6 +966,22 @@ function createMcpServer({ db, currentUser }: McpRequestContext): McpServer {
         };
       }
 
+      const storyResult = await getStory(storyRepository, {
+        projectId,
+        storyId: resolved.storyId,
+      });
+      if (storyResult.isErr() || !storyResult.value) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Story not found: ${resolved.storyId}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
       const repository = new D1StoryCommentRepository(db);
       const result = await createStoryComment(repository, {
         projectId,
@@ -974,6 +989,10 @@ function createMcpServer({ db, currentUser }: McpRequestContext): McpServer {
         userId: currentUser.id,
         actorName: currentUser.email ?? currentUser.id,
         body,
+        notify: {
+          storyTitle: storyResult.value.title,
+          ownerIds: storyResult.value.ownerIds,
+        },
       });
 
       if (result.isErr()) {
@@ -982,47 +1001,9 @@ function createMcpServer({ db, currentUser }: McpRequestContext): McpServer {
             ? `Story not found: ${resolved.storyId}`
             : `Failed to create comment: ${result.error}`;
         return {
-          content: [
-            {
-              type: "text" as const,
-              text: message,
-            },
-          ],
+          content: [{ type: "text" as const, text: message }],
           isError: true,
         };
-      }
-
-      const storyResult = await getStory(storyRepository, {
-        projectId,
-        storyId: resolved.storyId,
-      });
-      if (storyResult.isOk() && storyResult.value) {
-        const notificationRepository = new D1NotificationRepository(db);
-        const notifyResult = await createAssigneeCommentNotifications(
-          notificationRepository,
-          {
-            projectId,
-            storyId: resolved.storyId,
-            storyTitle: storyResult.value.title,
-            ownerIds: storyResult.value.ownerIds,
-            actorUserId: currentUser.id,
-            actorName: currentUser.email ?? currentUser.id,
-            commentId: result.value.id,
-            commentBody: result.value.body,
-            createdAt: result.value.createdAt,
-          },
-        );
-        if (notifyResult.isErr()) {
-          return {
-            content: [
-              {
-                type: "text" as const,
-                text: "Failed to create comment notifications",
-              },
-            ],
-            isError: true,
-          };
-        }
       }
 
       return {

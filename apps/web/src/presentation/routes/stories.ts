@@ -9,8 +9,6 @@ import {
   EMPTY_STORY_IDS_ERROR as EMPTY_STORY_IDS_FOR_STATUS_ERROR,
 } from "../../application/usecases/bulk-update-story-status";
 import { createStoryForPanel } from "../../application/usecases/create-story-for-panel";
-import { createAssigneeCommentNotifications } from "../../application/usecases/create-assignee-comment-notifications";
-import { createMentionNotifications } from "../../application/usecases/create-mention-notifications";
 import { createStoryComment } from "../../application/usecases/create-story-comment";
 import {
   deleteStoryAttachment,
@@ -1119,6 +1117,11 @@ storiesRoute.post(
     const commentBody = (body as { body: string }).body;
     const story = storyResult.value;
 
+    const membersResult = await membership.repository.listMembers(projectId);
+    if (membersResult.isErr()) {
+      return c.json({ error: "Failed to resolve project members" }, 500);
+    }
+
     const commentRepository = new D1StoryCommentRepository(c.env.DB);
     const currentUser = c.get("currentUser");
     const result = await createStoryComment(commentRepository, {
@@ -1127,57 +1130,17 @@ storiesRoute.post(
       userId: currentUser.id,
       actorName: currentUser.email ?? currentUser.id,
       body: commentBody,
+      notify: {
+        storyTitle: story.title,
+        ownerIds: story.ownerIds,
+        memberUserIds: membersResult.value.map((member) => member.userId),
+      },
     });
 
     if (result.isErr()) {
       if (result.error === STORY_COMMENT_ARCHIVED_ERROR)
         return c.json({ error: "Archived stories are read-only" }, 409);
       return c.json({ error: "Failed to create comment" }, 500);
-    }
-
-    const membersResult = await membership.repository.listMembers(projectId);
-    if (membersResult.isErr()) {
-      return c.json({ error: "Failed to resolve project members" }, 500);
-    }
-
-    const notificationRepository = new D1NotificationRepository(c.env.DB);
-    const mentionResult = await createMentionNotifications(
-      notificationRepository,
-      {
-        projectId,
-        storyId: story.id,
-        storyTitle: story.title,
-        actorUserId: currentUser.id,
-        actorName: currentUser.email ?? currentUser.id,
-        sourceType: "comment",
-        sourceId: result.value.id,
-        text: result.value.body,
-        memberUserIds: membersResult.value.map((member) => member.userId),
-        createdAt: result.value.createdAt,
-      },
-    );
-
-    if (mentionResult.isErr()) {
-      return c.json({ error: "Failed to create mention notifications" }, 500);
-    }
-
-    const assigneeCommentResult = await createAssigneeCommentNotifications(
-      notificationRepository,
-      {
-        projectId,
-        storyId: story.id,
-        storyTitle: story.title,
-        ownerIds: story.ownerIds,
-        actorUserId: currentUser.id,
-        actorName: currentUser.email ?? currentUser.id,
-        commentId: result.value.id,
-        commentBody: result.value.body,
-        createdAt: result.value.createdAt,
-      },
-    );
-
-    if (assigneeCommentResult.isErr()) {
-      return c.json({ error: "Failed to create comment notifications" }, 500);
     }
 
     return c.json({ comment: result.value }, 201);
