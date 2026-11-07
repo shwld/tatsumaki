@@ -91,3 +91,9 @@ ADR-0011 により、公式ホスト版は自由登録になる。登録者は p
 - 「別 site」の判定は public suffix list に基づく registrable domain の比較とする（`tldts`）。`app.example.com` と `content.example.com` は同一 site なので拒否する。loopback host など registrable domain を持たない host は完全一致で比較する。
 - Access: 当初の「content domain は Access の対象外で bypass 不要」を改め、content domain の `/artifact-content/*` に bypass application を作る（上記 §4）。
 
+
+## Amendment 2026-11-07 (story #373)
+
+- `run_worker_first = ["/", "/index.html"]` のままでは、content host でも `/assets/*` などの静的アセットが Worker を通らずに配信され、§2 の「`/artifact-content/*` 以外は 404」と矛盾する。Cloudflare の `run_worker_first` は host 別に設定できないため、split hosting のときは `run_worker_first = true` にし、content host の判定を Worker に通す。
+- 本体 host の静的アセットは、Worker が `ASSETS` binding へ渡す（GET/HEAD で、見つかった場合のみ）。未設定の self-hosting は従来の設定のままで、追加コストはない。
+- コスト: split hosting では静的アセットのリクエストごとに Worker が起動する（Workers の request 課金の対象になる）。分離を保証する代償として許容する。

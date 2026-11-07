@@ -282,7 +282,7 @@ function isMcpOAuthEnabled(env: Bindings): env is OAuthBindings {
 
 export default {
   async fetch(request: Request, env: Bindings, ctx: ExecutionContext) {
-    const contentHostResponse = routeByContentHost(request, env, ctx);
+    const contentHostResponse = await routeByContentHost(request, env, ctx);
     if (contentHostResponse) return contentHostResponse;
 
     if (!isMcpOAuthEnabled(env)) {

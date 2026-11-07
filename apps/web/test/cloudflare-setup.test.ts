@@ -87,6 +87,19 @@ describe("Cloudflare self-hosting setup", () => {
     expect(config).not.toContain("api-token");
     expect(config).not.toContain("account-id");
     expect(config).not.toContain("CONTROL_PLANE");
+    expect(config).toContain('run_worker_first = ["/", "/index.html"]');
+  });
+
+  it("runs the Worker first for every request when the content host is split (ADR-0012)", () => {
+    const [plan] = buildEnvironmentPlans("tatsumaki", "production");
+    const config = renderWranglerConfig(
+      plan,
+      "d1-id",
+      "kv-id",
+      undefined,
+      true,
+    );
+    expect(config).toContain("run_worker_first = true");
   });
 
   it("renders a staging-only Control Plane Service Binding", () => {

@@ -29,11 +29,11 @@ contentHostApp.all(
  * are served by `contentHostApp` alone, and the app host never serves
  * `/artifact-content/*`. Returns null when the normal app should handle it.
  */
-export function routeByContentHost(
+export async function routeByContentHost(
   request: Request,
   env: Bindings,
   ctx: ExecutionContext,
-): Promise<Response> | Response | null {
+): Promise<Response | null> {
   const configured = env.ARTIFACT_CONTENT_ORIGIN;
   if (!configured) return null;
 
@@ -47,5 +47,21 @@ export function routeByContentHost(
       headers: { "Content-Type": "text/plain; charset=utf-8" },
     });
   }
-  return null;
+  return serveStaticAssetOnAppHost(request, env);
+}
+
+/**
+ * Split hosting runs the Worker first for every request so the content host
+ * can refuse static assets; the app host then has to hand them back to the
+ * asset binding itself. "/" and "/index.html" are left to the SPA handler.
+ */
+async function serveStaticAssetOnAppHost(
+  request: Request,
+  env: Bindings,
+): Promise<Response | null> {
+  if (request.method !== "GET" && request.method !== "HEAD") return null;
+  const { pathname } = new URL(request.url);
+  if (pathname === "/" || pathname === "/index.html") return null;
+  const response = await env.ASSETS.fetch(request);
+  return response.status === 404 ? null : response;
 }
