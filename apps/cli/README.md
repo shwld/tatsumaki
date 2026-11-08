@@ -180,6 +180,19 @@ tm story reorder --project <project-id> --ordered-id <story-id-1> --ordered-id <
 tm --json story reorder --project <project-id> --ordered-id <story-id-1> --ordered-id <story-id-2>
 ```
 
+## Story iteration unassign
+
+Removes an Unstarted story from the iteration it was explicitly assigned to, so it returns to the Backlog and follows normal priority and auto-planning. Only the iteration assignment changes; status, position, points and owners are untouched. Unlike `tm story reorder`, which only changes priority and never changes the iteration.
+
+```bash
+tm story unassign-iteration --project <project-id> 389
+tm --json story unassign-iteration --project <project-id> 389
+```
+
+- Re-running on a story with no iteration succeeds and reports `changed: false`.
+- Started or later stories, archived stories, other projects' stories and unknown story numbers are rejected (409 / 404) without any change.
+- A story can still be pulled into Current again by auto-planning if its priority and the iteration's capacity allow it.
+
 ## Project get
 
 ```bash

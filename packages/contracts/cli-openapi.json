@@ -247,6 +247,18 @@
         ],
         "example": "Unstarted"
       },
+      "StoryIterationUnassignResponse": {
+        "type": "object",
+        "properties": {
+          "story": {
+            "$ref": "#/components/schemas/Story"
+          },
+          "changed": {
+            "type": "boolean"
+          }
+        },
+        "required": ["story", "changed"]
+      },
       "StoryBlockerResponse": {
         "type": "object",
         "properties": {
@@ -1528,6 +1540,57 @@
           },
           "409": {
             "description": "Invalid state or conflict"
+          }
+        }
+      }
+    },
+    "/programmatic-api/v1/projects/{projectId}/stories/{storyNumber}/iteration": {
+      "delete": {
+        "operationId": "unassignStoryIteration",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "example": "project-123"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "example": "95"
+            },
+            "required": true,
+            "name": "storyNumber",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Story removed from its iteration (changed=false when it was not assigned)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoryIterationUnassignResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Story not found"
+          },
+          "409": {
+            "description": "Story is archived or not Unstarted"
           }
         }
       }

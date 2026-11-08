@@ -5,6 +5,13 @@ import {
 } from "../../../../application/usecases/get-story-by-number";
 import { listStories } from "../../../../application/usecases/list-stories";
 import { reorderStories } from "../../../../application/usecases/reorder-stories";
+import {
+  STORY_ITERATION_UNASSIGN_INVALID_STATUS_ERROR,
+  STORY_ITERATION_UNASSIGN_NOT_FOUND_ERROR,
+  unassignStoryIterationByNumber,
+} from "../../../../application/usecases/unassign-story-iteration";
+import { STORY_ARCHIVED_ERROR } from "../../../../domain/repositories/story-repository";
+import { D1IterationRepository } from "../../../../infrastructure/db/repositories/d1-iteration-repository";
 import { INVALID_STORY_STATUS_ERROR } from "../../../../application/usecases/story-input";
 import { createStory } from "../../../../application/usecases/create-story";
 import { createStoryComment } from "../../../../application/usecases/create-story-comment";
@@ -236,6 +243,47 @@ cliV1StoriesRoute.post("/:projectId/stories/reorder", async (c) => {
 
   return c.json({ stories: result.value });
 });
+
+cliV1StoriesRoute.delete(
+  "/:projectId/stories/:storyNumber/iteration",
+  async (c) => {
+    const projectId = c.req.param("projectId");
+    const membership = await requireProjectMembership(c, projectId);
+    if (!membership.ok) {
+      return membership.response;
+    }
+    if (membership.member.role === "viewer") {
+      return c.json({ error: "Viewers cannot change story iterations" }, 403);
+    }
+    const storyNumber = parseStoryNumberReference(c.req.param("storyNumber"));
+    if (storyNumber === null) {
+      return c.json({ error: "Story not found" }, 404);
+    }
+
+    const result = await unassignStoryIterationByNumber(
+      new D1StoryRepository(c.env.DB),
+      new D1IterationRepository(c.env.DB),
+      { projectId, storyNumber },
+    );
+    if (result.isErr()) {
+      if (result.error === STORY_ITERATION_UNASSIGN_NOT_FOUND_ERROR) {
+        return c.json({ error: "Story not found" }, 404);
+      }
+      if (result.error === STORY_ARCHIVED_ERROR) {
+        return c.json({ error: "Archived stories are read-only" }, 409);
+      }
+      if (result.error === STORY_ITERATION_UNASSIGN_INVALID_STATUS_ERROR) {
+        return c.json(
+          { error: "Only unstarted stories can be removed from an iteration" },
+          409,
+        );
+      }
+      return c.json({ error: "Failed to unassign story iteration" }, 500);
+    }
+
+    return c.json(result.value);
+  },
+);
 
 cliV1StoriesRoute.patch("/:projectId/stories/:storyNumber", async (c) => {
   const projectId = c.req.param("projectId");
