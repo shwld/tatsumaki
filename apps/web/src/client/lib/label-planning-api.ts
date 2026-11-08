@@ -1,4 +1,9 @@
-import type { Epic, EpicPlanInput, LabelDeletionImpact } from "../types/epic";
+import type {
+  Epic,
+  EpicPlanInput,
+  EpicWithProgress,
+  LabelDeletionImpact,
+} from "../types/epic";
 
 export type PlanningApiResult<T> =
   | { ok: true; value: T }
@@ -100,5 +105,21 @@ export function fetchLabelDeletionImpact(projectId: string, labelId: string) {
     `${labelEpicPath(projectId, labelId)}/deletion-impact`,
     undefined,
     (body) => body as LabelDeletionImpact,
+  );
+}
+
+export function fetchEpicsProgress(projectId: string) {
+  return request(
+    `/api/projects/${encodeURIComponent(projectId)}/epics/progress`,
+    undefined,
+    (body) => (body as { epics: EpicWithProgress[] }).epics,
+  );
+}
+
+export function fetchEpicProgress(projectId: string, labelId: string) {
+  return request(
+    `${labelEpicPath(projectId, labelId)}/epic/progress`,
+    undefined,
+    (body) => body as EpicWithProgress,
   );
 }

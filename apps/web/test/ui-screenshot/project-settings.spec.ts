@@ -7,6 +7,88 @@ import {
   themeVariants,
 } from "./helpers";
 
+function epicsProgress() {
+  const counts = (total: number, accepted: number) => ({
+    total,
+    accepted,
+    inProgress: Math.max(total - accepted - 1, 0),
+    unstarted: total > accepted ? 1 : 0,
+    icebox: 0,
+    blocked: 0,
+  });
+  const epic = (
+    id: string,
+    name: string,
+    color: string,
+    start: string | null,
+    end: string | null,
+  ) => ({
+    id: `epic-${id}`,
+    projectId: "project-1",
+    labelId: `label-${id}`,
+    labelName: name,
+    labelColor: color,
+    enabled: true,
+    description: id === "growth" ? "新規登録を増やす" : "",
+    successCriteria: id === "growth" ? "月間登録数 1,000 件" : "",
+    ownerId: id === "growth" ? "github|owner" : null,
+    plannedStart: start,
+    plannedEnd: end,
+    position: 0,
+    outcomeStatus: "unevaluated",
+    revision: 1,
+    createdAt: "2026-01-01 00:00:00",
+    updatedAt: "2026-01-01 00:00:00",
+  });
+  const progress = (total: number, accepted: number, overdue = false) => ({
+    state:
+      total === 0
+        ? "no_stories"
+        : accepted === total
+          ? "completed"
+          : "in_progress",
+    storyCompletionRate: total === 0 ? null : accepted / total,
+    stories: counts(total, accepted),
+    pointCompletionRate: total === 0 ? null : accepted / total,
+    points: {
+      estimatedPoints: total * 2,
+      acceptedPoints: accepted * 2,
+      excludedStories: 0,
+    },
+    overdue,
+  });
+  return [
+    {
+      epic: epic("growth", "growth", "#2563eb", "2026-10-01", "2027-01-31"),
+      progress: progress(10, 4),
+    },
+    {
+      epic: epic("ops", "ops", "#16a34a", "2026-09-01", "2026-10-31"),
+      progress: progress(5, 3, true),
+    },
+    {
+      epic: epic("research", "research", "#9333ea", "2026-12-01", "2027-02-28"),
+      progress: progress(0, 0),
+    },
+    {
+      epic: epic("legacy", "legacy", "#6b7280", "2026-01-01", "2026-03-31"),
+      progress: progress(8, 8),
+    },
+    {
+      epic: epic("someday", "someday", "#f59e0b", null, null),
+      progress: progress(2, 0),
+    },
+  ];
+}
+
+function epicsProgressResponse() {
+  return {
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({ epics: epicsProgress(), total: {} }),
+  };
+}
+
 for (const theme of themeVariants) {
   test(`project members screen (${theme})`, async ({ page }) => {
     await setThemeMode(page, theme);
@@ -100,6 +182,58 @@ for (const theme of themeVariants) {
     await expect(page.getByLabel("目的")).toHaveValue("新規登録を増やす");
     await expect(page).toHaveScreenshot(
       resolveSnapshotName("project-labels.png", theme),
+    );
+  });
+
+  test(`project epics timeline screen (${theme})`, async ({ page }) => {
+    await page.clock.setFixedTime(new Date("2026-11-08T00:00:00Z"));
+    await setThemeMode(page, theme);
+    await mockAuthMe(page);
+    await mockStoriesList(page);
+    await page.route("**/api/projects/project-1/epics/progress", (route) =>
+      route.fulfill(epicsProgressResponse()),
+    );
+
+    await page.goto("/projects/project-1/epics");
+    await expect(page.getByRole("heading", { name: "Epics" })).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: /growth: 2026-10-01/ }),
+    ).toBeVisible();
+    await expect(page).toHaveScreenshot(
+      resolveSnapshotName("project-epics.png", theme),
+    );
+  });
+
+  test(`project epic detail screen (${theme})`, async ({ page }) => {
+    await page.clock.setFixedTime(new Date("2026-11-08T00:00:00Z"));
+    await setThemeMode(page, theme);
+    await mockAuthMe(page);
+    await mockStoriesList(page);
+    await page.route("**/api/projects/project-1/members", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          currentMemberRole: "owner",
+          members: [{ userId: "github|owner", displayName: "Owner" }],
+        }),
+      }),
+    );
+    await page.route(
+      "**/api/projects/project-1/labels/label-growth/epic/progress",
+      (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify(epicsProgress()[0]),
+        }),
+    );
+
+    await page.goto("/projects/project-1/epics/label-growth");
+    await expect(page.getByRole("heading", { name: "growth" })).toBeVisible();
+    await expect(page.getByText("新規登録を増やす")).toBeVisible();
+    await expect(page).toHaveScreenshot(
+      resolveSnapshotName("project-epic-detail.png", theme),
     );
   });
 

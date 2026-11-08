@@ -9,6 +9,10 @@ import { popReturnTo } from "./lib/api-error";
 import { LoginScreen } from "./screens/login-screen";
 import { ProjectCreateScreen } from "./screens/project-create-screen";
 import { ProjectListScreen } from "./screens/project-list-screen";
+import {
+  ProjectEpicDetailScreen,
+  ProjectEpicsScreen,
+} from "./screens/project-epics-screen";
 import { ProjectLabelsScreen } from "./screens/project-labels-screen";
 import { ProjectMembersScreen } from "./screens/project-members-screen";
 import { ProjectApiKeysScreen } from "./screens/project-api-keys-screen";
@@ -74,6 +78,14 @@ export function App() {
                     <Route
                       path="/projects/:projectId/labels"
                       element={<ProjectLabelsScreen />}
+                    />
+                    <Route
+                      path="/projects/:projectId/epics"
+                      element={<ProjectEpicsScreen />}
+                    />
+                    <Route
+                      path="/projects/:projectId/epics/:labelId"
+                      element={<ProjectEpicDetailScreen />}
                     />
                     <Route
                       path="/projects/:projectId/invitations/:invitationId/accept"
