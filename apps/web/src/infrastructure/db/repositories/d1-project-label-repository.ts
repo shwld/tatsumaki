@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, count, eq } from "drizzle-orm";
 import { err, ok, type Result } from "neverthrow";
 import { ulid } from "ulid";
 import type { ProjectLabel } from "../../../domain/entities/project-label";
@@ -14,6 +14,7 @@ import {
 } from "../../../domain/repositories/project-label-repository";
 import { createDb, type DbClient } from "../client";
 import { projectLabelsTable } from "../schema/project-labels";
+import { storyLabelsTable } from "../schema/story-labels";
 
 function toEntity(row: typeof projectLabelsTable.$inferSelect): ProjectLabel {
   return {
@@ -198,5 +199,23 @@ export class D1ProjectLabelRepository implements ProjectLabelRepository {
       .all();
 
     return ok(rows.map(toEntity));
+  }
+
+  async countStories(
+    projectId: string,
+    id: string,
+  ): Promise<Result<number, ProjectLabelRepositoryError>> {
+    const row = await this.db
+      .select({ value: count() })
+      .from(storyLabelsTable)
+      .where(
+        and(
+          eq(storyLabelsTable.projectId, projectId),
+          eq(storyLabelsTable.labelId, id),
+        ),
+      )
+      .get();
+
+    return ok(row?.value ?? 0);
   }
 }

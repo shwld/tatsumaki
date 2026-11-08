@@ -19,7 +19,6 @@ import {
   INVALID_STORY_LABELS_ERROR,
   INVALID_STORY_POINT_ERROR,
   INVALID_STORY_OWNER_IDS_ERROR,
-  INVALID_STORY_EPIC_ID_ERROR,
   INVALID_STORY_REQUESTER_ID_ERROR,
   INVALID_STORY_STATUS_ERROR,
   INVALID_STORY_TITLE_ERROR,
@@ -29,7 +28,6 @@ import {
   normalizeStoryLabels,
   normalizeStoryPoint,
   normalizeStoryOwnerIds,
-  normalizeStoryEpicId,
   normalizeStoryRequesterId,
   normalizeStoryStatus,
   normalizeStoryTitle,
@@ -52,7 +50,6 @@ export type CreateStoryError =
   | typeof INVALID_STORY_LABELS_ERROR
   | typeof INVALID_STORY_POINT_ERROR
   | typeof INVALID_STORY_OWNER_IDS_ERROR
-  | typeof INVALID_STORY_EPIC_ID_ERROR
   | typeof INVALID_STORY_IS_ICEBOX_ERROR
   | typeof INVALID_STORY_REQUESTER_ID_ERROR
   | StoryRepositoryError
@@ -71,7 +68,6 @@ export async function createStory(
     storyPoint: number | null;
     labels?: string[];
     labelIds?: string[];
-    epicId?: string | null;
     isIcebox?: boolean;
     ownerIds?: string[];
     requesterId?: string | null;
@@ -135,11 +131,6 @@ export async function createStory(
     return err(requesterIdResult.error);
   }
 
-  const epicIdResult = normalizeStoryEpicId(input.epicId ?? null);
-  if (epicIdResult.isErr()) {
-    return err(epicIdResult.error);
-  }
-
   const isIceboxResult = resolveStoryIsIcebox({
     requested: input.isIcebox ?? false,
     current: null,
@@ -158,7 +149,6 @@ export async function createStory(
     storyPoint: storyPointResult.value,
     labels: labelsResult.value,
     labelIds: labelIdsResult.value,
-    epicId: epicIdResult.value,
     isIcebox: isIceboxResult.value ?? false,
     ownerIds: ownerIdsResult.value,
     requesterId: requesterIdResult.value,

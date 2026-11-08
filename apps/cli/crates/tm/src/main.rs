@@ -4,6 +4,7 @@ mod artifact;
 mod artifact_cli;
 mod desktop_ipc_client;
 mod desktop_ipc_command;
+mod epic_cli;
 mod infrastructure;
 mod update;
 
@@ -82,6 +83,8 @@ enum Commands {
     Whoami,
     Story(StoryCommand),
     Artifact(artifact_cli::ArtifactCommand),
+    Label(epic_cli::LabelCommand),
+    Epic(epic_cli::EpicCommand),
     Project(ProjectCommand),
     Desktop(DesktopCommand),
     Update(UpdateCommand),
@@ -443,15 +446,23 @@ pub fn exit_code_for_error(error: &CliError) -> i32 {
     }
 }
 
-/// Exit code for an artifact API error. The server's `code` decides; the
+/// Exit code for an API error answered with `{ error, code }`. The server's `code` decides; the
 /// message text is never inspected (it can contain words like "required").
 pub fn exit_code_for_api_error(status: u16, code: &str) -> i32 {
     match code {
         "UNAUTHORIZED" | "FORBIDDEN" => EXIT_AUTH,
-        "BASE_VERSION_CONFLICT" | "PUBLISH_CONFLICT" => EXIT_CONFLICT,
+        "BASE_VERSION_CONFLICT"
+        | "PUBLISH_CONFLICT"
+        | "REVISION_CONFLICT"
+        | "REVISION_REQUIRED" => EXIT_CONFLICT,
         "NOT_FOUND" | "ARTIFACT_NOT_FOUND" | "VERSION_NOT_FOUND" | "FILE_NOT_FOUND"
-        | "SESSION_NOT_FOUND" => EXIT_NOT_FOUND,
+        | "SESSION_NOT_FOUND" | "LABEL_NOT_FOUND" | "EPIC_NOT_FOUND" => EXIT_NOT_FOUND,
         "INVALID_REQUEST"
+        | "INVALID_OWNER"
+        | "INVALID_DESCRIPTION"
+        | "INVALID_SUCCESS_CRITERIA"
+        | "INVALID_PLANNED_PERIOD"
+        | "INVALID_OUTCOME_STATUS"
         | "EMPTY_MANIFEST"
         | "INVALID_PATH"
         | "DUPLICATE_PATH"
@@ -555,6 +566,32 @@ async fn run() -> Result<(), (CliError, i32)> {
                 eprintln!("{warning}");
             }
             artifact_cli::run_artifact(artifact_cmd, &base_url, &service, cli.json).await
+        }
+        Commands::Label(mut label_cmd) => {
+            let slot = label_cmd.command.project_slot();
+            *slot = Some(require_project(slot.take())?);
+            let base_url = resolve_base_url(&config_store, cli.base_url.clone())?;
+            let service = build_service(base_url.clone());
+            if let Some(warning) = service
+                .check_version_compatibility(&base_url, env!("CARGO_PKG_VERSION"))
+                .await
+            {
+                eprintln!("{warning}");
+            }
+            epic_cli::run_label(label_cmd, &base_url, &service, cli.json).await
+        }
+        Commands::Epic(mut epic_cmd) => {
+            let slot = epic_cmd.command.project_slot();
+            *slot = Some(require_project(slot.take())?);
+            let base_url = resolve_base_url(&config_store, cli.base_url.clone())?;
+            let service = build_service(base_url.clone());
+            if let Some(warning) = service
+                .check_version_compatibility(&base_url, env!("CARGO_PKG_VERSION"))
+                .await
+            {
+                eprintln!("{warning}");
+            }
+            epic_cli::run_epic(epic_cmd, &base_url, &service, cli.json).await
         }
         Commands::Story(mut story_cmd) => {
             let slot = story_cmd.command.project_slot();

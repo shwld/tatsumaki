@@ -41,4 +41,8 @@ export interface ProjectLabelRepository {
   list(
     projectId: string,
   ): Promise<Result<ProjectLabel[], ProjectLabelRepositoryError>>;
+  countStories(
+    projectId: string,
+    id: string,
+  ): Promise<Result<number, ProjectLabelRepositoryError>>;
 }

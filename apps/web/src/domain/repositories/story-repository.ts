@@ -23,7 +23,6 @@ export type CreateStoryInput = {
   labelIds: string[];
   /** Temporary name-based path, removed with story #381. Names missing from the project are created as labels. */
   labels: string[];
-  epicId: string | null;
   isIcebox: boolean;
   ownerIds: string[];
   requesterId: string | null;
@@ -49,7 +48,6 @@ export type UpdateStoryInput = {
   labels?: string[];
   /** Temporary name-based path, removed with story #381. */
   addLabelNames?: string[];
-  epicId?: string | null;
   isIcebox?: boolean;
   /** Put the story at the top of the position order in the same write that takes it out of the Icebox. */
   moveToTop?: boolean;

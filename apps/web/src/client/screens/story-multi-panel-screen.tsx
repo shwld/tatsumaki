@@ -526,7 +526,6 @@ export function StoryMultiPanelScreen() {
             status: "Unstarted",
             storyPoint: null,
             labels: [],
-            epicId: null,
             isIcebox: false,
             ownerIds: [],
             requesterId: null,

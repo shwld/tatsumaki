@@ -843,7 +843,6 @@ describe("story routes", () => {
         storyPoint: null,
         labels: [],
         labelIds: [],
-        epicId: null,
         isIcebox: false,
         ownerIds: [],
         requesterId: null,

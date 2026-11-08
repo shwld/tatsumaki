@@ -26,7 +26,6 @@ describe("story request parsers", () => {
         storyPoint: null,
         labels: [],
         labelIds: [],
-        epicId: null,
         isIcebox: false,
         ownerIds: [],
         requesterId: null,
@@ -49,7 +48,6 @@ describe("story request parsers", () => {
         storyPoint: null,
         labels: [],
         labelIds: [],
-        epicId: null,
         isIcebox: false,
         ownerIds: [],
         requesterId: null,
@@ -93,7 +91,6 @@ describe("story request parsers", () => {
         storyPoint: 3,
         labels: [],
         labelIds: [],
-        epicId: null,
         isIcebox: false,
         ownerIds: [],
         requesterId: null,
@@ -141,7 +138,6 @@ describe("story request parsers", () => {
         storyPoint: null,
         labels: [],
         labelIds: [],
-        epicId: null,
         isIcebox: true,
         ownerIds: [],
         requesterId: null,
@@ -161,6 +157,18 @@ describe("story request parsers", () => {
       ok: false,
       message: "panel must be one of icebox, backlog, or current",
     });
+  });
+
+  it("rejects epicId and points to label membership", () => {
+    for (const result of [
+      parseCreateStoryRequest({ title: "Story", epicId: null }),
+      parseUpdateStoryRequest({ epicId: "epic-1" }),
+    ]) {
+      expect(result).toEqual({
+        ok: false,
+        message: expect.stringContaining("addLabelIds"),
+      });
+    }
   });
 
   it("parses partial update request", () => {

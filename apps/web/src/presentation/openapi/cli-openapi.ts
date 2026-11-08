@@ -3,6 +3,7 @@ import { STORY_STATUSES, STORY_TYPES } from "../../domain/entities/story";
 import type { ArtifactErrorCode } from "../../application/usecases/artifacts/errors";
 import { STATUS_BY_CODE } from "../routes/artifacts/responses";
 import { getCliVersionCompatibility } from "../../application/usecases/get-cli-version-compatibility";
+import { registerEpicOpenApi } from "./epic-openapi";
 
 const StoryStatusEnumSchema = z
   .enum(STORY_STATUSES)
@@ -1067,6 +1068,8 @@ export function buildCliOpenApiDoc() {
   app.openapi(finalizeArtifactUploadRoute, (c) =>
     c.json({ noop: false as const, artifactId: "a", version: 1 }),
   );
+
+  registerEpicOpenApi(app);
 
   app.openAPIRegistry.register("ArtifactError", ArtifactErrorSchema);
 

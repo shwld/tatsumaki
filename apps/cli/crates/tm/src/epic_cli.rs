@@ -1,0 +1,632 @@
+use std::future::Future;
+
+use clap::{Args, Subcommand, ValueEnum};
+use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
+use tabled::{Table, Tabled, settings::Style};
+
+use crate::{
+    CliError, EXIT_GENERAL, EXIT_INVALID_ARGUMENT,
+    adapters::artifact_gateway::parse_api_error,
+    application::artifact_flow::{FlowError, TokenProvider},
+    exit_code_for_error,
+    infrastructure::project_file::require_project,
+    is_unauthorized,
+};
+
+#[derive(Args, Debug)]
+pub struct LabelCommand {
+    #[command(subcommand)]
+    pub command: LabelSubcommand,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum LabelSubcommand {
+    /// List the labels of a project with their IDs
+    List {
+        #[arg(long)]
+        project: Option<String>,
+    },
+    /// Show what deleting a label also removes: its story memberships and its epic with the plan
+    DeletionImpact {
+        #[arg(long)]
+        project: Option<String>,
+        label_id: String,
+    },
+}
+
+#[derive(Args, Debug)]
+pub struct EpicCommand {
+    #[command(subcommand)]
+    pub command: EpicSubcommand,
+}
+
+/// An epic is the strategy plan of one label. Writes take the revision you
+/// last read; a newer one on the server is a conflict.
+#[derive(Subcommand, Debug)]
+pub enum EpicSubcommand {
+    /// List the epics of a project, with planning on or off
+    List {
+        #[arg(long)]
+        project: Option<String>,
+    },
+    /// Show the plan of a label
+    Get {
+        #[arg(long)]
+        project: Option<String>,
+        label_id: String,
+    },
+    /// Turn strategy planning on. Restoring a saved plan needs --revision
+    Enable {
+        #[arg(long)]
+        project: Option<String>,
+        label_id: String,
+        #[arg(long)]
+        revision: Option<i64>,
+    },
+    /// Turn strategy planning off. The plan is kept
+    Disable {
+        #[arg(long)]
+        project: Option<String>,
+        label_id: String,
+        #[arg(long)]
+        revision: i64,
+    },
+    /// Save the plan. Only the given fields change
+    Update {
+        #[arg(long)]
+        project: Option<String>,
+        label_id: String,
+        #[arg(long)]
+        revision: i64,
+        /// Purpose of the epic
+        #[arg(long)]
+        description: Option<String>,
+        #[arg(long)]
+        success_criteria: Option<String>,
+        /// User ID of a project member
+        #[arg(long, conflicts_with = "clear_owner")]
+        owner: Option<String>,
+        #[arg(long)]
+        clear_owner: bool,
+        /// YYYY-MM-DD; requires --planned-end
+        #[arg(long, requires = "planned_end", conflicts_with = "clear_period")]
+        planned_start: Option<String>,
+        /// YYYY-MM-DD; requires --planned-start
+        #[arg(long, requires = "planned_start", conflicts_with = "clear_period")]
+        planned_end: Option<String>,
+        #[arg(long)]
+        clear_period: bool,
+        /// Entered by a person; never inferred from story completion
+        #[arg(long, value_enum)]
+        outcome: Option<OutcomeArg>,
+    },
+}
+
+#[derive(Copy, Clone, Debug, ValueEnum)]
+pub enum OutcomeArg {
+    Unevaluated,
+    Achieved,
+    Missed,
+}
+
+impl OutcomeArg {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Unevaluated => "unevaluated",
+            Self::Achieved => "achieved",
+            Self::Missed => "missed",
+        }
+    }
+}
+
+impl LabelSubcommand {
+    pub fn project_slot(&mut self) -> &mut Option<String> {
+        match self {
+            Self::List { project } | Self::DeletionImpact { project, .. } => project,
+        }
+    }
+}
+
+impl EpicSubcommand {
+    pub fn project_slot(&mut self) -> &mut Option<String> {
+        match self {
+            Self::List { project }
+            | Self::Get { project, .. }
+            | Self::Enable { project, .. }
+            | Self::Disable { project, .. }
+            | Self::Update { project, .. } => project,
+        }
+    }
+}
+
+/// The output types are the CLI's own so that `--json` does not change when
+/// the server adds a field.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LabelInfo {
+    pub id: String,
+    pub name: String,
+    pub color: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EpicInfo {
+    pub id: String,
+    pub label_id: String,
+    pub label_name: String,
+    pub enabled: bool,
+    pub description: String,
+    pub success_criteria: String,
+    pub owner_id: Option<String>,
+    pub planned_start: Option<String>,
+    pub planned_end: Option<String>,
+    pub outcome_status: String,
+    pub revision: i64,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeletionImpactEpic {
+    pub id: String,
+    pub enabled: bool,
+    pub has_plan: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeletionImpact {
+    pub label_id: String,
+    pub label_name: String,
+    pub story_count: i64,
+    pub epic: Option<DeletionImpactEpic>,
+}
+
+#[derive(Deserialize)]
+struct LabelsBody {
+    labels: Vec<LabelInfo>,
+}
+#[derive(Deserialize)]
+struct EpicsBody {
+    epics: Vec<EpicInfo>,
+}
+#[derive(Deserialize)]
+struct EpicBody {
+    epic: EpicInfo,
+}
+
+/// Builds the PATCH body. The planned period is sent as a pair, as the server requires.
+pub fn plan_body(command: &EpicSubcommand) -> Result<Value, String> {
+    let EpicSubcommand::Update {
+        revision,
+        description,
+        success_criteria,
+        owner,
+        clear_owner,
+        planned_start,
+        planned_end,
+        clear_period,
+        outcome,
+        ..
+    } = command
+    else {
+        return Err("not an update command".to_string());
+    };
+    let mut body = Map::new();
+    if let Some(value) = description {
+        body.insert("description".into(), Value::from(value.as_str()));
+    }
+    if let Some(value) = success_criteria {
+        body.insert("successCriteria".into(), Value::from(value.as_str()));
+    }
+    if let Some(value) = owner {
+        body.insert("ownerId".into(), Value::from(value.as_str()));
+    } else if *clear_owner {
+        body.insert("ownerId".into(), Value::Null);
+    }
+    match (planned_start, planned_end) {
+        (Some(start), Some(end)) => {
+            body.insert("plannedStart".into(), Value::from(start.as_str()));
+            body.insert("plannedEnd".into(), Value::from(end.as_str()));
+        }
+        _ if *clear_period => {
+            body.insert("plannedStart".into(), Value::Null);
+            body.insert("plannedEnd".into(), Value::Null);
+        }
+        _ => {}
+    }
+    if let Some(value) = outcome {
+        body.insert("outcomeStatus".into(), Value::from(value.as_str()));
+    }
+    if body.is_empty() {
+        return Err(
+            "nothing to update: pass --description, --success-criteria, --owner/--clear-owner, --planned-start with --planned-end/--clear-period, or --outcome"
+                .to_string(),
+        );
+    }
+    body.insert("revision".into(), Value::from(*revision));
+    Ok(Value::Object(body))
+}
+
+struct EpicClient<'a, T: TokenProvider> {
+    base_url: &'a str,
+    project: String,
+    tokens: &'a T,
+    client: reqwest::Client,
+}
+
+impl<T: TokenProvider + Sync> EpicClient<'_, T> {
+    fn url(&self, path: &str) -> String {
+        format!(
+            "{}/programmatic-api/v1/projects/{}{}",
+            self.base_url.trim_end_matches('/'),
+            urlencoding::encode(&self.project),
+            path
+        )
+    }
+
+    fn label_url(&self, label_id: &str, suffix: &str) -> String {
+        self.url(&format!(
+            "/labels/{}{suffix}",
+            urlencoding::encode(label_id)
+        ))
+    }
+
+    async fn with_token<R, F, Fut>(&self, op: F) -> Result<R, FlowError>
+    where
+        F: Fn(String) -> Fut,
+        Fut: Future<Output = Result<R, CliError>>,
+    {
+        let token = self.tokens.access_token(self.base_url).await?;
+        match op(token).await {
+            Err(error)
+                if matches!(error, CliError::Api { status: 401, .. })
+                    || is_unauthorized(&error) =>
+            {
+                let token = self.tokens.refresh_access_token(self.base_url).await?;
+                op(token).await.map_err(|e| {
+                    let code = exit_code_for_error(&e);
+                    (e, code)
+                })
+            }
+            other => other.map_err(|e| {
+                let code = exit_code_for_error(&e);
+                (e, code)
+            }),
+        }
+    }
+
+    async fn send<R: serde::de::DeserializeOwned>(
+        &self,
+        method: reqwest::Method,
+        url: String,
+        body: Option<&Value>,
+    ) -> Result<R, FlowError> {
+        self.with_token(|token| {
+            let mut request = self.client.request(method.clone(), &url).bearer_auth(token);
+            if let Some(body) = body {
+                request = request.json(body);
+            }
+            async move {
+                let response = request.send().await?;
+                let status = response.status();
+                if status.is_success() {
+                    return Ok(response.json::<R>().await?);
+                }
+                let text = response.text().await.unwrap_or_default();
+                Err(parse_api_error(status.as_u16(), &text, None))
+            }
+        })
+        .await
+    }
+}
+
+fn print_json<T: Serialize>(value: &T) -> Result<(), FlowError> {
+    println!(
+        "{}",
+        serde_json::to_string_pretty(value).map_err(|e| (CliError::Json(e), EXIT_GENERAL))?
+    );
+    Ok(())
+}
+
+#[derive(Tabled)]
+struct EpicRow {
+    label: String,
+    #[tabled(rename = "label id")]
+    label_id: String,
+    planning: String,
+    period: String,
+    outcome: String,
+    revision: i64,
+}
+
+fn period(epic: &EpicInfo) -> String {
+    match (&epic.planned_start, &epic.planned_end) {
+        (Some(start), Some(end)) => format!("{start}..{end}"),
+        _ => "-".to_string(),
+    }
+}
+
+fn print_epic(epic: &EpicInfo, json: bool) -> Result<(), FlowError> {
+    if json {
+        return print_json(epic);
+    }
+    println!("label: {} ({})", epic.label_name, epic.label_id);
+    println!("planning: {}", if epic.enabled { "on" } else { "off" });
+    println!("description: {}", epic.description);
+    println!("success criteria: {}", epic.success_criteria);
+    println!("owner: {}", epic.owner_id.as_deref().unwrap_or("-"));
+    println!("period: {}", period(epic));
+    println!("outcome: {}", epic.outcome_status);
+    println!("revision: {}", epic.revision);
+    Ok(())
+}
+
+pub async fn run_label<T: TokenProvider + Sync>(
+    command: LabelCommand,
+    base_url: &str,
+    tokens: &T,
+    json: bool,
+) -> Result<(), FlowError> {
+    let mut command = command.command;
+    let client = EpicClient {
+        base_url,
+        project: require_project(command.project_slot().take())?,
+        tokens,
+        client: reqwest::Client::new(),
+    };
+    match command {
+        LabelSubcommand::List { .. } => {
+            let body: LabelsBody = client
+                .send(reqwest::Method::GET, client.url("/labels"), None)
+                .await?;
+            if json {
+                return print_json(&body.labels);
+            }
+            #[derive(Tabled)]
+            struct Row<'a> {
+                id: &'a str,
+                name: &'a str,
+                color: &'a str,
+            }
+            let rows: Vec<Row> = body
+                .labels
+                .iter()
+                .map(|l| Row {
+                    id: &l.id,
+                    name: &l.name,
+                    color: &l.color,
+                })
+                .collect();
+            println!("{}", Table::new(rows).with(Style::sharp()));
+            Ok(())
+        }
+        LabelSubcommand::DeletionImpact { label_id, .. } => {
+            let impact: DeletionImpact = client
+                .send(
+                    reqwest::Method::GET,
+                    client.label_url(&label_id, "/deletion-impact"),
+                    None,
+                )
+                .await?;
+            if json {
+                return print_json(&impact);
+            }
+            println!("label: {} ({})", impact.label_name, impact.label_id);
+            println!("stories losing the label: {}", impact.story_count);
+            match impact.epic {
+                Some(epic) => println!(
+                    "epic: {} (planning {}, {})",
+                    epic.id,
+                    if epic.enabled { "on" } else { "off" },
+                    if epic.has_plan {
+                        "its plan is deleted too; turning planning off keeps it"
+                    } else {
+                        "no plan saved"
+                    }
+                ),
+                None => println!("epic: none"),
+            }
+            Ok(())
+        }
+    }
+}
+
+pub async fn run_epic<T: TokenProvider + Sync>(
+    command: EpicCommand,
+    base_url: &str,
+    tokens: &T,
+    json: bool,
+) -> Result<(), FlowError> {
+    let mut command = command.command;
+    let client = EpicClient {
+        base_url,
+        project: require_project(command.project_slot().take())?,
+        tokens,
+        client: reqwest::Client::new(),
+    };
+    match &command {
+        EpicSubcommand::List { .. } => {
+            let body: EpicsBody = client
+                .send(reqwest::Method::GET, client.url("/epics"), None)
+                .await?;
+            if json {
+                return print_json(&body.epics);
+            }
+            let rows: Vec<EpicRow> = body
+                .epics
+                .iter()
+                .map(|e| EpicRow {
+                    label: e.label_name.clone(),
+                    label_id: e.label_id.clone(),
+                    planning: if e.enabled { "on" } else { "off" }.to_string(),
+                    period: period(e),
+                    outcome: e.outcome_status.clone(),
+                    revision: e.revision,
+                })
+                .collect();
+            println!("{}", Table::new(rows).with(Style::sharp()));
+            Ok(())
+        }
+        EpicSubcommand::Get { label_id, .. } => {
+            let body: EpicBody = client
+                .send(
+                    reqwest::Method::GET,
+                    client.label_url(label_id, "/epic"),
+                    None,
+                )
+                .await?;
+            print_epic(&body.epic, json)
+        }
+        EpicSubcommand::Enable {
+            label_id, revision, ..
+        } => {
+            let payload = match revision {
+                Some(revision) => serde_json::json!({ "revision": revision }),
+                None => serde_json::json!({}),
+            };
+            let body: EpicBody = client
+                .send(
+                    reqwest::Method::POST,
+                    client.label_url(label_id, "/epic/enable"),
+                    Some(&payload),
+                )
+                .await?;
+            print_epic(&body.epic, json)
+        }
+        EpicSubcommand::Disable {
+            label_id, revision, ..
+        } => {
+            let payload = serde_json::json!({ "revision": revision });
+            let body: EpicBody = client
+                .send(
+                    reqwest::Method::POST,
+                    client.label_url(label_id, "/epic/disable"),
+                    Some(&payload),
+                )
+                .await?;
+            print_epic(&body.epic, json)
+        }
+        EpicSubcommand::Update { label_id, .. } => {
+            let payload =
+                plan_body(&command).map_err(|m| (CliError::Message(m), EXIT_INVALID_ARGUMENT))?;
+            let body: EpicBody = client
+                .send(
+                    reqwest::Method::PATCH,
+                    client.label_url(label_id, "/epic"),
+                    Some(&payload),
+                )
+                .await?;
+            print_epic(&body.epic, json)
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use clap::Parser;
+
+    use super::*;
+
+    #[derive(Parser)]
+    struct Harness {
+        #[command(subcommand)]
+        command: EpicSubcommand,
+    }
+
+    fn parse(args: &[&str]) -> Result<EpicSubcommand, clap::Error> {
+        Harness::try_parse_from(std::iter::once("tm").chain(args.iter().copied()))
+            .map(|h| h.command)
+    }
+
+    #[test]
+    fn update_sends_only_given_fields_with_the_revision() {
+        let command = parse(&[
+            "update",
+            "label-1",
+            "--revision",
+            "3",
+            "--description",
+            "Purpose",
+            "--planned-start",
+            "2026-11-01",
+            "--planned-end",
+            "2026-11-30",
+            "--outcome",
+            "achieved",
+        ])
+        .unwrap();
+        assert_eq!(
+            plan_body(&command).unwrap(),
+            serde_json::json!({
+                "revision": 3,
+                "description": "Purpose",
+                "plannedStart": "2026-11-01",
+                "plannedEnd": "2026-11-30",
+                "outcomeStatus": "achieved",
+            })
+        );
+    }
+
+    #[test]
+    fn clearing_sends_nulls() {
+        let command = parse(&[
+            "update",
+            "label-1",
+            "--revision",
+            "1",
+            "--clear-owner",
+            "--clear-period",
+        ])
+        .unwrap();
+        assert_eq!(
+            plan_body(&command).unwrap(),
+            serde_json::json!({
+                "revision": 1,
+                "ownerId": null,
+                "plannedStart": null,
+                "plannedEnd": null,
+            })
+        );
+    }
+
+    #[test]
+    fn period_needs_both_dates_and_update_needs_a_field() {
+        assert!(
+            parse(&[
+                "update",
+                "l",
+                "--revision",
+                "1",
+                "--planned-start",
+                "2026-11-01"
+            ])
+            .is_err()
+        );
+        assert!(
+            parse(&[
+                "update",
+                "l",
+                "--revision",
+                "1",
+                "--owner",
+                "u",
+                "--clear-owner"
+            ])
+            .is_err()
+        );
+        let empty = parse(&["update", "l", "--revision", "1"]).unwrap();
+        assert!(plan_body(&empty).is_err());
+    }
+
+    #[test]
+    fn disable_requires_a_revision() {
+        assert!(parse(&["disable", "label-1"]).is_err());
+        assert!(matches!(
+            parse(&["enable", "label-1"]).unwrap(),
+            EpicSubcommand::Enable { revision: None, .. }
+        ));
+    }
+}
