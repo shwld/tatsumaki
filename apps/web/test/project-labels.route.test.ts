@@ -58,15 +58,25 @@ describe("project labels routes", () => {
 
   async function createStory(
     projectId: string,
-    labels: string[],
+    labelNames: string[],
   ): Promise<{ storyNumber: number }> {
+    const existing = (await (
+      await fetchWithAuth(labelsApiPath(projectId))
+    ).json()) as { labels: Array<{ id: string; name: string }> };
+    const labelIds: string[] = [];
+    for (const name of labelNames) {
+      labelIds.push(
+        existing.labels.find((label) => label.name === name)?.id ??
+          (await createLabel(projectId, name)),
+      );
+    }
     const response = await fetchWithAuth(storiesApiPath(projectId), {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         title: "Story with labels",
         description: "Used for project label cascade test",
-        labels,
+        labelIds,
       }),
     });
     expect(response.status).toBe(201);
@@ -255,6 +265,8 @@ describe("project labels routes", () => {
   it("keeps story update API behavior after label cascade changes", async () => {
     const projectId = await createProject();
     const story = await createStory(projectId, ["backend"]);
+    const frontendId = await createLabel(projectId, "frontend");
+    const highId = await createLabel(projectId, "priority:high");
 
     const response = await fetchWithAuth(
       storyApiPath(projectId, story.storyNumber),
@@ -263,7 +275,7 @@ describe("project labels routes", () => {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           title: "Updated title",
-          labels: ["frontend", "priority:high"],
+          labelIds: [frontendId, highId],
         }),
       },
     );
@@ -273,7 +285,7 @@ describe("project labels routes", () => {
       story: { title: string; labels: string[] };
     };
     expect(payload.story.title).toBe("Updated title");
-    expect(payload.story.labels).toEqual(["frontend", "priority:high"]);
+    expect(payload.story.labels.sort()).toEqual(["frontend", "priority:high"]);
   });
 
   it("rejects invalid color format", async () => {

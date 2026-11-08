@@ -32,8 +32,7 @@ export async function listStories(
     ownerId?: string;
     ownerIds?: string[];
     requesterId?: string;
-    label?: string;
-    labels?: string[];
+    labelIds?: string[];
     epicId?: string;
     epicIds?: string[];
     isIcebox?: boolean;
@@ -101,9 +100,8 @@ export async function listStories(
       ? { ownerIds: input.ownerIds }
       : {}),
     ...(input.requesterId ? { requesterId: input.requesterId } : {}),
-    ...(input.label ? { label: input.label } : {}),
-    ...(Array.isArray(input.labels) && input.labels.length > 0
-      ? { labels: input.labels }
+    ...(Array.isArray(input.labelIds) && input.labelIds.length > 0
+      ? { labelIds: input.labelIds }
       : {}),
     ...(input.epicId ? { epicId: input.epicId } : {}),
     ...(Array.isArray(input.epicIds) && input.epicIds.length > 0

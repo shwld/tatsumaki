@@ -674,6 +674,50 @@ describe("MCP OAuth", () => {
     expect(await countMentions()).toBe(1);
   });
 
+  it("sets labels by ID through update_story and rejects label names", async () => {
+    const projectId = await createProject("Label Project");
+    const storyId = await createStory(projectId, "Label story");
+    const accessToken = await issueMcpAccessToken();
+    const labelResponse = await SELF.fetch(
+      `https://localhost/api/projects/${projectId}/labels`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...(await createAuthHeaders()),
+        },
+        body: JSON.stringify({ name: "backend", color: "#3b82f6" }),
+      },
+    );
+    const labelId = ((await labelResponse.json()) as { label: { id: string } })
+      .label.id;
+
+    const call = async (args: Record<string, unknown>) => {
+      const response = await fetchMcp(accessToken, {
+        jsonrpc: "2.0",
+        id: "update-story-labels",
+        method: "tools/call",
+        params: {
+          name: "update_story",
+          arguments: { projectId, storyId, ...args },
+        },
+      });
+      return (await parseMcpResult(response)) as {
+        result?: { isError?: boolean; content?: Array<{ text?: string }> };
+      };
+    };
+
+    const updated = await call({ addLabelIds: [labelId] });
+    expect(updated.result?.isError).not.toBe(true);
+    expect(
+      JSON.parse(updated.result?.content?.[0]?.text ?? "{}").story.labelIds,
+    ).toEqual([labelId]);
+
+    const rejected = await call({ title: "x", labels: ["backend"] });
+    expect(rejected.result?.isError).toBe(true);
+    expect(rejected.result?.content?.[0]?.text).toContain("labelIds");
+  });
+
   it("updates a story status through update_story_status and returns the updated story", async () => {
     const projectId = await createProject("Status Project");
     const storyId = await createStory(projectId, "Ship status update", {
@@ -836,6 +880,7 @@ describe("MCP OAuth", () => {
         storyPoint: 2,
         type: "feature",
         labels: [],
+        labelIds: [],
       },
     });
   });
@@ -878,6 +923,7 @@ describe("MCP OAuth", () => {
         storyPoint: null,
         type: "feature",
         labels: [],
+        labelIds: [],
       },
     });
   });
@@ -1179,7 +1225,7 @@ async function createStory(
         type: options?.type ?? "feature",
         status: options?.status ?? "Unstarted",
         storyPoint: options?.storyPoint ?? null,
-        labels: [],
+        labelIds: [],
       }),
     },
   );

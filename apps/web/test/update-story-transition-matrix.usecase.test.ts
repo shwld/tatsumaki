@@ -30,6 +30,7 @@ function buildStory(overrides: Partial<Story>): Story {
     completedAt: null,
     storyPoint: 3,
     labels: [],
+    labelIds: [],
     epicId: null,
     iterationId: "iter-1",
     isIcebox: false,

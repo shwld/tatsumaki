@@ -4,7 +4,7 @@ import type { StoryType } from "../types/story";
 export type StoryPanelQueryFilters = {
   searchQuery: string;
   activeOwners: string[];
-  activeLabels: string[];
+  activeLabelIds: string[];
   activeEpicIds: string[];
   activeTypes: StoryType[];
   // Legacy fields kept optional for test compatibility.
@@ -32,7 +32,7 @@ export const storyQueryKeys = {
         currentIterationId,
         searchQuery: filters.searchQuery.trim(),
         activeOwners: filters.activeOwners,
-        activeLabels: filters.activeLabels,
+        activeLabelIds: filters.activeLabelIds,
         activeEpicIds: filters.activeEpicIds,
         activeTypes: filters.activeTypes,
       },

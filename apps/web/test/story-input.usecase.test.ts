@@ -8,7 +8,7 @@ import {
   INVALID_STORY_TITLE_ERROR,
   INVALID_STORY_TYPE_ERROR,
   normalizeStoryDescription,
-  normalizeStoryLabels,
+  normalizeStoryLabelIds,
   normalizeStoryPoint,
   normalizeStoryOwnerIds,
   normalizeStoryRequesterId,
@@ -50,17 +50,17 @@ describe("story input normalization", () => {
     }
   });
 
-  it("normalizes labels", () => {
-    const result = normalizeStoryLabels([" backend ", "api"]);
+  it("normalizes label IDs and drops duplicates", () => {
+    const result = normalizeStoryLabelIds([" l1 ", "l2", "l1"]);
 
     expect(result.isOk()).toBe(true);
     if (result.isOk()) {
-      expect(result.value).toEqual(["backend", "api"]);
+      expect(result.value).toEqual(["l1", "l2"]);
     }
   });
 
-  it("rejects blank label", () => {
-    const result = normalizeStoryLabels(["ok", "  "]);
+  it("rejects blank label ID", () => {
+    const result = normalizeStoryLabelIds(["ok", "  "]);
 
     expect(result.isErr()).toBe(true);
     if (result.isErr()) {

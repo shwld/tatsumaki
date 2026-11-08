@@ -16,6 +16,7 @@ import { STORY_ACTIVITY_REPOSITORY_ERROR } from "../../../domain/repositories/st
 import { createDb, type DbClient } from "../client";
 import { storiesTable } from "../schema/stories";
 import { storyTimelineEntriesTable } from "../schema/story-timeline";
+import { resolveLabelActivityNames } from "./story-activity-label-names";
 
 type ActivityRow = typeof storyTimelineEntriesTable.$inferSelect;
 
@@ -119,11 +120,11 @@ export class D1StoryActivityRepository implements StoryActivityRepository {
         )
         .all();
 
-      return ok(
-        activities.map((row) => {
-          return toStoryActivity(row.story_timeline_entries);
-        }),
+      const resolved = await resolveLabelActivityNames(
+        this.db,
+        activities.map((row) => row.story_timeline_entries),
       );
+      return ok(resolved.map(toStoryActivity));
     } catch {
       return err(STORY_ACTIVITY_REPOSITORY_ERROR);
     }
@@ -175,8 +176,12 @@ export class D1StoryActivityRepository implements StoryActivityRepository {
 
       const hasMore = activities.length > limit;
       const windowRows = hasMore ? activities.slice(0, limit) : activities;
-      const entries = windowRows.map((row) =>
-        toProjectHistoryEntry(row.entry, row.storyTitle ?? null),
+      const resolvedRows = await resolveLabelActivityNames(
+        this.db,
+        windowRows.map((row) => row.entry),
+      );
+      const entries = windowRows.map((row, index) =>
+        toProjectHistoryEntry(resolvedRows[index]!, row.storyTitle ?? null),
       );
       const oldest =
         windowRows.length > 0 ? windowRows[windowRows.length - 1] : null;

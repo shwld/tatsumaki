@@ -12,6 +12,7 @@ export const STORY_ACTIVITY_FIELDS = [
   "status",
   "storyPoint",
   "labels",
+  "labelIds",
   "story",
 ] as const;
 

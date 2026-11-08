@@ -70,6 +70,15 @@ savedFiltersRoute.post("/projects/:projectId/saved-filters", async (c) => {
   const MAX_ARRAY_ITEMS = 50;
   const MAX_QUERY_LENGTH = 200;
   const f = filters as Record<string, unknown>;
+  if (f.labels !== undefined) {
+    return c.json(
+      {
+        error:
+          "filters.labels (names) is no longer accepted. Use filters.labelIds",
+      },
+      400,
+    );
+  }
   if (
     (f.query !== undefined &&
       (typeof f.query !== "string" || f.query.length > MAX_QUERY_LENGTH)) ||
@@ -81,8 +90,8 @@ savedFiltersRoute.post("/projects/:projectId/saved-filters", async (c) => {
       (!Array.isArray(f.statuses) || f.statuses.length > MAX_ARRAY_ITEMS)) ||
     (f.ownerIds !== undefined &&
       (!Array.isArray(f.ownerIds) || f.ownerIds.length > MAX_ARRAY_ITEMS)) ||
-    (f.labels !== undefined &&
-      (!Array.isArray(f.labels) || f.labels.length > MAX_ARRAY_ITEMS)) ||
+    (f.labelIds !== undefined &&
+      (!Array.isArray(f.labelIds) || f.labelIds.length > MAX_ARRAY_ITEMS)) ||
     (f.epicIds !== undefined &&
       (!Array.isArray(f.epicIds) || f.epicIds.length > MAX_ARRAY_ITEMS))
   ) {

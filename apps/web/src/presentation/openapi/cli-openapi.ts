@@ -48,6 +48,15 @@ const StoryListQuerySchema = z.object({
     .enum(["exclude", "include", "only"])
     .optional()
     .openapi({ param: { name: "archived", in: "query" } }),
+  labelIds: z
+    .string()
+    .optional()
+    .openapi({
+      param: { name: "labelIds", in: "query" },
+      description:
+        "Comma-separated label IDs. Returns stories carrying any of them.",
+      example: "01KNCFJZJ0Z74X92QPCE0D9MK8",
+    }),
   limit: z
     .string()
     .regex(/^[1-9][0-9]*$/)
@@ -145,6 +154,7 @@ const StoryCreateBodySchema = z.object({
   type: z.enum(STORY_TYPES),
   description: z.string(),
   isIcebox: z.boolean().optional(),
+  labelIds: z.array(z.string()).optional(),
 });
 const StoryReorderBodySchema = z.object({
   orderedIds: z.array(z.string().min(1)).min(1),
@@ -154,7 +164,6 @@ const StoryUpdateBodySchema = z.object({
   description: z.string().optional(),
   type: z.enum(STORY_TYPES).optional(),
   storyPoint: z.number().int().nullable().optional(),
-  labels: z.array(z.string()).optional(),
   labelIds: z.array(z.string()).optional(),
   addLabelIds: z.array(z.string()).optional(),
   removeLabelIds: z.array(z.string()).optional(),

@@ -168,7 +168,7 @@ function StoryAccordionDetailComponent({
     null,
   );
   const isSaving = isPatchSaving;
-  const [selectedLabels, setSelectedLabels] = useState<string[]>([]);
+  const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
   const [titleDraft, setTitleDraft] = useState(story.title);
 
   const [selectedAttachmentFile, setSelectedAttachmentFile] =
@@ -194,12 +194,12 @@ function StoryAccordionDetailComponent({
   );
 
   const handleLabelsChange = useCallback(
-    (labels: string[]) => {
-      setSelectedLabels(labels);
-      if (sameStringArray(labels, resolvedStory.labels)) return;
-      void patchStory({ labels });
+    (labelIds: string[]) => {
+      setSelectedLabelIds(labelIds);
+      if (sameStringArray(labelIds, resolvedStory.labelIds)) return;
+      void patchStory({ labelIds });
     },
-    [patchStory, resolvedStory.labels],
+    [patchStory, resolvedStory.labelIds],
   );
 
   const timelineGroups = useMemo(
@@ -208,7 +208,7 @@ function StoryAccordionDetailComponent({
   );
 
   useEffect(() => {
-    setSelectedLabels(resolvedStory.labels);
+    setSelectedLabelIds(resolvedStory.labelIds);
     setTitleDraft(resolvedStory.title);
     setMetadataFieldErrors({});
   }, [resolvedStory.id]);
@@ -896,10 +896,10 @@ function StoryAccordionDetailComponent({
         </span>
         <LabelMultiSelect
           projectId={story.projectId}
-          selectedLabels={selectedLabels}
+          selectedLabelIds={selectedLabelIds}
           projectLabels={projectLabels}
           disabled={isSaving}
-          onSelectedLabelsChange={handleLabelsChange}
+          onSelectedLabelIdsChange={handleLabelsChange}
         />
       </div>
 

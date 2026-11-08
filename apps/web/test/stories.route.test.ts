@@ -96,6 +96,19 @@ describe("story routes", () => {
     return payload.project.id;
   };
 
+  const createLabel = async (projectId: string, name: string) => {
+    const response = await fetchWithAuth(
+      `https://localhost/api/projects/${projectId}/labels`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name, color: "#336699" }),
+      },
+    );
+    expect(response.status).toBe(201);
+    return ((await response.json()) as { label: { id: string } }).label.id;
+  };
+
   const ensureCurrentIterationForTest = async (projectId: string) => {
     const db = createDb(env.DB);
     const today = todayIso();
@@ -247,6 +260,8 @@ describe("story routes", () => {
 
   it("creates a story with title, description, type, status and labels", async () => {
     const projectId = await createProject();
+    const authId = await createLabel(projectId, "auth");
+    const backendId = await createLabel(projectId, "backend");
 
     const response = await fetchWithAuth(storiesApiPath(projectId), {
       method: "POST",
@@ -257,7 +272,7 @@ describe("story routes", () => {
         type: "feature",
         status: "Unstarted",
         storyPoint: 3,
-        labels: ["auth", "backend"],
+        labelIds: [authId, backendId],
       }),
     });
 
@@ -277,7 +292,7 @@ describe("story routes", () => {
         archivedAt: null,
         storyPoint: 3,
         labels: ["auth", "backend"],
-        labelIds: [expect.any(String), expect.any(String)],
+        labelIds: [authId, backendId],
         epicId: null,
         iterationId: null,
         isIcebox: false,
@@ -307,7 +322,6 @@ describe("story routes", () => {
         type: "feature",
         status: "Unstarted",
         storyPoint: 13,
-        labels: [],
       }),
     });
 
@@ -320,6 +334,8 @@ describe("story routes", () => {
 
   it("updates story content and labels", async () => {
     const projectId = await createProject();
+    const uiId = await createLabel(projectId, "ui");
+    const highId = await createLabel(projectId, "priority:high");
 
     const createResponse = await fetchWithAuth(storiesApiPath(projectId), {
       method: "POST",
@@ -342,7 +358,7 @@ describe("story routes", () => {
           title: "Updated title",
           description: "Updated description",
           storyPoint: 8,
-          labels: ["ui", "priority:high"],
+          labelIds: [uiId, highId],
         }),
       },
     );
@@ -363,7 +379,7 @@ describe("story routes", () => {
         archivedAt: null,
         storyPoint: 8,
         labels: ["priority:high", "ui"],
-        labelIds: [expect.any(String), expect.any(String)],
+        labelIds: expect.arrayContaining([uiId, highId]),
         epicId: null,
         iterationId: null,
         isIcebox: false,
@@ -439,7 +455,6 @@ describe("story routes", () => {
         type: "feature",
         status: "Unstarted",
         storyPoint: 1,
-        labels: [],
       }),
     });
     const created = (await createResponse.json()) as {
@@ -511,7 +526,7 @@ describe("story routes", () => {
         type: "feature",
         status: "Unstarted",
         storyPoint: 3,
-        labels: [],
+        labelIds: [],
         ownerIds: ["github|assignee"],
       }),
     });
@@ -555,6 +570,7 @@ describe("story routes", () => {
 
   it("returns summary stories when detail=summary", async () => {
     const projectId = await createProject();
+    const perfId = await createLabel(projectId, "perf");
 
     const createResponse = await fetchWithAuth(storiesApiPath(projectId), {
       method: "POST",
@@ -562,7 +578,7 @@ describe("story routes", () => {
       body: JSON.stringify({
         title: "Summary target",
         description: "Long description body",
-        labels: ["perf"],
+        labelIds: [perfId],
         ownerIds: ["github|test-user"],
       }),
     });
@@ -800,6 +816,7 @@ describe("story routes", () => {
 
   it("gets full story detail by id", async () => {
     const projectId = await createProject();
+    const uiLabelId = await createLabel(projectId, "ui");
 
     const createResponse = await fetchWithAuth(storiesApiPath(projectId), {
       method: "POST",
@@ -807,7 +824,7 @@ describe("story routes", () => {
       body: JSON.stringify({
         title: "Detail target",
         description: "Detailed body",
-        labels: ["ui"],
+        labelIds: [uiLabelId],
       }),
     });
     expect(createResponse.status).toBe(201);
@@ -824,7 +841,7 @@ describe("story routes", () => {
         id: created.story.id,
         title: "Detail target",
         description: "Detailed body",
-        labels: ["ui"],
+        labelIds: [uiLabelId],
       }),
     });
   });
@@ -841,7 +858,6 @@ describe("story routes", () => {
         type: "release",
         status: "Unstarted",
         storyPoint: null,
-        labels: [],
         labelIds: [],
         isIcebox: false,
         ownerIds: [],
@@ -1259,6 +1275,7 @@ describe("story routes", () => {
 
   it("bulk adds labels for selected stories", async () => {
     const projectId = await createProject();
+    const backendId = await createLabel(projectId, "backend");
 
     const createFirst = await fetchWithAuth(storiesApiPath(projectId), {
       method: "POST",
@@ -1289,7 +1306,7 @@ describe("story routes", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         storyIds: [first.story.id, second.story.id],
-        labels: ["backend"],
+        labelIds: [backendId],
       }),
     });
 
@@ -1570,6 +1587,8 @@ describe("story routes", () => {
 
   it("filters stories by keyword across title, description, and labels", async () => {
     const projectId = await createProject();
+    const keywordId = await createLabel(projectId, "keywordlabel");
+    const otherId = await createLabel(projectId, "other");
 
     const createByTitle = await fetchWithAuth(storiesApiPath(projectId), {
       method: "POST",
@@ -1577,7 +1596,6 @@ describe("story routes", () => {
       body: JSON.stringify({
         title: "Search target title",
         description: "plain description",
-        labels: [],
       }),
     });
     expect(createByTitle.status).toBe(201);
@@ -1588,7 +1606,6 @@ describe("story routes", () => {
       body: JSON.stringify({
         title: "Another story",
         description: "contains DESCNEEDLE in description",
-        labels: [],
       }),
     });
     expect(createByDescription.status).toBe(201);
@@ -1599,7 +1616,7 @@ describe("story routes", () => {
       body: JSON.stringify({
         title: "Label matched story",
         description: "plain text",
-        labels: ["keywordlabel"],
+        labelIds: [keywordId],
       }),
     });
     expect(createByLabel.status).toBe(201);
@@ -1610,7 +1627,7 @@ describe("story routes", () => {
       body: JSON.stringify({
         title: "No match",
         description: "irrelevant",
-        labels: ["other"],
+        labelIds: [otherId],
       }),
     });
     expect(createNoMatch.status).toBe(201);
@@ -2790,7 +2807,6 @@ describe("story routes", () => {
         type: "feature",
         status: "Unstarted",
         storyPoint: 1,
-        labels: [],
       }),
     });
     const created = (await createResponse.json()) as {

@@ -150,6 +150,9 @@ enum StorySubcommand {
         icebox: bool,
         #[arg(long)]
         archived: bool,
+        /// Only stories carrying any of these labels (label ID or name; repeatable)
+        #[arg(long = "label", value_name = "ID_OR_NAME")]
+        labels: Vec<String>,
         #[arg(long)]
         limit: Option<u32>,
     },
@@ -164,6 +167,9 @@ enum StorySubcommand {
         description: String,
         #[arg(long, default_value_t = false)]
         is_icebox: bool,
+        /// Label to attach (label ID or name; repeatable)
+        #[arg(long = "label", value_name = "ID_OR_NAME")]
+        labels: Vec<String>,
     },
     Update {
         #[arg(long)]
@@ -187,6 +193,18 @@ enum StorySubcommand {
         owners: Vec<String>,
         #[arg(long, conflicts_with = "owners")]
         clear_owners: bool,
+        /// Replace the whole label set (label ID or name; repeatable)
+        #[arg(long = "label", value_name = "ID_OR_NAME", conflicts_with_all = ["clear_labels", "add_labels", "remove_labels"])]
+        labels: Vec<String>,
+        /// Add a label, keeping the others (label ID or name; repeatable)
+        #[arg(long = "add-label", value_name = "ID_OR_NAME")]
+        add_labels: Vec<String>,
+        /// Remove a label (label ID or name; repeatable)
+        #[arg(long = "remove-label", value_name = "ID_OR_NAME")]
+        remove_labels: Vec<String>,
+        /// Remove every label
+        #[arg(long, conflicts_with_all = ["labels", "add_labels", "remove_labels"])]
+        clear_labels: bool,
     },
     Status {
         #[arg(long)]
@@ -659,14 +677,18 @@ async fn run() -> Result<(), (CliError, i32)> {
                     iteration,
                     icebox,
                     archived,
+                    labels,
                     limit,
                 } => {
                     let project = require_project(project)?;
+                    let label_ids =
+                        epic_cli::resolve_label_ids(&base_url, &project, &service, &labels).await?;
                     let filter = StoryListFilter {
                         status: status.map(|s| s.as_api_str().to_string()),
                         iteration_date_scope: iteration.map(|i| i.as_api_str().to_string()),
                         icebox,
                         archived,
+                        label_ids,
                         limit,
                     };
                     let body = service.list_stories(&base_url, &project, &filter).await?;
@@ -712,13 +734,17 @@ async fn run() -> Result<(), (CliError, i32)> {
                     story_type,
                     description,
                     is_icebox,
+                    labels,
                 } => {
                     let project = require_project(project)?;
+                    let label_ids =
+                        epic_cli::resolve_label_ids(&base_url, &project, &service, &labels).await?;
                     let input = StoryCreateInput {
                         title,
                         r#type: story_type.as_api_str().to_string(),
                         description,
                         is_icebox,
+                        label_ids,
                     };
                     let body = service.create_story(&base_url, &project, &input).await?;
                     if cli.json {
@@ -747,8 +773,28 @@ async fn run() -> Result<(), (CliError, i32)> {
                     no_icebox,
                     owners,
                     clear_owners,
+                    labels,
+                    add_labels,
+                    remove_labels,
+                    clear_labels,
                 } => {
                     let project = require_project(project)?;
+                    let label_ids = if clear_labels {
+                        Some(Vec::new())
+                    } else if labels.is_empty() {
+                        None
+                    } else {
+                        Some(
+                            epic_cli::resolve_label_ids(&base_url, &project, &service, &labels)
+                                .await?,
+                        )
+                    };
+                    let add_label_ids =
+                        epic_cli::resolve_label_ids(&base_url, &project, &service, &add_labels)
+                            .await?;
+                    let remove_label_ids =
+                        epic_cli::resolve_label_ids(&base_url, &project, &service, &remove_labels)
+                            .await?;
                     let input = StoryUpdateInput {
                         title,
                         description,
@@ -773,6 +819,9 @@ async fn run() -> Result<(), (CliError, i32)> {
                         } else {
                             Some(owners)
                         },
+                        label_ids,
+                        add_label_ids,
+                        remove_label_ids,
                     };
                     let body = service
                         .update_story(&base_url, &project, story_number, &input)
@@ -805,6 +854,7 @@ async fn run() -> Result<(), (CliError, i32)> {
                         status: Some(status.as_api_str().to_string()),
                         is_icebox: None,
                         owner_ids: None,
+                        ..Default::default()
                     };
                     let body = service
                         .update_story(&base_url, &project, story_number, &input)
@@ -1326,6 +1376,32 @@ mod tests {
         };
         assert_eq!(owners, vec!["user-1".to_string(), "user-2".to_string()]);
         assert!(!clear_owners);
+    }
+
+    #[test]
+    fn story_update_takes_label_flags_and_rejects_mixing_replace_with_add() {
+        let parsed = Cli::try_parse_from([
+            "tm", "story", "update", "--project", "p", "1", "--add-label", "bug", "--remove-label", "old",
+        ])
+        .expect("add/remove labels should be accepted");
+        let Commands::Story(StoryCommand {
+            command: StorySubcommand::Update { add_labels, remove_labels, labels, .. },
+        }) = parsed.command
+        else {
+            panic!("expected story update command");
+        };
+        assert_eq!(add_labels, vec!["bug".to_string()]);
+        assert_eq!(remove_labels, vec!["old".to_string()]);
+        assert!(labels.is_empty());
+
+        assert!(Cli::try_parse_from([
+            "tm", "story", "update", "--project", "p", "1", "--label", "a", "--add-label", "b",
+        ])
+        .is_err());
+        assert!(Cli::try_parse_from([
+            "tm", "story", "update", "--project", "p", "1", "--clear-labels", "--label", "a",
+        ])
+        .is_err());
     }
 
     #[test]

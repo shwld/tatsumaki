@@ -65,24 +65,6 @@ export function normalizeStoryStatus(
   return ok(status as StoryStatus);
 }
 
-export function normalizeStoryLabels(
-  labels: string[],
-): Result<string[], typeof INVALID_STORY_LABELS_ERROR> {
-  const normalizedLabels = labels.map((label) => {
-    return label.trim();
-  });
-
-  if (
-    normalizedLabels.some((label) => {
-      return !label;
-    })
-  ) {
-    return err(INVALID_STORY_LABELS_ERROR);
-  }
-
-  return ok(normalizedLabels);
-}
-
 export function normalizeStoryLabelIds(
   labelIds: string[],
 ): Result<string[], typeof INVALID_STORY_LABELS_ERROR> {

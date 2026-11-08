@@ -45,6 +45,7 @@ export type Story = {
   archivedAt?: string | null;
   storyPoint: StoryPoint | null;
   labels: string[];
+  labelIds: string[];
   iterationId: string | null;
   isIcebox: boolean;
   ownerIds: string[];

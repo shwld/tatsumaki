@@ -101,8 +101,8 @@ function panelBaseQuery(
   if (filters.activeOwners.length > 0) {
     query.set("owners", filters.activeOwners.join(","));
   }
-  if (filters.activeLabels.length > 0) {
-    query.set("labels", filters.activeLabels.join(","));
+  if (filters.activeLabelIds.length > 0) {
+    query.set("labelIds", filters.activeLabelIds.join(","));
   }
   if (filters.activeEpicIds.length > 0) {
     query.set("epicIds", filters.activeEpicIds.join(","));
@@ -159,8 +159,8 @@ function currentAcceptedBaseQuery(
   if (filters.activeOwners.length > 0) {
     query.set("owners", filters.activeOwners.join(","));
   }
-  if (filters.activeLabels.length > 0) {
-    query.set("labels", filters.activeLabels.join(","));
+  if (filters.activeLabelIds.length > 0) {
+    query.set("labelIds", filters.activeLabelIds.join(","));
   }
   if (filters.activeEpicIds.length > 0) {
     query.set("epicIds", filters.activeEpicIds.join(","));

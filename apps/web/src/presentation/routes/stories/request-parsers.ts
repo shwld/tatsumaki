@@ -9,7 +9,6 @@ export type CreateStoryRequest = {
   type: string;
   status: string;
   storyPoint: number | null;
-  labels: string[];
   labelIds: string[];
   panel: "icebox" | "backlog" | "current";
   isIcebox: boolean;
@@ -24,7 +23,6 @@ export type UpdateStoryRequest = {
   type?: string;
   status?: string;
   storyPoint?: number | null;
-  labels?: string[];
   labelIds?: string[];
   addLabelIds?: string[];
   removeLabelIds?: string[];
@@ -50,12 +48,16 @@ export type BulkUpdateStoryStatusRequest = {
 
 export type BulkAddStoryLabelsRequest = {
   storyIds: string[];
-  labels: string[];
+  labelIds: string[];
 };
 
 /** A story belongs to an epic by carrying the epic's label (ADR-0013); there is no direct epic reference to write. */
 export const EPIC_ID_WRITE_REMOVED_MESSAGE =
   "epicId is no longer accepted. A story belongs to an epic by carrying the epic's label: send that label ID in labelIds or addLabelIds";
+
+/** Labels are referenced by ID only (ADR-0013); a name list is rejected instead of silently ignored. */
+export const LABEL_NAMES_WRITE_REMOVED_MESSAGE =
+  "labels (names) is no longer accepted. Reference labels by ID with labelIds, addLabelIds or removeLabelIds (see GET /labels)";
 
 const LABEL_ID_FIELDS = ["labelIds", "addLabelIds", "removeLabelIds"] as const;
 
@@ -117,14 +119,8 @@ export function parseCreateStoryRequest(
     return { ok: false, message: "Story point must be a number or null" };
   }
 
-  if (
-    body.labels !== undefined &&
-    (!Array.isArray(body.labels) ||
-      body.labels.some((label) => {
-        return typeof label !== "string";
-      }))
-  ) {
-    return { ok: false, message: "Story labels must be an array of strings" };
+  if (body.labels !== undefined || body.addLabelNames !== undefined) {
+    return { ok: false, message: LABEL_NAMES_WRITE_REMOVED_MESSAGE };
   }
 
   const invalidLabelIds = invalidLabelIdField(body);
@@ -201,7 +197,6 @@ export function parseCreateStoryRequest(
         typeof body.storyPoint === "number" || body.storyPoint === null
           ? body.storyPoint
           : null,
-      labels: Array.isArray(body.labels) ? (body.labels as string[]) : [],
       labelIds: Array.isArray(body.labelIds) ? (body.labelIds as string[]) : [],
       isIcebox:
         body.panel === "icebox"
@@ -253,14 +248,8 @@ export function parseUpdateStoryRequest(
     return { ok: false, message: "Story point must be a number or null" };
   }
 
-  if (
-    body.labels !== undefined &&
-    (!Array.isArray(body.labels) ||
-      body.labels.some((label) => {
-        return typeof label !== "string";
-      }))
-  ) {
-    return { ok: false, message: "Story labels must be an array of strings" };
+  if (body.labels !== undefined || body.addLabelNames !== undefined) {
+    return { ok: false, message: LABEL_NAMES_WRITE_REMOVED_MESSAGE };
   }
 
   const invalidLabelIds = invalidLabelIdField(body);
@@ -318,7 +307,6 @@ export function parseUpdateStoryRequest(
       ...(body.storyPoint !== undefined
         ? { storyPoint: body.storyPoint as number | null }
         : {}),
-      ...(body.labels !== undefined ? { labels: body.labels as string[] } : {}),
       ...(body.labelIds !== undefined
         ? { labelIds: body.labelIds as string[] }
         : {}),
@@ -434,15 +422,19 @@ export function parseBulkAddStoryLabelsRequest(
     return { ok: false, message: "storyIds must be a non-empty string array" };
   }
 
-  if (!isNonEmptyStringArray(body.labels)) {
-    return { ok: false, message: "labels must be a non-empty string array" };
+  if (body.labels !== undefined) {
+    return { ok: false, message: LABEL_NAMES_WRITE_REMOVED_MESSAGE };
+  }
+
+  if (!isNonEmptyStringArray(body.labelIds)) {
+    return { ok: false, message: "labelIds must be a non-empty string array" };
   }
 
   return {
     ok: true,
     value: {
       storyIds: body.storyIds,
-      labels: body.labels,
+      labelIds: body.labelIds,
     },
   };
 }

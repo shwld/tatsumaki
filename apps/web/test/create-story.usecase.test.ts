@@ -23,7 +23,7 @@ describe("createStory initial status", () => {
           type: "feature",
           status,
           storyPoint: 3,
-          labels: [],
+          labelIds: [],
           actorUserId: "user-1",
           actorName: "user",
         }),

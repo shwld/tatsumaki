@@ -189,14 +189,12 @@ function storyUnchangedGuard(
   } and target.archived_at is null)`;
 }
 
-function storyHasAnyLabelNamed(names: string[]): SQL {
+function storyHasAnyLabelId(labelIds: string[]): SQL {
   return sql`exists (
     select 1
     from ${storyLabelsTable}
-    join ${projectLabelsTable}
-      on ${projectLabelsTable.id} = ${storyLabelsTable.labelId}
     where ${storyLabelsTable.storyId} = ${storiesTable.id}
-      and ${inArray(projectLabelsTable.name, names)}
+      and ${storyLabelsTable.labelId} in (select value from json_each(${JSON.stringify([...new Set(labelIds)])}))
   )`;
 }
 
@@ -311,12 +309,8 @@ function buildListFilters(input: ListStoriesInput): SQL[] {
     );
   }
 
-  if (input.label !== undefined) {
-    filters.push(storyHasAnyLabelNamed([input.label]));
-  }
-
-  if (Array.isArray(input.labels) && input.labels.length > 0) {
-    filters.push(storyHasAnyLabelNamed(input.labels));
+  if (Array.isArray(input.labelIds) && input.labelIds.length > 0) {
+    filters.push(storyHasAnyLabelId(input.labelIds));
   }
 
   if (normalizedQuery) {
@@ -543,44 +537,24 @@ export class D1StoryRepository implements StoryRepository {
   }
 
   // Label edits are idempotent inserts and deletes keyed by (story, label), so concurrent edits never remove labels they did not name.
-  // IDs and names are bound as one JSON array each so the D1 bind limit does not depend on how many labels a request carries.
+  // IDs are bound as one JSON array each so the D1 bind limit does not depend on how many labels a request carries.
   private buildLabelStatements(
     projectId: string,
     storyId: string,
     input: Pick<
       UpdateStoryInput,
-      "labelIds" | "addLabelIds" | "removeLabelIds" | "labels" | "addLabelNames"
+      "labelIds" | "addLabelIds" | "removeLabelIds"
     >,
     guard: SQL = sql`1 = 1`,
   ): BatchItem<"sqlite">[] {
     const json = (values: string[]) => JSON.stringify([...new Set(values)]);
     const statements: BatchItem<"sqlite">[] = [];
 
-    const names = [...(input.labels ?? []), ...(input.addLabelNames ?? [])];
-    if (names.length > 0) {
-      statements.push(
-        this.db
-          .insert(projectLabelsTable)
-          .select(
-            sql`select lower(hex(randomblob(16))), ${projectId}, value, '#6b7280', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-              from json_each(${json(names)})
-              where ${guard}`,
-          )
-          .onConflictDoNothing(),
-      );
-    }
-
-    const matching = (ids: string[], byName: string[]) =>
-      sql`select id from project_labels
-        where project_id = ${projectId}
-          and (id in (select value from json_each(${json(ids)}))
-            or name in (select value from json_each(${json(byName)})))`;
-
-    if (input.labelIds !== undefined || input.labels !== undefined) {
+    if (input.labelIds !== undefined) {
       statements.push(
         this.db.delete(storyLabelsTable).where(
           sql`${storyLabelsTable.storyId} = ${storyId}
-              and ${storyLabelsTable.labelId} not in (${matching(input.labelIds ?? [], input.labels ?? [])})
+              and ${storyLabelsTable.labelId} not in (select value from json_each(${json(input.labelIds)}))
               and ${guard}`,
         ),
       );
@@ -597,14 +571,16 @@ export class D1StoryRepository implements StoryRepository {
     }
 
     const addIds = [...(input.labelIds ?? []), ...(input.addLabelIds ?? [])];
-    if (addIds.length > 0 || names.length > 0) {
+    if (addIds.length > 0) {
       statements.push(
         this.db
           .insert(storyLabelsTable)
           .select(
             sql`select ${projectId}, ${storyId}, id, CURRENT_TIMESTAMP
-              from (${matching(addIds, names)})
-              where ${guard}`,
+              from project_labels
+              where project_id = ${projectId}
+                and id in (select value from json_each(${json(addIds)}))
+                and ${guard}`,
           )
           .onConflictDoNothing(),
       );
@@ -1004,7 +980,7 @@ export class D1StoryRepository implements StoryRepository {
     const labelStatements = this.buildLabelStatements(
       input.projectId,
       inserted.id,
-      { labelIds: input.labelIds, addLabelNames: input.labels },
+      { labelIds: input.labelIds },
     );
     if (labelStatements.length > 0) {
       await this.db.batch(

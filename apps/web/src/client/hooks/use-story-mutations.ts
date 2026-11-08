@@ -76,6 +76,8 @@ export type BulkStatusMutationVariables = {
 export type BulkLabelMutationVariables = {
   storyIds: string[];
   stories: Story[];
+  labelId: string;
+  /** Shown in the optimistic story and the toast; the server stores the ID only. */
   labelName: string;
 };
 
@@ -503,7 +505,7 @@ export function useStoryMutations({
     BulkLabelMutationVariables,
     MutationContext
   >({
-    mutationFn: async ({ storyIds, labelName }) => {
+    mutationFn: async ({ storyIds, labelId }) => {
       const safeProjectId = ensureProjectId();
       const response = await fetch(
         projectBulkStoryLabelsApiPath(safeProjectId),
@@ -512,7 +514,7 @@ export function useStoryMutations({
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
             storyIds,
-            labels: [labelName],
+            labelIds: [labelId],
           }),
         },
       );
@@ -522,15 +524,18 @@ export function useStoryMutations({
       const data = (await response.json()) as { stories: Story[] };
       return Array.isArray(data.stories) ? data.stories : [];
     },
-    onMutate: async ({ stories, labelName }) => {
+    onMutate: async ({ stories, labelId, labelName }) => {
       await panelQueries.cancelPanels({ panels: ALL_PANELS });
       const snapshot = panelQueries.snapshotPanels({ panels: ALL_PANELS });
       panelQueries.applyStoriesUpdate(
         stories.map((story) => ({
           ...story,
-          labels: story.labels.includes(labelName)
+          labels: story.labelIds.includes(labelId)
             ? story.labels
             : [...story.labels, labelName],
+          labelIds: story.labelIds.includes(labelId)
+            ? story.labelIds
+            : [...story.labelIds, labelId],
         })),
       );
       return { snapshot };

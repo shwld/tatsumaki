@@ -50,6 +50,7 @@ function buildStory(overrides: Partial<Story> = {}): Story {
     statusChangedAt: "2026-01-01T00:00:00.000Z",
     storyPoint: 3,
     labels: [],
+    labelIds: [],
     iterationId: null,
     isIcebox: false,
     ownerIds: [],
@@ -935,6 +936,7 @@ describe("useStoryMutations", () => {
       mutationPromise = result.current.bulkLabelMutation.mutateAsync({
         storyIds: [story.id],
         stories: [story],
+        labelId: "label-urgent",
         labelName: "urgent",
       });
     });
@@ -946,6 +948,7 @@ describe("useStoryMutations", () => {
       expect.objectContaining({
         id: story.id,
         labels: ["existing", "urgent"],
+        labelIds: ["label-urgent"],
       }),
     ]);
 

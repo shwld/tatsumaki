@@ -11,7 +11,7 @@ import type {
 import type { NotificationRepository } from "../../domain/repositories/notification-repository";
 import {
   INVALID_STORY_LABELS_ERROR,
-  normalizeStoryLabels,
+  normalizeStoryLabelIds,
 } from "./story-input";
 import {
   STORY_NOT_FOUND_ERROR,
@@ -46,7 +46,7 @@ export async function bulkAddStoryLabels(
   input: {
     projectId: string;
     storyIds: string[];
-    labels: string[];
+    labelIds: string[];
     actor: StoryUpdateActor;
   },
   options?: {
@@ -59,16 +59,16 @@ export async function bulkAddStoryLabels(
     return err(EMPTY_STORY_IDS_ERROR);
   }
 
-  if (input.labels.length === 0) {
+  if (input.labelIds.length === 0) {
     return err(EMPTY_LABELS_ERROR);
   }
 
-  const normalizedLabels = normalizeStoryLabels(input.labels);
-  if (normalizedLabels.isErr()) {
-    return err(normalizedLabels.error);
+  const normalizedLabelIds = normalizeStoryLabelIds(input.labelIds);
+  if (normalizedLabelIds.isErr()) {
+    return err(normalizedLabelIds.error);
   }
 
-  const labelsToAdd = normalizedLabels.value;
+  const labelIdsToAdd = normalizedLabelIds.value;
   const updatedStories: Story[] = [];
 
   for (const storyId of storyIds) {
@@ -88,7 +88,7 @@ export async function bulkAddStoryLabels(
       {
         projectId: input.projectId,
         id: storyId,
-        addLabelNames: labelsToAdd,
+        addLabelIds: labelIdsToAdd,
         actor: input.actor,
       },
       options,

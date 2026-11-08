@@ -166,6 +166,7 @@ function createStory(): Story {
     statusChangedAt: "2026-01-01T00:00:00.000Z",
     storyPoint: 3,
     labels: [],
+    labelIds: [],
     iterationId: null,
     isIcebox: false,
     ownerIds: [],
@@ -590,7 +591,7 @@ describe("StoryAccordionDetail", () => {
         "/api/projects/project-1/stories/1",
         expect.objectContaining({
           method: "PATCH",
-          body: JSON.stringify({ labels: ["urgent"] }),
+          body: JSON.stringify({ labelIds: ["label-1"] }),
         }),
       );
     });

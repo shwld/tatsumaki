@@ -21,8 +21,6 @@ export type CreateStoryInput = {
   status: StoryStatus;
   storyPoint: StoryPoint | null;
   labelIds: string[];
-  /** Temporary name-based path, removed with story #381. Names missing from the project are created as labels. */
-  labels: string[];
   isIcebox: boolean;
   ownerIds: string[];
   requesterId: string | null;
@@ -44,10 +42,6 @@ export type UpdateStoryInput = {
   /** Applied atomically so concurrent edits do not remove each other's labels. */
   addLabelIds?: string[];
   removeLabelIds?: string[];
-  /** Temporary name-based path, removed with story #381. Replaces the whole label set. */
-  labels?: string[];
-  /** Temporary name-based path, removed with story #381. */
-  addLabelNames?: string[];
   isIcebox?: boolean;
   /** Put the story at the top of the position order in the same write that takes it out of the Icebox. */
   moveToTop?: boolean;
@@ -78,8 +72,8 @@ export type ListStoriesInput = {
   ownerId?: string;
   ownerIds?: string[];
   requesterId?: string;
-  label?: string;
-  labels?: string[];
+  /** OR match: a story qualifies when it carries any of these labels. */
+  labelIds?: string[];
   epicId?: string;
   epicIds?: string[];
   isIcebox?: boolean;

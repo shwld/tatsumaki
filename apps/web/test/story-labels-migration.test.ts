@@ -1,5 +1,5 @@
 import { env } from "cloudflare:test";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createDb } from "../src/infrastructure/db/client";
 import { projectLabelsTable } from "../src/infrastructure/db/schema/project-labels";
 import { projectsTable } from "../src/infrastructure/db/schema/projects";
@@ -22,14 +22,22 @@ async function rerunBackfill() {
   }
 }
 
+// 0063 drops stories.labels; the backfill of 0059 is replayed against a temporary copy of the column.
 describe("0059_create_story_labels backfill", () => {
   beforeEach(async () => {
+    await env.DB.prepare(
+      "ALTER TABLE stories ADD COLUMN labels TEXT NOT NULL DEFAULT '[]'",
+    ).run();
     await resetDatabase(env.DB);
     const db = createDb(env.DB);
     await db.insert(projectsTable).values([
       { id: P1, name: "One" },
       { id: P2, name: "Two" },
     ]);
+  });
+
+  afterEach(async () => {
+    await env.DB.prepare("ALTER TABLE stories DROP COLUMN labels").run();
   });
 
   async function insertStory(id: string, projectId: string, labels: string[]) {
@@ -42,8 +50,10 @@ describe("0059_create_story_labels backfill", () => {
         title: id,
         description: "-",
         position: 1,
-        labels: JSON.stringify(labels),
       });
+    await env.DB.prepare("UPDATE stories SET labels = ? WHERE id = ?")
+      .bind(JSON.stringify(labels), id)
+      .run();
   }
 
   it("maps names to same-project label IDs, creates missing labels and keeps projects apart", async () => {
