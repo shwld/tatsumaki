@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { type Context, Hono } from "hono";
 import {
   createProjectLabel,
   deleteProjectLabel,
@@ -15,6 +15,14 @@ import type { Env } from "../../index";
 import { requireProjectMembership } from "./project-membership";
 
 export const projectLabelsRoute = new Hono<Env>();
+
+/** Deleting a label also deletes its epic and plan (ADR-0013), so viewers must not reach any label write. */
+function viewerCannotChangeLabels(c: Context<Env>) {
+  return c.json(
+    { error: "Viewers cannot change labels", code: "FORBIDDEN" },
+    403,
+  );
+}
 
 projectLabelsRoute.get("/projects/:projectId/labels", async (c) => {
   const projectId = c.req.param("projectId");
@@ -38,6 +46,9 @@ projectLabelsRoute.post("/projects/:projectId/labels", async (c) => {
   const membership = await requireProjectMembership(c, projectId);
   if (!membership.ok) {
     return membership.response;
+  }
+  if (membership.member.role === "viewer") {
+    return viewerCannotChangeLabels(c);
   }
 
   let body: unknown;
@@ -91,6 +102,9 @@ projectLabelsRoute.patch("/projects/:projectId/labels/:labelId", async (c) => {
   const membership = await requireProjectMembership(c, projectId);
   if (!membership.ok) {
     return membership.response;
+  }
+  if (membership.member.role === "viewer") {
+    return viewerCannotChangeLabels(c);
   }
 
   let body: unknown;
@@ -148,6 +162,9 @@ projectLabelsRoute.delete("/projects/:projectId/labels/:labelId", async (c) => {
   const membership = await requireProjectMembership(c, projectId);
   if (!membership.ok) {
     return membership.response;
+  }
+  if (membership.member.role === "viewer") {
+    return viewerCannotChangeLabels(c);
   }
 
   const repository = new D1ProjectLabelRepository(c.env.DB);

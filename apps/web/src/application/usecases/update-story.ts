@@ -17,7 +17,6 @@ import {
   INVALID_STORY_LABELS_ERROR,
   INVALID_STORY_POINT_ERROR,
   INVALID_STORY_OWNER_IDS_ERROR,
-  INVALID_STORY_EPIC_ID_ERROR,
   INVALID_STORY_REQUESTER_ID_ERROR,
   INVALID_STORY_STATUS_ERROR,
   INVALID_STORY_TITLE_ERROR,
@@ -27,7 +26,6 @@ import {
   normalizeStoryLabels,
   normalizeStoryPoint,
   normalizeStoryOwnerIds,
-  normalizeStoryEpicId,
   normalizeStoryRequesterId,
   normalizeStoryStatus,
   normalizeStoryTitle,
@@ -76,7 +74,6 @@ export type UpdateStoryError =
   | typeof INVALID_STORY_LABELS_ERROR
   | typeof INVALID_STORY_POINT_ERROR
   | typeof INVALID_STORY_OWNER_IDS_ERROR
-  | typeof INVALID_STORY_EPIC_ID_ERROR
   | typeof INVALID_STORY_IS_ICEBOX_ERROR
   | typeof INVALID_STORY_REQUESTER_ID_ERROR
   | InvalidStoryStatusTransitionError
@@ -186,7 +183,6 @@ export async function updateStory(
     removeLabelIds?: string[];
     addLabelNames?: string[];
     ownerIds?: string[];
-    epicId?: string | null;
     isIcebox?: boolean;
     moveToTopOnLeavingIcebox?: boolean;
     requesterId?: string | null;
@@ -210,7 +206,6 @@ export async function updateStory(
     input.removeLabelIds !== undefined ||
     input.addLabelNames !== undefined ||
     input.ownerIds !== undefined ||
-    input.epicId !== undefined ||
     input.isIcebox !== undefined ||
     input.requesterId !== undefined;
 
@@ -320,12 +315,6 @@ export async function updateStory(
     return err(normalizedRequesterId.error);
   }
 
-  const normalizedEpicId =
-    input.epicId !== undefined ? normalizeStoryEpicId(input.epicId) : undefined;
-  if (normalizedEpicId?.isErr()) {
-    return err(normalizedEpicId.error);
-  }
-
   const resolvedIsIcebox = resolveStoryIsIcebox({
     requested: input.isIcebox,
     current: currentResult.value,
@@ -370,7 +359,6 @@ export async function updateStory(
     ...(normalizedOwnerIds?.isOk()
       ? { ownerIds: normalizedOwnerIds.value }
       : {}),
-    ...(normalizedEpicId?.isOk() ? { epicId: normalizedEpicId.value } : {}),
     ...(resolvedIsIcebox.value !== undefined
       ? { isIcebox: resolvedIsIcebox.value }
       : {}),

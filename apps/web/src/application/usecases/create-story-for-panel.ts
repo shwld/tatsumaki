@@ -53,7 +53,6 @@ type CreateStoryForPanelInput = {
   allowedStoryPoints?: number[];
   labels?: string[];
   labelIds?: string[];
-  epicId?: string | null;
   ownerIds?: string[];
   requesterId?: string | null;
   releaseDate?: string | null;

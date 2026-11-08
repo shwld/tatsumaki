@@ -11,7 +11,6 @@ export type CreateStoryRequest = {
   storyPoint: number | null;
   labels: string[];
   labelIds: string[];
-  epicId: string | null;
   panel: "icebox" | "backlog" | "current";
   isIcebox: boolean;
   ownerIds: string[];
@@ -29,7 +28,6 @@ export type UpdateStoryRequest = {
   labelIds?: string[];
   addLabelIds?: string[];
   removeLabelIds?: string[];
-  epicId?: string | null;
   isIcebox?: boolean;
   ownerIds?: string[];
   requesterId?: string | null;
@@ -54,6 +52,10 @@ export type BulkAddStoryLabelsRequest = {
   storyIds: string[];
   labels: string[];
 };
+
+/** A story belongs to an epic by carrying the epic's label (ADR-0013); there is no direct epic reference to write. */
+export const EPIC_ID_WRITE_REMOVED_MESSAGE =
+  "epicId is no longer accepted. A story belongs to an epic by carrying the epic's label: send that label ID in labelIds or addLabelIds";
 
 const LABEL_ID_FIELDS = ["labelIds", "addLabelIds", "removeLabelIds"] as const;
 
@@ -142,12 +144,8 @@ export function parseCreateStoryRequest(
     };
   }
 
-  if (
-    body.epicId !== undefined &&
-    body.epicId !== null &&
-    typeof body.epicId !== "string"
-  ) {
-    return { ok: false, message: "Story epicId must be a string or null" };
+  if (body.epicId !== undefined) {
+    return { ok: false, message: EPIC_ID_WRITE_REMOVED_MESSAGE };
   }
 
   if (body.isIcebox !== undefined && typeof body.isIcebox !== "boolean") {
@@ -205,10 +203,6 @@ export function parseCreateStoryRequest(
           : null,
       labels: Array.isArray(body.labels) ? (body.labels as string[]) : [],
       labelIds: Array.isArray(body.labelIds) ? (body.labelIds as string[]) : [],
-      epicId:
-        typeof body.epicId === "string" || body.epicId === null
-          ? body.epicId
-          : null,
       isIcebox:
         body.panel === "icebox"
           ? true
@@ -274,12 +268,8 @@ export function parseUpdateStoryRequest(
     return { ok: false, message: invalidLabelIds };
   }
 
-  if (
-    body.epicId !== undefined &&
-    body.epicId !== null &&
-    typeof body.epicId !== "string"
-  ) {
-    return { ok: false, message: "Story epicId must be a string or null" };
+  if (body.epicId !== undefined) {
+    return { ok: false, message: EPIC_ID_WRITE_REMOVED_MESSAGE };
   }
 
   if (body.isIcebox !== undefined && typeof body.isIcebox !== "boolean") {
@@ -337,9 +327,6 @@ export function parseUpdateStoryRequest(
         : {}),
       ...(body.removeLabelIds !== undefined
         ? { removeLabelIds: body.removeLabelIds as string[] }
-        : {}),
-      ...(body.epicId !== undefined
-        ? { epicId: body.epicId as string | null }
         : {}),
       ...(body.isIcebox !== undefined
         ? { isIcebox: body.isIcebox as boolean }

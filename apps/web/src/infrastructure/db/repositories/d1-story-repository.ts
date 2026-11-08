@@ -50,6 +50,7 @@ import {
 } from "../../../domain/repositories/story-repository";
 import { todayIso } from "../../../shared/date/today-iso";
 import { createDb, type DbClient } from "../client";
+import { epicsTable } from "../schema/epics";
 import { iterationsTable } from "../schema/iterations";
 import { projectLabelsTable } from "../schema/project-labels";
 import { projectMembersTable } from "../schema/project-members";
@@ -199,6 +200,17 @@ function storyHasAnyLabelNamed(names: string[]): SQL {
   )`;
 }
 
+/** An epic's stories are the stories carrying its label (ADR-0013). */
+function belongsToAnyEpic(epicIds: string[]): SQL {
+  return sql`exists (
+    select 1
+    from ${storyLabelsTable}
+    join ${epicsTable} on ${epicsTable.labelId} = ${storyLabelsTable.labelId}
+    where ${storyLabelsTable.storyId} = ${storiesTable.id}
+      and ${inArray(epicsTable.id, epicIds)}
+  )`;
+}
+
 function buildListFilters(input: ListStoriesInput): SQL[] {
   const filters: SQL[] = [eq(storiesTable.projectId, input.projectId)];
   if (input.archived !== "include") {
@@ -223,11 +235,11 @@ function buildListFilters(input: ListStoriesInput): SQL[] {
   }
 
   if (input.epicId !== undefined) {
-    filters.push(eq(storiesTable.epicId, input.epicId));
+    filters.push(belongsToAnyEpic([input.epicId]));
   }
 
   if (Array.isArray(input.epicIds) && input.epicIds.length > 0) {
-    filters.push(inArray(storiesTable.epicId, input.epicIds));
+    filters.push(belongsToAnyEpic(input.epicIds));
   }
 
   if (input.requesterId !== undefined) {

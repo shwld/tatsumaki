@@ -3,10 +3,14 @@ import { getProject } from "../../../../application/usecases/get-project";
 import type { Env } from "../../../../index";
 import { requireProjectMembership } from "../../project-membership";
 import { createArtifactRoutes } from "../../artifacts/routes";
+import { createEpicRoutes } from "../../epics/routes";
+import { cliV1LabelsRoute } from "./labels";
 import { cliV1StoriesRoute } from "./stories";
 
 export const cliV1ProjectsRoute = new Hono<Env>();
 cliV1ProjectsRoute.route("/", cliV1StoriesRoute);
+cliV1ProjectsRoute.route("/", cliV1LabelsRoute);
+cliV1ProjectsRoute.route("/", createEpicRoutes());
 cliV1ProjectsRoute.route(
   "/",
   createArtifactRoutes({ readMiddleware: [], writeMiddleware: [] }),

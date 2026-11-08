@@ -68,7 +68,7 @@ tm config show
 
 ## Project resolution
 
-`tm story`, `tm artifact`, `tm project get` and `tm desktop refetch` resolve the project in this order:
+`tm story`, `tm label`, `tm epic`, `tm artifact`, `tm project get` and `tm desktop refetch` resolve the project in this order:
 
 1. `--project` (for `tm project get`, the positional project ID)
 2. `TATSUMAKI_PROJECT_ID`
@@ -186,6 +186,28 @@ tm --json story reorder --project <project-id> --ordered-id <story-id-1> --order
 tm project get <project-id>
 tm --json project get <project-id>
 ```
+
+## Labels and strategy planning (epics)
+
+An epic is the strategy plan of one label: purpose, success criteria, owner, planned period and outcome. Its name is the label's name, and its stories are the stories that carry the label. Project owners and members can change plans; viewers can only read them.
+
+```bash
+tm label list --project <project-id>
+tm label deletion-impact --project <project-id> <label-id>
+tm epic list --project <project-id>
+tm epic get --project <project-id> <label-id>
+tm epic enable --project <project-id> <label-id>
+tm epic update --project <project-id> <label-id> --revision 1 \
+  --description "Make the first week easy" --success-criteria "80% finish setup" \
+  --owner <user-id> --planned-start 2026-11-01 --planned-end 2026-12-31 --outcome unevaluated
+tm epic disable --project <project-id> <label-id> --revision 2
+tm epic enable --project <project-id> <label-id> --revision 3
+```
+
+- `enable` creates the epic the first time. `disable` keeps the plan, and `enable --revision` restores it; the label stays on its stories either way.
+- Writes take the `revision` you last read. If someone changed the plan in between, the command fails with exit code 7 and nothing changes; read it again and retry.
+- The planned period is two calendar days (`YYYY-MM-DD`) given together, start on or before end; `--clear-period` removes it. `--outcome` (`unevaluated`, `achieved`, `missed`) is entered by a person and never inferred from story completion.
+- Deleting a label also deletes its epic with the plan. `tm label deletion-impact` shows what would go.
 
 ## Artifacts
 

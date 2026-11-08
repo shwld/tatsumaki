@@ -17,8 +17,6 @@ export const INVALID_STORY_OWNER_IDS_ERROR =
   "INVALID_STORY_OWNER_IDS_ERROR" as const;
 export const INVALID_STORY_REQUESTER_ID_ERROR =
   "INVALID_STORY_REQUESTER_ID_ERROR" as const;
-export const INVALID_STORY_EPIC_ID_ERROR =
-  "INVALID_STORY_EPIC_ID_ERROR" as const;
 
 export type StoryInputValidationError =
   | typeof INVALID_STORY_TITLE_ERROR
@@ -28,7 +26,6 @@ export type StoryInputValidationError =
   | typeof INVALID_STORY_POINT_ERROR
   | typeof INVALID_STORY_OWNER_IDS_ERROR
   | typeof INVALID_STORY_REQUESTER_ID_ERROR
-  | typeof INVALID_STORY_EPIC_ID_ERROR
   | typeof INVALID_STORY_IS_ICEBOX_ERROR;
 
 export function normalizeStoryTitle(
@@ -141,21 +138,6 @@ export function normalizeStoryRequesterId(
   const normalized = requesterId.trim();
   if (!normalized) {
     return err(INVALID_STORY_REQUESTER_ID_ERROR);
-  }
-
-  return ok(normalized);
-}
-
-export function normalizeStoryEpicId(
-  epicId: string | null,
-): Result<string | null, typeof INVALID_STORY_EPIC_ID_ERROR> {
-  if (epicId === null) {
-    return ok(null);
-  }
-
-  const normalized = epicId.trim();
-  if (!normalized) {
-    return err(INVALID_STORY_EPIC_ID_ERROR);
   }
 
   return ok(normalized);

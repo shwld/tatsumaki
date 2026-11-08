@@ -15,7 +15,6 @@ import { setStoryArchived } from "../../application/usecases/set-story-archived"
 import { D1StoryArchiveRepository } from "../../infrastructure/db/repositories/d1-story-archive-repository";
 import { STORY_STATUSES, STORY_TYPES } from "../../domain/entities/story";
 import { getPointScale } from "../../domain/entities/project";
-import type { ProjectRepository } from "../../domain/repositories/project-repository";
 import { D1StoryActivityRepository } from "../../infrastructure/db/repositories/d1-story-activity-repository";
 import { D1NotificationRepository } from "../../infrastructure/db/repositories/d1-notification-repository";
 import { D1IterationRepository } from "../../infrastructure/db/repositories/d1-iteration-repository";
@@ -32,51 +31,13 @@ import {
   toReorderStoriesErrorResponse,
   toUpdateStoryErrorResponse,
 } from "./stories/error-responses";
+import { registerEpicTools } from "./mcp/epic-tools";
+import { requireProjectAccess } from "./mcp/project-access";
 
 type McpRequestContext = {
   db: D1Database;
   currentUser: CurrentUser;
 };
-
-async function requireProjectAccess(
-  projectRepository: ProjectRepository,
-  projectId: string,
-  userId: string,
-) {
-  const memberResult = await projectRepository.findMember(projectId, userId);
-
-  if (memberResult.isErr()) {
-    return {
-      ok: false as const,
-      response: {
-        content: [
-          {
-            type: "text" as const,
-            text: "Failed to verify project membership.",
-          },
-        ],
-        isError: true,
-      },
-    };
-  }
-
-  if (!memberResult.value) {
-    return {
-      ok: false as const,
-      response: {
-        content: [
-          {
-            type: "text" as const,
-            text: "You do not have access to this project.",
-          },
-        ],
-        isError: true,
-      },
-    };
-  }
-
-  return { ok: true as const, member: memberResult.value };
-}
 
 const mcpStoryReferenceSchemaFields = {
   storyId: z
@@ -1021,6 +982,8 @@ function createMcpServer({ db, currentUser }: McpRequestContext): McpServer {
       };
     },
   );
+
+  registerEpicTools(server, { db, currentUser });
 
   return server;
 }

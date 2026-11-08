@@ -1,35 +1,36 @@
-import { and, asc, eq, isNull, sql } from "drizzle-orm";
-import { err, ok, type Result } from "neverthrow";
+import { and, asc, eq, sql } from "drizzle-orm";
+import { ok, type Result } from "neverthrow";
 import { ulid } from "ulid";
 import type { Epic } from "../../../domain/entities/epic";
 import type {
-  CreateEpicInput,
+  EpicPlanPatch,
   EpicRepository,
   EpicRepositoryError,
-  UpdateEpicInput,
-} from "../../../domain/repositories/epic-repository";
-import {
-  EPIC_DUPLICATE_NAME_ERROR,
-  EPIC_REPOSITORY_ERROR,
 } from "../../../domain/repositories/epic-repository";
 import { createDb, type DbClient } from "../client";
 import { epicsTable } from "../schema/epics";
-import { storiesTable } from "../schema/stories";
+import { projectLabelsTable } from "../schema/project-labels";
 
 type EpicRow = typeof epicsTable.$inferSelect;
+type LabelRow = Pick<typeof projectLabelsTable.$inferSelect, "name" | "color">;
 
-function toEpic(row: EpicRow, completed: number, total: number): Epic {
+function toEpic(row: EpicRow & { labelId: string }, label: LabelRow): Epic {
   return {
     __typename: "Epic",
     id: row.id,
     projectId: row.projectId,
-    name: row.name,
+    labelId: row.labelId,
+    labelName: label.name,
+    labelColor: label.color,
+    enabled: row.enabled,
     description: row.description,
-    progress: {
-      completed,
-      remaining: Math.max(0, total - completed),
-      total,
-    },
+    successCriteria: row.successCriteria,
+    ownerId: row.ownerId,
+    plannedStart: row.plannedStart,
+    plannedEnd: row.plannedEnd,
+    position: row.position,
+    outcomeStatus: row.outcomeStatus,
+    revision: row.revision,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -37,182 +38,141 @@ function toEpic(row: EpicRow, completed: number, total: number): Epic {
 
 export class D1EpicRepository implements EpicRepository {
   private readonly db: DbClient;
+  private readonly d1: D1Database;
 
   constructor(d1: D1Database) {
+    this.d1 = d1;
     this.db = createDb(d1);
   }
 
-  async create(
-    input: CreateEpicInput,
-  ): Promise<Result<Epic, EpicRepositoryError>> {
-    const duplicate = await this.db
-      .select({ id: epicsTable.id })
-      .from(epicsTable)
-      .where(
-        and(
-          eq(epicsTable.projectId, input.projectId),
-          eq(epicsTable.name, input.name),
-        ),
-      )
-      .get();
-
-    if (duplicate) {
-      return err(EPIC_DUPLICATE_NAME_ERROR);
-    }
-
-    const now = new Date().toISOString();
-    const id = ulid();
-
-    await this.db.insert(epicsTable).values({
-      id,
-      projectId: input.projectId,
-      name: input.name,
-      description: input.description,
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    const created = await this.db
-      .select()
-      .from(epicsTable)
-      .where(eq(epicsTable.id, id))
-      .get();
-    if (!created) {
-      return err(EPIC_REPOSITORY_ERROR);
-    }
-
-    return ok(toEpic(created, 0, 0));
-  }
-
-  async update(
-    input: UpdateEpicInput,
-  ): Promise<Result<Epic | null, EpicRepositoryError>> {
-    const existing = await this.db
-      .select()
-      .from(epicsTable)
-      .where(
-        and(
-          eq(epicsTable.projectId, input.projectId),
-          eq(epicsTable.id, input.id),
-        ),
-      )
-      .get();
-
-    if (!existing) {
-      return ok(null);
-    }
-
-    if (input.name !== undefined && input.name !== existing.name) {
-      const duplicate = await this.db
-        .select({ id: epicsTable.id })
-        .from(epicsTable)
-        .where(
-          and(
-            eq(epicsTable.projectId, input.projectId),
-            eq(epicsTable.name, input.name),
-          ),
-        )
-        .get();
-      if (duplicate) {
-        return err(EPIC_DUPLICATE_NAME_ERROR);
-      }
-    }
-
-    await this.db
-      .update(epicsTable)
-      .set({
-        ...(input.name !== undefined ? { name: input.name } : {}),
-        ...(input.description !== undefined
-          ? { description: input.description }
-          : {}),
-        updatedAt: sql`CURRENT_TIMESTAMP`,
-      })
-      .where(
-        and(
-          eq(epicsTable.projectId, input.projectId),
-          eq(epicsTable.id, input.id),
-        ),
-      );
-
-    const [row] = await this.db
+  private selectWithLabel() {
+    return this.db
       .select({
         epic: epicsTable,
-        completed: sql<number>`count(case when ${storiesTable.status} = 'Accepted' then 1 end)`,
-        total: sql<number>`count(${storiesTable.id})`,
+        labelId: projectLabelsTable.id,
+        labelName: projectLabelsTable.name,
+        labelColor: projectLabelsTable.color,
       })
       .from(epicsTable)
-      .leftJoin(
-        storiesTable,
+      .innerJoin(
+        projectLabelsTable,
         and(
-          eq(storiesTable.epicId, epicsTable.id),
-          isNull(storiesTable.archivedAt),
+          eq(projectLabelsTable.id, epicsTable.labelId),
+          eq(projectLabelsTable.projectId, epicsTable.projectId),
         ),
-      )
-      .where(
-        and(
-          eq(epicsTable.projectId, input.projectId),
-          eq(epicsTable.id, input.id),
-        ),
-      )
-      .groupBy(epicsTable.id)
-      .all();
-
-    if (!row) {
-      return err(EPIC_REPOSITORY_ERROR);
-    }
-
-    return ok(toEpic(row.epic, row.completed ?? 0, row.total ?? 0));
-  }
-
-  async delete(
-    projectId: string,
-    id: string,
-  ): Promise<Result<boolean, EpicRepositoryError>> {
-    const removed = await this.db
-      .delete(epicsTable)
-      .where(and(eq(epicsTable.projectId, projectId), eq(epicsTable.id, id)))
-      .returning({ id: epicsTable.id });
-
-    return ok(removed.length > 0);
+      );
   }
 
   async list(projectId: string): Promise<Result<Epic[], EpicRepositoryError>> {
-    const rows = await this.db
-      .select({
-        epic: epicsTable,
-        completed: sql<number>`count(case when ${storiesTable.status} = 'Accepted' then 1 end)`,
-        total: sql<number>`count(${storiesTable.id})`,
-      })
-      .from(epicsTable)
-      .leftJoin(
-        storiesTable,
-        and(
-          eq(storiesTable.epicId, epicsTable.id),
-          isNull(storiesTable.archivedAt),
-        ),
-      )
+    const rows = await this.selectWithLabel()
       .where(eq(epicsTable.projectId, projectId))
-      .groupBy(epicsTable.id)
-      .orderBy(asc(epicsTable.name))
+      .orderBy(asc(epicsTable.position), asc(epicsTable.createdAt))
       .all();
 
     return ok(
-      rows.map((row) => {
-        return toEpic(row.epic, row.completed ?? 0, row.total ?? 0);
-      }),
+      rows.map((row) =>
+        toEpic(
+          { ...row.epic, labelId: row.labelId },
+          { name: row.labelName, color: row.labelColor },
+        ),
+      ),
     );
   }
 
-  async exists(
+  async findByLabelId(
     projectId: string,
-    id: string,
-  ): Promise<Result<boolean, EpicRepositoryError>> {
-    const row = await this.db
-      .select({ id: epicsTable.id })
-      .from(epicsTable)
-      .where(and(eq(epicsTable.projectId, projectId), eq(epicsTable.id, id)))
+    labelId: string,
+  ): Promise<Result<Epic | null, EpicRepositoryError>> {
+    const row = await this.selectWithLabel()
+      .where(
+        and(
+          eq(epicsTable.projectId, projectId),
+          eq(epicsTable.labelId, labelId),
+        ),
+      )
       .get();
 
-    return ok(Boolean(row));
+    if (!row) {
+      return ok(null);
+    }
+    return ok(
+      toEpic(
+        { ...row.epic, labelId: row.labelId },
+        { name: row.labelName, color: row.labelColor },
+      ),
+    );
+  }
+
+  async createEnabled(
+    projectId: string,
+    labelId: string,
+  ): Promise<Result<Epic | null, EpicRepositoryError>> {
+    const now = new Date().toISOString();
+    // The label_id unique index makes concurrent first ONs collapse into one epic.
+    const result = await this.d1
+      .prepare(
+        `INSERT INTO epics (id, project_id, name, label_id, enabled, position, revision, created_at, updated_at)
+         SELECT ?1, pl.project_id, pl.name, pl.id, 1,
+           (SELECT coalesce(max(position), 0) + 1 FROM epics WHERE project_id = ?2),
+           1, ?4, ?4
+         FROM project_labels pl
+         WHERE pl.id = ?3 AND pl.project_id = ?2
+         ON CONFLICT(label_id) DO NOTHING`,
+      )
+      .bind(ulid(), projectId, labelId, now)
+      .run();
+
+    if (result.meta.changes === 0) {
+      return ok(null);
+    }
+    return this.findByLabelId(projectId, labelId);
+  }
+
+  async setEnabled(
+    projectId: string,
+    labelId: string,
+    enabled: boolean,
+    expectedRevision: number,
+  ): Promise<Result<Epic | null, EpicRepositoryError>> {
+    return this.updateAtRevision(projectId, labelId, expectedRevision, {
+      enabled,
+    });
+  }
+
+  async updatePlan(
+    projectId: string,
+    labelId: string,
+    expectedRevision: number,
+    patch: EpicPlanPatch,
+  ): Promise<Result<Epic | null, EpicRepositoryError>> {
+    return this.updateAtRevision(projectId, labelId, expectedRevision, patch);
+  }
+
+  private async updateAtRevision(
+    projectId: string,
+    labelId: string,
+    expectedRevision: number,
+    values: EpicPlanPatch & { enabled?: boolean },
+  ): Promise<Result<Epic | null, EpicRepositoryError>> {
+    const updated = await this.db
+      .update(epicsTable)
+      .set({
+        ...values,
+        revision: sql`${epicsTable.revision} + 1`,
+        updatedAt: new Date().toISOString(),
+      })
+      .where(
+        and(
+          eq(epicsTable.projectId, projectId),
+          eq(epicsTable.labelId, labelId),
+          eq(epicsTable.revision, expectedRevision),
+        ),
+      )
+      .returning({ id: epicsTable.id });
+
+    if (updated.length === 0) {
+      return ok(null);
+    }
+    return this.findByLabelId(projectId, labelId);
   }
 }

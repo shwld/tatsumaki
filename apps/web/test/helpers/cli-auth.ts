@@ -33,6 +33,7 @@ export async function submitConsent(
 /** Runs the OAuth authorization-code flow and returns a CLI access token. */
 export async function issueAccessToken(
   identity?: Parameters<typeof createAuthHeaders>[0],
+  resource = "https://localhost/programmatic-api/v1",
 ) {
   const response = await SELF.fetch("https://localhost/oauth/register", {
     method: "POST",
@@ -68,10 +69,7 @@ export async function issueAccessToken(
   authorizeUrl.searchParams.set("state", "state-cli-v1");
   authorizeUrl.searchParams.set("code_challenge", challenge);
   authorizeUrl.searchParams.set("code_challenge_method", "S256");
-  authorizeUrl.searchParams.set(
-    "resource",
-    "https://localhost/programmatic-api/v1",
-  );
+  authorizeUrl.searchParams.set("resource", resource);
 
   const authorizeResponse = await submitConsent(
     authorizeUrl,
