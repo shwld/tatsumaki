@@ -51,7 +51,8 @@ type CreateStoryForPanelInput = {
   status: string;
   storyPoint: number | null;
   allowedStoryPoints?: number[];
-  labels: string[];
+  labels?: string[];
+  labelIds?: string[];
   epicId?: string | null;
   ownerIds?: string[];
   requesterId?: string | null;

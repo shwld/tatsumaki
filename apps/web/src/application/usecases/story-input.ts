@@ -86,6 +86,16 @@ export function normalizeStoryLabels(
   return ok(normalizedLabels);
 }
 
+export function normalizeStoryLabelIds(
+  labelIds: string[],
+): Result<string[], typeof INVALID_STORY_LABELS_ERROR> {
+  const normalized = labelIds.map((id) => id.trim());
+  if (normalized.some((id) => !id)) {
+    return err(INVALID_STORY_LABELS_ERROR);
+  }
+  return ok([...new Set(normalized)]);
+}
+
 export function normalizeStoryPoint(
   point: number | null,
   allowedPoints?: number[],

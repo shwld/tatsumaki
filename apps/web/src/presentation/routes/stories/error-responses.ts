@@ -24,6 +24,7 @@ import {
   STORY_STATUS_CHANGED_CONCURRENTLY_ERROR,
   STORY_ARCHIVED_ERROR,
   STORY_REQUESTER_NOT_PROJECT_MEMBER_ERROR,
+  STORY_LABEL_NOT_IN_PROJECT_ERROR,
 } from "../../../domain/repositories/story-repository";
 import {
   INVALID_STORY_LABELS_ERROR,
@@ -117,6 +118,10 @@ export function toCreateStoryErrorResponse(
 
   if (error === STORY_REQUESTER_NOT_PROJECT_MEMBER_ERROR) {
     return { message: "Requester must be a project member", status: 400 };
+  }
+
+  if (error === STORY_LABEL_NOT_IN_PROJECT_ERROR) {
+    return { message: "All labels must belong to the project", status: 400 };
   }
 
   if (error === STORY_REPOSITORY_ERROR) {
@@ -237,6 +242,10 @@ export function toUpdateStoryErrorResponse(
 
   if (error === STORY_REQUESTER_NOT_PROJECT_MEMBER_ERROR) {
     return { message: "Requester must be a project member", status: 400 };
+  }
+
+  if (error === STORY_LABEL_NOT_IN_PROJECT_ERROR) {
+    return { message: "All labels must belong to the project", status: 400 };
   }
 
   if (error === STORY_NOT_FOUND_ERROR) {

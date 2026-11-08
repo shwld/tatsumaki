@@ -145,7 +145,9 @@ export type Story = {
   completedAt: string | null;
   archivedAt: string | null;
   storyPoint: StoryPoint | null;
+  /** Label names derived from labelIds (presentation only). */
   labels: string[];
+  labelIds: string[];
   epicId: string | null;
   iterationId: string | null;
   isIcebox: boolean;

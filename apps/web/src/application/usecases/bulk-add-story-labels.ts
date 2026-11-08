@@ -40,10 +40,6 @@ function uniqueStoryIds(storyIds: string[]): string[] {
   return Array.from(new Set(storyIds));
 }
 
-function mergeLabels(current: string[], labelsToAdd: string[]): string[] {
-  return Array.from(new Set([...current, ...labelsToAdd]));
-}
-
 export async function bulkAddStoryLabels(
   repository: StoryRepository,
   activityRepository: StoryActivityRepository,
@@ -92,7 +88,7 @@ export async function bulkAddStoryLabels(
       {
         projectId: input.projectId,
         id: storyId,
-        labels: mergeLabels(current.labels, labelsToAdd),
+        addLabelNames: labelsToAdd,
         actor: input.actor,
       },
       options,

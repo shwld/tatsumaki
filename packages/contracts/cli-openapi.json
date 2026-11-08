@@ -91,6 +91,12 @@
                   "type": "string"
                 }
               },
+              "labelIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
               "epicId": {
                 "type": "string",
                 "nullable": true
@@ -148,6 +154,7 @@
               "completedAt",
               "storyPoint",
               "labels",
+              "labelIds",
               "epicId",
               "iterationId",
               "ownerIds",
@@ -762,6 +769,24 @@
                     "nullable": true
                   },
                   "labels": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "labelIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "addLabelIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "removeLabelIds": {
                     "type": "array",
                     "items": {
                       "type": "string"

@@ -45,13 +45,16 @@ import {
   STORY_REPOSITORY_ERROR,
   STORY_STATUS_CHANGED_CONCURRENTLY_ERROR,
   STORY_ARCHIVED_ERROR,
+  STORY_LABEL_NOT_IN_PROJECT_ERROR,
   STORY_REQUESTER_NOT_PROJECT_MEMBER_ERROR,
 } from "../../../domain/repositories/story-repository";
 import { todayIso } from "../../../shared/date/today-iso";
 import { createDb, type DbClient } from "../client";
 import { iterationsTable } from "../schema/iterations";
+import { projectLabelsTable } from "../schema/project-labels";
 import { projectMembersTable } from "../schema/project-members";
 import { storyBlockersTable } from "../schema/story-blockers";
+import { storyLabelsTable } from "../schema/story-labels";
 import {
   storyOwnersTable,
   storyPriorityHistoryTable,
@@ -62,21 +65,10 @@ type StoryRow = typeof storiesTable.$inferSelect;
 type StoryPriorityHistoryRow = typeof storyPriorityHistoryTable.$inferSelect;
 type StoryBlockerRow = typeof storyBlockersTable.$inferSelect;
 
-function parseLabels(labelsJson: string): string[] {
-  try {
-    const parsed = JSON.parse(labelsJson);
-
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed.filter((value): value is string => {
-      return typeof value === "string";
-    });
-  } catch {
-    return [];
-  }
-}
+type StoryLabelsByStoryId = ReadonlyMap<
+  string,
+  { ids: string[]; names: string[] }
+>;
 
 function toStoryRelation(row: {
   id: string;
@@ -97,6 +89,7 @@ function toStoryRelation(row: {
 function toStory(
   row: StoryRow,
   ownerIdsByStoryId: ReadonlyMap<string, string[]>,
+  labelsByStoryId: StoryLabelsByStoryId,
 ): Story {
   const rawStoryPoint = row.storyPoint;
   const storyPoint =
@@ -121,7 +114,8 @@ function toStory(
     completedAt: row.completedAt ?? null,
     archivedAt: row.archivedAt,
     storyPoint,
-    labels: parseLabels(row.labels),
+    labels: labelsByStoryId.get(row.id)?.names ?? [],
+    labelIds: labelsByStoryId.get(row.id)?.ids ?? [],
     epicId: row.epicId,
     iterationId: row.iterationId ?? null,
     isIcebox: row.isIcebox === 1,
@@ -166,6 +160,7 @@ function toStorySummary(
     archivedAt: row.archivedAt,
     storyPoint,
     labels: [],
+    labelIds: [],
     epicId: row.epicId,
     iterationId: row.iterationId ?? null,
     isIcebox: row.isIcebox === 1,
@@ -180,6 +175,17 @@ function toStorySummary(
     blockingStories: [],
     blockedStories: [],
   };
+}
+
+function storyHasAnyLabelNamed(names: string[]): SQL {
+  return sql`exists (
+    select 1
+    from ${storyLabelsTable}
+    join ${projectLabelsTable}
+      on ${projectLabelsTable.id} = ${storyLabelsTable.labelId}
+    where ${storyLabelsTable.storyId} = ${storiesTable.id}
+      and ${inArray(projectLabelsTable.name, names)}
+  )`;
 }
 
 function buildListFilters(input: ListStoriesInput): SQL[] {
@@ -283,26 +289,11 @@ function buildListFilters(input: ListStoriesInput): SQL[] {
   }
 
   if (input.label !== undefined) {
-    filters.push(
-      sql`exists (
-        select 1
-        from json_each(${storiesTable.labels})
-        where json_each.value = ${input.label}
-      )`,
-    );
+    filters.push(storyHasAnyLabelNamed([input.label]));
   }
 
   if (Array.isArray(input.labels) && input.labels.length > 0) {
-    filters.push(
-      sql`exists (
-        select 1
-        from json_each(${storiesTable.labels})
-        where json_each.value in (${sql.join(
-          input.labels.map((l) => sql`${l}`),
-          sql`, `,
-        )})
-      )`,
-    );
+    filters.push(storyHasAnyLabelNamed(input.labels));
   }
 
   if (normalizedQuery) {
@@ -314,8 +305,11 @@ function buildListFilters(input: ListStoriesInput): SQL[] {
         or lower(${storiesTable.description}) like ${like} escape '\\'
         or exists (
           select 1
-          from json_each(${storiesTable.labels})
-          where lower(cast(json_each.value as text)) like ${like} escape '\\'
+          from ${storyLabelsTable}
+          join ${projectLabelsTable}
+            on ${projectLabelsTable.id} = ${storyLabelsTable.labelId}
+          where ${storyLabelsTable.storyId} = ${storiesTable.id}
+            and lower(${projectLabelsTable.name}) like ${like} escape '\\'
         )
       )`,
     );
@@ -467,6 +461,185 @@ export class D1StoryRepository implements StoryRepository {
     return ownerIdsByStoryId;
   }
 
+  private async listLabelsByStoryIds(
+    storyIds: string[],
+  ): Promise<Map<string, { ids: string[]; names: string[] }>> {
+    const labelsByStoryId = new Map<
+      string,
+      { ids: string[]; names: string[] }
+    >();
+    for (const chunk of chunkArray(storyIds, D1_MAX_BIND_PARAMS)) {
+      const rows = await this.db
+        .select({
+          storyId: storyLabelsTable.storyId,
+          labelId: projectLabelsTable.id,
+          name: projectLabelsTable.name,
+        })
+        .from(storyLabelsTable)
+        .innerJoin(
+          projectLabelsTable,
+          eq(projectLabelsTable.id, storyLabelsTable.labelId),
+        )
+        .where(inArray(storyLabelsTable.storyId, chunk))
+        .orderBy(asc(storyLabelsTable.storyId), asc(projectLabelsTable.name))
+        .all();
+      for (const row of rows) {
+        const current = labelsByStoryId.get(row.storyId) ?? {
+          ids: [],
+          names: [],
+        };
+        current.ids.push(row.labelId);
+        current.names.push(row.name);
+        labelsByStoryId.set(row.storyId, current);
+      }
+    }
+    return labelsByStoryId;
+  }
+
+  private async assertLabelIdsBelongToProject(
+    projectId: string,
+    labelIds: string[],
+  ): Promise<Result<void, StoryRepositoryError>> {
+    const uniqueIds = [...new Set(labelIds)];
+    for (const chunk of chunkArray(uniqueIds, D1_MAX_BIND_PARAMS - 1)) {
+      const rows = await this.db
+        .select({ id: projectLabelsTable.id })
+        .from(projectLabelsTable)
+        .where(
+          and(
+            eq(projectLabelsTable.projectId, projectId),
+            inArray(projectLabelsTable.id, chunk),
+          ),
+        )
+        .all();
+      if (rows.length !== chunk.length) {
+        return err(STORY_LABEL_NOT_IN_PROJECT_ERROR);
+      }
+    }
+    return ok(undefined);
+  }
+
+  // Label edits are idempotent inserts and deletes keyed by (story, label), so concurrent edits never remove labels they did not name.
+  private buildLabelStatements(
+    projectId: string,
+    storyId: string,
+    input: Pick<
+      UpdateStoryInput,
+      "labelIds" | "addLabelIds" | "removeLabelIds" | "labels" | "addLabelNames"
+    >,
+  ): BatchItem<"sqlite">[] {
+    const statements: BatchItem<"sqlite">[] = [];
+    const names = [
+      ...new Set([...(input.labels ?? []), ...(input.addLabelNames ?? [])]),
+    ];
+    if (names.length > 0) {
+      statements.push(
+        this.db
+          .insert(projectLabelsTable)
+          .values(
+            names.map((name) => ({
+              id: ulid(),
+              projectId,
+              name,
+            })),
+          )
+          .onConflictDoNothing(),
+      );
+    }
+
+    const wantedLabelIds = (
+      ids: string[] | undefined,
+      byName: string[] | undefined,
+    ) => {
+      const conditions: SQL[] = [];
+      if (ids && ids.length > 0)
+        conditions.push(inArray(projectLabelsTable.id, ids));
+      if (byName && byName.length > 0)
+        conditions.push(inArray(projectLabelsTable.name, byName));
+      const matched = or(...conditions);
+      return this.db
+        .select({ id: projectLabelsTable.id })
+        .from(projectLabelsTable)
+        .where(
+          matched
+            ? and(eq(projectLabelsTable.projectId, projectId), matched)
+            : sql`0 = 1`,
+        );
+    };
+
+    const replacesAll =
+      input.labelIds !== undefined || input.labels !== undefined;
+    if (replacesAll) {
+      const keep = wantedLabelIds(input.labelIds, input.labels);
+      statements.push(
+        this.db
+          .delete(storyLabelsTable)
+          .where(
+            and(
+              eq(storyLabelsTable.storyId, storyId),
+              sql`${storyLabelsTable.labelId} not in (${keep})`,
+            ),
+          ),
+      );
+    }
+
+    if (input.removeLabelIds && input.removeLabelIds.length > 0) {
+      statements.push(
+        this.db
+          .delete(storyLabelsTable)
+          .where(
+            and(
+              eq(storyLabelsTable.storyId, storyId),
+              inArray(storyLabelsTable.labelId, input.removeLabelIds),
+            ),
+          ),
+      );
+    }
+
+    const addIds = [...(input.labelIds ?? []), ...(input.addLabelIds ?? [])];
+    const addNames = [...(input.labels ?? []), ...(input.addLabelNames ?? [])];
+    if (addIds.length > 0 || addNames.length > 0) {
+      const conditions: SQL[] = [];
+      if (addIds.length > 0)
+        conditions.push(inArray(projectLabelsTable.id, addIds));
+      if (addNames.length > 0)
+        conditions.push(inArray(projectLabelsTable.name, addNames));
+      statements.push(
+        this.db
+          .insert(storyLabelsTable)
+          .select(
+            this.db
+              .select({
+                projectId: sql<string>`${projectId}`.as("project_id"),
+                storyId: sql<string>`${storyId}`.as("story_id"),
+                labelId: projectLabelsTable.id,
+                createdAt: sql<string>`CURRENT_TIMESTAMP`.as("created_at"),
+              })
+              .from(projectLabelsTable)
+              .where(
+                and(
+                  eq(projectLabelsTable.projectId, projectId),
+                  or(...conditions),
+                ),
+              ),
+          )
+          .onConflictDoNothing(),
+      );
+    }
+
+    return statements;
+  }
+
+  private async validateLabelInput(
+    projectId: string,
+    input: Pick<UpdateStoryInput, "labelIds" | "addLabelIds">,
+  ): Promise<Result<void, StoryRepositoryError>> {
+    return this.assertLabelIdsBelongToProject(projectId, [
+      ...(input.labelIds ?? []),
+      ...(input.addLabelIds ?? []),
+    ]);
+  }
+
   private async listWithRelations(rows: StoryRow[]): Promise<Story[]> {
     if (rows.length === 0) {
       return [];
@@ -476,8 +649,9 @@ export class D1StoryRepository implements StoryRepository {
       return story.id;
     });
     const ownerIdsByStoryId = await this.listOwnerIdsByStoryIds(ids);
+    const labelsByStoryId = await this.listLabelsByStoryIds(ids);
     const stories = rows.map((row) => {
-      return toStory(row, ownerIdsByStoryId);
+      return toStory(row, ownerIdsByStoryId, labelsByStoryId);
     });
 
     const relationByStoryId = new Map(
@@ -611,7 +785,8 @@ export class D1StoryRepository implements StoryRepository {
     }
 
     const ownerIdsByStoryId = await this.listOwnerIdsByStoryIds([row.id]);
-    const story = toStory(row, ownerIdsByStoryId);
+    const labelsByStoryId = await this.listLabelsByStoryIds([row.id]);
+    const story = toStory(row, ownerIdsByStoryId, labelsByStoryId);
     const blockerRows = await this.db
       .select()
       .from(storyBlockersTable)
@@ -754,6 +929,13 @@ export class D1StoryRepository implements StoryRepository {
   async create(
     input: CreateStoryInput,
   ): Promise<Result<Story, StoryRepositoryError>> {
+    const labelValidation = await this.validateLabelInput(input.projectId, {
+      labelIds: input.labelIds,
+    });
+    if (labelValidation.isErr()) {
+      return err(labelValidation.error);
+    }
+
     const ownerValidation = await this.assertOwnerIdsAreProjectMembers(
       input.projectId,
       input.ownerIds,
@@ -827,7 +1009,6 @@ export class D1StoryRepository implements StoryRepository {
         type: input.type,
         status: input.status,
         storyPoint: input.storyPoint,
-        labels: JSON.stringify(input.labels),
         requesterId: input.requesterId,
         releaseDate: input.releaseDate ?? null,
         isIcebox: input.isIcebox ? 1 : 0,
@@ -839,6 +1020,17 @@ export class D1StoryRepository implements StoryRepository {
 
     if (!inserted) {
       return err(STORY_REPOSITORY_ERROR);
+    }
+
+    const labelStatements = this.buildLabelStatements(
+      input.projectId,
+      inserted.id,
+      { labelIds: input.labelIds, addLabelNames: input.labels },
+    );
+    if (labelStatements.length > 0) {
+      await this.db.batch(
+        labelStatements as [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]],
+      );
     }
 
     if (input.ownerIds.length > 0) {
@@ -917,6 +1109,14 @@ export class D1StoryRepository implements StoryRepository {
 
     if (current.archivedAt !== null) {
       return err(STORY_ARCHIVED_ERROR);
+    }
+
+    const labelValidation = await this.validateLabelInput(
+      input.projectId,
+      input,
+    );
+    if (labelValidation.isErr()) {
+      return err(labelValidation.error);
     }
 
     const currentOwnerIdSet = new Set(
@@ -1054,9 +1254,6 @@ export class D1StoryRepository implements StoryRepository {
         ...(input.storyPoint !== undefined
           ? { storyPoint: input.storyPoint }
           : {}),
-        ...(input.labels !== undefined
-          ? { labels: JSON.stringify(input.labels) }
-          : {}),
         ...(input.requesterId !== undefined
           ? { requesterId: input.requesterId }
           : {}),
@@ -1117,7 +1314,13 @@ export class D1StoryRepository implements StoryRepository {
             ),
         ]
       : [];
+    const labelStatements = this.buildLabelStatements(
+      input.projectId,
+      input.id,
+      input,
+    );
     const preStatements: BatchItem<"sqlite">[] = [
+      ...labelStatements,
       ...ownerStatements,
       ...shiftStatement,
     ];
