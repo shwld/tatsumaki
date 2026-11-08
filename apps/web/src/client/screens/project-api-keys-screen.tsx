@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { PermissionDenied } from "../components/permission-denied";
+import { ProjectSection } from "../components/project-section";
 import { ProjectPage } from "../components/project-page";
 import { useAuthError } from "../contexts/auth-error-context";
 import { isAuthError, isForbiddenError } from "../lib/api-error";
@@ -180,7 +181,7 @@ export function ProjectApiKeysScreen() {
 
   return (
     <ProjectPage title="APIキー管理">
-      <div className="max-w-3xl">
+      <div className="space-y-6">
         {requestError ? (
           <p className="mt-3 text-sm text-red-600" role="alert">
             {requestError}
@@ -188,23 +189,17 @@ export function ProjectApiKeysScreen() {
         ) : null}
 
         {issuedRawKey ? (
-          <section className="mb-6 rounded-md border border-yellow-300 bg-yellow-50 p-4">
-            <h2 className="text-base font-semibold text-yellow-900">
-              新しいAPIキーを発行しました
-            </h2>
+          <ProjectSection title="新しいAPIキーを発行しました" tone="notice">
             <p className="mt-2 text-sm text-yellow-900">
               このキーは再表示できません。必ず今コピーして安全に保管してください。
             </p>
             <code className="mt-3 block break-all rounded bg-yellow-100 p-2 text-xs text-yellow-900">
               {issuedRawKey}
             </code>
-          </section>
+          </ProjectSection>
         ) : null}
 
-        <section className="rounded-md border border-gray-200 p-4">
-          <h2 className="text-base font-semibold text-gray-900">
-            新しいキーを発行
-          </h2>
+        <ProjectSection title="新しいキーを発行">
           <form className="mt-3 flex gap-2" onSubmit={handleIssueApiKey}>
             <label className="sr-only" htmlFor="api-key-name">
               キー名
@@ -225,13 +220,9 @@ export function ProjectApiKeysScreen() {
               {isIssuing ? "発行中..." : "発行"}
             </button>
           </form>
-        </section>
+        </ProjectSection>
 
-        <section className="mt-6 rounded-md border border-gray-200 p-4">
-          <h2 className="text-base font-semibold text-gray-900">
-            既存のAPIキー
-          </h2>
-
+        <ProjectSection title="既存のAPIキー">
           {isLoading || apiKeys.length === 0 ? (
             <p className="mt-3 text-sm text-gray-600">
               {isLoading
@@ -280,7 +271,7 @@ export function ProjectApiKeysScreen() {
               ))}
             </ul>
           ) : null}
-        </section>
+        </ProjectSection>
       </div>
     </ProjectPage>
   );

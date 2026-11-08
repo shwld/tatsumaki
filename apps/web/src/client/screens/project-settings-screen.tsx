@@ -2,6 +2,7 @@ import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 
 import { ProjectPage } from "../components/project-page";
+import { ProjectSection } from "../components/project-section";
 import { useAuthError } from "../contexts/auth-error-context";
 import { useToast } from "../contexts/toast-context";
 import { isAuthError } from "../lib/api-error";
@@ -385,159 +386,155 @@ export function ProjectSettingsScreen() {
 
   return (
     <ProjectPage title="プロジェクト設定">
-      <div className="max-w-2xl">
+      <div className="space-y-6">
         {project ? (
-          <form onSubmit={handleGeneralSubmit} className="space-y-4">
-            <fieldset>
-              <legend className="mb-2 text-lg font-semibold text-gray-800">
-                基本設定
-              </legend>
+          <ProjectSection title="基本設定">
+            <form onSubmit={handleGeneralSubmit} className="mt-3 space-y-4">
+              <fieldset>
+                <legend className="sr-only">基本設定</legend>
+                <div className="space-y-4">
+                  <div>
+                    <label
+                      htmlFor="projectName"
+                      className="block text-sm font-medium text-gray-700"
+                    >
+                      プロジェクト名
+                    </label>
+                    <input
+                      id="projectName"
+                      type="text"
+                      value={nameInput}
+                      onChange={(e) => setNameInput(e.target.value)}
+                      disabled={!isOwner}
+                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100"
+                    />
+                  </div>
 
-              <div className="space-y-4">
-                <div>
-                  <label
-                    htmlFor="projectName"
-                    className="block text-sm font-medium text-gray-700"
-                  >
-                    プロジェクト名
+                  <div>
+                    <label
+                      htmlFor="projectDescription"
+                      className="block text-sm font-medium text-gray-700"
+                    >
+                      説明
+                    </label>
+                    <textarea
+                      id="projectDescription"
+                      value={descriptionInput}
+                      onChange={(e) => setDescriptionInput(e.target.value)}
+                      disabled={!isOwner}
+                      rows={3}
+                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100"
+                    />
+                  </div>
+
+                  <label className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      checked={isPublicInput}
+                      disabled={!isOwner}
+                      onChange={(e) => setIsPublicInput(e.target.checked)}
+                    />
+                    <span className="text-sm text-gray-700">
+                      プロジェクトを公開する
+                    </span>
                   </label>
-                  <input
-                    id="projectName"
-                    type="text"
-                    value={nameInput}
-                    onChange={(e) => setNameInput(e.target.value)}
-                    disabled={!isOwner}
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100"
-                  />
+
+                  <div>
+                    <label
+                      htmlFor="projectTimezone"
+                      className="block text-sm font-medium text-gray-700"
+                    >
+                      タイムゾーン
+                    </label>
+                    <select
+                      id="projectTimezone"
+                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100"
+                      value={timezoneInput}
+                      disabled={!isOwner}
+                      onChange={(e) => setTimezoneInput(e.target.value)}
+                    >
+                      {TIMEZONE_OPTIONS.map((tz) => (
+                        <option key={tz} value={tz}>
+                          {tz}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
+              </fieldset>
 
-                <div>
-                  <label
-                    htmlFor="projectDescription"
-                    className="block text-sm font-medium text-gray-700"
-                  >
-                    説明
-                  </label>
-                  <textarea
-                    id="projectDescription"
-                    value={descriptionInput}
-                    onChange={(e) => setDescriptionInput(e.target.value)}
-                    disabled={!isOwner}
-                    rows={3}
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100"
-                  />
-                </div>
+              {isOwner && (
+                <button
+                  type="submit"
+                  disabled={isSavingGeneral}
+                  className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {isSavingGeneral ? "保存中..." : "保存"}
+                </button>
+              )}
 
-                <label className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    checked={isPublicInput}
-                    disabled={!isOwner}
-                    onChange={(e) => setIsPublicInput(e.target.checked)}
-                  />
-                  <span className="text-sm text-gray-700">
-                    プロジェクトを公開する
-                  </span>
-                </label>
-
-                <div>
-                  <label
-                    htmlFor="projectTimezone"
-                    className="block text-sm font-medium text-gray-700"
-                  >
-                    タイムゾーン
-                  </label>
-                  <select
-                    id="projectTimezone"
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100"
-                    value={timezoneInput}
-                    disabled={!isOwner}
-                    onChange={(e) => setTimezoneInput(e.target.value)}
-                  >
-                    {TIMEZONE_OPTIONS.map((tz) => (
-                      <option key={tz} value={tz}>
-                        {tz}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </fieldset>
-
-            {isOwner && (
-              <button
-                type="submit"
-                disabled={isSavingGeneral}
-                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-              >
-                {isSavingGeneral ? "保存中..." : "保存"}
-              </button>
-            )}
-
-            {!isOwner && (
-              <p className="text-xs text-gray-500">
-                設定を変更するにはオーナー権限が必要です。
-              </p>
-            )}
-          </form>
+              {!isOwner && (
+                <p className="text-xs text-gray-500">
+                  設定を変更するにはオーナー権限が必要です。
+                </p>
+              )}
+            </form>
+          </ProjectSection>
         ) : null}
 
-        <form onSubmit={handleSubmit} className="mt-8 space-y-6">
-          <fieldset>
-            <legend className="mb-2 text-lg font-semibold text-gray-800">
-              ポイントスケール
-            </legend>
-            <div className="space-y-2">
-              {POINT_SCALE_TYPES.map((scaleType) => (
-                <label key={scaleType} className="flex items-center gap-2">
-                  <input
-                    type="radio"
-                    name="pointScaleType"
-                    value={scaleType}
-                    checked={pointScaleType === scaleType}
-                    onChange={() => setPointScaleType(scaleType)}
-                    className="text-blue-600"
-                  />
-                  <span className="text-sm text-gray-700">
-                    {POINT_SCALE_LABELS[scaleType]}
-                  </span>
-                </label>
-              ))}
-            </div>
-
-            {pointScaleType === "custom" ? (
-              <div className="mt-3">
-                <label className="block text-sm font-medium text-gray-700">
-                  カスタム値（カンマ区切り）
-                  <input
-                    type="text"
-                    value={customScaleInput}
-                    onChange={(e) => setCustomScaleInput(e.target.value)}
-                    placeholder="0, 1, 2, 3, 5, 8, 13"
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                  />
-                </label>
+        <ProjectSection title="ポイントスケール">
+          <form onSubmit={handleSubmit} className="mt-3 space-y-6">
+            <fieldset>
+              <legend className="sr-only">ポイントスケール</legend>
+              <div className="space-y-2">
+                {POINT_SCALE_TYPES.map((scaleType) => (
+                  <label key={scaleType} className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="pointScaleType"
+                      value={scaleType}
+                      checked={pointScaleType === scaleType}
+                      onChange={() => setPointScaleType(scaleType)}
+                      className="text-blue-600"
+                    />
+                    <span className="text-sm text-gray-700">
+                      {POINT_SCALE_LABELS[scaleType]}
+                    </span>
+                  </label>
+                ))}
               </div>
-            ) : null}
-          </fieldset>
 
-          {error ? <p className="text-sm text-red-600">{error}</p> : null}
+              {pointScaleType === "custom" ? (
+                <div className="mt-3">
+                  <label className="block text-sm font-medium text-gray-700">
+                    カスタム値（カンマ区切り）
+                    <input
+                      type="text"
+                      value={customScaleInput}
+                      onChange={(e) => setCustomScaleInput(e.target.value)}
+                      placeholder="0, 1, 2, 3, 5, 8, 13"
+                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    />
+                  </label>
+                </div>
+              ) : null}
+            </fieldset>
 
-          <button
-            type="submit"
-            disabled={isSaving}
-            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-          >
-            {isSaving ? "保存中..." : "保存"}
-          </button>
-        </form>
+            {error ? <p className="text-sm text-red-600">{error}</p> : null}
+
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              {isSaving ? "保存中..." : "保存"}
+            </button>
+          </form>
+        </ProjectSection>
 
         {project ? (
-          <section className="mt-8">
-            <h2 className="mb-2 text-lg font-semibold text-gray-800">
-              見積もり設定
-            </h2>
+          <ProjectSection title="見積もり設定">
             <p className="mb-4 text-sm text-gray-600">
               Bug・Choreタイプのストーリーにポイント見積もりを付けるかどうかを設定します。
             </p>
@@ -579,14 +576,11 @@ export function ProjectSettingsScreen() {
                 設定を変更するにはオーナー権限が必要です。
               </p>
             )}
-          </section>
+          </ProjectSection>
         ) : null}
 
         {project ? (
-          <section className="mt-8">
-            <h2 className="mb-2 text-lg font-semibold text-gray-800">
-              イテレーション設定
-            </h2>
+          <ProjectSection title="イテレーション設定">
             <p className="mb-4 text-sm text-gray-600">
               スプリントの長さと開始曜日を設定します。保存後に再計算が完了すると反映されます。
             </p>
@@ -659,14 +653,11 @@ export function ProjectSettingsScreen() {
                 設定を変更するにはオーナー権限が必要です。
               </p>
             )}
-          </section>
+          </ProjectSection>
         ) : null}
 
         {projectId ? (
-          <section className="mt-8 rounded-md border border-gray-200 p-4">
-            <h2 className="mb-2 text-lg font-semibold text-gray-800">
-              Label と戦略・計画管理
-            </h2>
+          <ProjectSection title="Label と戦略・計画管理">
             <p className="mb-3 text-sm text-gray-600">
               Label ごとに戦略・計画管理を ON/OFF
               し、目的・成功条件・期間を記録します。
@@ -677,14 +668,11 @@ export function ProjectSettingsScreen() {
             >
               Label 設定を開く
             </Link>
-          </section>
+          </ProjectSection>
         ) : null}
 
         {projectId && isOwner ? (
-          <section className="mt-8 rounded-md border border-gray-200 p-4">
-            <h2 className="mb-2 text-lg font-semibold text-gray-800">
-              APIキー管理
-            </h2>
+          <ProjectSection title="APIキー管理">
             <p className="mb-3 text-sm text-gray-600">
               CLI や外部ツール向けの API キーを発行・失効します。
             </p>
@@ -694,14 +682,11 @@ export function ProjectSettingsScreen() {
             >
               APIキー管理を開く
             </Link>
-          </section>
+          </ProjectSection>
         ) : null}
 
         {project && projectId && isOwner ? (
-          <section className="mt-8 rounded-md border border-red-200 bg-red-50 p-4">
-            <h2 className="mb-2 text-lg font-semibold text-red-900">
-              危険操作: プロジェクト削除
-            </h2>
+          <ProjectSection title="危険操作: プロジェクト削除" tone="danger">
             <p className="mb-3 text-sm text-red-800">
               この操作は取り消せません。削除するにはプロジェクト名を正確に入力してください。
             </p>
@@ -731,7 +716,7 @@ export function ProjectSettingsScreen() {
                 {isDeletingProject ? "削除中..." : "プロジェクトを削除する"}
               </button>
             </form>
-          </section>
+          </ProjectSection>
         ) : null}
       </div>
     </ProjectPage>

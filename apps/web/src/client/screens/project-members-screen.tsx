@@ -4,6 +4,7 @@ import { useParams } from "react-router";
 
 import { PermissionDenied } from "../components/permission-denied";
 import { ProjectPage } from "../components/project-page";
+import { ProjectSection } from "../components/project-section";
 import { useAuthError } from "../contexts/auth-error-context";
 import { isAuthError, isForbiddenError } from "../lib/api-error";
 import { parseErrorMessage } from "../lib/parse-error-message";
@@ -274,7 +275,7 @@ export function ProjectMembersScreen() {
 
   return (
     <ProjectPage title={t("projectMembersScreen.title")}>
-      <div className="max-w-3xl">
+      <div className="space-y-6">
         {isLoading ? (
           <p className="mt-5 text-gray-600">
             {t("projectMembersScreen.loading")}
@@ -295,10 +296,7 @@ export function ProjectMembersScreen() {
 
         {!isLoading ? (
           <>
-            <section className="mt-6 rounded-md border border-gray-200 p-4">
-              <h2 className="text-base font-semibold text-gray-900">
-                {t("projectMembersScreen.invite.title")}
-              </h2>
+            <ProjectSection title={t("projectMembersScreen.invite.title")}>
               <p className="mt-1 text-sm text-gray-600">
                 {t("projectMembersScreen.invite.description")}
               </p>
@@ -405,12 +403,9 @@ export function ProjectMembersScreen() {
                   </div>
                 ) : null}
               </div>
-            </section>
+            </ProjectSection>
 
-            <section className="mt-6 rounded-md border border-gray-200 p-4">
-              <h2 className="text-base font-semibold text-gray-900">
-                {t("projectMembersScreen.members.title")}
-              </h2>
+            <ProjectSection title={t("projectMembersScreen.members.title")}>
               {members.length === 0 ? (
                 <p className="mt-2 text-sm text-gray-600">
                   {t("projectMembersScreen.members.empty")}
@@ -454,12 +449,9 @@ export function ProjectMembersScreen() {
                   ))}
                 </ul>
               )}
-            </section>
+            </ProjectSection>
 
-            <section className="mt-6 rounded-md border border-gray-200 p-4">
-              <h2 className="text-base font-semibold text-gray-900">
-                {t("projectMembersScreen.invitations.title")}
-              </h2>
+            <ProjectSection title={t("projectMembersScreen.invitations.title")}>
               {invitations.length === 0 ? (
                 <p className="mt-2 text-sm text-gray-600">
                   {t("projectMembersScreen.invitations.empty")}
@@ -507,7 +499,7 @@ export function ProjectMembersScreen() {
                   ))}
                 </ul>
               )}
-            </section>
+            </ProjectSection>
           </>
         ) : null}
       </div>

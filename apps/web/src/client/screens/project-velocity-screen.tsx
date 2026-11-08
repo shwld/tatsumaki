@@ -6,6 +6,7 @@ import {
   type IterationProgressChartPayload,
 } from "../components/iteration-progress-chart";
 import { ProjectPage } from "../components/project-page";
+import { ProjectSection } from "../components/project-section";
 import { useAuthError } from "../contexts/auth-error-context";
 import { isAuthError } from "../lib/api-error";
 import { findCurrentIteration } from "../lib/current-iteration";
@@ -209,7 +210,7 @@ export function ProjectVelocityScreen() {
 
         {!isLoading && !error ? (
           <>
-            <section className="mt-6 grid max-w-4xl gap-4 md:grid-cols-3">
+            <section className="mt-6 grid gap-4 md:grid-cols-3">
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                   直近3スプリント平均
@@ -274,25 +275,21 @@ export function ProjectVelocityScreen() {
             ) : null}
 
             {burndownPayload && currentIteration ? (
-              <section
-                className="mt-6 max-w-4xl rounded-md border border-gray-200 bg-white p-4 shadow-sm"
-                aria-label="現在イテレーションの進捗チャート"
-              >
-                <h2 className="text-base font-semibold text-gray-900">
-                  進捗チャート（現在イテレーション）
-                </h2>
-                <IterationProgressChart
-                  iterationLabel={formatIterationRange(currentIteration)}
-                  payload={burndownPayload}
-                />
-              </section>
+              <div className="mt-6">
+                <ProjectSection
+                  title="進捗チャート（現在イテレーション）"
+                  width="full"
+                >
+                  <IterationProgressChart
+                    iterationLabel={formatIterationRange(currentIteration)}
+                    payload={burndownPayload}
+                  />
+                </ProjectSection>
+              </div>
             ) : null}
 
             <section className="mt-8 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-              <div className="rounded-lg border border-gray-200 p-4">
-                <h2 className="text-base font-semibold text-gray-900">
-                  過去スプリント実績
-                </h2>
+              <ProjectSection title="過去スプリント実績" width="full">
                 {completedIterations.length === 0 ? (
                   <p className="mt-4 text-sm text-gray-500">
                     まだ完了したイテレーションがありません。完了後に実績がここへ表示されます。
@@ -326,12 +323,9 @@ export function ProjectVelocityScreen() {
                     </table>
                   </div>
                 )}
-              </div>
+              </ProjectSection>
 
-              <div className="rounded-lg border border-gray-200 p-4">
-                <h2 className="text-base font-semibold text-gray-900">
-                  ベロシティ推移
-                </h2>
+              <ProjectSection title="ベロシティ推移" width="full">
                 {completedIterations.length === 0 ? (
                   <p className="mt-4 text-sm text-gray-500">
                     推移グラフは、完了したスプリントができると表示されます。
@@ -362,7 +356,7 @@ export function ProjectVelocityScreen() {
                     ))}
                   </div>
                 )}
-              </div>
+              </ProjectSection>
             </section>
           </>
         ) : null}
