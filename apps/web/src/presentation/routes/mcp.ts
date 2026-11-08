@@ -31,6 +31,7 @@ import {
   toReorderStoriesErrorResponse,
   toUpdateStoryErrorResponse,
 } from "./stories/error-responses";
+import { LABEL_NAMES_WRITE_REMOVED_MESSAGE } from "./stories/request-parsers";
 import { registerEpicTools } from "./mcp/epic-tools";
 import { requireProjectAccess } from "./mcp/project-access";
 
@@ -38,6 +39,14 @@ type McpRequestContext = {
   db: D1Database;
   currentUser: CurrentUser;
 };
+
+/** Declared only so a client still sending label names gets an error instead of a silently dropped field. */
+const legacyLabelNames = z
+  .unknown()
+  .optional()
+  .refine((value) => value === undefined, {
+    message: LABEL_NAMES_WRITE_REMOVED_MESSAGE,
+  });
 
 const mcpStoryReferenceSchemaFields = {
   storyId: z
@@ -698,6 +707,7 @@ function createMcpServer({ db, currentUser }: McpRequestContext): McpServer {
             .nullable()
             .optional()
             .describe("The story point estimate. Set to null to clear."),
+          labels: legacyLabelNames,
           labelIds: z
             .array(z.string())
             .optional()

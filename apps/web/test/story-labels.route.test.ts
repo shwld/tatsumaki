@@ -2,6 +2,7 @@ import { SELF, env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createAuthHeaders, setupAccessBindings } from "./helpers/access-jwt";
 import { resetDatabase } from "./helpers/db";
+import { D1StoryRepository } from "../src/infrastructure/db/repositories/d1-story-repository";
 
 type StoryPayload = {
   id: string;
@@ -228,6 +229,25 @@ describe("story labels by ID", () => {
       addLabelIds: ids.slice(0, 120),
     });
     expect(readded.story.labelIds).toHaveLength(120);
+  });
+
+  it("filters by more label IDs than the D1 bind limit", async () => {
+    const projectId = await createProject();
+    const ids: string[] = [];
+    for (let i = 0; i < 120; i += 1) {
+      ids.push(await createLabel(projectId, `bulk-${i}`));
+    }
+    await createStory(projectId, { title: "tagged", labelIds: [ids[119]!] });
+    await createStory(projectId, { title: "plain" });
+
+    const result = await new D1StoryRepository(env.DB).list({
+      projectId,
+      labelIds: ids,
+    });
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap().map((story) => story.title)).toEqual([
+      "tagged",
+    ]);
   });
 
   it("records label changes by ID and shows current names in history", async () => {

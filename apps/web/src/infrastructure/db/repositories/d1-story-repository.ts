@@ -194,7 +194,7 @@ function storyHasAnyLabelId(labelIds: string[]): SQL {
     select 1
     from ${storyLabelsTable}
     where ${storyLabelsTable.storyId} = ${storiesTable.id}
-      and ${inArray(storyLabelsTable.labelId, labelIds)}
+      and ${storyLabelsTable.labelId} in (select value from json_each(${JSON.stringify([...new Set(labelIds)])}))
   )`;
 }
 
