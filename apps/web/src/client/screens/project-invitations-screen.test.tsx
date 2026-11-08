@@ -194,6 +194,50 @@ describe("ProjectInvitationsScreen", () => {
     expect(screen.queryByText(/github\|alice/)).toBeNull();
   });
 
+  it("keeps user-ID invitations distinguishable when the invitee has no profile", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      buildJsonResponse({
+        currentMemberRole: "owner",
+        members: [],
+        invitations: [
+          {
+            id: "inv-2",
+            projectId: "project-1",
+            inviterUserId: "github|owner",
+            targetUserId: "github|newcomer",
+            targetEmail: null,
+            role: "member",
+            status: "pending",
+            expiresAt: "2099-01-08T00:00:00.000Z",
+            acceptedByUserId: null,
+            acceptedAt: null,
+            createdAt: "2026-01-01T00:00:00.000Z",
+            updatedAt: "2026-01-01T00:00:00.000Z",
+          },
+        ],
+      }),
+    );
+
+    render(
+      <MemoryRouter
+        initialEntries={["/projects/project-1/members/invitations"]}
+      >
+        <AuthErrorProvider>
+          <Routes>
+            <Route
+              path="/projects/:projectId/members/invitations"
+              element={<ProjectInvitationsScreen />}
+            />
+          </Routes>
+        </AuthErrorProvider>
+      </MemoryRouter>,
+    );
+
+    expect(
+      await screen.findByText("招待先: 不明なユーザー (github|newcomer)"),
+    ).toBeInTheDocument();
+  });
+
   it("creates, copies, and revokes a one-time invitation link", async () => {
     const fetchMock = vi.mocked(fetch);
     const writeText = vi.fn().mockResolvedValue(undefined);

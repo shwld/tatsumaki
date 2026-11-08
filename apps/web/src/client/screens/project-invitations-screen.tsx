@@ -40,7 +40,9 @@ export function ProjectInvitationsScreen() {
     const member = members.find(
       (item) => item.userId === invitation.targetUserId,
     );
-    return member?.displayName ?? t("actorLabel.unknownUser");
+    if (member?.displayName) return member.displayName;
+    // 未参加ユーザーのプロフィールは引けないため、招待どうしを見分けられるよう ID を補足する
+    return `${t("actorLabel.unknownUser")} (${invitation.targetUserId})`;
   };
 
   const handleInvite = async (event: FormEvent<HTMLFormElement>) => {
