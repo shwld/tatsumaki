@@ -14,6 +14,7 @@ import type {
 import { STORY_TIMELINE_READ_REPOSITORY_ERROR } from "../../../domain/repositories/story-timeline-read-repository";
 import { createDb, type DbClient } from "../client";
 import { storyTimelineEntriesTable } from "../schema/story-timeline";
+import { resolveLabelActivityNames } from "./story-activity-label-names";
 
 type TimelineRow = typeof storyTimelineEntriesTable.$inferSelect;
 
@@ -92,7 +93,7 @@ export class D1StoryTimelineReadRepository
     }
 
     try {
-      const rows = await this.db
+      const fetched = await this.db
         .select()
         .from(storyTimelineEntriesTable)
         .where(and(...predicates))
@@ -103,6 +104,7 @@ export class D1StoryTimelineReadRepository
         )
         .limit(take)
         .all();
+      const rows = await resolveLabelActivityNames(this.db, fetched);
 
       const hasMore = rows.length > input.limit;
       const windowRows = hasMore ? rows.slice(0, input.limit) : rows;

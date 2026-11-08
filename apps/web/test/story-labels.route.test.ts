@@ -148,40 +148,74 @@ describe("story labels by ID", () => {
     expect(replaced.story.labelIds).toEqual([b]);
   });
 
-  it("resolves legacy label names to IDs and creates missing labels", async () => {
-    const projectId = await createProject();
-    const backend = await createLabel(projectId, "backend");
-
-    const { story } = await createStory(projectId, {
-      labels: [" backend ", "new-label"],
-    });
-
-    expect(story.labels).toEqual(["backend", "new-label"]);
-    expect(story.labelIds).toContain(backend);
-
-    const labelsRes = await api(`/projects/${projectId}/labels`);
-    const { labels } = (await labelsRes.json()) as {
-      labels: { name: string }[];
-    };
-    expect(labels.map((l) => l.name)).toEqual(["backend", "new-label"]);
-  });
-
-  it("filters by label name through story_labels", async () => {
+  it("rejects label names on create, update and bulk add", async () => {
     const projectId = await createProject();
     const a = await createLabel(projectId, "a");
-    await createStory(projectId, { title: "with a", labelIds: [a] });
+    const { story } = await createStory(projectId, { labelIds: [a] });
+
+    const created = await api(`/projects/${projectId}/stories`, {
+      method: "POST",
+      body: JSON.stringify({ title: "x", labels: ["a"] }),
+    });
+    expect(created.status).toBe(400);
+
+    const patched = await api(
+      `/projects/${projectId}/stories/${story.storyNumber}`,
+      { method: "PATCH", body: JSON.stringify({ labels: ["a"] }) },
+    );
+    expect(patched.status).toBe(400);
+
+    const bulk = await api(`/projects/${projectId}/stories/bulk-labels`, {
+      method: "PATCH",
+      body: JSON.stringify({ storyIds: [story.id], labels: ["a"] }),
+    });
+    expect(bulk.status).toBe(400);
+
+    const listed = await api(`/projects/${projectId}/stories?labels=a`);
+    expect(listed.status).toBe(400);
+  });
+
+  it("filters by labelIds with OR and lists a story once across pages", async () => {
+    const projectId = await createProject();
+    const a = await createLabel(projectId, "a");
+    const b = await createLabel(projectId, "b");
+    await createStory(projectId, { title: "both", labelIds: [a, b] });
+    await createStory(projectId, { title: "only a", labelIds: [a] });
+    await createStory(projectId, { title: "only b", labelIds: [b] });
     await createStory(projectId, { title: "without" });
 
-    const res = await api(`/projects/${projectId}/stories?labels=a`);
-    const { stories } = (await res.json()) as { stories: { title: string }[] };
-    expect(stories.map((s) => s.title)).toEqual(["with a"]);
+    const titles = async (query: string) => {
+      const res = await api(`/projects/${projectId}/stories?${query}`);
+      expect(res.status).toBe(200);
+      return ((await res.json()) as { stories: { title: string }[] }).stories
+        .map((s) => s.title)
+        .sort();
+    };
+
+    expect(await titles(`labelIds=${a}`)).toEqual(["both", "only a"]);
+    expect(await titles(`labelIds=${a},${b}`)).toEqual([
+      "both",
+      "only a",
+      "only b",
+    ]);
+
+    const paged: string[] = [];
+    for (const offset of [0, 1, 2, 3]) {
+      paged.push(
+        ...(await titles(`labelIds=${a},${b}&limit=1&offset=${offset}`)),
+      );
+    }
+    expect(paged.sort()).toEqual(["both", "only a", "only b"]);
   });
 
   it("handles more labels than the D1 bind limit", async () => {
     const projectId = await createProject();
-    const names = Array.from({ length: 150 }, (_, i) => `label-${i}`);
+    const ids: string[] = [];
+    for (let i = 0; i < 150; i += 1) {
+      ids.push(await createLabel(projectId, `label-${i}`));
+    }
 
-    const { status, story } = await createStory(projectId, { labels: names });
+    const { status, story } = await createStory(projectId, { labelIds: ids });
     expect(status).toBe(201);
     expect(story.labelIds).toHaveLength(150);
 
@@ -191,9 +225,36 @@ describe("story labels by ID", () => {
     expect(cleared.story.labelIds).toEqual([]);
 
     const readded = await patchStory(projectId, story.storyNumber, {
-      addLabelIds: story.labelIds.slice(0, 120),
+      addLabelIds: ids.slice(0, 120),
     });
     expect(readded.story.labelIds).toHaveLength(120);
+  });
+
+  it("records label changes by ID and shows current names in history", async () => {
+    const projectId = await createProject();
+    const a = await createLabel(projectId, "alpha");
+    const { story } = await createStory(projectId);
+
+    await patchStory(projectId, story.storyNumber, { addLabelIds: [a] });
+    const renamed = await api(`/projects/${projectId}/labels/${a}`, {
+      method: "PATCH",
+      body: JSON.stringify({ name: "beta" }),
+    });
+    expect(renamed.status).toBe(200);
+
+    const stored = await env.DB.prepare(
+      "select old_value, new_value from story_timeline_entries where field_name = 'labelIds'",
+    ).first<{ old_value: string; new_value: string }>();
+    expect(JSON.parse(stored?.new_value ?? "[]")).toEqual([a]);
+
+    const history = await api(`/projects/${projectId}/history`);
+    const entries = (
+      (await history.json()) as {
+        history: { fieldName: string; newValue: string | null }[];
+      }
+    ).history;
+    const labelEntry = entries.find((e) => e.fieldName === "labels");
+    expect(JSON.parse(labelEntry?.newValue ?? "[]")).toEqual(["beta"]);
   });
 
   it("rejects non-string labelIds", async () => {

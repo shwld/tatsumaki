@@ -6,7 +6,7 @@ export type SavedFilterConditions = {
   unestimatedOnly?: boolean;
   statuses?: StoryStatus[];
   ownerIds?: string[];
-  labels?: string[];
+  labelIds?: string[];
   epicIds?: string[];
 };
 

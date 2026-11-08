@@ -18,6 +18,7 @@ function makeStory(id: string, position: number): Story {
     statusChangedAt: "2026-01-01T00:00:00.000Z",
     storyPoint: 1,
     labels: [],
+    labelIds: [],
     iterationId: null,
     isIcebox: false,
     ownerIds: [],

@@ -46,7 +46,6 @@ describe("D1StoryRepository.update owner membership", () => {
       type: "feature",
       status: "Unstarted",
       storyPoint: 3,
-      labels: "[]",
       iterationId: null,
       position: 1,
       isIcebox: 0,

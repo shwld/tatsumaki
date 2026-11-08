@@ -296,6 +296,12 @@ function createMcpServer({ db, currentUser }: McpRequestContext): McpServer {
           .describe(
             "Filter stories to the current iteration only. Omit to return all stories.",
           ),
+        labelIds: z
+          .array(z.string())
+          .optional()
+          .describe(
+            "Return stories carrying any of these label IDs (see list_labels).",
+          ),
         limit: z
           .number()
           .int()
@@ -306,7 +312,14 @@ function createMcpServer({ db, currentUser }: McpRequestContext): McpServer {
           ),
       }),
     },
-    async ({ projectId, status, iterationScope, limit, archived }) => {
+    async ({
+      projectId,
+      status,
+      iterationScope,
+      limit,
+      archived,
+      labelIds,
+    }) => {
       const projectRepository = new D1ProjectRepository(db);
       const access = await requireProjectAccess(
         projectRepository,
@@ -323,6 +336,7 @@ function createMcpServer({ db, currentUser }: McpRequestContext): McpServer {
         projectId,
         ...(archived ? { archived } : {}),
         ...(status !== undefined ? { status } : {}),
+        ...(labelIds && labelIds.length > 0 ? { labelIds } : {}),
       });
 
       if (result.isErr()) {
@@ -381,6 +395,7 @@ function createMcpServer({ db, currentUser }: McpRequestContext): McpServer {
         storyPoint: story.storyPoint,
         type: story.type,
         labels: story.labels,
+        labelIds: story.labelIds,
         iterationId: story.iterationId,
       }));
 
@@ -478,6 +493,7 @@ function createMcpServer({ db, currentUser }: McpRequestContext): McpServer {
                 storyPoint: result.value.storyPoint,
                 type: result.value.type,
                 labels: result.value.labels,
+                labelIds: result.value.labelIds,
               },
             }),
           },
@@ -540,6 +556,7 @@ function createMcpServer({ db, currentUser }: McpRequestContext): McpServer {
         storyPoint: story.storyPoint,
         type: story.type,
         labels: story.labels,
+        labelIds: story.labelIds,
         iterationId: story.iterationId,
       }));
 
@@ -570,13 +587,17 @@ function createMcpServer({ db, currentUser }: McpRequestContext): McpServer {
             `The story type. Required. One of: ${STORY_TYPES.join(", ")}.`,
           ),
         description: z.string().describe("The story description."),
+        labelIds: z
+          .array(z.string())
+          .optional()
+          .describe("Label IDs to attach to the story (see list_labels)."),
         isIcebox: z
           .boolean()
           .optional()
           .describe("Whether the story should start in Icebox."),
       }),
     },
-    async ({ projectId, title, type, description, isIcebox }) => {
+    async ({ projectId, title, type, description, labelIds, isIcebox }) => {
       const projectRepository = new D1ProjectRepository(db);
       const access = await requireProjectAccess(
         projectRepository,
@@ -615,7 +636,7 @@ function createMcpServer({ db, currentUser }: McpRequestContext): McpServer {
           isIcebox: isIcebox ?? false,
           storyPoint: null,
           allowedStoryPoints,
-          labels: [],
+          labelIds: labelIds ?? [],
           actorUserId: currentUser.id,
           actorName: currentUser.email ?? currentUser.id,
         },
@@ -677,7 +698,20 @@ function createMcpServer({ db, currentUser }: McpRequestContext): McpServer {
             .nullable()
             .optional()
             .describe("The story point estimate. Set to null to clear."),
-          labels: z.array(z.string()).optional().describe("The story labels"),
+          labelIds: z
+            .array(z.string())
+            .optional()
+            .describe(
+              "Replaces the whole label set with these label IDs (see list_labels).",
+            ),
+          addLabelIds: z
+            .array(z.string())
+            .optional()
+            .describe("Label IDs to add to the story (see list_labels)."),
+          removeLabelIds: z
+            .array(z.string())
+            .optional()
+            .describe("Label IDs to remove from the story."),
           isIcebox: z
             .boolean()
             .optional()
@@ -693,7 +727,9 @@ function createMcpServer({ db, currentUser }: McpRequestContext): McpServer {
       description,
       type,
       storyPoint,
-      labels,
+      labelIds,
+      addLabelIds,
+      removeLabelIds,
       isIcebox,
     }) => {
       const projectRepository = new D1ProjectRepository(db);
@@ -746,7 +782,9 @@ function createMcpServer({ db, currentUser }: McpRequestContext): McpServer {
           ...(type !== undefined ? { type } : {}),
           ...(storyPoint !== undefined ? { storyPoint } : {}),
           allowedStoryPoints,
-          ...(labels !== undefined ? { labels } : {}),
+          ...(labelIds !== undefined ? { labelIds } : {}),
+          ...(addLabelIds !== undefined ? { addLabelIds } : {}),
+          ...(removeLabelIds !== undefined ? { removeLabelIds } : {}),
           ...(isIcebox !== undefined ? { isIcebox } : {}),
           actor: {
             id: currentUser.id,
@@ -784,6 +822,7 @@ function createMcpServer({ db, currentUser }: McpRequestContext): McpServer {
                 storyPoint: result.value.storyPoint,
                 type: result.value.type,
                 labels: result.value.labels,
+                labelIds: result.value.labelIds,
               },
             }),
           },

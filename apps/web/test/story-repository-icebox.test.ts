@@ -22,7 +22,6 @@ async function insertStory(status: string, isIcebox: number) {
     type: "feature",
     status,
     storyPoint: 3,
-    labels: "[]",
     iterationId: null,
     position: 1,
     isIcebox,

@@ -241,7 +241,7 @@ export function StoryMultiPanelScreen() {
     () => new Set(),
   );
   const [bulkStatus, setBulkStatus] = useState<StoryStatus>("Started");
-  const [bulkLabelName, setBulkLabelName] = useState("");
+  const [bulkLabelId, setBulkLabelId] = useState("");
   const [createTargetPanel, setCreateTargetPanel] =
     useState<CreateTargetPanel | null>(null);
   const [createTitle, setCreateTitle] = useState("");
@@ -354,10 +354,10 @@ export function StoryMultiPanelScreen() {
       } else {
         next.delete("owners");
       }
-      if (filters.labels.length > 0) {
-        next.set("labels", filters.labels.join(","));
+      if (filters.labelIds.length > 0) {
+        next.set("labelIds", filters.labelIds.join(","));
       } else {
-        next.delete("labels");
+        next.delete("labelIds");
       }
       if (filters.epicIds.length > 0) {
         next.set("epicIds", filters.epicIds.join(","));
@@ -421,9 +421,9 @@ export function StoryMultiPanelScreen() {
         .map((o) => o.trim())
         .filter(Boolean)
     : [];
-  const rawLabelsParam = searchParams.get("labels");
-  const activeLabels = rawLabelsParam
-    ? rawLabelsParam
+  const rawLabelIdsParam = searchParams.get("labelIds");
+  const activeLabelIds = rawLabelIdsParam
+    ? rawLabelIdsParam
         .split(",")
         .map((l) => l.trim())
         .filter(Boolean)
@@ -469,7 +469,7 @@ export function StoryMultiPanelScreen() {
     filters: {
       searchQuery,
       activeOwners,
-      activeLabels,
+      activeLabelIds,
       activeEpicIds,
       activeTypes,
     },
@@ -525,7 +525,7 @@ export function StoryMultiPanelScreen() {
             type: "release",
             status: "Unstarted",
             storyPoint: null,
-            labels: [],
+            labelIds: [],
             isIcebox: false,
             ownerIds: [],
             requesterId: null,
@@ -1019,7 +1019,8 @@ export function StoryMultiPanelScreen() {
   };
 
   const handleBulkAddLabel = async () => {
-    if (!projectId || selectedVisibleStoryIds.length === 0 || !bulkLabelName)
+    const bulkLabel = projectLabels.find((label) => label.id === bulkLabelId);
+    if (!projectId || selectedVisibleStoryIds.length === 0 || !bulkLabel)
       return;
 
     retryRequestRef.current = handleBulkAddLabel;
@@ -1029,7 +1030,8 @@ export function StoryMultiPanelScreen() {
       await bulkLabelMutation.mutateAsync({
         storyIds: selectedVisibleStoryIds,
         stories: selectedVisibleStories,
-        labelName: bulkLabelName,
+        labelId: bulkLabel.id,
+        labelName: bulkLabel.name,
       });
       setSelectedStoryIds(new Set());
     } catch {
@@ -1394,7 +1396,7 @@ export function StoryMultiPanelScreen() {
     activeTypes.length > 0 ||
     showUnestimatedOnly ||
     activeOwners.length > 0 ||
-    activeLabels.length > 0 ||
+    activeLabelIds.length > 0 ||
     activeEpicIds.length > 0;
   const hasPanelErrors =
     Boolean(panelQueries.panels.Done.error) ||
@@ -2193,7 +2195,7 @@ export function StoryMultiPanelScreen() {
                   types: activeTypes,
                   unestimatedOnly: showUnestimatedOnly,
                   ownerIds: activeOwners,
-                  labels: activeLabels,
+                  labelIds: activeLabelIds,
                   epicIds: activeEpicIds,
                 }}
                 memberOptions={memberOptions}
@@ -2376,14 +2378,14 @@ export function StoryMultiPanelScreen() {
               <>
                 <select
                   className="rounded-md border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-900"
-                  value={bulkLabelName}
-                  onChange={(e) => setBulkLabelName(e.target.value)}
+                  value={bulkLabelId}
+                  onChange={(e) => setBulkLabelId(e.target.value)}
                 >
                   <option value="">
                     {t("storyMultiPanelScreen.bulk.selectLabel")}
                   </option>
                   {projectLabels.map((label) => (
-                    <option key={label.id} value={label.name}>
+                    <option key={label.id} value={label.id}>
                       {label.name}
                     </option>
                   ))}
@@ -2394,7 +2396,7 @@ export function StoryMultiPanelScreen() {
                   onClick={() => void handleBulkAddLabel()}
                   disabled={
                     selectedVisibleStoryIds.length === 0 ||
-                    !bulkLabelName ||
+                    !bulkLabelId ||
                     bulkLabelMutation.isPending
                   }
                 >

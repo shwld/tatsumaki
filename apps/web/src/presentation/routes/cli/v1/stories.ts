@@ -27,6 +27,7 @@ import {
 import { getPointScale } from "../../../../domain/entities/project";
 import { changeStoryBlocker } from "../../stories/blocker-handlers";
 import { handleStoryArchive } from "../../stories/archive-handler";
+import { LABEL_NAMES_WRITE_REMOVED_MESSAGE } from "../../stories/request-parsers";
 import {
   handleCliStoryUpdate,
   resolveStoryIdByNumber,
@@ -79,6 +80,10 @@ cliV1StoriesRoute.get("/:projectId/stories", async (c) => {
   const iterationDateScope = c.req.query("iterationDateScope");
   const iceboxRaw = c.req.query("icebox");
   const archived = c.req.query("archived");
+  const labelIds = (c.req.query("labelIds") ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
   if (
     archived !== undefined &&
     archived !== "only" &&
@@ -123,6 +128,7 @@ cliV1StoriesRoute.get("/:projectId/stories", async (c) => {
       ? { iterationDateScope: "current" as const }
       : {}),
     ...(iceboxRaw === "true" ? { isIcebox: true } : {}),
+    ...(labelIds.length > 0 ? { labelIds } : {}),
     limit,
     detailLevel: "summary",
   });
@@ -148,6 +154,16 @@ cliV1StoriesRoute.post("/:projectId/stories", async (c) => {
   const payload = await parseJsonBody(c);
   if (payload === null) {
     return c.json({ error: "Invalid JSON body" }, 400);
+  }
+  if (payload.labels !== undefined) {
+    return c.json({ error: LABEL_NAMES_WRITE_REMOVED_MESSAGE }, 400);
+  }
+  if (
+    payload.labelIds !== undefined &&
+    (!Array.isArray(payload.labelIds) ||
+      payload.labelIds.some((id: unknown) => typeof id !== "string"))
+  ) {
+    return c.json({ error: "labelIds must be an array of strings" }, 400);
   }
   const repository = new D1StoryRepository(c.env.DB);
   const projectRepository = new D1ProjectRepository(c.env.DB);
@@ -176,7 +192,7 @@ cliV1StoriesRoute.post("/:projectId/stories", async (c) => {
       isIcebox: payload.isIcebox ?? false,
       storyPoint: null,
       allowedStoryPoints,
-      labels: [],
+      labelIds: Array.isArray(payload.labelIds) ? payload.labelIds : [],
       actorUserId: membership.member.userId,
       actorName: currentUser.email ?? currentUser.id,
     },

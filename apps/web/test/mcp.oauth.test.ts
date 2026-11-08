@@ -836,6 +836,7 @@ describe("MCP OAuth", () => {
         storyPoint: 2,
         type: "feature",
         labels: [],
+        labelIds: [],
       },
     });
   });
@@ -878,6 +879,7 @@ describe("MCP OAuth", () => {
         storyPoint: null,
         type: "feature",
         labels: [],
+        labelIds: [],
       },
     });
   });
@@ -1179,7 +1181,7 @@ async function createStory(
         type: options?.type ?? "feature",
         status: options?.status ?? "Unstarted",
         storyPoint: options?.storyPoint ?? null,
-        labels: [],
+        labelIds: [],
       }),
     },
   );

@@ -40,7 +40,7 @@ export async function createSavedFilter(
     input.filters.unestimatedOnly === true ||
     (input.filters.statuses && input.filters.statuses.length > 0) ||
     (input.filters.ownerIds && input.filters.ownerIds.length > 0) ||
-    (input.filters.labels && input.filters.labels.length > 0) ||
+    (input.filters.labelIds && input.filters.labelIds.length > 0) ||
     (input.filters.epicIds && input.filters.epicIds.length > 0);
 
   if (!hasCondition) {

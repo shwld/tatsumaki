@@ -19,7 +19,7 @@ export type StorySearchFilters = {
   types: StoryType[];
   unestimatedOnly: boolean;
   ownerIds: string[];
-  labels: string[];
+  labelIds: string[];
   epicIds: string[];
 };
 
@@ -94,13 +94,13 @@ export const StorySearchBar = memo(function StorySearchBar({
   );
 
   const toggleLabel = useCallback(
-    (label: string) => {
-      const labels = filters.labels.includes(label)
-        ? filters.labels.filter((l) => l !== label)
-        : [...filters.labels, label];
-      updateFilters({ labels });
+    (labelId: string) => {
+      const labelIds = filters.labelIds.includes(labelId)
+        ? filters.labelIds.filter((id) => id !== labelId)
+        : [...filters.labelIds, labelId];
+      updateFilters({ labelIds });
     },
-    [filters.labels, updateFilters],
+    [filters.labelIds, updateFilters],
   );
 
   const clearAll = useCallback(() => {
@@ -109,7 +109,7 @@ export const StorySearchBar = memo(function StorySearchBar({
       types: [],
       unestimatedOnly: false,
       ownerIds: [],
-      labels: [],
+      labelIds: [],
       epicIds: [],
     };
     setFilters(empty);
@@ -124,7 +124,7 @@ export const StorySearchBar = memo(function StorySearchBar({
     filters.types.length > 0 ||
     filters.unestimatedOnly ||
     filters.ownerIds.length > 0 ||
-    filters.labels.length > 0 ||
+    filters.labelIds.length > 0 ||
     filters.epicIds.length > 0;
 
   const handleSave = useCallback(() => {
@@ -227,9 +227,9 @@ export const StorySearchBar = memo(function StorySearchBar({
                 <button
                   key={pl.id}
                   type="button"
-                  onClick={() => toggleLabel(pl.name)}
+                  onClick={() => toggleLabel(pl.id)}
                   className={`rounded px-2 py-0.5 text-xs transition-colors ${
-                    filters.labels.includes(pl.name)
+                    filters.labelIds.includes(pl.id)
                       ? "bg-primary text-primary-foreground"
                       : "bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                   }`}
@@ -320,15 +320,15 @@ export const StorySearchBar = memo(function StorySearchBar({
               </button>
             </span>
           )}
-          {filters.labels.map((label) => (
+          {filters.labelIds.map((labelId) => (
             <span
-              key={label}
+              key={labelId}
               className="flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-xs"
             >
-              {label}
+              {projectLabels.find((pl) => pl.id === labelId)?.name ?? labelId}
               <button
                 type="button"
-                onClick={() => toggleLabel(label)}
+                onClick={() => toggleLabel(labelId)}
                 className="hover:text-destructive"
               >
                 ×

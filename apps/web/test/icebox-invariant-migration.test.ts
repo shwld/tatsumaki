@@ -36,7 +36,6 @@ async function insertStory(
       type: "feature",
       status,
       storyPoint: 3,
-      labels: "[]",
       iterationId,
       position: 1,
       isIcebox,

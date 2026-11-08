@@ -209,6 +209,20 @@ tm epic enable --project <project-id> <label-id> --revision 3
 - The planned period is two calendar days (`YYYY-MM-DD`) given together, start on or before end; `--clear-period` removes it. `--outcome` (`unevaluated`, `achieved`, `missed`) is entered by a person and never inferred from story completion.
 - Deleting a label also deletes its epic with the plan. `tm label deletion-impact` shows what would go.
 
+### Labels on stories
+
+Stories reference labels by ID. `--label`, `--add-label` and `--remove-label` take a label ID or, as a convenience, a label name that the CLI resolves to an ID through `tm label list` before calling the API.
+
+```bash
+tm story create --project <project-id> --title "..." --type feature --description "..." --label backend
+tm story update --project <project-id> 12 --add-label backend --remove-label <label-id>
+tm story update --project <project-id> 12 --label backend --label api   # replaces the whole set
+tm story update --project <project-id> 12 --clear-labels
+tm story list --project <project-id> --label backend --label api        # any of them
+```
+
+An unknown label is rejected with exit code 2 and nothing changes.
+
 ## Artifacts
 
 An artifact is a built directory (HTML, CSS, JavaScript, images, fonts) stored in a project. Every upload creates an immutable version; the web app shows the latest or a pinned version in a sandboxed preview.

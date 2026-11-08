@@ -23,7 +23,6 @@ import {
   INVALID_STORY_TYPE_ERROR,
   normalizeStoryDescription,
   normalizeStoryLabelIds,
-  normalizeStoryLabels,
   normalizeStoryPoint,
   normalizeStoryOwnerIds,
   normalizeStoryRequesterId,
@@ -124,6 +123,8 @@ function serializeStoryFieldValue(
       return story.storyPoint === null ? null : String(story.storyPoint);
     case "labels":
       return JSON.stringify(story.labels);
+    case "labelIds":
+      return JSON.stringify([...story.labelIds].sort());
     case "story":
       return story.title;
   }
@@ -140,7 +141,7 @@ function buildStoryActivities(params: {
     "type",
     "status",
     "storyPoint",
-    "labels",
+    "labelIds",
   ];
 
   return fields.flatMap((fieldName) => {
@@ -177,11 +178,9 @@ export async function updateStory(
     type?: string;
     status?: string;
     storyPoint?: number | null;
-    labels?: string[];
     labelIds?: string[];
     addLabelIds?: string[];
     removeLabelIds?: string[];
-    addLabelNames?: string[];
     ownerIds?: string[];
     isIcebox?: boolean;
     moveToTopOnLeavingIcebox?: boolean;
@@ -200,11 +199,9 @@ export async function updateStory(
     input.type !== undefined ||
     input.status !== undefined ||
     input.storyPoint !== undefined ||
-    input.labels !== undefined ||
     input.labelIds !== undefined ||
     input.addLabelIds !== undefined ||
     input.removeLabelIds !== undefined ||
-    input.addLabelNames !== undefined ||
     input.ownerIds !== undefined ||
     input.isIcebox !== undefined ||
     input.requesterId !== undefined;
@@ -268,20 +265,6 @@ export async function updateStory(
     }
   }
 
-  const normalizedLabels =
-    input.labels !== undefined ? normalizeStoryLabels(input.labels) : undefined;
-  if (normalizedLabels?.isErr()) {
-    return err(normalizedLabels.error);
-  }
-
-  const normalizedAddLabelNames =
-    input.addLabelNames !== undefined
-      ? normalizeStoryLabels(input.addLabelNames)
-      : undefined;
-  if (normalizedAddLabelNames?.isErr()) {
-    return err(normalizedAddLabelNames.error);
-  }
-
   const normalizedLabelIds = {
     labelIds: input.labelIds,
     addLabelIds: input.addLabelIds,
@@ -342,10 +325,6 @@ export async function updateStory(
       : {}),
     ...(normalizedStoryPoint?.isOk()
       ? { storyPoint: normalizedStoryPoint.value }
-      : {}),
-    ...(normalizedLabels?.isOk() ? { labels: normalizedLabels.value } : {}),
-    ...(normalizedAddLabelNames?.isOk()
-      ? { addLabelNames: normalizedAddLabelNames.value }
       : {}),
     ...(normalizedLabelIds.labelIds !== undefined
       ? { labelIds: normalizedLabelIds.labelIds }

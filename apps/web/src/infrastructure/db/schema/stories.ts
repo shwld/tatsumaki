@@ -20,7 +20,6 @@ export const storiesTable = sqliteTable("stories", {
   completedAt: text("completed_at"),
   archivedAt: text("archived_at"),
   storyPoint: integer("story_point"),
-  labels: text("labels").notNull().default("[]"),
   requesterId: text("requester_id"),
   epicId: text("epic_id").references(() => epicsTable.id, {
     onDelete: "set null",

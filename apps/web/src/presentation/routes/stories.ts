@@ -71,6 +71,7 @@ import {
   toUpdateStoryErrorResponse,
 } from "./stories/error-responses";
 import {
+  LABEL_NAMES_WRITE_REMOVED_MESSAGE,
   parseBulkAddStoryLabelsRequest,
   parseBulkUpdateStoryStatusRequest,
   parseCreateStoryRequest,
@@ -184,8 +185,13 @@ storiesRoute.get("/projects/:projectId/stories", async (c) => {
   const ownersRaw = c.req.query("owners");
   const requester = c.req.query("requester");
   const myWork = c.req.query("myWork");
-  const label = c.req.query("label");
-  const labelsRaw = c.req.query("labels");
+  const labelIdsRaw = c.req.query("labelIds");
+  if (
+    c.req.query("label") !== undefined ||
+    c.req.query("labels") !== undefined
+  ) {
+    return c.json({ error: LABEL_NAMES_WRITE_REMOVED_MESSAGE }, 400);
+  }
   const epicId = c.req.query("epicId");
   const epicIdsRaw = c.req.query("epicIds");
   const isIcebox = c.req.query("isIcebox");
@@ -225,7 +231,7 @@ storiesRoute.get("/projects/:projectId/stories", async (c) => {
   const statuses = parseCsvParam(statusesRaw);
   const types = parseCsvParam(typesRaw);
   const owners = parseCsvParam(ownersRaw);
-  const labels = parseCsvParam(labelsRaw);
+  const labelIds = parseCsvParam(labelIdsRaw);
   const epicIds = parseCsvParam(epicIdsRaw);
 
   const parsedLimit = limitRaw ? Number.parseInt(limitRaw, 10) : undefined;
@@ -268,8 +274,7 @@ storiesRoute.get("/projects/:projectId/stories", async (c) => {
           ? { ownerIds: owners }
           : {}),
     ...(requester ? { requesterId: requester } : {}),
-    ...(label ? { label } : {}),
-    ...(labels.length > 0 ? { labels } : {}),
+    ...(labelIds.length > 0 ? { labelIds } : {}),
     ...(epicId ? { epicId } : {}),
     ...(epicIds.length > 0 ? { epicIds } : {}),
     ...(isIcebox === "true" || isIcebox === "1"
@@ -418,7 +423,6 @@ storiesRoute.post("/projects/:projectId/stories", async (c) => {
       status: parsed.value.status,
       storyPoint: parsed.value.storyPoint,
       allowedStoryPoints,
-      labels: parsed.value.labels,
       labelIds: parsed.value.labelIds,
       ownerIds: parsed.value.ownerIds,
       requesterId: parsed.value.requesterId,
@@ -515,7 +519,7 @@ storiesRoute.patch("/projects/:projectId/stories/bulk-labels", async (c) => {
     {
       projectId,
       storyIds: parsed.value.storyIds,
-      labels: parsed.value.labels,
+      labelIds: parsed.value.labelIds,
       actor: {
         id: c.get("currentUser").id,
         name: c.get("currentUser").email ?? c.get("currentUser").id,
@@ -529,7 +533,7 @@ storiesRoute.patch("/projects/:projectId/stories/bulk-labels", async (c) => {
       return c.json({ error: "storyIds must not be empty" }, 400);
     }
     if (result.error === EMPTY_LABELS_ERROR) {
-      return c.json({ error: "labels must not be empty" }, 400);
+      return c.json({ error: "labelIds must not be empty" }, 400);
     }
     const response = toUpdateStoryErrorResponse(result.error);
     return c.json({ error: response.message }, response.status);

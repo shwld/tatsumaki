@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  LABEL_NAMES_WRITE_REMOVED_MESSAGE,
   parseBulkAddStoryLabelsRequest,
   parseBulkUpdateStoryStatusRequest,
   parseCreateStoryRequest,
@@ -24,7 +25,6 @@ describe("story request parsers", () => {
         type: "feature",
         status: "Unstarted",
         storyPoint: null,
-        labels: [],
         labelIds: [],
         isIcebox: false,
         ownerIds: [],
@@ -46,7 +46,6 @@ describe("story request parsers", () => {
         type: "feature",
         status: "Unstarted",
         storyPoint: null,
-        labels: [],
         labelIds: [],
         isIcebox: false,
         ownerIds: [],
@@ -89,7 +88,6 @@ describe("story request parsers", () => {
         type: "feature",
         status: "Started",
         storyPoint: 3,
-        labels: [],
         labelIds: [],
         isIcebox: false,
         ownerIds: [],
@@ -106,16 +104,23 @@ describe("story request parsers", () => {
     });
   });
 
-  it("returns error for invalid create labels", () => {
+  it("rejects label names on create", () => {
     const result = parseCreateStoryRequest({
       title: "New story",
       description: "Implement feature",
-      labels: ["ok", 1],
+      labels: ["ok"],
     });
 
     expect(result).toEqual({
       ok: false,
-      message: "Story labels must be an array of strings",
+      message: LABEL_NAMES_WRITE_REMOVED_MESSAGE,
+    });
+  });
+
+  it("rejects label names on update", () => {
+    expect(parseUpdateStoryRequest({ labels: ["backend"] })).toEqual({
+      ok: false,
+      message: LABEL_NAMES_WRITE_REMOVED_MESSAGE,
     });
   });
 
@@ -136,7 +141,6 @@ describe("story request parsers", () => {
         type: "feature",
         status: "Unstarted",
         storyPoint: null,
-        labels: [],
         labelIds: [],
         isIcebox: true,
         ownerIds: [],
@@ -174,14 +178,14 @@ describe("story request parsers", () => {
   it("parses partial update request", () => {
     const result = parseUpdateStoryRequest({
       title: "Updated",
-      labels: ["backend"],
+      addLabelIds: ["label-1"],
     });
 
     expect(result).toEqual({
       ok: true,
       value: {
         title: "Updated",
-        labels: ["backend"],
+        addLabelIds: ["label-1"],
       },
     });
   });
@@ -296,14 +300,14 @@ describe("story request parsers", () => {
   it("parses bulk add labels request", () => {
     const result = parseBulkAddStoryLabelsRequest({
       storyIds: ["story-1"],
-      labels: ["backend", "priority:high"],
+      labelIds: ["label-1", "label-2"],
     });
 
     expect(result).toEqual({
       ok: true,
       value: {
         storyIds: ["story-1"],
-        labels: ["backend", "priority:high"],
+        labelIds: ["label-1", "label-2"],
       },
     });
   });
@@ -311,12 +315,18 @@ describe("story request parsers", () => {
   it("returns error for invalid bulk labels request", () => {
     const result = parseBulkAddStoryLabelsRequest({
       storyIds: ["story-1"],
-      labels: [],
+      labelIds: [],
     });
 
     expect(result).toEqual({
       ok: false,
-      message: "labels must be a non-empty string array",
+      message: "labelIds must be a non-empty string array",
     });
+  });
+
+  it("rejects label names on bulk add", () => {
+    expect(
+      parseBulkAddStoryLabelsRequest({ storyIds: ["story-1"], labels: ["a"] }),
+    ).toEqual({ ok: false, message: LABEL_NAMES_WRITE_REMOVED_MESSAGE });
   });
 });

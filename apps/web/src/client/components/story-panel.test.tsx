@@ -27,6 +27,7 @@ function makeStory(overrides: Partial<Story> = {}): Story {
     isIcebox: false,
     iterationId: null,
     labels: [],
+    labelIds: [],
     description: "",
     requesterId: null,
     releaseDate: null,

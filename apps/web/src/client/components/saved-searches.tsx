@@ -60,7 +60,7 @@ export const SavedSearches = memo(function SavedSearches({
         types: sf.filters.types ?? [],
         unestimatedOnly: sf.filters.unestimatedOnly === true,
         ownerIds: sf.filters.ownerIds ?? [],
-        labels: sf.filters.labels ?? [],
+        labelIds: sf.filters.labelIds ?? [],
         epicIds: sf.filters.epicIds ?? [],
       });
     },

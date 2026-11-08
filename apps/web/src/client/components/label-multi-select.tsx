@@ -23,18 +23,18 @@ const PRESET_COLORS = [
 
 type LabelMultiSelectProps = {
   projectId: string;
-  selectedLabels: string[];
+  selectedLabelIds: string[];
   projectLabels: ProjectLabel[];
   disabled?: boolean;
-  onSelectedLabelsChange: (labels: string[]) => void;
+  onSelectedLabelIdsChange: (labelIds: string[]) => void;
 };
 
 export function LabelMultiSelect({
   projectId,
-  selectedLabels,
+  selectedLabelIds,
   projectLabels,
   disabled,
-  onSelectedLabelsChange,
+  onSelectedLabelIdsChange,
 }: LabelMultiSelectProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -53,37 +53,43 @@ export function LabelMultiSelect({
     setError,
   } = useProjectLabelMutations(projectId);
 
-  const unknownLabels = selectedLabels.filter(
-    (name) => !projectLabels.some((pl) => pl.name === name),
+  const unknownLabelIds = selectedLabelIds.filter(
+    (id) => !projectLabels.some((pl) => pl.id === id),
   );
 
   const handleToggle = useCallback(
-    (labelName: string) => {
-      const next = selectedLabels.includes(labelName)
-        ? selectedLabels.filter((l) => l !== labelName)
-        : [...selectedLabels, labelName];
-      onSelectedLabelsChange(next);
+    (labelId: string) => {
+      const next = selectedLabelIds.includes(labelId)
+        ? selectedLabelIds.filter((id) => id !== labelId)
+        : [...selectedLabelIds, labelId];
+      onSelectedLabelIdsChange(next);
     },
-    [selectedLabels, onSelectedLabelsChange],
+    [selectedLabelIds, onSelectedLabelIdsChange],
   );
 
   const handleRemoveChip = useCallback(
-    (labelName: string, event: React.MouseEvent) => {
+    (labelId: string, event: React.MouseEvent) => {
       event.stopPropagation();
-      onSelectedLabelsChange(selectedLabels.filter((l) => l !== labelName));
+      onSelectedLabelIdsChange(selectedLabelIds.filter((id) => id !== labelId));
     },
-    [selectedLabels, onSelectedLabelsChange],
+    [selectedLabelIds, onSelectedLabelIdsChange],
   );
 
   const handleCreate = useCallback(async () => {
     if (!newName.trim()) return;
     const label = await createLabel({ name: newName.trim(), color: newColor });
     if (label) {
-      onSelectedLabelsChange([...selectedLabels, label.name]);
+      onSelectedLabelIdsChange([...selectedLabelIds, label.id]);
       setNewName("");
       setNewColor(DEFAULT_COLOR);
     }
-  }, [createLabel, newName, newColor, selectedLabels, onSelectedLabelsChange]);
+  }, [
+    createLabel,
+    newName,
+    newColor,
+    selectedLabelIds,
+    onSelectedLabelIdsChange,
+  ]);
 
   const handleStartEdit = useCallback(
     (label: ProjectLabel) => {
@@ -103,18 +109,10 @@ export function LabelMultiSelect({
         color: editColor,
       });
       if (updated) {
-        if (
-          selectedLabels.includes(label.name) &&
-          updated.name !== label.name
-        ) {
-          onSelectedLabelsChange(
-            selectedLabels.map((l) => (l === label.name ? updated.name : l)),
-          );
-        }
         setEditingLabelId(null);
       }
     },
-    [updateLabel, editName, editColor, selectedLabels, onSelectedLabelsChange],
+    [updateLabel, editName, editColor],
   );
 
   const handleDelete = useCallback(
@@ -127,15 +125,17 @@ export function LabelMultiSelect({
         return;
       }
       const success = await deleteLabel(label.id);
-      if (success && selectedLabels.includes(label.name)) {
-        onSelectedLabelsChange(selectedLabels.filter((l) => l !== label.name));
+      if (success && selectedLabelIds.includes(label.id)) {
+        onSelectedLabelIdsChange(
+          selectedLabelIds.filter((id) => id !== label.id),
+        );
       }
     },
-    [deleteLabel, selectedLabels, onSelectedLabelsChange, t],
+    [deleteLabel, selectedLabelIds, onSelectedLabelIdsChange, t],
   );
 
-  const visibleChips = selectedLabels.slice(0, 3);
-  const extraCount = selectedLabels.length - 3;
+  const visibleChips = selectedLabelIds.slice(0, 3);
+  const extraCount = selectedLabelIds.length - 3;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -145,17 +145,18 @@ export function LabelMultiSelect({
           disabled={disabled}
           className="min-h-7 min-w-0 flex-1 rounded border border-gray-200 bg-white px-2 py-0.5 text-left hover:bg-gray-50 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-900 dark:hover:bg-slate-800"
         >
-          {selectedLabels.length === 0 ? (
+          {selectedLabelIds.length === 0 ? (
             <span className="text-xs text-gray-400">
               {t("storyAccordion.labels.select")}
             </span>
           ) : (
             <div className="flex flex-wrap items-center gap-1">
-              {visibleChips.map((name) => {
-                const meta = projectLabels.find((pl) => pl.name === name);
+              {visibleChips.map((labelId) => {
+                const meta = projectLabels.find((pl) => pl.id === labelId);
+                const name = meta?.name ?? labelId;
                 return (
                   <span
-                    key={name}
+                    key={labelId}
                     className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium text-white"
                     style={{
                       backgroundColor: meta?.color ?? UNKNOWN_LABEL_COLOR,
@@ -166,7 +167,7 @@ export function LabelMultiSelect({
                       <button
                         type="button"
                         className="ml-0.5 opacity-70 hover:opacity-100"
-                        onClick={(e) => handleRemoveChip(name, e)}
+                        onClick={(e) => handleRemoveChip(labelId, e)}
                         aria-label={t("storyAccordion.labels.remove", { name })}
                       >
                         <X className="h-2.5 w-2.5" />
@@ -247,7 +248,7 @@ export function LabelMultiSelect({
                 <button
                   type="button"
                   className="flex flex-1 items-center gap-1.5 text-left"
-                  onClick={() => handleToggle(label.name)}
+                  onClick={() => handleToggle(label.id)}
                   disabled={disabled || isSubmitting}
                 >
                   <span
@@ -257,7 +258,7 @@ export function LabelMultiSelect({
                   <span className="flex-1 truncate text-xs text-gray-700 dark:text-slate-200">
                     {label.name}
                   </span>
-                  {selectedLabels.includes(label.name) && (
+                  {selectedLabelIds.includes(label.id) && (
                     <Check className="h-3 w-3 shrink-0 text-blue-600" />
                   )}
                 </button>
@@ -288,20 +289,20 @@ export function LabelMultiSelect({
               </div>
             ),
           )}
-          {unknownLabels.length > 0 && (
+          {unknownLabelIds.length > 0 && (
             <>
               <hr className="my-1 border-gray-100 dark:border-slate-700" />
               <p className="px-1 py-0.5 text-[10px] text-gray-400">
                 {t("storyAccordion.labels.undefined")}
               </p>
-              {unknownLabels.map((name) => (
+              {unknownLabelIds.map((labelId) => (
                 <div
-                  key={name}
+                  key={labelId}
                   className="flex items-center gap-1.5 rounded px-1 py-0.5"
                 >
                   <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-gray-400" />
                   <span className="flex-1 truncate text-xs text-gray-500 dark:text-slate-400">
-                    {name}
+                    {labelId}
                   </span>
                   <Check className="h-3 w-3 shrink-0 text-blue-600" />
                 </div>

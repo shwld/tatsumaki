@@ -129,6 +129,9 @@ impl StoryGateway for HttpStoryGateway {
     if filter.archived {
       query.push(("archived", "only".to_string()));
     }
+    if !filter.label_ids.is_empty() {
+      query.push(("labelIds", filter.label_ids.join(",")));
+    }
     if let Some(limit) = filter.limit {
       query.push(("limit", limit.to_string()));
     }
@@ -163,7 +166,8 @@ impl StoryGateway for HttpStoryGateway {
         "title": input.title,
         "type": input.r#type,
         "description": input.description,
-        "isIcebox": input.is_icebox
+        "isIcebox": input.is_icebox,
+        "labelIds": input.label_ids
       }))
       .send()
       .await?;
@@ -273,6 +277,15 @@ fn story_update_payload(input: &StoryUpdateInput) -> serde_json::Value {
   if let Some(owner_ids) = &input.owner_ids {
     payload.insert("ownerIds".to_string(), owner_ids.clone().into());
   }
+  if let Some(label_ids) = &input.label_ids {
+    payload.insert("labelIds".to_string(), label_ids.clone().into());
+  }
+  if !input.add_label_ids.is_empty() {
+    payload.insert("addLabelIds".to_string(), input.add_label_ids.clone().into());
+  }
+  if !input.remove_label_ids.is_empty() {
+    payload.insert("removeLabelIds".to_string(), input.remove_label_ids.clone().into());
+  }
   payload.into()
 }
 
@@ -350,6 +363,9 @@ mod tests {
       status: None,
       is_icebox: None,
       owner_ids: None,
+      label_ids: None,
+      add_label_ids: Vec::new(),
+      remove_label_ids: Vec::new(),
     }
   }
 
@@ -361,6 +377,32 @@ mod tests {
     });
 
     assert_eq!(payload, serde_json::json!({ "title": "Updated title" }));
+  }
+
+  #[test]
+  fn story_update_payload_sends_label_ids_only() {
+    let payload = story_update_payload(&StoryUpdateInput {
+      label_ids: Some(vec!["l1".to_string()]),
+      add_label_ids: vec!["l2".to_string()],
+      remove_label_ids: vec!["l3".to_string()],
+      ..empty_update()
+    });
+
+    assert_eq!(
+      payload,
+      serde_json::json!({ "labelIds": ["l1"], "addLabelIds": ["l2"], "removeLabelIds": ["l3"] })
+    );
+    assert!(payload.get("labels").is_none());
+  }
+
+  #[test]
+  fn story_update_payload_clears_labels_with_empty_label_ids() {
+    let payload = story_update_payload(&StoryUpdateInput {
+      label_ids: Some(Vec::new()),
+      ..empty_update()
+    });
+
+    assert_eq!(payload, serde_json::json!({ "labelIds": [] }));
   }
 
   #[test]

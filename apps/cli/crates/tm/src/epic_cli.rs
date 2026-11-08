@@ -364,6 +364,47 @@ fn print_epic(epic: &EpicInfo, json: bool) -> Result<(), FlowError> {
     Ok(())
 }
 
+/// Resolves `--label` values to label IDs. A value is matched as an ID first, then as a name; the API itself only takes IDs.
+pub async fn resolve_label_ids<T: TokenProvider + Sync>(
+    base_url: &str,
+    project: &str,
+    tokens: &T,
+    specs: &[String],
+) -> Result<Vec<String>, FlowError> {
+    if specs.is_empty() {
+        return Ok(Vec::new());
+    }
+    let client = EpicClient {
+        base_url,
+        project: project.to_string(),
+        tokens,
+        client: reqwest::Client::new(),
+    };
+    let body: LabelsBody = client
+        .send(reqwest::Method::GET, client.url("/labels"), None)
+        .await?;
+    pick_label_ids(&body.labels, specs).map_err(|message| (CliError::Message(message), EXIT_INVALID_ARGUMENT))
+}
+
+fn pick_label_ids(labels: &[LabelInfo], specs: &[String]) -> Result<Vec<String>, String> {
+    let mut ids: Vec<String> = Vec::new();
+    for spec in specs {
+        let found = labels
+            .iter()
+            .find(|label| &label.id == spec)
+            .or_else(|| labels.iter().find(|label| &label.name == spec));
+        let Some(label) = found else {
+            return Err(format!(
+                "Invalid label: no label with ID or name \"{spec}\" in the project (see `tm label list`)"
+            ));
+        };
+        if !ids.contains(&label.id) {
+            ids.push(label.id.clone());
+        }
+    }
+    Ok(ids)
+}
+
 pub async fn run_label<T: TokenProvider + Sync>(
     command: LabelCommand,
     base_url: &str,
@@ -529,6 +570,27 @@ mod tests {
     use clap::Parser;
 
     use super::*;
+
+    fn label(id: &str, name: &str) -> LabelInfo {
+        LabelInfo { id: id.to_string(), name: name.to_string(), color: "#000000".to_string() }
+    }
+
+    #[test]
+    fn pick_label_ids_resolves_by_id_then_name_without_duplicates() {
+        let labels = vec![label("l1", "backend"), label("l2", "l1")];
+        let ids = pick_label_ids(
+            &labels,
+            &["backend".to_string(), "l1".to_string(), "l1".to_string()],
+        )
+        .unwrap();
+        assert_eq!(ids, vec!["l1".to_string()]);
+    }
+
+    #[test]
+    fn pick_label_ids_rejects_unknown_label() {
+        let error = pick_label_ids(&[label("l1", "backend")], &["nope".to_string()]).unwrap_err();
+        assert!(error.contains("Invalid label"), "{error}");
+    }
 
     #[derive(Parser)]
     struct Harness {

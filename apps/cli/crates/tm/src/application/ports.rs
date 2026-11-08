@@ -35,8 +35,9 @@ pub struct StoryCreateInput {
     pub r#type: String,
     pub description: String,
     pub is_icebox: bool,
+    pub label_ids: Vec<String>,
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct StoryUpdateInput {
     pub title: Option<String>,
     pub description: Option<String>,
@@ -45,6 +46,10 @@ pub struct StoryUpdateInput {
     pub status: Option<String>,
     pub is_icebox: Option<bool>,
     pub owner_ids: Option<Vec<String>>,
+    /// Replaces the whole label set.
+    pub label_ids: Option<Vec<String>>,
+    pub add_label_ids: Vec<String>,
+    pub remove_label_ids: Vec<String>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum StoryPointUpdate {
@@ -95,6 +100,8 @@ pub struct StoryListFilter {
     pub iteration_date_scope: Option<String>,
     pub icebox: bool,
     pub archived: bool,
+    /// Stories carrying any of these labels.
+    pub label_ids: Vec<String>,
     pub limit: Option<u32>,
 }
 

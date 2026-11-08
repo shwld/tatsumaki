@@ -976,12 +976,6 @@
                     "type": "integer",
                     "nullable": true
                   },
-                  "labels": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  },
                   "labelIds": {
                     "type": "array",
                     "items": {
@@ -1100,6 +1094,17 @@
           {
             "schema": {
               "type": "string",
+              "description": "Comma-separated label IDs. Returns stories carrying any of them.",
+              "example": "01KNCFJZJ0Z74X92QPCE0D9MK8"
+            },
+            "required": false,
+            "description": "Comma-separated label IDs. Returns stories carrying any of them.",
+            "name": "labelIds",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
               "pattern": "^[1-9][0-9]*$",
               "example": "10"
             },
@@ -1162,6 +1167,12 @@
                   },
                   "isIcebox": {
                     "type": "boolean"
+                  },
+                  "labelIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
                   }
                 },
                 "required": ["title", "type", "description"]
