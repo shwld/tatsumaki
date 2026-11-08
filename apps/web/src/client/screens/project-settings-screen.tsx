@@ -391,6 +391,7 @@ export function ProjectSettingsScreen() {
           <ProjectSection title="基本設定">
             <form onSubmit={handleGeneralSubmit} className="mt-3 space-y-4">
               <fieldset>
+                <legend className="sr-only">基本設定</legend>
                 <div className="space-y-4">
                   <div>
                     <label
@@ -485,6 +486,7 @@ export function ProjectSettingsScreen() {
         <ProjectSection title="ポイントスケール">
           <form onSubmit={handleSubmit} className="mt-3 space-y-6">
             <fieldset>
+              <legend className="sr-only">ポイントスケール</legend>
               <div className="space-y-2">
                 {POINT_SCALE_TYPES.map((scaleType) => (
                   <label key={scaleType} className="flex items-center gap-2">
