@@ -23,6 +23,7 @@ import {
   INVALID_STORY_TITLE_ERROR,
   INVALID_STORY_TYPE_ERROR,
   normalizeStoryDescription,
+  normalizeStoryLabelIds,
   normalizeStoryLabels,
   normalizeStoryPoint,
   normalizeStoryOwnerIds,
@@ -180,6 +181,10 @@ export async function updateStory(
     status?: string;
     storyPoint?: number | null;
     labels?: string[];
+    labelIds?: string[];
+    addLabelIds?: string[];
+    removeLabelIds?: string[];
+    addLabelNames?: string[];
     ownerIds?: string[];
     epicId?: string | null;
     isIcebox?: boolean;
@@ -200,6 +205,10 @@ export async function updateStory(
     input.status !== undefined ||
     input.storyPoint !== undefined ||
     input.labels !== undefined ||
+    input.labelIds !== undefined ||
+    input.addLabelIds !== undefined ||
+    input.removeLabelIds !== undefined ||
+    input.addLabelNames !== undefined ||
     input.ownerIds !== undefined ||
     input.epicId !== undefined ||
     input.isIcebox !== undefined ||
@@ -270,6 +279,31 @@ export async function updateStory(
     return err(normalizedLabels.error);
   }
 
+  const normalizedAddLabelNames =
+    input.addLabelNames !== undefined
+      ? normalizeStoryLabels(input.addLabelNames)
+      : undefined;
+  if (normalizedAddLabelNames?.isErr()) {
+    return err(normalizedAddLabelNames.error);
+  }
+
+  const normalizedLabelIds = {
+    labelIds: input.labelIds,
+    addLabelIds: input.addLabelIds,
+    removeLabelIds: input.removeLabelIds,
+  };
+  for (const key of Object.keys(normalizedLabelIds) as Array<
+    keyof typeof normalizedLabelIds
+  >) {
+    const ids = normalizedLabelIds[key];
+    if (ids === undefined) continue;
+    const result = normalizeStoryLabelIds(ids);
+    if (result.isErr()) {
+      return err(result.error);
+    }
+    normalizedLabelIds[key] = result.value;
+  }
+
   const normalizedOwnerIds =
     input.ownerIds !== undefined
       ? normalizeStoryOwnerIds(input.ownerIds)
@@ -321,6 +355,18 @@ export async function updateStory(
       ? { storyPoint: normalizedStoryPoint.value }
       : {}),
     ...(normalizedLabels?.isOk() ? { labels: normalizedLabels.value } : {}),
+    ...(normalizedAddLabelNames?.isOk()
+      ? { addLabelNames: normalizedAddLabelNames.value }
+      : {}),
+    ...(normalizedLabelIds.labelIds !== undefined
+      ? { labelIds: normalizedLabelIds.labelIds }
+      : {}),
+    ...(normalizedLabelIds.addLabelIds !== undefined
+      ? { addLabelIds: normalizedLabelIds.addLabelIds }
+      : {}),
+    ...(normalizedLabelIds.removeLabelIds !== undefined
+      ? { removeLabelIds: normalizedLabelIds.removeLabelIds }
+      : {}),
     ...(normalizedOwnerIds?.isOk()
       ? { ownerIds: normalizedOwnerIds.value }
       : {}),

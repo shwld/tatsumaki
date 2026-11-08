@@ -11,6 +11,7 @@ export { epicsTable } from "./epics";
 export { storiesTable, storyPriorityHistoryTable } from "./stories";
 export { storyTimelineEntriesTable } from "./story-timeline";
 export { storyBlockersTable } from "./story-blockers";
+export { storyLabelsTable } from "./story-labels";
 export { storyAttachmentsTable } from "./story-attachments";
 export { usersTable } from "./users";
 export { savedFiltersTable } from "./saved-filters";

@@ -1,11 +1,10 @@
 import { SELF, env } from "cloudflare:test";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createAuthHeaders, setupAccessBindings } from "./helpers/access-jwt";
 import { resetDatabase } from "./helpers/db";
 import { createDb } from "../src/infrastructure/db/client";
 import { projectLabelsTable } from "../src/infrastructure/db/schema/project-labels";
-import { storiesTable } from "../src/infrastructure/db/schema/stories";
 
 function labelsApiPath(projectId: string): string {
   return `https://localhost/api/projects/${projectId}/labels`;
@@ -21,18 +20,6 @@ function storiesApiPath(projectId: string): string {
 
 function storyApiPath(projectId: string, storyNumber: number): string {
   return `${storiesApiPath(projectId)}/${storyNumber}`;
-}
-
-async function withSuppressedConsoleError<T>(
-  callback: () => Promise<T>,
-): Promise<T> {
-  const original = console.error;
-  console.error = () => {};
-  try {
-    return await callback();
-  } finally {
-    console.error = original;
-  }
 }
 
 describe("project labels routes", () => {
@@ -161,36 +148,47 @@ describe("project labels routes", () => {
     expect(data.label.color).toBe("#ef4444");
   });
 
-  it("cascades label rename to stories and deduplicates labels", async () => {
-    const projectId = await createProject();
-    const story = await createStory(projectId, ["backend", "frontend"]);
-
-    const createResponse = await fetchWithAuth(labelsApiPath(projectId), {
+  async function createLabel(
+    projectId: string,
+    name: string,
+    color = "#3b82f6",
+  ): Promise<string> {
+    const response = await fetchWithAuth(labelsApiPath(projectId), {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: "backend", color: "#3b82f6" }),
+      body: JSON.stringify({ name, color }),
     });
-    const created = (await createResponse.json()) as {
-      label: { id: string };
-    };
+    const created = (await response.json()) as { label: { id: string } };
+    return created.label.id;
+  }
 
-    const response = await fetchWithAuth(
-      labelApiPath(projectId, created.label.id),
-      {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: "frontend" }),
-      },
-    );
+  async function getStory(
+    projectId: string,
+    storyNumber: number,
+  ): Promise<{ labels: string[]; labelIds: string[] }> {
+    const response = await fetchWithAuth(storyApiPath(projectId, storyNumber));
+    return (
+      (await response.json()) as {
+        story: { labels: string[]; labelIds: string[] };
+      }
+    ).story;
+  }
+
+  it("keeps story membership when a label is renamed", async () => {
+    const projectId = await createProject();
+    const backendId = await createLabel(projectId, "backend");
+    const story = await createStory(projectId, ["backend", "frontend"]);
+
+    const response = await fetchWithAuth(labelApiPath(projectId, backendId), {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "platform" }),
+    });
     expect(response.status).toBe(200);
 
-    const storyResponse = await fetchWithAuth(
-      `https://localhost/api/projects/${projectId}/stories/${story.storyNumber}`,
-    );
-    const storyPayload = (await storyResponse.json()) as {
-      story: { labels: string[] };
-    };
-    expect(storyPayload.story.labels).toEqual(["frontend"]);
+    const stored = await getStory(projectId, story.storyNumber);
+    expect(stored.labels).toEqual(["frontend", "platform"]);
+    expect(stored.labelIds).toContain(backendId);
   });
 
   it("deletes a label", async () => {
@@ -216,178 +214,42 @@ describe("project labels routes", () => {
     expect(data.labels).toEqual([]);
   });
 
-  it("cascades label delete to stories", async () => {
+  it("removes a deleted label from its stories only", async () => {
     const projectId = await createProject();
+    const backendId = await createLabel(projectId, "backend");
     const story = await createStory(projectId, ["backend", "frontend"]);
 
-    const createResponse = await fetchWithAuth(labelsApiPath(projectId), {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: "backend", color: "#3b82f6" }),
+    const response = await fetchWithAuth(labelApiPath(projectId, backendId), {
+      method: "DELETE",
     });
-    const created = (await createResponse.json()) as {
-      label: { id: string };
-    };
-
-    const response = await fetchWithAuth(
-      labelApiPath(projectId, created.label.id),
-      { method: "DELETE" },
-    );
     expect(response.status).toBe(204);
 
-    const storyResponse = await fetchWithAuth(
-      `https://localhost/api/projects/${projectId}/stories/${story.storyNumber}`,
-    );
-    const storyPayload = (await storyResponse.json()) as {
-      story: { labels: string[] };
-    };
-    expect(storyPayload.story.labels).toEqual(["frontend"]);
+    const stored = await getStory(projectId, story.storyNumber);
+    expect(stored.labels).toEqual(["frontend"]);
+    expect(stored.labelIds).not.toContain(backendId);
   });
 
   it("keeps labels and stories unchanged when rename fails", async () => {
     const projectId = await createProject();
+    const backendId = await createLabel(projectId, "backend");
+    await createLabel(projectId, "frontend", "#ef4444");
     const story = await createStory(projectId, ["backend", "frontend"]);
 
-    const backendResponse = await fetchWithAuth(labelsApiPath(projectId), {
-      method: "POST",
+    const response = await fetchWithAuth(labelApiPath(projectId, backendId), {
+      method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: "backend", color: "#3b82f6" }),
+      body: JSON.stringify({ name: "frontend" }),
     });
-    const backendLabel = (await backendResponse.json()) as {
-      label: { id: string };
-    };
-
-    await fetchWithAuth(labelsApiPath(projectId), {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: "frontend", color: "#ef4444" }),
-    });
-
-    const response = await fetchWithAuth(
-      labelApiPath(projectId, backendLabel.label.id),
-      {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: "frontend" }),
-      },
-    );
     expect(response.status).toBe(409);
 
-    const db = createDb(env.DB);
-    const label = await db
+    const label = await createDb(env.DB)
       .select({ name: projectLabelsTable.name })
       .from(projectLabelsTable)
-      .where(eq(projectLabelsTable.id, backendLabel.label.id))
+      .where(eq(projectLabelsTable.id, backendId))
       .get();
     expect(label?.name).toBe("backend");
-
-    const updatedStory = await db
-      .select({ labels: storiesTable.labels })
-      .from(storiesTable)
-      .where(
-        and(
-          eq(storiesTable.projectId, projectId),
-          eq(storiesTable.storyNumber, story.storyNumber),
-        ),
-      )
-      .get();
-    expect(updatedStory).not.toBeUndefined();
-    expect(JSON.parse(updatedStory?.labels ?? "[]")).toEqual([
-      "backend",
-      "frontend",
-    ]);
-  });
-
-  it("rolls back label rename when story cascade update fails", async () => {
-    const projectId = await createProject();
-
-    const createResponse = await fetchWithAuth(labelsApiPath(projectId), {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: "backend", color: "#3b82f6" }),
-    });
-    const created = (await createResponse.json()) as {
-      label: { id: string };
-    };
-
-    const story = await createStory(projectId, ["backend"]);
-    const db = createDb(env.DB);
-    await db
-      .update(storiesTable)
-      .set({ labels: "not-json" })
-      .where(
-        and(
-          eq(storiesTable.projectId, projectId),
-          eq(storiesTable.storyNumber, story.storyNumber),
-        ),
-      );
-
-    const response = await withSuppressedConsoleError(() =>
-      fetchWithAuth(labelApiPath(projectId, created.label.id), {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: "platform" }),
-      }),
-    );
-    expect(response.status).toBe(500);
-
-    const label = await db
-      .select({ name: projectLabelsTable.name })
-      .from(projectLabelsTable)
-      .where(eq(projectLabelsTable.id, created.label.id))
-      .get();
-    expect(label?.name).toBe("backend");
-
-    const unchangedStory = await db
-      .select({ labels: storiesTable.labels })
-      .from(storiesTable)
-      .where(
-        and(
-          eq(storiesTable.projectId, projectId),
-          eq(storiesTable.storyNumber, story.storyNumber),
-        ),
-      )
-      .get();
-    expect(unchangedStory?.labels).toBe("not-json");
-  });
-
-  it("rolls back label delete when story cascade update fails", async () => {
-    const projectId = await createProject();
-
-    const createResponse = await fetchWithAuth(labelsApiPath(projectId), {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: "backend", color: "#3b82f6" }),
-    });
-    const created = (await createResponse.json()) as {
-      label: { id: string };
-    };
-
-    const story = await createStory(projectId, ["backend"]);
-    const db = createDb(env.DB);
-    await db
-      .update(storiesTable)
-      .set({ labels: "not-json" })
-      .where(
-        and(
-          eq(storiesTable.projectId, projectId),
-          eq(storiesTable.storyNumber, story.storyNumber),
-        ),
-      );
-
-    const response = await withSuppressedConsoleError(() =>
-      fetchWithAuth(labelApiPath(projectId, created.label.id), {
-        method: "DELETE",
-      }),
-    );
-    expect(response.status).toBe(500);
-
-    const label = await db
-      .select({ id: projectLabelsTable.id })
-      .from(projectLabelsTable)
-      .where(eq(projectLabelsTable.id, created.label.id))
-      .get();
-    expect(label?.id).toBe(created.label.id);
+    const stored = await getStory(projectId, story.storyNumber);
+    expect(stored.labels).toEqual(["backend", "frontend"]);
   });
 
   it("keeps story update API behavior after label cascade changes", async () => {

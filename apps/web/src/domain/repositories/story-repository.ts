@@ -20,6 +20,8 @@ export type CreateStoryInput = {
   type: StoryType;
   status: StoryStatus;
   storyPoint: StoryPoint | null;
+  labelIds: string[];
+  /** Temporary name-based path, removed with story #381. Names missing from the project are created as labels. */
   labels: string[];
   epicId: string | null;
   isIcebox: boolean;
@@ -38,7 +40,15 @@ export type UpdateStoryInput = {
   /** The status the transition was validated against; the write fails if the stored status differs. */
   expectedStatus?: StoryStatus;
   storyPoint?: StoryPoint | null;
+  /** Replaces the whole label set. */
+  labelIds?: string[];
+  /** Applied atomically so concurrent edits do not remove each other's labels. */
+  addLabelIds?: string[];
+  removeLabelIds?: string[];
+  /** Temporary name-based path, removed with story #381. Replaces the whole label set. */
   labels?: string[];
+  /** Temporary name-based path, removed with story #381. */
+  addLabelNames?: string[];
   epicId?: string | null;
   isIcebox?: boolean;
   /** Put the story at the top of the position order in the same write that takes it out of the Icebox. */
@@ -110,6 +120,8 @@ export const STORY_REQUESTER_NOT_PROJECT_MEMBER_ERROR =
 export const STORY_STATUS_CHANGED_CONCURRENTLY_ERROR =
   "STORY_STATUS_CHANGED_CONCURRENTLY_ERROR" as const;
 export const STORY_ARCHIVED_ERROR = "STORY_ARCHIVED_ERROR" as const;
+export const STORY_LABEL_NOT_IN_PROJECT_ERROR =
+  "STORY_LABEL_NOT_IN_PROJECT_ERROR" as const;
 export const STORY_EPIC_NOT_FOUND_ERROR = "STORY_EPIC_NOT_FOUND_ERROR" as const;
 
 export type StoryRepositoryError =
@@ -119,6 +131,7 @@ export type StoryRepositoryError =
   | typeof STORY_EPIC_NOT_FOUND_ERROR
   | typeof STORY_STATUS_CHANGED_CONCURRENTLY_ERROR
   | typeof STORY_ARCHIVED_ERROR
+  | typeof STORY_LABEL_NOT_IN_PROJECT_ERROR
   | typeof INVALID_STORY_IS_ICEBOX_ERROR;
 
 export interface StoryRepository {

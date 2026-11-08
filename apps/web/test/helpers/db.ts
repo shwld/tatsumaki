@@ -11,6 +11,7 @@ import {
   storiesTable,
   storyPriorityHistoryTable,
 } from "../../src/infrastructure/db/schema/stories";
+import { storyLabelsTable } from "../../src/infrastructure/db/schema/story-labels";
 import { storyBlockersTable } from "../../src/infrastructure/db/schema/story-blockers";
 import { iterationDailySnapshotsTable } from "../../src/infrastructure/db/schema/iteration-daily-snapshots";
 import { iterationsTable } from "../../src/infrastructure/db/schema/iterations";
@@ -42,6 +43,7 @@ export async function resetDatabase(db: D1Database): Promise<void> {
   await client.delete(projectInvitationsTable);
   await client.delete(projectMembersTable);
   await client.delete(projectApiKeysTable);
+  await client.delete(storyLabelsTable);
   await client.delete(projectLabelsTable);
   await client.delete(storyTimelineEntriesTable);
   await client.delete(storyBlockersTable);

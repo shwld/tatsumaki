@@ -25,6 +25,7 @@ import {
   INVALID_STORY_TITLE_ERROR,
   INVALID_STORY_TYPE_ERROR,
   normalizeStoryDescription,
+  normalizeStoryLabelIds,
   normalizeStoryLabels,
   normalizeStoryPoint,
   normalizeStoryOwnerIds,
@@ -68,7 +69,8 @@ export async function createStory(
     type: string;
     status: string;
     storyPoint: number | null;
-    labels: string[];
+    labels?: string[];
+    labelIds?: string[];
     epicId?: string | null;
     isIcebox?: boolean;
     ownerIds?: string[];
@@ -103,9 +105,14 @@ export async function createStory(
     return err(INVALID_STORY_INITIAL_STATUS_ERROR);
   }
 
-  const labelsResult = normalizeStoryLabels(input.labels);
+  const labelsResult = normalizeStoryLabels(input.labels ?? []);
   if (labelsResult.isErr()) {
     return err(labelsResult.error);
+  }
+
+  const labelIdsResult = normalizeStoryLabelIds(input.labelIds ?? []);
+  if (labelIdsResult.isErr()) {
+    return err(labelIdsResult.error);
   }
 
   const storyPointResult = normalizeStoryPoint(
@@ -150,6 +157,7 @@ export async function createStory(
     status: statusResult.value,
     storyPoint: storyPointResult.value,
     labels: labelsResult.value,
+    labelIds: labelIdsResult.value,
     epicId: epicIdResult.value,
     isIcebox: isIceboxResult.value ?? false,
     ownerIds: ownerIdsResult.value,

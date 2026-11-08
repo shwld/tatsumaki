@@ -10,6 +10,7 @@ export type CreateStoryRequest = {
   status: string;
   storyPoint: number | null;
   labels: string[];
+  labelIds: string[];
   epicId: string | null;
   panel: "icebox" | "backlog" | "current";
   isIcebox: boolean;
@@ -25,6 +26,9 @@ export type UpdateStoryRequest = {
   status?: string;
   storyPoint?: number | null;
   labels?: string[];
+  labelIds?: string[];
+  addLabelIds?: string[];
+  removeLabelIds?: string[];
   epicId?: string | null;
   isIcebox?: boolean;
   ownerIds?: string[];
@@ -50,6 +54,21 @@ export type BulkAddStoryLabelsRequest = {
   storyIds: string[];
   labels: string[];
 };
+
+const LABEL_ID_FIELDS = ["labelIds", "addLabelIds", "removeLabelIds"] as const;
+
+function invalidLabelIdField(body: Record<string, unknown>): string | null {
+  for (const field of LABEL_ID_FIELDS) {
+    const value = body[field];
+    if (
+      value !== undefined &&
+      (!Array.isArray(value) || value.some((id) => typeof id !== "string"))
+    ) {
+      return `${field} must be an array of strings`;
+    }
+  }
+  return null;
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -104,6 +123,11 @@ export function parseCreateStoryRequest(
       }))
   ) {
     return { ok: false, message: "Story labels must be an array of strings" };
+  }
+
+  const invalidLabelIds = invalidLabelIdField(body);
+  if (invalidLabelIds) {
+    return { ok: false, message: invalidLabelIds };
   }
 
   if (
@@ -180,6 +204,7 @@ export function parseCreateStoryRequest(
           ? body.storyPoint
           : null,
       labels: Array.isArray(body.labels) ? (body.labels as string[]) : [],
+      labelIds: Array.isArray(body.labelIds) ? (body.labelIds as string[]) : [],
       epicId:
         typeof body.epicId === "string" || body.epicId === null
           ? body.epicId
@@ -244,6 +269,11 @@ export function parseUpdateStoryRequest(
     return { ok: false, message: "Story labels must be an array of strings" };
   }
 
+  const invalidLabelIds = invalidLabelIdField(body);
+  if (invalidLabelIds) {
+    return { ok: false, message: invalidLabelIds };
+  }
+
   if (
     body.epicId !== undefined &&
     body.epicId !== null &&
@@ -299,6 +329,15 @@ export function parseUpdateStoryRequest(
         ? { storyPoint: body.storyPoint as number | null }
         : {}),
       ...(body.labels !== undefined ? { labels: body.labels as string[] } : {}),
+      ...(body.labelIds !== undefined
+        ? { labelIds: body.labelIds as string[] }
+        : {}),
+      ...(body.addLabelIds !== undefined
+        ? { addLabelIds: body.addLabelIds as string[] }
+        : {}),
+      ...(body.removeLabelIds !== undefined
+        ? { removeLabelIds: body.removeLabelIds as string[] }
+        : {}),
       ...(body.epicId !== undefined
         ? { epicId: body.epicId as string | null }
         : {}),

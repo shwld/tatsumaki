@@ -27,90 +27,11 @@ function toEntity(row: typeof projectLabelsTable.$inferSelect): ProjectLabel {
   };
 }
 
-type D1PreparedStatementLike = {
-  bind(...values: unknown[]): D1PreparedStatementLike;
-};
-
-type D1BatchClientLike = {
-  prepare(query: string): D1PreparedStatementLike;
-  batch(statements: D1PreparedStatementLike[]): Promise<unknown>;
-};
-
 export class D1ProjectLabelRepository implements ProjectLabelRepository {
   private db: DbClient;
-  private d1: D1BatchClientLike;
 
   constructor(d1: D1Database) {
-    this.d1 = d1 as unknown as D1BatchClientLike;
     this.db = createDb(d1);
-  }
-
-  private buildRenameCascadeStatement(
-    projectId: string,
-    previousName: string,
-    nextName: string,
-  ) {
-    return this.d1
-      .prepare(
-        `update stories
-       set labels = (
-         with mapped as (
-           select
-             cast(json_each.key as integer) as idx,
-             case
-               when cast(json_each.value as text) = ?2 then ?3
-               else cast(json_each.value as text)
-             end as value
-           from json_each(stories.labels)
-         ),
-         deduped as (
-           select
-             idx,
-             value,
-             row_number() over (partition by value order by idx) as rn
-           from mapped
-         )
-         select coalesce(json_group_array(value), json('[]'))
-         from (
-           select value
-           from deduped
-           where rn = 1
-           order by idx
-         )
-       ),
-       updated_at = current_timestamp
-       where stories.project_id = ?1
-         and exists (
-           select 1
-           from json_each(stories.labels)
-           where cast(json_each.value as text) = ?2
-         )`,
-      )
-      .bind(projectId, previousName, nextName);
-  }
-
-  private buildDeleteCascadeStatement(projectId: string, removedName: string) {
-    return this.d1
-      .prepare(
-        `update stories
-       set labels = (
-         select coalesce(json_group_array(value), json('[]'))
-         from (
-           select cast(json_each.value as text) as value
-           from json_each(stories.labels)
-           where cast(json_each.value as text) <> ?2
-           order by cast(json_each.key as integer)
-         )
-       ),
-       updated_at = current_timestamp
-       where stories.project_id = ?1
-         and exists (
-           select 1
-           from json_each(stories.labels)
-           where cast(json_each.value as text) = ?2
-         )`,
-      )
-      .bind(projectId, removedName);
   }
 
   async create(
@@ -222,34 +143,19 @@ export class D1ProjectLabelRepository implements ProjectLabelRepository {
       }
     }
 
-    const nextName = input.name ?? existing.name;
-    const previousName = existing.name;
-    const statements = [
-      this.d1
-        .prepare(
-          `update project_labels
-           set name = ?1, color = ?2, updated_at = ?3
-           where id = ?4 and project_id = ?5`,
-        )
-        .bind(
-          nextName,
-          updates.color ?? existing.color,
-          updates.updatedAt,
-          input.id,
-          input.projectId,
-        ),
-    ];
-    if (nextName !== previousName) {
-      statements.push(
-        this.buildRenameCascadeStatement(
-          input.projectId,
-          previousName,
-          nextName,
+    await this.db
+      .update(projectLabelsTable)
+      .set({
+        name: input.name ?? existing.name,
+        color: updates.color ?? existing.color,
+        updatedAt: updates.updatedAt,
+      })
+      .where(
+        and(
+          eq(projectLabelsTable.id, input.id),
+          eq(projectLabelsTable.projectId, input.projectId),
         ),
       );
-    }
-
-    await this.d1.batch(statements);
 
     const row = await this.db
       .select()
@@ -268,29 +174,17 @@ export class D1ProjectLabelRepository implements ProjectLabelRepository {
     projectId: string,
     id: string,
   ): Promise<Result<boolean, ProjectLabelRepositoryError>> {
-    const existing = await this.db
-      .select({ name: projectLabelsTable.name })
-      .from(projectLabelsTable)
+    const deleted = await this.db
+      .delete(projectLabelsTable)
       .where(
         and(
           eq(projectLabelsTable.id, id),
           eq(projectLabelsTable.projectId, projectId),
         ),
       )
-      .get();
+      .returning({ id: projectLabelsTable.id });
 
-    if (!existing) {
-      return ok(false);
-    }
-
-    await this.d1.batch([
-      this.d1
-        .prepare(`delete from project_labels where id = ?1 and project_id = ?2`)
-        .bind(id, projectId),
-      this.buildDeleteCascadeStatement(projectId, existing.name),
-    ]);
-
-    return ok(true);
+    return ok(deleted.length > 0);
   }
 
   async list(

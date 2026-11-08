@@ -419,6 +419,7 @@ storiesRoute.post("/projects/:projectId/stories", async (c) => {
       storyPoint: parsed.value.storyPoint,
       allowedStoryPoints,
       labels: parsed.value.labels,
+      labelIds: parsed.value.labelIds,
       epicId: parsed.value.epicId,
       ownerIds: parsed.value.ownerIds,
       requesterId: parsed.value.requesterId,
