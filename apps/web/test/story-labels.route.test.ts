@@ -177,6 +177,25 @@ describe("story labels by ID", () => {
     expect(stories.map((s) => s.title)).toEqual(["with a"]);
   });
 
+  it("handles more labels than the D1 bind limit", async () => {
+    const projectId = await createProject();
+    const names = Array.from({ length: 150 }, (_, i) => `label-${i}`);
+
+    const { status, story } = await createStory(projectId, { labels: names });
+    expect(status).toBe(201);
+    expect(story.labelIds).toHaveLength(150);
+
+    const cleared = await patchStory(projectId, story.storyNumber, {
+      labelIds: [],
+    });
+    expect(cleared.story.labelIds).toEqual([]);
+
+    const readded = await patchStory(projectId, story.storyNumber, {
+      addLabelIds: story.labelIds.slice(0, 120),
+    });
+    expect(readded.story.labelIds).toHaveLength(120);
+  });
+
   it("rejects non-string labelIds", async () => {
     const projectId = await createProject();
     const res = await api(`/projects/${projectId}/stories`, {

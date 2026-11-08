@@ -177,6 +177,17 @@ function toStorySummary(
   };
 }
 
+function storyUnchangedGuard(
+  storyId: string,
+  current: { status: string; isIcebox: number; iterationId: string | null },
+): SQL {
+  return sql`exists (select 1 from ${storiesTable} as target where target.id = ${storyId} and target.status = ${current.status} and target.is_icebox = ${current.isIcebox} and ${
+    current.iterationId === null
+      ? sql`target.iteration_id is null`
+      : sql`target.iteration_id = ${current.iterationId}`
+  } and target.archived_at is null)`;
+}
+
 function storyHasAnyLabelNamed(names: string[]): SQL {
   return sql`exists (
     select 1
@@ -520,6 +531,7 @@ export class D1StoryRepository implements StoryRepository {
   }
 
   // Label edits are idempotent inserts and deletes keyed by (story, label), so concurrent edits never remove labels they did not name.
+  // IDs and names are bound as one JSON array each so the D1 bind limit does not depend on how many labels a request carries.
   private buildLabelStatements(
     projectId: string,
     storyId: string,
@@ -527,101 +539,60 @@ export class D1StoryRepository implements StoryRepository {
       UpdateStoryInput,
       "labelIds" | "addLabelIds" | "removeLabelIds" | "labels" | "addLabelNames"
     >,
+    guard: SQL = sql`1 = 1`,
   ): BatchItem<"sqlite">[] {
+    const json = (values: string[]) => JSON.stringify([...new Set(values)]);
     const statements: BatchItem<"sqlite">[] = [];
-    const names = [
-      ...new Set([...(input.labels ?? []), ...(input.addLabelNames ?? [])]),
-    ];
+
+    const names = [...(input.labels ?? []), ...(input.addLabelNames ?? [])];
     if (names.length > 0) {
       statements.push(
         this.db
           .insert(projectLabelsTable)
-          .values(
-            names.map((name) => ({
-              id: ulid(),
-              projectId,
-              name,
-            })),
+          .select(
+            sql`select lower(hex(randomblob(16))), ${projectId}, value, '#6b7280', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+              from json_each(${json(names)})
+              where ${guard}`,
           )
           .onConflictDoNothing(),
       );
     }
 
-    const wantedLabelIds = (
-      ids: string[] | undefined,
-      byName: string[] | undefined,
-    ) => {
-      const conditions: SQL[] = [];
-      if (ids && ids.length > 0)
-        conditions.push(inArray(projectLabelsTable.id, ids));
-      if (byName && byName.length > 0)
-        conditions.push(inArray(projectLabelsTable.name, byName));
-      const matched = or(...conditions);
-      return this.db
-        .select({ id: projectLabelsTable.id })
-        .from(projectLabelsTable)
-        .where(
-          matched
-            ? and(eq(projectLabelsTable.projectId, projectId), matched)
-            : sql`0 = 1`,
-        );
-    };
+    const matching = (ids: string[], byName: string[]) =>
+      sql`select id from project_labels
+        where project_id = ${projectId}
+          and (id in (select value from json_each(${json(ids)}))
+            or name in (select value from json_each(${json(byName)})))`;
 
-    const replacesAll =
-      input.labelIds !== undefined || input.labels !== undefined;
-    if (replacesAll) {
-      const keep = wantedLabelIds(input.labelIds, input.labels);
+    if (input.labelIds !== undefined || input.labels !== undefined) {
       statements.push(
-        this.db
-          .delete(storyLabelsTable)
-          .where(
-            and(
-              eq(storyLabelsTable.storyId, storyId),
-              sql`${storyLabelsTable.labelId} not in (${keep})`,
-            ),
-          ),
+        this.db.delete(storyLabelsTable).where(
+          sql`${storyLabelsTable.storyId} = ${storyId}
+              and ${storyLabelsTable.labelId} not in (${matching(input.labelIds ?? [], input.labels ?? [])})
+              and ${guard}`,
+        ),
       );
     }
 
     if (input.removeLabelIds && input.removeLabelIds.length > 0) {
       statements.push(
-        this.db
-          .delete(storyLabelsTable)
-          .where(
-            and(
-              eq(storyLabelsTable.storyId, storyId),
-              inArray(storyLabelsTable.labelId, input.removeLabelIds),
-            ),
-          ),
+        this.db.delete(storyLabelsTable).where(
+          sql`${storyLabelsTable.storyId} = ${storyId}
+              and ${storyLabelsTable.labelId} in (select value from json_each(${json(input.removeLabelIds)}))
+              and ${guard}`,
+        ),
       );
     }
 
     const addIds = [...(input.labelIds ?? []), ...(input.addLabelIds ?? [])];
-    const addNames = [...(input.labels ?? []), ...(input.addLabelNames ?? [])];
-    if (addIds.length > 0 || addNames.length > 0) {
-      const conditions: SQL[] = [];
-      if (addIds.length > 0)
-        conditions.push(inArray(projectLabelsTable.id, addIds));
-      if (addNames.length > 0)
-        conditions.push(inArray(projectLabelsTable.name, addNames));
+    if (addIds.length > 0 || names.length > 0) {
       statements.push(
         this.db
           .insert(storyLabelsTable)
           .select(
-            this.db
-              .select({
-                projectId: sql<string>`${projectId}`.as("project_id"),
-                storyId: sql<string>`${storyId}`.as("story_id"),
-                labelId: projectLabelsTable.id,
-                createdAt: sql<string>`CURRENT_TIMESTAMP`.as("created_at"),
-              })
-              .from(projectLabelsTable)
-              .where(
-                and(
-                  eq(projectLabelsTable.projectId, projectId),
-                  or(...conditions),
-                ),
-              ),
+            sql`select ${projectId}, ${storyId}, id, CURRENT_TIMESTAMP
+              from (${matching(addIds, names)})
+              where ${guard}`,
           )
           .onConflictDoNothing(),
       );
@@ -859,11 +830,7 @@ export class D1StoryRepository implements StoryRepository {
     ownerIds: string[],
   ) {
     const wantedOwnerIds = sql`select value from json_each(${JSON.stringify([...new Set(ownerIds)])})`;
-    const storyUnchanged = sql`exists (select 1 from ${storiesTable} as target where target.id = ${storyId} and target.status = ${current.status} and target.is_icebox = ${current.isIcebox} and ${
-      current.iterationId === null
-        ? sql`target.iteration_id is null`
-        : sql`target.iteration_id = ${current.iterationId}`
-    } and target.archived_at is null)`;
+    const storyUnchanged = storyUnchangedGuard(storyId, current);
     const everyOwnerIsCurrentOrMember = sql`not exists (select 1 from (${wantedOwnerIds}) as wanted where wanted.value not in (select ${storyOwnersTable.userId} from ${storyOwnersTable} where ${storyOwnersTable.storyId} = ${storyId}) and wanted.value not in (select ${projectMembersTable.userId} from ${projectMembersTable} where ${projectMembersTable.projectId} = ${projectId}))`;
     const guard = sql`${storyUnchanged} and ${everyOwnerIsCurrentOrMember}`;
 
@@ -1318,6 +1285,7 @@ export class D1StoryRepository implements StoryRepository {
       input.projectId,
       input.id,
       input,
+      storyUnchangedGuard(input.id, current),
     );
     const preStatements: BatchItem<"sqlite">[] = [
       ...labelStatements,
