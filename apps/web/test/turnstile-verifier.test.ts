@@ -12,9 +12,28 @@ const respond = (body: unknown, status = 200) =>
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe("CloudflareTurnstileVerifier", () => {
+  it("calls the global fetch without the verifier as its receiver", async () => {
+    vi.stubGlobal("fetch", function (this: unknown) {
+      if (this !== undefined && this !== globalThis) {
+        throw new TypeError("Illegal invocation");
+      }
+      return Promise.resolve(
+        Response.json({
+          success: true,
+          hostname: "app.example",
+          action: "onboarding",
+        }),
+      );
+    });
+    const verifier = new CloudflareTurnstileVerifier("secret");
+
+    await expect(verifier.verify(input)).resolves.toBe(true);
+  });
+
   it("accepts a successful verification for the same hostname and action", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const verifier = new CloudflareTurnstileVerifier(
