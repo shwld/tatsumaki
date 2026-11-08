@@ -20,52 +20,7 @@ describe("ProjectMembersScreen", () => {
     vi.unstubAllGlobals();
   });
 
-  it("creates an invitation by email", async () => {
-    const fetchMock = vi.mocked(fetch);
-    fetchMock.mockImplementation(async (input, init) => {
-      const url = typeof input === "string" ? input : input.toString();
-
-      if (!init?.method) {
-        return buildJsonResponse({
-          currentMemberRole: "owner",
-          members: [
-            {
-              projectId: "project-1",
-              userId: "github|owner",
-              role: "owner",
-              createdAt: "2026-01-01T00:00:00.000Z",
-              updatedAt: "2026-01-01T00:00:00.000Z",
-            },
-          ],
-          invitations: [],
-        });
-      }
-
-      if (init.method === "POST" && url.endsWith("/invitations")) {
-        return buildJsonResponse(
-          {
-            invitation: {
-              id: "inv-1",
-              projectId: "project-1",
-              inviterUserId: "github|owner",
-              targetUserId: null,
-              targetEmail: "new-user@example.com",
-              role: "member",
-              status: "pending",
-              expiresAt: "2026-01-08T00:00:00.000Z",
-              acceptedByUserId: null,
-              acceptedAt: null,
-              createdAt: "2026-01-01T00:00:00.000Z",
-              updatedAt: "2026-01-01T00:00:00.000Z",
-            },
-          },
-          201,
-        );
-      }
-
-      return buildJsonResponse({ error: "unexpected" }, 500);
-    });
-
+  const renderScreen = () =>
     render(
       <MemoryRouter initialEntries={["/projects/project-1/members"]}>
         <AuthErrorProvider>
@@ -79,215 +34,110 @@ describe("ProjectMembersScreen", () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByText("メンバーを招待")).toBeInTheDocument();
-    });
-
-    fireEvent.change(screen.getByLabelText("メールアドレス"), {
-      target: { value: "new-user@example.com" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "招待を送信" }));
-
-    await waitFor(() => {
-      expect(screen.getByText(/new-user@example\.com/)).toBeInTheDocument();
-    });
-
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/projects/project-1/invitations",
-      expect.objectContaining({
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          email: "new-user@example.com",
-          role: "member",
-        }),
-      }),
-    );
-  });
-
-  it("shows validation error when both email and user ID are provided", async () => {
+  it("shows display names and readable roles instead of user IDs, and links to invitations", async () => {
     vi.mocked(fetch).mockResolvedValue(
       buildJsonResponse({
         currentMemberRole: "owner",
-        members: [],
+        members: [
+          {
+            projectId: "project-1",
+            userId: "github|alice",
+            role: "owner",
+            displayName: "Alice",
+            avatarUrl: null,
+            gravatarUrl: null,
+            createdAt: "2026-01-01T00:00:00.000Z",
+            updatedAt: "2026-01-01T00:00:00.000Z",
+          },
+          {
+            projectId: "project-1",
+            userId: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            role: "viewer",
+            displayName: null,
+            createdAt: "2026-01-01T00:00:00.000Z",
+            updatedAt: "2026-01-01T00:00:00.000Z",
+          },
+        ],
         invitations: [],
       }),
     );
 
-    render(
-      <MemoryRouter initialEntries={["/projects/project-1/members"]}>
-        <AuthErrorProvider>
-          <Routes>
-            <Route
-              path="/projects/:projectId/members"
-              element={<ProjectMembersScreen />}
-            />
-          </Routes>
-        </AuthErrorProvider>
-      </MemoryRouter>,
+    renderScreen();
+
+    expect(await screen.findByText("Alice")).toBeInTheDocument();
+    expect(screen.getByText("不明なユーザー")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("オーナー")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("閲覧者")).toBeInTheDocument();
+    expect(screen.queryByText(/github\|alice/)).toBeNull();
+    expect(screen.getByText("01ARZ3NDEKTSV4RRFFQ69G5FAV")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "招待を管理" })).toHaveAttribute(
+      "href",
+      "/projects/project-1/members/invitations",
     );
-
-    await waitFor(() => {
-      expect(screen.getByText("メンバーを招待")).toBeInTheDocument();
-    });
-
-    fireEvent.change(screen.getByLabelText("メールアドレス"), {
-      target: { value: "new-user@example.com" },
-    });
-    fireEvent.change(screen.getByLabelText("ユーザーID"), {
-      target: { value: "github|new-user" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "招待を送信" }));
-
-    expect(
-      screen.getByText(
-        "メールアドレスまたはユーザーIDのどちらか一方を入力してください",
-      ),
-    ).toBeInTheDocument();
+    expect(screen.queryByText("メンバーを招待")).toBeNull();
   });
 
-  it("creates, copies, and revokes a one-time invitation link", async () => {
-    const fetchMock = vi.mocked(fetch);
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: { writeText },
-    });
-    fetchMock.mockImplementation(async (input, init) => {
-      const url = typeof input === "string" ? input : input.toString();
-      if (!init?.method) {
-        return buildJsonResponse({
-          currentMemberRole: "owner",
-          members: [],
-          invitations: [],
-        });
-      }
-      if (init.method === "POST" && url.endsWith("/invitation-links")) {
-        return buildJsonResponse(
+  it("disables role management for non-owner", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      buildJsonResponse({
+        currentMemberRole: "member",
+        members: [
           {
-            invitation: {
-              id: "link-1",
-              projectId: "project-1",
-              inviterUserId: "github|owner",
-              targetUserId: null,
-              targetEmail: null,
-              invitationType: "single_use",
-              role: "member",
-              status: "pending",
-              expiresAt: "2026-01-08T00:00:00.000Z",
-              acceptedByUserId: null,
-              acceptedAt: null,
-              createdAt: "2026-01-01T00:00:00.000Z",
-              updatedAt: "2026-01-01T00:00:00.000Z",
-            },
-            url: "https://example.com/invite#secret-token",
+            projectId: "project-1",
+            userId: "github|owner",
+            role: "owner",
+            displayName: "Owner",
+            createdAt: "2026-01-01T00:00:00.000Z",
+            updatedAt: "2026-01-01T00:00:00.000Z",
           },
-          201,
-        );
-      }
-      if (init.method === "DELETE" && url.endsWith("/link-1")) {
-        return buildJsonResponse({ invitation: { status: "cancelled" } });
-      }
-      return buildJsonResponse({ error: "unexpected" }, 500);
-    });
-
-    render(
-      <MemoryRouter initialEntries={["/projects/project-1/members"]}>
-        <AuthErrorProvider>
-          <Routes>
-            <Route
-              path="/projects/:projectId/members"
-              element={<ProjectMembersScreen />}
-            />
-          </Routes>
-        </AuthErrorProvider>
-      </MemoryRouter>,
-    );
-
-    fireEvent.click(
-      await screen.findByRole("button", {
-        name: "1回限りの招待リンクを作成",
+        ],
+        invitations: [],
       }),
     );
-    const linkInput = await screen.findByLabelText("作成した招待リンク");
-    expect(linkInput).toHaveValue("https://example.com/invite#secret-token");
 
-    fireEvent.click(screen.getByRole("button", { name: "コピー" }));
-    expect(writeText).toHaveBeenCalledWith(
-      "https://example.com/invite#secret-token",
-    );
+    renderScreen();
 
-    fireEvent.click(screen.getByRole("button", { name: "リンクを無効化" }));
-    await waitFor(() => {
-      expect(
-        screen.queryByRole("button", { name: "リンクを無効化" }),
-      ).toBeNull();
-    });
+    expect(await screen.findByDisplayValue("オーナー")).toBeDisabled();
   });
 
-  it("disables role management for non-owner and shows permission guidance", async () => {
-    const fetchMock = vi.mocked(fetch);
-    fetchMock.mockImplementation(async (_input, init) => {
-      if (!init?.method) {
+  it("updates a member role and keeps the profile", async () => {
+    vi.mocked(fetch).mockImplementation(async (_input, init) => {
+      if (init?.method === "PATCH") {
         return buildJsonResponse({
-          currentMemberRole: "member",
-          members: [
-            {
-              projectId: "project-1",
-              userId: "github|owner",
-              role: "owner",
-              createdAt: "2026-01-01T00:00:00.000Z",
-              updatedAt: "2026-01-01T00:00:00.000Z",
-            },
-          ],
-          invitations: [],
+          member: {
+            projectId: "project-1",
+            userId: "github|bob",
+            role: "viewer",
+            createdAt: "2026-01-01T00:00:00.000Z",
+            updatedAt: "2026-01-02T00:00:00.000Z",
+          },
         });
       }
-
-      if (init.method === "POST") {
-        return buildJsonResponse(
+      return buildJsonResponse({
+        currentMemberRole: "owner",
+        members: [
           {
-            error:
-              "Only project owners can invite members. Ask an owner to send this invitation.",
+            projectId: "project-1",
+            userId: "github|bob",
+            role: "member",
+            displayName: "Bob",
+            createdAt: "2026-01-01T00:00:00.000Z",
+            updatedAt: "2026-01-01T00:00:00.000Z",
           },
-          403,
-        );
-      }
-
-      return buildJsonResponse({ error: "unexpected" }, 500);
+        ],
+        invitations: [],
+      });
     });
 
-    render(
-      <MemoryRouter initialEntries={["/projects/project-1/members"]}>
-        <AuthErrorProvider>
-          <Routes>
-            <Route
-              path="/projects/:projectId/members"
-              element={<ProjectMembersScreen />}
-            />
-          </Routes>
-        </AuthErrorProvider>
-      </MemoryRouter>,
-    );
+    renderScreen();
+
+    fireEvent.change(await screen.findByDisplayValue("メンバー"), {
+      target: { value: "viewer" },
+    });
 
     await waitFor(() => {
-      expect(screen.getByText("メンバー")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("閲覧者")).toBeInTheDocument();
     });
-
-    const memberRoleSelect = screen.getByDisplayValue("owner");
-    expect(memberRoleSelect).toBeDisabled();
-
-    fireEvent.change(screen.getByLabelText("メールアドレス"), {
-      target: { value: "blocked@example.com" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "招待を送信" }));
-
-    await waitFor(() => {
-      expect(
-        screen.getByText(
-          "Only project owners can invite members. Ask an owner to send this invitation.",
-        ),
-      ).toBeInTheDocument();
-    });
+    expect(screen.getByText("Bob")).toBeInTheDocument();
   });
 });

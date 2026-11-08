@@ -76,6 +76,10 @@ export type ProjectMember = {
   updatedAt: string;
 };
 
+/** メンバー一覧 API の応答。プロフィール未解決のとき displayName は null。 */
+export type ProjectMemberEntry = ProjectMember &
+  Pick<ProjectMemberProfile, "displayName" | "avatarUrl" | "gravatarUrl">;
+
 export type ProjectInvitationStatus =
   | "pending"
   | "accepted"

@@ -262,6 +262,10 @@ export function projectMembersPath(projectId: string): string {
   return `/projects/${projectId}/members`;
 }
 
+export function projectInvitationsPath(projectId: string): string {
+  return `/projects/${encodeURIComponent(projectId)}/members/invitations`;
+}
+
 export function projectApiKeysPath(projectId: string): string {
   return `/projects/${encodeURIComponent(projectId)}/api-keys`;
 }
