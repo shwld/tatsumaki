@@ -69,7 +69,7 @@ describe("ProjectMembersScreen", () => {
     expect(screen.getByDisplayValue("オーナー")).toBeInTheDocument();
     expect(screen.getByDisplayValue("閲覧者")).toBeInTheDocument();
     expect(screen.queryByText(/github\|alice/)).toBeNull();
-    expect(screen.queryByText(/01ARZ3NDEKTSV4RRFFQ69G5FAV/)).toBeNull();
+    expect(screen.getByText("01ARZ3NDEKTSV4RRFFQ69G5FAV")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "招待を管理" })).toHaveAttribute(
       "href",
       "/projects/project-1/members/invitations",

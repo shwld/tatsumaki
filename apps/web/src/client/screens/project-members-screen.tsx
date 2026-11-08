@@ -118,6 +118,9 @@ export function ProjectMembersScreen() {
                       <p className="text-sm font-medium text-gray-900">
                         <ActorLabel member={member} actorName={null} />
                       </p>
+                      {member.displayName ? null : (
+                        <p className="text-xs text-gray-500">{member.userId}</p>
+                      )}
                       <p className="text-xs text-gray-500">
                         {t("projectMembersScreen.members.joined", {
                           date: new Date(member.createdAt).toLocaleString(),
