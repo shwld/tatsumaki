@@ -9,12 +9,14 @@ import {
   EPIC_FORBIDDEN_ERROR,
   EPIC_LABEL_NOT_FOUND_ERROR,
   EPIC_NOT_FOUND_ERROR,
+  EPIC_PLANNING_OFF_ERROR,
   EPIC_REVISION_CONFLICT_ERROR,
   EPIC_REVISION_REQUIRED_ERROR,
   INVALID_EPIC_OWNER_ERROR,
   type ManageEpicError,
 } from "../../../application/usecases/manage-epics";
 import type { Epic } from "../../../domain/entities/epic";
+import type { EpicWithProgress } from "../../../domain/entities/epic-progress";
 
 export type EpicErrorResponse = {
   status: 400 | 403 | 404 | 409 | 500;
@@ -41,6 +43,13 @@ export function toEpicErrorResponse(error: ManageEpicError): EpicErrorResponse {
         status: 404,
         code: "EPIC_NOT_FOUND",
         message: "Strategy planning has never been turned on for this label",
+      };
+    case EPIC_PLANNING_OFF_ERROR:
+      return {
+        status: 404,
+        code: "EPIC_PLANNING_OFF",
+        message:
+          "Strategy planning is off for this label. Turn it on to see progress",
       };
     case EPIC_REVISION_REQUIRED_ERROR:
       return {
@@ -99,4 +108,12 @@ export function toEpicErrorResponse(error: ManageEpicError): EpicErrorResponse {
 export function toEpicResponse(epic: Epic) {
   const { __typename: _typename, ...rest } = epic;
   return rest;
+}
+
+export function toEpicProgressResponse({ epic, progress }: EpicWithProgress) {
+  return { epic: toEpicResponse(epic), progress };
+}
+
+export function currentCalendarDateUtc(): string {
+  return new Date().toISOString().slice(0, 10);
 }

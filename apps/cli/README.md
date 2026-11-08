@@ -196,6 +196,8 @@ tm label list --project <project-id>
 tm label deletion-impact --project <project-id> <label-id>
 tm epic list --project <project-id>
 tm epic get --project <project-id> <label-id>
+tm epic progress --project <project-id>                # ON epics with progress
+tm epic progress --project <project-id> <label-id>     # one epic with its stories
 tm epic enable --project <project-id> <label-id>
 tm epic update --project <project-id> <label-id> --revision 1 \
   --description "Make the first week easy" --success-criteria "80% finish setup" \

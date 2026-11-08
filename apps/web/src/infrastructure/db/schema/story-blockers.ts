@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { index, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { storiesTable } from "./stories";
 
 export const storyBlockersTable = sqliteTable(
@@ -18,6 +18,9 @@ export const storyBlockersTable = sqliteTable(
     return {
       storyBlockersUnique: uniqueIndex("story_blockers_unique").on(
         table.blockingStoryId,
+        table.blockedStoryId,
+      ),
+      blockedStoryIdx: index("idx_story_blockers_blocked_story_id").on(
         table.blockedStoryId,
       ),
     };

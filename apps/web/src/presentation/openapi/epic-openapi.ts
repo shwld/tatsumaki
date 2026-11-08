@@ -1,5 +1,6 @@
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 import { EPIC_OUTCOME_STATUSES } from "../../domain/entities/epic";
+import { EPIC_PROGRESS_STATES } from "../../domain/entities/epic-progress";
 
 const LabelParamsSchema = z.object({
   projectId: z
@@ -45,6 +46,70 @@ export const EpicSchema = z
     updatedAt: z.string(),
   })
   .openapi("Epic");
+
+const StoryCountsSchema = z
+  .object({
+    total: z.number().int(),
+    accepted: z.number().int(),
+    inProgress: z
+      .number()
+      .int()
+      .describe("Started, Finished, Delivered or Rejected, outside the Icebox"),
+    unstarted: z.number().int().describe("Unstarted, outside the Icebox"),
+    icebox: z.number().int().describe("Not accepted and in the Icebox"),
+    blocked: z
+      .number()
+      .int()
+      .describe("Not accepted and waiting on a blocker; overlaps other counts"),
+  })
+  .openapi("EpicStoryCounts");
+
+const EpicProgressSchema = z
+  .object({
+    state: z.enum(EPIC_PROGRESS_STATES),
+    storyCompletionRate: z
+      .number()
+      .nullable()
+      .describe("Accepted ÷ all stories with the label; null without stories"),
+    stories: StoryCountsSchema,
+    pointCompletionRate: z
+      .number()
+      .nullable()
+      .describe(
+        "Accepted points ÷ points of estimated features; null when none is estimated",
+      ),
+    points: z.object({
+      estimatedPoints: z.number().int(),
+      acceptedPoints: z.number().int(),
+      excludedStories: z
+        .number()
+        .int()
+        .describe(
+          "Stories outside the point basis: not features or unestimated",
+        ),
+    }),
+    overdue: z
+      .boolean()
+      .describe("The planned end has passed and a story is not accepted"),
+  })
+  .openapi("EpicProgress");
+
+const EpicWithProgressSchema = z
+  .object({ epic: EpicSchema, progress: EpicProgressSchema })
+  .openapi("EpicWithProgress");
+
+const EpicStorySchema = z
+  .object({
+    id: z.string(),
+    storyNumber: z.number().int(),
+    title: z.string(),
+    type: z.string(),
+    status: z.string(),
+    isIcebox: z.boolean(),
+    isBlocked: z.boolean(),
+    storyPoint: z.number().int().nullable(),
+  })
+  .openapi("EpicStory");
 
 const EpicResponseSchema = z
   .object({ epic: EpicSchema })
@@ -93,6 +158,24 @@ const exampleEpic: z.infer<typeof EpicSchema> = {
   revision: 1,
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
+};
+
+const exampleCounts: z.infer<typeof StoryCountsSchema> = {
+  total: 0,
+  accepted: 0,
+  inProgress: 0,
+  unstarted: 0,
+  icebox: 0,
+  blocked: 0,
+};
+
+const exampleProgress: z.infer<typeof EpicProgressSchema> = {
+  state: "no_stories",
+  storyCompletionRate: null,
+  stories: exampleCounts,
+  pointCompletionRate: null,
+  points: { estimatedPoints: 0, acceptedPoints: 0, excludedStories: 0 },
+  overdue: false,
 };
 
 const PREFIX = "/programmatic-api/v1/projects/{projectId}";
@@ -144,6 +227,67 @@ export function registerEpicOpenApi(app: OpenAPIHono) {
       },
     }),
     (c) => c.json({ epics: [exampleEpic] }),
+  );
+
+  app.openapi(
+    createRoute({
+      operationId: "listEpicProgress",
+      method: "get",
+      path: `${PREFIX}/epics/progress`,
+      request: { params: ProjectParamsSchema },
+      responses: {
+        200: {
+          description:
+            "Epics with planning on, with progress aggregated from their stories on read. total counts a story shared by several epics once",
+          content: {
+            "application/json": {
+              schema: z
+                .object({
+                  epics: z.array(EpicWithProgressSchema),
+                  total: StoryCountsSchema,
+                })
+                .openapi("EpicProgressListResponse"),
+            },
+          },
+        },
+        401: { description: "Unauthorized" },
+        403: { description: "Forbidden" },
+      },
+    }),
+    (c) => c.json({ epics: [], total: exampleCounts }),
+  );
+
+  app.openapi(
+    createRoute({
+      operationId: "getLabelEpicProgress",
+      method: "get",
+      path: `${PREFIX}/labels/{labelId}/epic/progress`,
+      request: { params: LabelParamsSchema },
+      responses: {
+        200: {
+          description:
+            "The epic with its progress and the stories carrying its label",
+          content: {
+            "application/json": {
+              schema: EpicWithProgressSchema.extend({
+                stories: z.array(EpicStorySchema),
+              }).openapi("EpicProgressDetailResponse"),
+            },
+          },
+        },
+        401: { description: "Unauthorized" },
+        403: { description: "Forbidden" },
+        404: epicError(
+          "Label not found, planning never turned on, or planning is off",
+        ),
+      },
+    }),
+    (c) =>
+      c.json({
+        epic: exampleEpic,
+        progress: exampleProgress,
+        stories: [],
+      }),
   );
 
   app.openapi(

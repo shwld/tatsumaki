@@ -4,7 +4,9 @@ import {
   type EpicDependencies,
   enableEpicPlanning,
   getEpic,
+  getEpicProgress,
   getLabelDeletionImpact,
+  listEpicProgress,
   listEpics,
   type ManageEpicError,
   updateEpicPlan,
@@ -18,7 +20,12 @@ import {
   parseEnableEpicBody,
   parseEpicPlanBody,
 } from "./request-parsers";
-import { toEpicErrorResponse, toEpicResponse } from "./responses";
+import {
+  currentCalendarDateUtc,
+  toEpicErrorResponse,
+  toEpicProgressResponse,
+  toEpicResponse,
+} from "./responses";
 
 function dependencies(
   c: Context<Env>,
@@ -68,6 +75,42 @@ export function createEpicRoutes() {
     );
     if (result.isErr()) return errorResponse(c, result.error);
     return c.json({ epics: result.value.map(toEpicResponse) });
+  });
+
+  app.get("/:projectId/epics/progress", async (c) => {
+    const projectId = c.req.param("projectId");
+    const membership = await requireProjectMembership(c, projectId);
+    if (!membership.ok) return membership.response;
+
+    const result = await listEpicProgress(
+      dependencies(c, membership.repository),
+      { projectId, today: currentCalendarDateUtc() },
+    );
+    if (result.isErr()) return errorResponse(c, result.error);
+    return c.json({
+      epics: result.value.epics.map(toEpicProgressResponse),
+      total: result.value.total,
+    });
+  });
+
+  app.get("/:projectId/labels/:labelId/epic/progress", async (c) => {
+    const projectId = c.req.param("projectId");
+    const membership = await requireProjectMembership(c, projectId);
+    if (!membership.ok) return membership.response;
+
+    const result = await getEpicProgress(
+      dependencies(c, membership.repository),
+      {
+        projectId,
+        labelId: c.req.param("labelId"),
+        today: currentCalendarDateUtc(),
+      },
+    );
+    if (result.isErr()) return errorResponse(c, result.error);
+    return c.json({
+      ...toEpicProgressResponse(result.value),
+      stories: result.value.stories,
+    });
   });
 
   app.get("/:projectId/labels/:labelId/epic", async (c) => {

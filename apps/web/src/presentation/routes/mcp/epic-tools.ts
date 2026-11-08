@@ -7,7 +7,9 @@ import {
   type EpicDependencies,
   enableEpicPlanning,
   getEpic,
+  getEpicProgress,
   getLabelDeletionImpact,
+  listEpicProgress,
   listEpics,
   type ManageEpicError,
   updateEpicPlan,
@@ -20,7 +22,12 @@ import { D1ProjectLabelRepository } from "../../../infrastructure/db/repositorie
 import { D1ProjectRepository } from "../../../infrastructure/db/repositories/d1-project-repository";
 import type { CurrentUser } from "../../middleware/access-auth";
 import { parseEpicPlanBody } from "../epics/request-parsers";
-import { toEpicErrorResponse, toEpicResponse } from "../epics/responses";
+import {
+  currentCalendarDateUtc,
+  toEpicErrorResponse,
+  toEpicProgressResponse,
+  toEpicResponse,
+} from "../epics/responses";
 import { requireProjectAccess } from "./project-access";
 
 type ToolResult = {
@@ -118,6 +125,54 @@ export function registerEpicTools(
         const result = await listEpics(deps, projectId);
         if (result.isErr()) return epicFailure(result.error);
         return text({ epics: result.value.map(toEpicResponse) });
+      }),
+  );
+
+  server.registerTool(
+    "list_epic_progress",
+    {
+      title: "List Epic Progress",
+      description:
+        "List the epics with planning on, each with progress derived from its stories: completion rate (accepted ÷ all stories with the label, Icebox included), counts by status, blocked count, supplementary point rate, state and overdue. `total` counts a story shared by several epics once.",
+      inputSchema: z.object({ projectId: projectIdField }),
+    },
+    ({ projectId }) =>
+      withMember(projectId, async () => {
+        const result = await listEpicProgress(deps, {
+          projectId,
+          today: currentCalendarDateUtc(),
+        });
+        if (result.isErr()) return epicFailure(result.error);
+        return text({
+          epics: result.value.epics.map(toEpicProgressResponse),
+          total: result.value.total,
+        });
+      }),
+  );
+
+  server.registerTool(
+    "get_label_epic_progress",
+    {
+      title: "Get Label Epic Progress",
+      description:
+        "Get one epic with planning on: its plan, progress breakdown, and the stories carrying its label.",
+      inputSchema: z.object({
+        projectId: projectIdField,
+        labelId: labelIdField,
+      }),
+    },
+    ({ projectId, labelId }) =>
+      withMember(projectId, async () => {
+        const result = await getEpicProgress(deps, {
+          projectId,
+          labelId,
+          today: currentCalendarDateUtc(),
+        });
+        if (result.isErr()) return epicFailure(result.error);
+        return text({
+          ...toEpicProgressResponse(result.value),
+          stories: result.value.stories,
+        });
       }),
   );
 
