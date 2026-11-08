@@ -191,6 +191,10 @@ describe("epic progress", () => {
       storyCompletionRate: null,
       pointCompletionRate: null,
     });
+    expect(empty.points.excludedStories).toBe(0);
+
+    await addStory([label], { archived: true });
+    expect((await progressOf(label)).progress.points.excludedStories).toBe(0);
 
     await addStory([label]);
     const unestimated = (await progressOf(label)).progress;

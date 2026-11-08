@@ -231,6 +231,7 @@ pub struct EpicWithProgress {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EpicStoryInfo {
+    pub id: String,
     pub story_number: i64,
     pub title: String,
     #[serde(rename = "type")]

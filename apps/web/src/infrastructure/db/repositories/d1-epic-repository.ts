@@ -59,7 +59,7 @@ const AGGREGATES = `
   coalesce(sum(s.status <> 'Accepted' AND ${UNRESOLVED_BLOCKER}), 0) AS blocked,
   coalesce(sum(CASE WHEN ${POINT_BASIS} THEN s.story_point ELSE 0 END), 0) AS estimated_points,
   coalesce(sum(CASE WHEN ${POINT_BASIS} AND s.status = 'Accepted' THEN s.story_point ELSE 0 END), 0) AS accepted_points,
-  coalesce(sum(NOT ${POINT_BASIS}), 0) AS excluded_stories`;
+  coalesce(sum(s.id IS NOT NULL AND NOT ${POINT_BASIS}), 0) AS excluded_stories`;
 
 type AggregateRow = {
   total: number;
