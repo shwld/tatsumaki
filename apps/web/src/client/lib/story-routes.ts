@@ -1,5 +1,5 @@
 export function projectStoriesPath(projectId: string): string {
-  return `/projects/${projectId}/stories`;
+  return `/projects/${projectId}`;
 }
 
 export function projectEpicsPath(projectId: string): string {

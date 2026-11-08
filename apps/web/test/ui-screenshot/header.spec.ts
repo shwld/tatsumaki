@@ -30,7 +30,7 @@ for (const theme of themeVariants) {
           });
         },
       );
-      await page.goto("/projects/project-1/stories");
+      await page.goto("/projects/project-1");
       const header = page.getByTestId("app-header-container");
       const panel = page.getByTestId(
         width === 390 ? "panel-scroll-Backlog" : "panel-scroll-Current",

@@ -46,7 +46,7 @@ it("shows the same menu with project name on non-stories project screens and mar
   );
   expect(screen.getByRole("link", { name: "Stories" })).toHaveAttribute(
     "href",
-    "/projects/p1/stories",
+    "/projects/p1",
   );
   expect(screen.getByRole("link", { name: "Project History" })).toHaveAttribute(
     "aria-current",
