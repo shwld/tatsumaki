@@ -104,9 +104,22 @@ for (const theme of themeVariants) {
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
-          members: [{ userId: "github|owner", role: "owner" }],
+          members: [
+            {
+              userId: "github|owner",
+              role: "owner",
+              displayName: "Alice Owner",
+              createdAt: "2026-01-01T00:00:00.000Z",
+            },
+            {
+              userId: "github|viewer",
+              role: "viewer",
+              displayName: null,
+              createdAt: "2026-01-02T00:00:00.000Z",
+            },
+          ],
           invitations: [],
-          currentUserRole: "owner",
+          currentMemberRole: "owner",
         }),
       });
     });
@@ -117,6 +130,54 @@ for (const theme of themeVariants) {
     ).toBeVisible();
     await expect(page).toHaveScreenshot(
       resolveSnapshotName("project-members.png", theme),
+    );
+  });
+
+  test(`project invitations screen (${theme})`, async ({ page }) => {
+    await setThemeMode(page, theme);
+    await mockAuthMe(page);
+    await mockStoriesList(page);
+
+    await page.route("**/api/projects/*/members", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          members: [
+            {
+              userId: "github|owner",
+              role: "owner",
+              displayName: "Alice Owner",
+              createdAt: "2026-01-01T00:00:00.000Z",
+            },
+          ],
+          invitations: [
+            {
+              id: "inv-1",
+              projectId: "project-1",
+              inviterUserId: "github|owner",
+              targetUserId: null,
+              targetEmail: "new-user@example.com",
+              role: "member",
+              status: "pending",
+              expiresAt: "2099-01-08T00:00:00.000Z",
+              acceptedByUserId: null,
+              acceptedAt: null,
+              createdAt: "2026-01-01T00:00:00.000Z",
+              updatedAt: "2026-01-01T00:00:00.000Z",
+            },
+          ],
+          currentMemberRole: "owner",
+        }),
+      });
+    });
+
+    await page.goto("/projects/project-1/members/invitations");
+    await expect(
+      page.getByRole("heading", { name: "メンバーの招待" }),
+    ).toBeVisible();
+    await expect(page).toHaveScreenshot(
+      resolveSnapshotName("project-invitations.png", theme),
     );
   });
 

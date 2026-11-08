@@ -2,22 +2,29 @@ export const projectMembersScreenJa = {
   projectMembersScreen: {
     missingProjectId: "プロジェクトIDが見つかりません",
     loadError: "プロジェクトメンバーの読み込みに失敗しました",
-    validation: {
-      singleTarget:
-        "メールアドレスまたはユーザーIDのどちらか一方を入力してください",
-    },
-    invitationError: "招待の作成に失敗しました",
     roleUpdateError: "メンバー権限の更新に失敗しました",
     breadcrumb: "メンバー",
     title: "プロジェクトメンバー",
     loading: "メンバーを読み込み中...",
+    manageInvitations: "招待を管理",
+    roles: { owner: "オーナー", member: "メンバー", viewer: "閲覧者" },
+    members: {
+      title: "メンバー",
+      empty: "メンバーはまだいません。",
+      joined: "参加日時: {{date}}",
+      roleOf: "権限",
+    },
+  },
+  projectInvitationsScreen: {
+    title: "メンバーの招待",
+    backToMembers: "メンバー一覧へ",
+    invitationError: "招待の作成に失敗しました",
+    validation: { emailRequired: "メールアドレスを入力してください" },
     invite: {
       title: "メンバーを招待",
-      description:
-        "メールアドレスまたはユーザーIDで招待し、ロールを割り当てます。",
+      description: "メールアドレスで招待し、権限を割り当てます。",
       email: "メールアドレス",
-      userId: "ユーザーID",
-      role: "ロール",
+      role: "権限",
       inviting: "招待中...",
       send: "招待を送信",
       linkDescription:
@@ -27,16 +34,17 @@ export const projectMembersScreenJa = {
       createdLink: "作成した招待リンク",
       copyLink: "コピー",
     },
-    members: {
-      title: "メンバー",
-      empty: "メンバーはまだいません。",
-      joined: "参加日時: {{date}}",
+    status: {
+      pending: "招待中",
+      accepted: "承諾済み",
+      expired: "期限切れ",
+      cancelled: "取り消し済み",
     },
-    invitations: {
+    list: {
       title: "招待",
       empty: "招待はまだありません。",
-      target: "対象: {{target}}",
-      metadata: "ロール: {{role}} / ステータス: {{status}}",
+      target: "招待先: {{target}}",
+      metadata: "権限: {{role}} / 状態: {{status}}",
       expires: "有効期限: {{date}}",
       singleUse: "1回限りのリンク",
       revoke: "リンクを無効化",
@@ -48,19 +56,28 @@ export const projectMembersScreenEn = {
   projectMembersScreen: {
     missingProjectId: "Project ID is missing",
     loadError: "Failed to load project members",
-    validation: {
-      singleTarget: "Provide either email or user ID",
-    },
-    invitationError: "Failed to create invitation",
     roleUpdateError: "Failed to update member role",
     breadcrumb: "Members",
     title: "Project members",
     loading: "Loading members...",
+    manageInvitations: "Manage invitations",
+    roles: { owner: "Owner", member: "Member", viewer: "Viewer" },
+    members: {
+      title: "Members",
+      empty: "No members yet.",
+      joined: "Joined: {{date}}",
+      roleOf: "Role",
+    },
+  },
+  projectInvitationsScreen: {
+    title: "Invite members",
+    backToMembers: "Back to members",
+    invitationError: "Failed to create invitation",
+    validation: { emailRequired: "Enter an email address" },
     invite: {
       title: "Invite member",
-      description: "Invite by email address or user ID, then assign a role.",
+      description: "Invite by email address, then assign a role.",
       email: "Email address",
-      userId: "User ID",
       role: "Role",
       inviting: "Inviting...",
       send: "Send invitation",
@@ -71,15 +88,16 @@ export const projectMembersScreenEn = {
       createdLink: "Created invitation link",
       copyLink: "Copy",
     },
-    members: {
-      title: "Members",
-      empty: "No members yet.",
-      joined: "Joined: {{date}}",
+    status: {
+      pending: "Pending",
+      accepted: "Accepted",
+      expired: "Expired",
+      cancelled: "Cancelled",
     },
-    invitations: {
+    list: {
       title: "Invitations",
       empty: "No invitations yet.",
-      target: "Target: {{target}}",
+      target: "Invitee: {{target}}",
       metadata: "Role: {{role}} / Status: {{status}}",
       expires: "Expires: {{date}}",
       singleUse: "One-time link",

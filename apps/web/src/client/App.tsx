@@ -14,6 +14,7 @@ import {
   ProjectEpicsScreen,
 } from "./screens/project-epics-screen";
 import { ProjectLabelsScreen } from "./screens/project-labels-screen";
+import { ProjectInvitationsScreen } from "./screens/project-invitations-screen";
 import { ProjectMembersScreen } from "./screens/project-members-screen";
 import { ProjectApiKeysScreen } from "./screens/project-api-keys-screen";
 import { ArtifactDetailScreen } from "./screens/artifact-detail-screen";
@@ -74,6 +75,10 @@ export function App() {
                     <Route
                       path="/projects/:projectId/members"
                       element={<ProjectMembersScreen />}
+                    />
+                    <Route
+                      path="/projects/:projectId/members/invitations"
+                      element={<ProjectInvitationsScreen />}
                     />
                     <Route
                       path="/projects/:projectId/labels"
