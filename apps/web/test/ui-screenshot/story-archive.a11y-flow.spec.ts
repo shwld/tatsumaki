@@ -44,7 +44,7 @@ test("archive a story, find it in search, and restore it", async ({ page }) => {
       },
     });
   });
-  await page.goto("/projects/project-1/stories");
+  await page.goto("/projects/project-1");
   const card = page.getByTestId(`panel-story-${story.id}`);
   await expect(card).toBeVisible();
   await page

@@ -13,7 +13,7 @@ for (const theme of themeVariants) {
     await mockAuthMe(page);
     await mockStoriesList(page);
 
-    await page.goto("/projects/project-1/stories");
+    await page.goto("/projects/project-1");
     await expect(page.getByTestId("multi-panel-layout")).toBeVisible();
     await page
       .getByRole("button", { name: "+ ストーリーを追加" })
@@ -30,7 +30,7 @@ for (const theme of themeVariants) {
     await mockAuthMe(page);
     await mockStoriesList(page);
 
-    await page.goto("/projects/project-1/stories");
+    await page.goto("/projects/project-1");
     await expect(page.getByTestId("panel-actions-toggle")).toBeVisible();
     await expect(page.getByTestId("panel-Current")).toBeVisible();
     await expect(page.getByTestId("panel-Backlog")).toBeVisible();
@@ -61,7 +61,7 @@ for (const theme of themeVariants) {
     await mockAuthMe(page);
     await mockStoriesList(page);
 
-    await page.goto("/projects/project-1/stories");
+    await page.goto("/projects/project-1");
     await expect(page.getByTestId("panel-Current")).toBeVisible();
     await expect(page.getByTestId("panel-Backlog")).toHaveCount(0);
     await expect(page).toHaveScreenshot(
@@ -77,7 +77,7 @@ for (const theme of themeVariants) {
     await mockAuthMe(page);
     await mockStoriesList(page);
 
-    await page.goto("/projects/project-1/stories");
+    await page.goto("/projects/project-1");
     await expect(page.getByTestId("panel-Current")).toBeVisible();
     await expect(page.getByTestId("panel-Backlog")).toBeVisible();
     await expect(page).toHaveScreenshot(

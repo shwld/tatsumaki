@@ -29,7 +29,7 @@ import {
 
 describe("story-routes", () => {
   it("projectStoriesPath", () => {
-    expect(projectStoriesPath("p1")).toBe("/projects/p1/stories");
+    expect(projectStoriesPath("p1")).toBe("/projects/p1");
   });
 
   it("projectVelocityDashboardPath", () => {
@@ -49,7 +49,7 @@ describe("story-routes", () => {
   });
 
   it("projectStoryHashPath", () => {
-    expect(projectStoryHashPath("p1", 123)).toBe("/projects/p1/stories#123");
+    expect(projectStoryHashPath("p1", 123)).toBe("/projects/p1#123");
   });
 
   it("parseStoryNumberFromHash", () => {

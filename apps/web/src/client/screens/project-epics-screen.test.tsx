@@ -251,10 +251,7 @@ describe("ProjectEpicDetailScreen", () => {
     expect(screen.getByText("集計対象外の story: 1 件")).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "この Label の Stories を開く" }),
-    ).toHaveAttribute(
-      "href",
-      `/projects/${PROJECT_ID}/stories?labelIds=label-growth`,
-    );
+    ).toHaveAttribute("href", `/projects/${PROJECT_ID}?labelIds=label-growth`);
   });
 
   it("explains an epic without stories", async () => {

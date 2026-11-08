@@ -22,6 +22,7 @@ import { ArtifactListScreen } from "./screens/artifact-list-screen";
 import { StoryEditScreen } from "./screens/story-edit-screen";
 import { ProjectSettingsScreen } from "./screens/project-settings-screen";
 import { ProjectVelocityScreen } from "./screens/project-velocity-screen";
+import { NavigateToProjectStories } from "./components/navigate-to-project-stories";
 import { StoryDetailScreen } from "./screens/story-detail-screen";
 import { StoryMultiPanelScreen } from "./screens/story-multi-panel-screen";
 import { AccountScreen } from "./screens/account-screen";
@@ -126,8 +127,12 @@ export function App() {
                     />
                     <Route path="/account" element={<AccountScreen />} />
                     <Route
-                      path="/projects/:projectId/stories"
+                      path="/projects/:projectId"
                       element={<StoryMultiPanelScreen />}
+                    />
+                    <Route
+                      path="/projects/:projectId/stories"
+                      element={<NavigateToProjectStories />}
                     />
                     <Route
                       path="/projects/:projectId/stories/:storyNumber"
@@ -139,7 +144,7 @@ export function App() {
                     />
                     <Route
                       path="/projects/:projectId/stories/new"
-                      element={<Navigate to=".." replace />}
+                      element={<NavigateToProjectStories />}
                     />
                     <Route
                       path="/projects/:projectId/stories/:storyNumber/edit"
@@ -148,15 +153,15 @@ export function App() {
                     {/* Legacy redirects — single-line for lint-screenshot-coverage */}
                     <Route
                       path="/projects/:projectId/stories/panels"
-                      element={<Navigate to=".." replace />}
+                      element={<NavigateToProjectStories />}
                     />
                     <Route
                       path="/projects/:projectId/stories/backlog"
-                      element={<Navigate to=".." replace />}
+                      element={<NavigateToProjectStories />}
                     />
                     <Route
                       path="/projects/:projectId/stories/board"
-                      element={<Navigate to=".." replace />}
+                      element={<NavigateToProjectStories />}
                     />
                     <Route
                       path="/my-work"

@@ -76,7 +76,13 @@ function ProjectNavContent({ projectId }: { projectId: string }) {
 
   const storiesPath = projectStoriesPath(projectId);
   const items = [
-    { to: storiesPath, label: t("projectNav.stories"), prefix: storiesPath },
+    {
+      to: storiesPath,
+      label: t("projectNav.stories"),
+      current:
+        pathname === storiesPath ||
+        pathname.startsWith(`${storiesPath}/stories`),
+    },
     {
       to: projectVelocityDashboardPath(projectId),
       label: t("projectNav.velocity"),
@@ -87,10 +93,11 @@ function ProjectNavContent({ projectId }: { projectId: string }) {
     { to: projectMembersPath(projectId), label: t("projectNav.members") },
     { to: projectSettingsPath(projectId), label: t("projectNav.settings") },
   ].map((item) => {
-    const base = item.prefix ?? item.to;
     return {
       ...item,
-      current: pathname === base || pathname.startsWith(`${base}/`),
+      current:
+        item.current ??
+        (pathname === item.to || pathname.startsWith(`${item.to}/`)),
     };
   });
   const displayName = projectName ?? t("projectNav.fallbackProjectName");
