@@ -100,6 +100,65 @@ describe("StoryMultiPanelScreen UI contracts", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
+  it("keeps the latest optimistic status while earlier saves of a rapid sequence resolve", async () => {
+    const story = BASE_STORIES[1]!;
+    const baseFetch = createStoryMultiPanelFetchMock({ stories: [story] });
+    const pending: Array<(response: Response) => void> = [];
+    const statuses: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        if (
+          String(input) === `/api/projects/${PROJECT_ID}/stories/2` &&
+          init?.method === "PATCH"
+        ) {
+          const { status } = JSON.parse(String(init.body)) as {
+            status: string;
+          };
+          statuses.push(status);
+          return new Promise<Response>((resolve) => {
+            pending.push(resolve);
+          });
+        }
+        return baseFetch(input, init);
+      }),
+    );
+    const respondWith = async (status: string) => {
+      const resolve = pending.shift()!;
+      await act(async () => {
+        resolve(
+          new Response(JSON.stringify({ story: { ...story, status } }), {
+            status: 200,
+          }),
+        );
+      });
+      await act(() => new Promise((r) => setTimeout(r, 0)));
+    };
+    renderStoryMultiPanel();
+    fireEvent.click(await screen.findByRole("button", { name: "Finish" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Deliver" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Accept" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Accept" })).toBeNull(),
+    );
+
+    await respondWith("Finished");
+    await waitFor(() => expect(statuses).toEqual(["Finished", "Delivered"]));
+    expect(screen.queryByRole("button", { name: "Deliver" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Accept" })).toBeNull();
+
+    await respondWith("Delivered");
+    await waitFor(() =>
+      expect(statuses).toEqual(["Finished", "Delivered", "Accepted"]),
+    );
+    expect(screen.queryByRole("button", { name: "Deliver" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Accept" })).toBeNull();
+
+    await respondWith("Accepted");
+    expect(screen.queryByRole("button", { name: "Accept" })).toBeNull();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("drops dependent transitions and retries from the last saved status after a failure", async () => {
     const story = BASE_STORIES[1]!;
     const baseFetch = createStoryMultiPanelFetchMock({ stories: [story] });
