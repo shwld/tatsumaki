@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { HttpStatusError, isHttpStatusError } from "../lib/api-error";
 import {
   artifactApiPath,
@@ -8,6 +8,7 @@ import {
 import { parseErrorMessage } from "../lib/parse-error-message";
 import type {
   Artifact,
+  ArtifactListItem,
   ArtifactPreviewToken,
   ArtifactVersion,
 } from "../types/artifact";
@@ -43,7 +44,7 @@ export function useArtifactList(projectId: string) {
     queryKey: artifactQueryKeys.list(projectId),
     retry: retryTransientOnly,
     queryFn: () =>
-      getJson<{ artifacts: Artifact[] }>(artifactsApiPath(projectId)),
+      getJson<{ artifacts: ArtifactListItem[] }>(artifactsApiPath(projectId)),
   });
 }
 
@@ -136,5 +137,29 @@ export function useIssuePreviewToken(
       const body = (await response.json()) as ArtifactPreviewToken;
       return { expiresAt: body.expiresAt, contentUrl: body.contentUrl };
     },
+  });
+}
+
+/** Pins are personal and the list order depends on them, so the list is refetched rather than patched. */
+export function useSetArtifactPinned(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { artifactId: string; pinned: boolean }) => {
+      const response = await fetch(
+        `${artifactApiPath(projectId, input.artifactId)}/pin`,
+        { method: input.pinned ? "PUT" : "DELETE" },
+      );
+      if (!response.ok) {
+        throw new HttpStatusError(
+          await parseErrorMessage(response),
+          response.status,
+        );
+      }
+    },
+    onSettled: () =>
+      queryClient.invalidateQueries({
+        queryKey: artifactQueryKeys.list(projectId),
+        exact: true,
+      }),
   });
 }

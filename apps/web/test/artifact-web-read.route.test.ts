@@ -277,4 +277,105 @@ describe("artifact read API for the web app (/api)", () => {
       });
     });
   });
+  describe("pinning", () => {
+    type ListBody = { artifacts: Array<{ id: string; pinned: boolean }> };
+    const listAs = async (as: Identity, archived = false) =>
+      json<ListBody>(
+        await web(
+          "GET",
+          `/${projectId}/artifacts${archived ? "?archived=true" : ""}`,
+          { as },
+        ),
+      );
+    const pinPath = (id: string) => `/${projectId}/artifacts/${id}/pin`;
+
+    it("keeps pins personal, pins first, and is idempotent", async () => {
+      const { artifactId: second } = await publishTestArtifact(
+        projectId,
+        SITE,
+        OWNER,
+      );
+      expect((await listAs(OWNER)).artifacts.map((a) => a.id)).toEqual([
+        second,
+        artifactId,
+      ]);
+
+      expect((await web("PUT", pinPath(artifactId))).status).toBe(200);
+      expect((await web("PUT", pinPath(artifactId))).status).toBe(200);
+      expect((await listAs(OWNER)).artifacts).toEqual([
+        expect.objectContaining({ id: artifactId, pinned: true }),
+        expect.objectContaining({ id: second, pinned: false }),
+      ]);
+
+      const other = await listAs(VIEWER);
+      expect(other.artifacts.every((a) => !a.pinned)).toBe(true);
+      expect(other.artifacts.map((a) => a.id)).toEqual([second, artifactId]);
+
+      expect((await web("DELETE", pinPath(artifactId))).status).toBe(200);
+      expect((await web("DELETE", pinPath(artifactId))).status).toBe(200);
+      expect((await listAs(OWNER)).artifacts.map((a) => a.pinned)).toEqual([
+        false,
+        false,
+      ]);
+    });
+
+    it("orders several pins by most recently pinned", async () => {
+      const { artifactId: second } = await publishTestArtifact(
+        projectId,
+        SITE,
+        OWNER,
+      );
+      await web("PUT", pinPath(second));
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      await web("PUT", pinPath(artifactId));
+      expect((await listAs(OWNER)).artifacts.map((a) => a.id)).toEqual([
+        artifactId,
+        second,
+      ]);
+    });
+
+    it("lets viewers pin but hides artifacts from non-members", async () => {
+      expect(
+        (await web("PUT", pinPath(artifactId), { as: VIEWER })).status,
+      ).toBe(200);
+      expect((await listAs(VIEWER)).artifacts[0]?.pinned).toBe(true);
+
+      expect(
+        (await web("PUT", pinPath(artifactId), { as: OUTSIDER })).status,
+      ).toBe(404);
+      expect((await web("PUT", pinPath("missing"))).status).toBe(404);
+    });
+
+    it("keeps the pin across archive and restore without prioritising archived artifacts", async () => {
+      await web("PUT", pinPath(artifactId));
+      const { artifactId: second } = await publishTestArtifact(
+        projectId,
+        SITE,
+        OWNER,
+      );
+      const programmatic = (path: string) =>
+        issueAccessToken(OWNER).then((token) =>
+          SELF.fetch(
+            `https://localhost/programmatic-api/v1/projects/${projectId}${path}`,
+            { method: "POST", headers: { authorization: `Bearer ${token}` } },
+          ),
+        );
+      expect(
+        (await programmatic(`/artifacts/${artifactId}/archive`)).status,
+      ).toBe(200);
+
+      expect((await listAs(OWNER)).artifacts.map((a) => a.id)).toEqual([
+        second,
+      ]);
+      expect((await listAs(OWNER, true)).artifacts).toEqual([
+        expect.objectContaining({ id: artifactId, pinned: true }),
+      ]);
+
+      await programmatic(`/artifacts/${artifactId}/unarchive`);
+      expect((await listAs(OWNER)).artifacts.map((a) => a.id)).toEqual([
+        artifactId,
+        second,
+      ]);
+    });
+  });
 });

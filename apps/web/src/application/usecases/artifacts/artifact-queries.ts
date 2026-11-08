@@ -23,15 +23,60 @@ import { normalizeArtifactTitle } from "./create-artifact-upload";
 const notFound = () =>
   artifactError("ARTIFACT_NOT_FOUND", "Artifact not found");
 
+export type ArtifactListItem = { artifact: Artifact; pinned: boolean };
+
+/**
+ * Pins are per user. The active list puts the caller's pins first (most
+ * recently pinned first); archived artifacts keep their pin but are not
+ * prioritised, so restoring one brings its pin back.
+ */
 export async function listArtifacts(
   repository: ArtifactRepository,
-  input: { projectId: string; archived: boolean },
-): Promise<Result<Artifact[], ArtifactError>> {
-  const result = await repository.listByProject(input.projectId, {
-    archived: input.archived,
-  });
-  if (result.isErr()) return err(fromRepositoryError(result.error));
-  return ok(result.value);
+  input: { projectId: string; userId: string; archived: boolean },
+): Promise<Result<ArtifactListItem[], ArtifactError>> {
+  const [artifacts, pins] = await Promise.all([
+    repository.listByProject(input.projectId, { archived: input.archived }),
+    repository.listPins(input.projectId, input.userId),
+  ]);
+  if (artifacts.isErr()) return err(fromRepositoryError(artifacts.error));
+  if (pins.isErr()) return err(fromRepositoryError(pins.error));
+
+  const pinRank = new Map(
+    pins.value.map((pin, index) => [pin.artifactId, index] as const),
+  );
+  const items = artifacts.value.map((artifact) => ({
+    artifact,
+    pinned: pinRank.has(artifact.id),
+  }));
+  if (input.archived) return ok(items);
+
+  const pinned = items
+    .filter((item) => item.pinned)
+    .sort(
+      (a, b) =>
+        (pinRank.get(a.artifact.id) ?? 0) - (pinRank.get(b.artifact.id) ?? 0),
+    );
+  return ok([...pinned, ...items.filter((item) => !item.pinned)]);
+}
+
+export async function setArtifactPinned(
+  repository: ArtifactRepository,
+  input: {
+    projectId: string;
+    artifactId: string;
+    userId: string;
+    pinned: boolean;
+  },
+): Promise<Result<void, ArtifactError>> {
+  const result = await repository.setPinned(input);
+  if (result.isErr()) {
+    return err(
+      result.error === "ARTIFACT_NOT_FOUND_ERROR"
+        ? notFound()
+        : fromRepositoryError(result.error),
+    );
+  }
+  return ok(undefined);
 }
 
 export async function getArtifact(

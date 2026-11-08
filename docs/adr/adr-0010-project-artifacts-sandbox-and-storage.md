@@ -102,6 +102,8 @@ R2 へのアクセスは集約ごとの port `application/ports/artifact-object-
 - 既存 API key に artifact scope は自動付与しない。
 - **API 経路**: CLI が story で既に使用している `/programmatic-api/v1/projects/{projectId}/artifacts...` に載せ、`cli-openapi.ts` へ追加する。OAuth 経路は scope で絞れず role 判定のみ、API key 経路は `artifact:read` / `artifact:write` を完全一致で要求する。Web UI 用の一覧・詳細・preview-token は `/api` の session 経路とする。
 
+- **ピン留め（個人設定）**: よく見る Artifact が更新順の一覧に埋もれないよう、ピン留めはユーザーごとの個人設定とし `artifact_pins`（artifact × user）に保存する。プロジェクト共有にしないのは、他メンバーの一覧順を変えず、PivotalTracker にない機能として小さなチームの流れを重くしないため。ピン留め／解除は Artifact の内容を変えないので viewer も可能で、Web の `/api` セッション経路のみ（`PUT|DELETE /projects/{id}/artifacts/{artifactId}/pin`、API key scope なし）。一覧は通常表示でピン留めを新しい順に先頭へ出し、アーカイブ済み一覧では優先表示しない。アーカイブしてもピンは保持し、復元すると先頭に戻る。バージョン固定 URL とは別の概念である。
+
 ### 8. Self-hosting
 
 README の R2 bucket 記述、setup script（3 つ目の bucket、`ARTIFACT_CONTENT_SIGNING_KEY` の生成と `secret bulk` への追加、Access bypass）、`wrangler.toml` / `wrangler.deploy.toml` / `wrangler.dev.toml` / `wrangler.test.toml` を更新する。

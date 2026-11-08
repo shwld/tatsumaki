@@ -9,6 +9,9 @@ export const artifactScreensJa = {
       latestVersion: "最新: v{{version}}",
       noVersion: "版なし",
       updatedAt: "更新: {{date}}",
+      pin: "{{title}} をピン留めする",
+      unpin: "{{title}} のピン留めを外す",
+      pinError: "ピン留めの更新に失敗しました",
     },
     detail: {
       loading: "Artifact を読み込み中...",
@@ -53,6 +56,9 @@ export const artifactScreensEn = {
       latestVersion: "Latest: v{{version}}",
       noVersion: "No version",
       updatedAt: "Updated: {{date}}",
+      pin: "Pin {{title}}",
+      unpin: "Unpin {{title}}",
+      pinError: "Failed to update the pin",
     },
     detail: {
       loading: "Loading artifact...",

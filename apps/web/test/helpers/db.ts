@@ -18,6 +18,7 @@ import { iterationsTable } from "../../src/infrastructure/db/schema/iterations";
 import { storyTimelineEntriesTable } from "../../src/infrastructure/db/schema/story-timeline";
 import {
   artifactFilesTable,
+  artifactPinsTable,
   artifactUploadSessionFilesTable,
   artifactUploadSessionsTable,
   artifactVersionsTable,
@@ -35,6 +36,7 @@ import { usersTable } from "../../src/infrastructure/db/schema/users";
  */
 export async function resetDatabase(db: D1Database): Promise<void> {
   const client = createDb(db);
+  await client.delete(artifactPinsTable);
   await client.delete(artifactUploadSessionFilesTable);
   await client.delete(artifactUploadSessionsTable);
   await client.delete(artifactFilesTable);

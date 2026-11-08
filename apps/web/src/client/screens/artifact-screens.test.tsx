@@ -186,6 +186,66 @@ describe("artifact screens", () => {
     });
   });
 
+  describe("list pins", () => {
+    it("shows the pin state and toggles it through the pin API", async () => {
+      let pinned = false;
+      const calls: string[] = [];
+      mockApi({
+        ...baseRoutes(),
+        "GET /api/projects/p1/artifacts": () =>
+          json({ artifacts: [{ ...artifact, pinned }] }),
+        "PUT /api/projects/p1/artifacts/art-1/pin": () => {
+          calls.push("PUT");
+          pinned = true;
+          return json({ pinned: true });
+        },
+        "DELETE /api/projects/p1/artifacts/art-1/pin": () => {
+          calls.push("DELETE");
+          pinned = false;
+          return json({ pinned: false });
+        },
+      });
+      renderAt("/projects/p1/artifacts");
+
+      const pin = await screen.findByRole("button", {
+        name: "Release report をピン留めする",
+      });
+      expect(pin).toHaveAttribute("aria-pressed", "false");
+      fireEvent.click(pin);
+
+      const unpin = await screen.findByRole("button", {
+        name: "Release report のピン留めを外す",
+      });
+      expect(unpin).toHaveAttribute("aria-pressed", "true");
+      fireEvent.click(unpin);
+
+      await screen.findByRole("button", {
+        name: "Release report をピン留めする",
+      });
+      expect(calls).toEqual(["PUT", "DELETE"]);
+    });
+
+    it("tells the user when the pin could not be saved", async () => {
+      mockApi({
+        ...baseRoutes(),
+        "GET /api/projects/p1/artifacts": () =>
+          json({ artifacts: [{ ...artifact, pinned: false }] }),
+        "PUT /api/projects/p1/artifacts/art-1/pin": () =>
+          json({ error: "boom" }, 500),
+      });
+      renderAt("/projects/p1/artifacts");
+
+      fireEvent.click(
+        await screen.findByRole("button", {
+          name: "Release report をピン留めする",
+        }),
+      );
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "ピン留めの更新に失敗しました",
+      );
+    });
+  });
+
   describe("detail", () => {
     it("shows metadata, the creator's name and a sandboxed preview of the latest version", async () => {
       mockApi(baseRoutes());
