@@ -20,7 +20,7 @@
 - 仕様不明点は「実装か提案か」「完成度」「制約」を先に確認する
 - 変更は最小スコープで行い、無関係なリファクタを混ぜない
 - 既存ルールを変更する場合は、対象ドキュメントと理由を同一PRで更新する
-- UI/UX 変更は ADR-0002 に従い、PivotalTracker を正として挙動差分を確認する
+- PivotalTracker にある機能の UI/UX 変更は ADR-0002 に従い、PivotalTracker を正として挙動差分を確認する。PivotalTracker にない機能は ADR-0002 の対象外とし、story の Plan に採用理由を書く
 - PivotalTracker 準拠のために意図的にスコープから落とす要件は、必ず tatsumaki の follow-up story を起票して追跡可能にする
 - **Git（エージェント含む）**: `git commit` / `git push` に `--no-verify`（`-n`）を付けない
 - **Pull Request（エージェント含む）**: PR 作成時は必ず `.github/pull_request_template.md` のテンプレートに従い、必須セクションを埋める

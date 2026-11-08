@@ -12,7 +12,8 @@
 ## 実行前チェック
 
 - 対象 story に `## Plan` / `DoD` / `verify` があることを確認する
-- UI 変更は PivotalTracker 準拠（ADR-0002）を実装計画で明示し、差分がある場合は根拠を記録する
+- PivotalTracker にある機能の UI 変更は、PivotalTracker 準拠（ADR-0002）を実装計画で明示し、差分がある場合は根拠を記録する
+- PivotalTracker にない機能は、必要な理由と小さなチームの流れを重くしないことを Plan に書く（ADR-0002 Amendment: scope of PivotalTracker fidelity）
 - スコープ外に落とす要件がある場合は、実装前に follow-up story を作成して storyId を残す
 
 ## PR マージ後
