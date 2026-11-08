@@ -15,6 +15,8 @@ export const projectLabelsScreenJa = {
       offHint: "OFF にしても計画は保持され、再度 ON にすると復元されます。",
       toggleError:
         "戦略・計画管理の切り替えに失敗しました。もう一度お試しください",
+      toggleConflict:
+        "他の人が先にこの Label の計画を更新しました。最新の版に更新したので、もう一度切り替えてください",
       notSet: "未設定",
       setupHint: "目的・期間を入力すると、計画の見通しが立てやすくなります。",
     },
@@ -86,6 +88,8 @@ export const projectLabelsScreenEn = {
       offHint:
         "Turning it off keeps the plan. Turning it on again restores it.",
       toggleError: "Failed to change strategy planning. Try again",
+      toggleConflict:
+        "Someone else updated this label's plan first. It was updated to the latest version; toggle again",
       notSet: "Not set",
       setupHint:
         "Enter a purpose and a period to make the plan easier to follow.",

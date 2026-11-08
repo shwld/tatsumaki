@@ -50,8 +50,7 @@ function toPlan(draft: Draft): EpicPlanInput {
 }
 
 /** Fields the user has not edited follow the latest epic, so unsaved edits survive and nothing newer is overwritten. */
-function mergeDraft(current: Draft, before: Epic | null, latest: Epic): Draft {
-  const base = toDraft(before);
+function mergeDraft(current: Draft, base: Draft, latest: Epic): Draft {
   const next = toDraft(latest);
   const merged = { ...current };
   for (const key of Object.keys(base) as (keyof Draft)[]) {
@@ -131,6 +130,17 @@ export function LabelPlanRow({
     setIsBusy(false);
     if (!result.ok) {
       if (result.status === 401) return onSessionExpired();
+      if (
+        result.code === "REVISION_CONFLICT" ||
+        result.code === "REVISION_REQUIRED"
+      ) {
+        await handleRefresh();
+        setNotice({
+          kind: "error",
+          message: t("projectLabelsScreen.planning.toggleConflict"),
+        });
+        return;
+      }
       setNotice({
         kind: "error",
         message: t("projectLabelsScreen.planning.toggleError"),
@@ -138,7 +148,7 @@ export function LabelPlanRow({
       return;
     }
     onEpicChange(result.value);
-    setDraft((current) => mergeDraft(current, epic, result.value));
+    setDraft((current) => mergeDraft(current, toDraft(epic), result.value));
   };
 
   const handleSave = async (event: FormEvent) => {
@@ -146,6 +156,7 @@ export function LabelPlanRow({
     if (!epic) return;
     setShowErrors(true);
     if (errors.length > 0) return;
+    const submitted = draft;
     setIsBusy(true);
     setNotice({ kind: "none" });
     const result = await saveEpicPlan(
@@ -168,7 +179,7 @@ export function LabelPlanRow({
       return;
     }
     onEpicChange(result.value);
-    setDraft(toDraft(result.value));
+    setDraft((current) => mergeDraft(current, submitted, result.value));
     setShowErrors(false);
     setNotice({ kind: "saved" });
   };
@@ -185,7 +196,7 @@ export function LabelPlanRow({
       });
       return;
     }
-    setDraft((current) => mergeDraft(current, epic, result.value));
+    setDraft((current) => mergeDraft(current, toDraft(epic), result.value));
     onEpicChange(result.value);
     setNotice({ kind: "refreshed" });
   };

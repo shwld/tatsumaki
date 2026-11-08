@@ -262,6 +262,56 @@ describe("ProjectLabelsScreen", () => {
     expect(await screen.findByLabelText("目的")).toHaveValue("Saved + unsaved");
   });
 
+  it("recovers from a stale revision when toggling planning", async () => {
+    let toggles = 0;
+    const calls = mockApi({
+      epics: [epicOf({ description: "Saved" })],
+      onRequest: (call) => {
+        if (call.url.endsWith("/epic/disable")) {
+          toggles += 1;
+          return toggles === 1
+            ? new Response(
+                JSON.stringify({ error: "x", code: "REVISION_CONFLICT" }),
+                { status: 409 },
+              )
+            : new Response(
+                JSON.stringify({
+                  epic: epicOf({
+                    enabled: false,
+                    description: "Saved",
+                    revision: 8,
+                  }),
+                }),
+                { status: 200 },
+              );
+        }
+        if (call.method === "GET" && call.url.endsWith("/label-growth/epic")) {
+          return new Response(
+            JSON.stringify({
+              epic: epicOf({ description: "Saved", revision: 7 }),
+            }),
+            { status: 200 },
+          );
+        }
+        return undefined;
+      },
+    });
+    const user = userEvent.setup();
+    renderScreen();
+
+    await screen.findByLabelText("目的");
+    await user.click(growthSwitch());
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "もう一度切り替えてください",
+    );
+    await user.click(growthSwitch());
+    await waitFor(() => expect(screen.queryByLabelText("目的")).toBeNull());
+    const disables = calls.filter((call) => call.url.endsWith("/epic/disable"));
+    expect(
+      disables.map((c) => (c.body as { revision: number }).revision),
+    ).toEqual([1, 7]);
+  });
+
   it("keeps the input on a conflict and retries with the latest revision", async () => {
     let patchCount = 0;
     const calls = mockApi({
