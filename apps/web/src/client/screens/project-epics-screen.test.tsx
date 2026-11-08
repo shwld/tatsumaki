@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes, useNavigate } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthErrorProvider } from "../contexts/auth-error-context";
+import { i18n } from "../i18n/config";
 import type { Epic, EpicProgress, EpicWithProgress } from "../types/epic";
 import {
   ProjectEpicDetailScreen,
@@ -344,5 +345,47 @@ describe("ProjectEpicDetailScreen", () => {
       await screen.findByRole("heading", { name: "beta" }),
     ).toBeInTheDocument();
     view.unmount();
+  });
+});
+
+describe("Epics screens language", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-08T00:00:00Z"));
+    vi.spyOn(globalThis, "fetch");
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it.each([
+    ["ja", "Epics に戻る", "期間未設定", "story 未登録"],
+    ["en", "Back to Epics", "No period set", "No stories"],
+  ] as const)("renders the list and detail in %s without raw keys", async (language, back, unscheduled, noStories) => {
+    await i18n.changeLanguage(language);
+    mockFetch(() => ({
+      epics: [
+        item(
+          { labelId: "label-someday", labelName: "someday" },
+          { state: "no_stories" },
+        ),
+      ],
+    }));
+    const list = renderAt(`/projects/${PROJECT_ID}/epics`);
+    expect(await screen.findByText(unscheduled)).toBeInTheDocument();
+    expect(list.container.textContent).not.toMatch(/projectEpic/);
+    list.unmount();
+
+    mockFetch(() =>
+      item(
+        { labelId: "label-someday", labelName: "someday" },
+        { state: "no_stories" },
+      ),
+    );
+    const detail = renderAt(`/projects/${PROJECT_ID}/epics/label-someday`);
+    expect(await screen.findByText(back)).toBeInTheDocument();
+    expect(detail.container.textContent).not.toMatch(/projectEpic/);
+    expect(detail.container.textContent).toContain(noStories);
   });
 });
