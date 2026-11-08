@@ -23,3 +23,7 @@ Editing existing migration files after they have been applied (even in developme
 - No risk of schema drift between developer environments
 - Slightly more migration files over time, but each is small and self-contained
 - When tatsumaki reaches production, data migration will become necessary and this policy should be amended
+
+## Amendment: production data migration (story #377, 2026-11-08)
+
+tatsumaki now holds production data. Schema changes that move or reshape existing data include the data migration. Split it into expand, backfill and contract migration files, report rows that cannot be converted instead of discarding or merging them silently, and keep the old columns until every client uses the new shape so they remain the rollback path. [ADR-0013](adr-0013-label-bound-epic-planning.md) applies this to story labels and epics. The rule that committed migration files are never edited is unchanged.
