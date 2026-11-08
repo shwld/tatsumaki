@@ -61,7 +61,6 @@ export const SavedSearches = memo(function SavedSearches({
         unestimatedOnly: sf.filters.unestimatedOnly === true,
         ownerIds: sf.filters.ownerIds ?? [],
         labelIds: sf.filters.labelIds ?? [],
-        epicIds: sf.filters.epicIds ?? [],
       });
     },
     [onApply],

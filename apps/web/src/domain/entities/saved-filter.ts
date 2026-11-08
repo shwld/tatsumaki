@@ -9,7 +9,6 @@ export type SavedFilterConditions = {
   statuses?: StoryStatus[];
   ownerIds?: string[];
   labelIds?: string[];
-  epicIds?: string[];
 };
 
 export type SavedFilter = {

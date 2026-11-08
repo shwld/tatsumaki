@@ -9,6 +9,7 @@ import {
   projectApiKeysPath,
   projectDeleteApiPath,
   projectApiPath,
+  projectLabelsPath,
   projectPointScaleApiPath,
   projectSettingsApiPath,
 } from "../lib/story-routes";
@@ -658,6 +659,24 @@ export function ProjectSettingsScreen() {
                 設定を変更するにはオーナー権限が必要です。
               </p>
             )}
+          </section>
+        ) : null}
+
+        {projectId ? (
+          <section className="mt-8 rounded-md border border-gray-200 p-4">
+            <h2 className="mb-2 text-lg font-semibold text-gray-800">
+              Label と戦略・計画管理
+            </h2>
+            <p className="mb-3 text-sm text-gray-600">
+              Label ごとに戦略・計画管理を ON/OFF
+              し、目的・成功条件・期間を記録します。
+            </p>
+            <Link
+              to={projectLabelsPath(projectId)}
+              className="inline-flex rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            >
+              Label 設定を開く
+            </Link>
           </section>
         ) : null}
 

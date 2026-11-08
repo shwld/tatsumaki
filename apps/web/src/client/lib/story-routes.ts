@@ -239,6 +239,10 @@ export function projectPointScaleApiPath(projectId: string): string {
   return `/api/projects/${projectId}/point-scale`;
 }
 
+export function projectLabelsPath(projectId: string): string {
+  return `/projects/${projectId}/labels`;
+}
+
 export function projectMembersPath(projectId: string): string {
   return `/projects/${projectId}/members`;
 }

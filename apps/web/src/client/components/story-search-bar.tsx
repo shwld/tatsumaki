@@ -20,7 +20,6 @@ export type StorySearchFilters = {
   unestimatedOnly: boolean;
   ownerIds: string[];
   labelIds: string[];
-  epicIds: string[];
 };
 
 type StorySearchBarProps = {
@@ -110,7 +109,6 @@ export const StorySearchBar = memo(function StorySearchBar({
       unestimatedOnly: false,
       ownerIds: [],
       labelIds: [],
-      epicIds: [],
     };
     setFilters(empty);
     onFiltersChange(empty);
@@ -124,8 +122,7 @@ export const StorySearchBar = memo(function StorySearchBar({
     filters.types.length > 0 ||
     filters.unestimatedOnly ||
     filters.ownerIds.length > 0 ||
-    filters.labelIds.length > 0 ||
-    filters.epicIds.length > 0;
+    filters.labelIds.length > 0;
 
   const handleSave = useCallback(() => {
     if (onSaveSearch && saveName.trim()) {

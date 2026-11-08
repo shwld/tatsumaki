@@ -104,9 +104,6 @@ function panelBaseQuery(
   if (filters.activeLabelIds.length > 0) {
     query.set("labelIds", filters.activeLabelIds.join(","));
   }
-  if (filters.activeEpicIds.length > 0) {
-    query.set("epicIds", filters.activeEpicIds.join(","));
-  }
   if (filters.activeTypes.length > 0) {
     query.set("types", filters.activeTypes.join(","));
   }
@@ -161,9 +158,6 @@ function currentAcceptedBaseQuery(
   }
   if (filters.activeLabelIds.length > 0) {
     query.set("labelIds", filters.activeLabelIds.join(","));
-  }
-  if (filters.activeEpicIds.length > 0) {
-    query.set("epicIds", filters.activeEpicIds.join(","));
   }
   if (filters.activeTypes.length > 0) {
     query.set("types", filters.activeTypes.join(","));

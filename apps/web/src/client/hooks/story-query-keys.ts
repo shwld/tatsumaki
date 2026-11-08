@@ -5,7 +5,6 @@ export type StoryPanelQueryFilters = {
   searchQuery: string;
   activeOwners: string[];
   activeLabelIds: string[];
-  activeEpicIds: string[];
   activeTypes: StoryType[];
   // Legacy fields kept optional for test compatibility.
   activeOwner?: string | null;
@@ -33,7 +32,6 @@ export const storyQueryKeys = {
         searchQuery: filters.searchQuery.trim(),
         activeOwners: filters.activeOwners,
         activeLabelIds: filters.activeLabelIds,
-        activeEpicIds: filters.activeEpicIds,
         activeTypes: filters.activeTypes,
       },
     ] as const,

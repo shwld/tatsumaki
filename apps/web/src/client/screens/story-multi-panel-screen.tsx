@@ -359,11 +359,6 @@ export function StoryMultiPanelScreen() {
       } else {
         next.delete("labelIds");
       }
-      if (filters.epicIds.length > 0) {
-        next.set("epicIds", filters.epicIds.join(","));
-      } else {
-        next.delete("epicIds");
-      }
       setSearchParams(next);
     },
     [searchParams, setSearchParams],
@@ -428,13 +423,6 @@ export function StoryMultiPanelScreen() {
         .map((l) => l.trim())
         .filter(Boolean)
     : [];
-  const rawEpicIdsParam = searchParams.get("epicIds");
-  const activeEpicIds = rawEpicIdsParam
-    ? rawEpicIdsParam
-        .split(",")
-        .map((e) => e.trim())
-        .filter(Boolean)
-    : [];
 
   const bootstrapQuery = useProjectBootstrap(projectId);
   const projectData = bootstrapQuery.data;
@@ -470,7 +458,6 @@ export function StoryMultiPanelScreen() {
       searchQuery,
       activeOwners,
       activeLabelIds,
-      activeEpicIds,
       activeTypes,
     },
     enabled: !bootstrapQuery.isLoading && !bootstrapQuery.isError,
@@ -1396,8 +1383,7 @@ export function StoryMultiPanelScreen() {
     activeTypes.length > 0 ||
     showUnestimatedOnly ||
     activeOwners.length > 0 ||
-    activeLabelIds.length > 0 ||
-    activeEpicIds.length > 0;
+    activeLabelIds.length > 0;
   const hasPanelErrors =
     Boolean(panelQueries.panels.Done.error) ||
     Boolean(panelQueries.panels.Current.error) ||
@@ -2196,7 +2182,6 @@ export function StoryMultiPanelScreen() {
                   unestimatedOnly: showUnestimatedOnly,
                   ownerIds: activeOwners,
                   labelIds: activeLabelIds,
-                  epicIds: activeEpicIds,
                 }}
                 memberOptions={memberOptions}
                 projectLabels={projectLabels}

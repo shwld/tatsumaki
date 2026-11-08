@@ -16,7 +16,6 @@ export const epicsTable = sqliteTable(
     projectId: text("project_id")
       .notNull()
       .references(() => projectsTable.id, { onDelete: "cascade" }),
-    name: text("name").notNull(),
     labelId: text("label_id").references(() => projectLabelsTable.id, {
       onDelete: "cascade",
     }),

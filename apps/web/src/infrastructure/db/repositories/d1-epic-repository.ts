@@ -162,8 +162,8 @@ export class D1EpicRepository implements EpicRepository {
     // The label_id unique index makes concurrent first ONs collapse into one epic.
     const result = await this.d1
       .prepare(
-        `INSERT INTO epics (id, project_id, name, label_id, enabled, position, revision, created_at, updated_at)
-         SELECT ?1, pl.project_id, pl.name, pl.id, 1,
+        `INSERT INTO epics (id, project_id, label_id, enabled, position, revision, created_at, updated_at)
+         SELECT ?1, pl.project_id, pl.id, 1,
            (SELECT coalesce(max(position), 0) + 1 FROM epics WHERE project_id = ?2),
            1, ?4, ?4
          FROM project_labels pl

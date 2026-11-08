@@ -148,7 +148,6 @@ export type Story = {
   /** Label names derived from labelIds (presentation only). */
   labels: string[];
   labelIds: string[];
-  epicId: string | null;
   iterationId: string | null;
   isIcebox: boolean;
   ownerIds: string[];

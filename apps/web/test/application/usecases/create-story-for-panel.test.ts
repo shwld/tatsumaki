@@ -28,7 +28,6 @@ function makeStory(overrides: Partial<Story> = {}): Story {
     storyPoint: null,
     labels: [],
     labelIds: [],
-    epicId: null,
     iterationId: null,
     isIcebox: false,
     ownerIds: [],
