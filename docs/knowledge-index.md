@@ -21,6 +21,7 @@
 - `docs/agent-custom-linter-strategy.md` | [link](agent-custom-linter-strategy.md) | 責務: project custom lint の運用 | Load when: custom lint ルールを変更するとき | 更新責任: Web ドメイン実装者
 - `docs/desktop-app.md` | [link](desktop-app.md) | 責務: Desktop アプリの実行/設計方針 | Load when: desktop 実装・運用を変更するとき | 更新責任: Desktop 機能の実装者
 - `docs/local-cloudflare-access-setup.md` | [link](local-cloudflare-access-setup.md) | 責務: ローカル Cloudflare Access 設定 | Load when: Access 連携や tunnel を扱うとき | 更新責任: Web 運用担当
+- `docs/hosted-access-rollout.md` | [link](hosted-access-rollout.md) | 責務: 公式ホスト版の Access 自由登録構成・バイパス確認・ロールバック | Load when: 本番の Access ポリシーや Turnstile 設定を変更するとき | 更新責任: Web 運用担当
 - `docs/pivotal-tracker-ui-specification.ja.md` | [link](pivotal-tracker-ui-specification.ja.md) | 責務: PivotalTracker 準拠 UI 仕様 | Load when: story UI/UX を変更するとき | 更新責任: Product/UI オーナー
 - `docs/story-delete-and-timeline-entries.md` | [link](story-delete-and-timeline-entries.md) | 責務: story 削除時の timeline 挙動 | Load when: story 削除や timeline を変更するとき | 更新責任: Web ドメイン実装者
 - `docs/web-e2e-strategy.md` | [link](web-e2e-strategy.md) | 責務: Web E2E 戦略 | Load when: E2E 方針や Playwright tests を変更するとき | 更新責任: Web QA 担当

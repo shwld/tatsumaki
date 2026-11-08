@@ -60,3 +60,9 @@ The goal is to open registration to anyone on the official hosted service, keep 
 - The error-code change breaks any client that matches `INVITATION_REQUIRED`; the replacement is a coordinated change.
 - Rollout order matters: Control Plane free limit and entitlement mode first, then onboarding, then billing display and upgrade flows, and only last the production Access policy. Opening Access earlier would let free users in before the limit applies.
 - The production Access policy must have a documented rollback to the single-account policy.
+
+## Amendment 2026-11-08 (story #353)
+
+- 公開面の確認結果と運用手順は [hosted-access-rollout.md](../hosted-access-rollout.md) に記録した。bypass は `/artifact-content/*`(content host)、`/api-key/*`、`/programmatic-api`、`/.well-known/oauth-*`、`/oauth/token`、`/oauth/register` で、いずれも Access ではなく各経路の認証(capability token、project API key、OAuth Bearer)に任せる。`/oauth/authorize` と `/oauth/consent` は Access の背後に残す。
+- ユーザー・project 単位の容量・件数上限は、公開の条件にしない。free ユーザーは project を作れず、artifact を置けるのは招待された project に限られ、1 version あたりの上限(50 MB、1 ファイル 25 MB、1000 ファイル)は有効なため。代わりに R2・D1 の使用量を運用で定期確認し、異常があれば `access_status = 'blocked'` で停止する。使用量が増えた時点で、project 単位の上限を別 story で検討する。
+- ロールバックは、Turnstile secret の削除(登録のみ停止)、Access ポリシーの無効化、`blocked` の順に行う。
