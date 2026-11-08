@@ -53,6 +53,7 @@ export type StatusMutationVariables = {
   story: Story;
   nextStatus: StoryStatus;
   currentIterationId: string | null;
+  hasNewerPendingStatus?: () => boolean;
 };
 
 export type MovePanelMutationVariables = {
@@ -222,7 +223,12 @@ export function useStoryMutations({
         ...(clearIcebox ? { isIcebox: false } : {}),
       });
     },
-    onMutate: async ({ story, nextStatus, currentIterationId }) => {
+    onMutate: async ({
+      story,
+      nextStatus,
+      currentIterationId,
+      hasNewerPendingStatus,
+    }) => {
       const shouldAssignCurrentIteration =
         IN_PROGRESS_STATUSES.has(nextStatus) &&
         story.iterationId === null &&
@@ -236,16 +242,18 @@ export function useStoryMutations({
 
       await panelQueries.cancelPanels({ panels: ALL_PANELS });
       const snapshot = panelQueries.snapshotPanels({ panels: ALL_PANELS });
-      panelQueries.applyStoryUpdate({
-        ...story,
-        status: nextStatus,
-        iterationId: shouldAssignCurrentIteration
-          ? currentIterationId
-          : shouldClearIteration
-            ? null
-            : story.iterationId,
-        isIcebox: clearIcebox ? false : story.isIcebox,
-      });
+      if (!hasNewerPendingStatus?.()) {
+        panelQueries.applyStoryUpdate({
+          ...story,
+          status: nextStatus,
+          iterationId: shouldAssignCurrentIteration
+            ? currentIterationId
+            : shouldClearIteration
+              ? null
+              : story.iterationId,
+          isIcebox: clearIcebox ? false : story.isIcebox,
+        });
+      }
       return { snapshot };
     },
     onError: (error, _variables, context) => {
@@ -256,7 +264,9 @@ export function useStoryMutations({
       );
     },
     onSuccess: (story, variables) => {
-      panelQueries.applyStoryUpdate(story);
+      if (!variables.hasNewerPendingStatus?.()) {
+        panelQueries.applyStoryUpdate(story);
+      }
       setError(null);
       showToast(
         "success",

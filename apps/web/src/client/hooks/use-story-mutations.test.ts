@@ -173,6 +173,55 @@ describe("useStoryMutations", () => {
     expect(setForbidden).not.toHaveBeenCalled();
   });
 
+  it("does not apply intermediate status to panels while a newer status is pending", async () => {
+    const story = buildStory();
+    const panelQueries = createPanelQueriesMock();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_input: string | URL, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body)) as { status: string };
+        return new Response(
+          JSON.stringify({ story: { ...story, status: body.status } }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }),
+    );
+    const { result } = renderHook(
+      () =>
+        useStoryMutations({
+          projectId: PROJECT_ID,
+          panelQueries,
+          notifySessionExpired: vi.fn(),
+          setForbidden: vi.fn(),
+          setError: vi.fn(),
+          showToast: vi.fn(),
+        }),
+      { wrapper: createWrapper() },
+    );
+
+    await act(async () => {
+      await result.current.statusMutation.mutateAsync({
+        story,
+        nextStatus: "Started",
+        currentIterationId: CURRENT_ITERATION_ID,
+        hasNewerPendingStatus: () => true,
+      });
+    });
+    expect(panelQueries.applyStoryUpdate).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await result.current.statusMutation.mutateAsync({
+        story,
+        nextStatus: "Finished",
+        currentIterationId: CURRENT_ITERATION_ID,
+        hasNewerPendingStatus: () => false,
+      });
+    });
+    expect(panelQueries.applyStoryUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "Finished" }),
+    );
+  });
+
   it("assigns current iteration and clears icebox when starting from Icebox", async () => {
     const story = buildStory({ isIcebox: true });
     const fetchMock = vi.fn(
