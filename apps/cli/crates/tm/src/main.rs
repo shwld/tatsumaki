@@ -236,9 +236,19 @@ enum StorySubcommand {
         #[command(flatten)]
         relation: StoryBlockerRelationArgs,
     },
+    /// Change story priority (order) by listing story IDs from highest to lowest priority
+    ///
+    /// Earlier --ordered-id values get higher priority. --ordered-id takes the internal story ID
+    /// (the `id` field of `tm --json story list`), not the story number. Only the stories you list
+    /// are rearranged, and only among the positions they already occupy; unlisted stories keep
+    /// their positions, so a newly listed story does not move to the end of the Backlog on its own.
+    /// To move story N to the end of the Backlog, list the current last Backlog story first, then N.
+    /// This changes priority only: status, Icebox and iteration assignment are untouched, so Current
+    /// assignment is not released (use `unassign-iteration` for that).
     Reorder {
         #[arg(long)]
         project: Option<String>,
+        /// Internal story ID (not the story number); repeat from highest to lowest priority
         #[arg(long = "ordered-id")]
         ordered_ids: Vec<String>,
     },

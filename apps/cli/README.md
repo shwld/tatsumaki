@@ -175,6 +175,10 @@ tm --json story block --project <project-id> 328 --by 325
 
 ## Story reorder
 
+Changes story priority (order). `--ordered-id` is repeated from highest to lowest priority and takes the internal story ID (the `id` field of `tm --json story list`), not the story number. Only the listed stories are rearranged, and only among the positions they already occupy; unlisted stories keep their positions. A story you list is therefore not moved to the end of the Backlog by itself: to move story N to the end, list the current last Backlog story first, then N.
+
+Reorder changes priority only. Status, Icebox and iteration assignment are untouched, so it does not release a Current assignment; use `tm story unassign-iteration` for that.
+
 ```bash
 tm story reorder --project <project-id> --ordered-id <story-id-1> --ordered-id <story-id-2>
 tm --json story reorder --project <project-id> --ordered-id <story-id-1> --ordered-id <story-id-2>
