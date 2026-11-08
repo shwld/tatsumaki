@@ -69,10 +69,12 @@ ingress:
 1. **Access → Applications → Add an application**
 2. **Self-hosted** を選択
 3. **Application domain** にステップ 3 で設定した `<hostname>` を入力
-4. **Policy** は、利用予定者がメールOTPで本人確認できる範囲を `Include: Emails` または許可対象ドメインで設定する
+4. **Policy** は、自分だけが使うなら `Include: Emails` で自分のメールアドレスに限定する
 5. 作成後、Application の **Audience (AUD) tag** を控える
 
-Cloudflare Access は本人確認だけを担当し、tatsumaki の利用可否はアプリ内の単回利用招待で判定する。したがって、特定ユーザーを Access Policy に事前登録して招待を表現しない。Access をインターネット全体へ無条件公開するのではなく、メールOTPを必須にし、必要に応じてメールドメインなどで認証可能な母集団を制限する。
+Cloudflare Access は本人確認だけを担当し、tatsumaki の利用可否はアプリ内のオンボーディング(規約同意と Turnstile)で判定する。特定ユーザーを Access Policy に事前登録して招待を表現しない。
+
+ローカル Tunnel は開発機に直結するため、公式ホスト版の自由登録ポリシー(Include: Everyone)を付けない。公式ホスト版の Access 構成と手順は [hosted-access-rollout.md](hosted-access-rollout.md) を参照する。
 
 ---
 
@@ -112,9 +114,9 @@ ACCESS_TEAM_DOMAIN=<your-team>.cloudflareaccess.com
 
 1. ブラウザで `https://<hostname>` にアクセス
 2. Cloudflare Access のログイン画面が表示される
-3. IdP（GitHub 等）で認証する
-4. Owner が発行した `https://<hostname>/invite#<token>` を開く
-5. 招待の受諾後にアプリのトップ画面へ遷移する
+3. IdP(メール OTP 等)で認証する
+4. 初回はオンボーディング画面で規約に同意する(Turnstile を設定している場合は bot 確認も行う)
+5. 完了後にアプリのトップ画面へ遷移する。プロジェクトへの参加は、Owner が発行した `https://<hostname>/invite#<token>` を開く
 6. `https://<hostname>/api/auth/me` にアクセスし、`{"email":"your@email.com"}` が返ることを確認
 
 ---
