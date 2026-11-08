@@ -793,6 +793,177 @@
           "updatedAt"
         ]
       },
+      "EpicProgressListResponse": {
+        "type": "object",
+        "properties": {
+          "epics": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EpicWithProgress"
+            }
+          },
+          "total": {
+            "$ref": "#/components/schemas/EpicStoryCounts"
+          }
+        },
+        "required": ["epics", "total"]
+      },
+      "EpicWithProgress": {
+        "type": "object",
+        "properties": {
+          "epic": {
+            "$ref": "#/components/schemas/Epic"
+          },
+          "progress": {
+            "$ref": "#/components/schemas/EpicProgress"
+          }
+        },
+        "required": ["epic", "progress"]
+      },
+      "EpicProgress": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": ["no_stories", "not_started", "in_progress", "completed"]
+          },
+          "storyCompletionRate": {
+            "type": "number",
+            "description": "Accepted ÷ all stories with the label; null without stories",
+            "nullable": true
+          },
+          "stories": {
+            "$ref": "#/components/schemas/EpicStoryCounts"
+          },
+          "pointCompletionRate": {
+            "type": "number",
+            "description": "Accepted points ÷ points of estimated features; null when none is estimated",
+            "nullable": true
+          },
+          "points": {
+            "type": "object",
+            "properties": {
+              "estimatedPoints": {
+                "type": "integer"
+              },
+              "acceptedPoints": {
+                "type": "integer"
+              },
+              "excludedStories": {
+                "type": "integer",
+                "description": "Stories outside the point basis: not features or unestimated"
+              }
+            },
+            "required": ["estimatedPoints", "acceptedPoints", "excludedStories"]
+          },
+          "overdue": {
+            "type": "boolean",
+            "description": "The planned end has passed and a story is not accepted"
+          }
+        },
+        "required": [
+          "state",
+          "storyCompletionRate",
+          "stories",
+          "pointCompletionRate",
+          "points",
+          "overdue"
+        ]
+      },
+      "EpicStoryCounts": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer"
+          },
+          "accepted": {
+            "type": "integer"
+          },
+          "inProgress": {
+            "type": "integer",
+            "description": "Started, Finished, Delivered or Rejected, outside the Icebox"
+          },
+          "unstarted": {
+            "type": "integer",
+            "description": "Unstarted, outside the Icebox"
+          },
+          "icebox": {
+            "type": "integer",
+            "description": "Not accepted and in the Icebox"
+          },
+          "blocked": {
+            "type": "integer",
+            "description": "Not accepted and waiting on a blocker; overlaps other counts"
+          }
+        },
+        "required": [
+          "total",
+          "accepted",
+          "inProgress",
+          "unstarted",
+          "icebox",
+          "blocked"
+        ]
+      },
+      "EpicProgressDetailResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/EpicWithProgress"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "stories": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/EpicStory"
+                }
+              }
+            },
+            "required": ["stories"]
+          }
+        ]
+      },
+      "EpicStory": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "storyNumber": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "isIcebox": {
+            "type": "boolean"
+          },
+          "isBlocked": {
+            "type": "boolean"
+          },
+          "storyPoint": {
+            "type": "integer",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "storyNumber",
+          "title",
+          "type",
+          "status",
+          "isIcebox",
+          "isBlocked",
+          "storyPoint"
+        ]
+      },
       "EpicResponse": {
         "type": "object",
         "properties": {
@@ -2343,6 +2514,89 @@
           },
           "403": {
             "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/programmatic-api/v1/projects/{projectId}/epics/progress": {
+      "get": {
+        "operationId": "listEpicProgress",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "example": "project-123"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Epics with planning on, with progress aggregated from their stories on read. total counts a story shared by several epics once",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EpicProgressListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/programmatic-api/v1/projects/{projectId}/labels/{labelId}/epic/progress": {
+      "get": {
+        "operationId": "getLabelEpicProgress",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "example": "project-123"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "example": "label-123"
+            },
+            "required": true,
+            "name": "labelId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The epic with its progress and the stories carrying its label",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EpicProgressDetailResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Label not found, planning never turned on, or planning is off. Body: { error, code }"
           }
         }
       }

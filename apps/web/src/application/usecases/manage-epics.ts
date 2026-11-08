@@ -1,5 +1,14 @@
 import { err, ok, type Result } from "neverthrow";
 import { type Epic, hasEpicPlan } from "../../domain/entities/epic";
+import {
+  deriveEpicProgress,
+  type EpicProgress,
+  type EpicStory,
+  type EpicStoryAggregate,
+  type EpicWithProgress,
+  type StoryCounts,
+  toStoryCounts,
+} from "../../domain/entities/epic-progress";
 import type { ProjectLabel } from "../../domain/entities/project-label";
 import type { ProjectMemberRole } from "../../domain/entities/project-member";
 import type {
@@ -30,6 +39,7 @@ import {
 export const EPIC_FORBIDDEN_ERROR = "EPIC_FORBIDDEN_ERROR" as const;
 export const EPIC_LABEL_NOT_FOUND_ERROR = "EPIC_LABEL_NOT_FOUND_ERROR" as const;
 export const EPIC_NOT_FOUND_ERROR = "EPIC_NOT_FOUND_ERROR" as const;
+export const EPIC_PLANNING_OFF_ERROR = "EPIC_PLANNING_OFF_ERROR" as const;
 export const EPIC_REVISION_REQUIRED_ERROR =
   "EPIC_REVISION_REQUIRED_ERROR" as const;
 export const EPIC_REVISION_CONFLICT_ERROR =
@@ -43,6 +53,7 @@ export type ManageEpicError =
   | typeof EPIC_FORBIDDEN_ERROR
   | typeof EPIC_LABEL_NOT_FOUND_ERROR
   | typeof EPIC_NOT_FOUND_ERROR
+  | typeof EPIC_PLANNING_OFF_ERROR
   | typeof EPIC_REVISION_REQUIRED_ERROR
   | typeof EPIC_REVISION_CONFLICT_ERROR
   | typeof INVALID_EPIC_OWNER_ERROR
@@ -127,6 +138,98 @@ export async function getEpic(
     return err(epic.error);
   }
   return epic.value ? ok(epic.value) : err(EPIC_NOT_FOUND_ERROR);
+}
+
+const emptyAggregate: EpicStoryAggregate = {
+  total: 0,
+  accepted: 0,
+  inProgress: 0,
+  unstarted: 0,
+  icebox: 0,
+  blocked: 0,
+  estimatedPoints: 0,
+  acceptedPoints: 0,
+  excludedStories: 0,
+};
+
+export type EpicProgressList = {
+  epics: EpicWithProgress[];
+  /** Shared stories counted once across the listed epics. */
+  total: StoryCounts;
+};
+
+/** Epics with planning on, in plan order; each carries its progress, derived on read. */
+export async function listEpicProgress(
+  deps: Pick<EpicDependencies, "epicRepository">,
+  input: { projectId: string; today: string },
+): Promise<Result<EpicProgressList, ManageEpicError>> {
+  const epics = await deps.epicRepository.list(input.projectId);
+  if (epics.isErr()) {
+    return err(epics.error);
+  }
+  const aggregates = await deps.epicRepository.aggregateStories(
+    input.projectId,
+  );
+  if (aggregates.isErr()) {
+    return err(aggregates.error);
+  }
+  const { byEpicId, total } = aggregates.value;
+
+  return ok({
+    epics: epics.value
+      .filter((epic) => epic.enabled)
+      .map((epic) => ({
+        epic,
+        progress: deriveEpicProgress(
+          epic,
+          byEpicId.get(epic.id) ?? emptyAggregate,
+          input.today,
+        ),
+      })),
+    total: toStoryCounts(total),
+  });
+}
+
+export type EpicProgressDetail = {
+  epic: Epic;
+  progress: EpicProgress;
+  stories: EpicStory[];
+};
+
+export async function getEpicProgress(
+  deps: Pick<EpicDependencies, "epicRepository" | "labelRepository">,
+  input: EpicTarget & { today: string },
+): Promise<Result<EpicProgressDetail, ManageEpicError>> {
+  const epic = await getEpic(deps, input);
+  if (epic.isErr()) {
+    return err(epic.error);
+  }
+  if (!epic.value.enabled) {
+    return err(EPIC_PLANNING_OFF_ERROR);
+  }
+  const aggregates = await deps.epicRepository.aggregateStories(
+    input.projectId,
+    input.labelId,
+  );
+  if (aggregates.isErr()) {
+    return err(aggregates.error);
+  }
+  const stories = await deps.epicRepository.listLabelStories(
+    input.projectId,
+    input.labelId,
+  );
+  if (stories.isErr()) {
+    return err(stories.error);
+  }
+  return ok({
+    epic: epic.value,
+    progress: deriveEpicProgress(
+      epic.value,
+      aggregates.value.byEpicId.get(epic.value.id) ?? emptyAggregate,
+      input.today,
+    ),
+    stories: stories.value,
+  });
 }
 
 /**

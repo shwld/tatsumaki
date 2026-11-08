@@ -56,6 +56,12 @@ pub enum EpicSubcommand {
         project: Option<String>,
         label_id: String,
     },
+    /// Show progress of the epics with planning on, or of one label's epic with its stories
+    Progress {
+        #[arg(long)]
+        project: Option<String>,
+        label_id: Option<String>,
+    },
     /// Turn strategy planning on. Restoring a saved plan needs --revision
     Enable {
         #[arg(long)]
@@ -133,6 +139,7 @@ impl EpicSubcommand {
         match self {
             Self::List { project }
             | Self::Get { project, .. }
+            | Self::Progress { project, .. }
             | Self::Enable { project, .. }
             | Self::Disable { project, .. }
             | Self::Update { project, .. } => project,
@@ -182,6 +189,151 @@ pub struct DeletionImpact {
     pub label_name: String,
     pub story_count: i64,
     pub epic: Option<DeletionImpactEpic>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StoryCounts {
+    pub total: i64,
+    pub accepted: i64,
+    pub in_progress: i64,
+    pub unstarted: i64,
+    pub icebox: i64,
+    pub blocked: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PointCounts {
+    pub estimated_points: i64,
+    pub accepted_points: i64,
+    pub excluded_stories: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProgressInfo {
+    pub state: String,
+    pub story_completion_rate: Option<f64>,
+    pub stories: StoryCounts,
+    pub point_completion_rate: Option<f64>,
+    pub points: PointCounts,
+    pub overdue: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EpicWithProgress {
+    pub epic: EpicInfo,
+    pub progress: ProgressInfo,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EpicStoryInfo {
+    pub story_number: i64,
+    pub title: String,
+    #[serde(rename = "type")]
+    pub story_type: String,
+    pub status: String,
+    pub is_icebox: bool,
+    pub is_blocked: bool,
+    pub story_point: Option<i64>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct ProgressListBody {
+    epics: Vec<EpicWithProgress>,
+    total: StoryCounts,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct ProgressDetailBody {
+    epic: EpicInfo,
+    progress: ProgressInfo,
+    stories: Vec<EpicStoryInfo>,
+}
+
+#[derive(Tabled)]
+struct ProgressRow {
+    label: String,
+    state: String,
+    progress: String,
+    accepted: i64,
+    #[tabled(rename = "in progress")]
+    in_progress: i64,
+    unstarted: i64,
+    icebox: i64,
+    blocked: i64,
+    period: String,
+    overdue: String,
+}
+
+#[derive(Tabled)]
+struct EpicStoryRow {
+    #[tabled(rename = "#")]
+    number: i64,
+    status: String,
+    #[tabled(rename = "type")]
+    story_type: String,
+    point: String,
+    flags: String,
+    title: String,
+}
+
+fn percent(rate: Option<f64>) -> String {
+    match rate {
+        Some(rate) => format!("{:.0}%", rate * 100.0),
+        None => "-".to_string(),
+    }
+}
+
+fn progress_row(item: &EpicWithProgress) -> ProgressRow {
+    let s = &item.progress.stories;
+    ProgressRow {
+        label: item.epic.label_name.clone(),
+        state: item.progress.state.clone(),
+        progress: format!(
+            "{}/{} {}",
+            s.accepted,
+            s.total,
+            percent(item.progress.story_completion_rate)
+        ),
+        accepted: s.accepted,
+        in_progress: s.in_progress,
+        unstarted: s.unstarted,
+        icebox: s.icebox,
+        blocked: s.blocked,
+        period: period(&item.epic),
+        overdue: if item.progress.overdue {
+            "overdue"
+        } else {
+            "-"
+        }
+        .to_string(),
+    }
+}
+
+fn story_row(story: &EpicStoryInfo) -> EpicStoryRow {
+    let mut flags = Vec::new();
+    if story.is_icebox {
+        flags.push("icebox");
+    }
+    if story.is_blocked {
+        flags.push("blocked");
+    }
+    EpicStoryRow {
+        number: story.story_number,
+        status: story.status.clone(),
+        story_type: story.story_type.clone(),
+        point: story.story_point.map_or("-".to_string(), |p| p.to_string()),
+        flags: if flags.is_empty() {
+            "-".to_string()
+        } else {
+            flags.join(",")
+        },
+        title: story.title.clone(),
+    }
 }
 
 #[derive(Deserialize)]
@@ -383,7 +535,8 @@ pub async fn resolve_label_ids<T: TokenProvider + Sync>(
     let body: LabelsBody = client
         .send(reqwest::Method::GET, client.url("/labels"), None)
         .await?;
-    pick_label_ids(&body.labels, specs).map_err(|message| (CliError::Message(message), EXIT_INVALID_ARGUMENT))
+    pick_label_ids(&body.labels, specs)
+        .map_err(|message| (CliError::Message(message), EXIT_INVALID_ARGUMENT))
 }
 
 fn pick_label_ids(labels: &[LabelInfo], specs: &[String]) -> Result<Vec<String>, String> {
@@ -511,6 +664,64 @@ pub async fn run_epic<T: TokenProvider + Sync>(
             println!("{}", Table::new(rows).with(Style::sharp()));
             Ok(())
         }
+        EpicSubcommand::Progress { label_id: None, .. } => {
+            let body: ProgressListBody = client
+                .send(reqwest::Method::GET, client.url("/epics/progress"), None)
+                .await?;
+            if json {
+                return print_json(&body);
+            }
+            let rows: Vec<ProgressRow> = body.epics.iter().map(progress_row).collect();
+            println!("{}", Table::new(rows).with(Style::sharp()));
+            let t = &body.total;
+            println!(
+                "total (shared stories counted once): {}/{} accepted, {} in progress, {} unstarted, {} icebox, {} blocked",
+                t.accepted, t.total, t.in_progress, t.unstarted, t.icebox, t.blocked
+            );
+            Ok(())
+        }
+        EpicSubcommand::Progress {
+            label_id: Some(label_id),
+            ..
+        } => {
+            let body: ProgressDetailBody = client
+                .send(
+                    reqwest::Method::GET,
+                    client.label_url(label_id, "/epic/progress"),
+                    None,
+                )
+                .await?;
+            if json {
+                return print_json(&body);
+            }
+            print_epic(&body.epic, false)?;
+            let p = &body.progress;
+            println!(
+                "state: {}{}",
+                p.state,
+                if p.overdue { " (overdue)" } else { "" }
+            );
+            println!(
+                "stories: {}/{} accepted ({}), {} in progress, {} unstarted, {} icebox, {} blocked",
+                p.stories.accepted,
+                p.stories.total,
+                percent(p.story_completion_rate),
+                p.stories.in_progress,
+                p.stories.unstarted,
+                p.stories.icebox,
+                p.stories.blocked
+            );
+            println!(
+                "points (estimated features only): {}/{} accepted ({}), {} stories not counted",
+                p.points.accepted_points,
+                p.points.estimated_points,
+                percent(p.point_completion_rate),
+                p.points.excluded_stories
+            );
+            let rows: Vec<EpicStoryRow> = body.stories.iter().map(story_row).collect();
+            println!("{}", Table::new(rows).with(Style::sharp()));
+            Ok(())
+        }
         EpicSubcommand::Get { label_id, .. } => {
             let body: EpicBody = client
                 .send(
@@ -572,7 +783,11 @@ mod tests {
     use super::*;
 
     fn label(id: &str, name: &str) -> LabelInfo {
-        LabelInfo { id: id.to_string(), name: name.to_string(), color: "#000000".to_string() }
+        LabelInfo {
+            id: id.to_string(),
+            name: name.to_string(),
+            color: "#000000".to_string(),
+        }
     }
 
     #[test]
