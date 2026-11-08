@@ -277,6 +277,41 @@ export function createArtifactPinRoutes() {
   return app;
 }
 
+/**
+ * Archive and restore. A separate factory so the Web can mount it on the
+ * session routes without the title edit and upload protocol (ADR-0010 §7).
+ */
+export function createArtifactArchiveRoutes(options: WriteOptions) {
+  const app = new Hono<Env>();
+  const writeMw = composeMiddleware(options.writeMiddleware);
+
+  for (const [action, archived] of [
+    ["archive", true],
+    ["unarchive", false],
+  ] as const) {
+    app.post(
+      `/:projectId/artifacts/:artifactId/${action}`,
+      writeMw,
+      async (c) => {
+        const projectId = c.req.param("projectId");
+        const access = await requireArtifactAccess(c, projectId, {
+          write: true,
+        });
+        if (!access.ok) return access.response;
+
+        const result = await updateArtifactMetadata(
+          new D1ArtifactRepository(c.env.DB),
+          { projectId, artifactId: c.req.param("artifactId"), archived },
+        );
+        if (result.isErr()) return artifactErrorResponse(c, result.error);
+        return c.json({ artifact: toArtifactResponse(result.value) });
+      },
+    );
+  }
+
+  return app;
+}
+
 /** Title and archive changes, and the upload / publish protocol. */
 export function createArtifactWriteRoutes(options: WriteOptions) {
   const app = new Hono<Env>();
@@ -303,29 +338,7 @@ export function createArtifactWriteRoutes(options: WriteOptions) {
     return c.json({ artifact: toArtifactResponse(result.value) });
   });
 
-  for (const [action, archived] of [
-    ["archive", true],
-    ["unarchive", false],
-  ] as const) {
-    app.post(
-      `/:projectId/artifacts/:artifactId/${action}`,
-      writeMw,
-      async (c) => {
-        const projectId = c.req.param("projectId");
-        const access = await requireArtifactAccess(c, projectId, {
-          write: true,
-        });
-        if (!access.ok) return access.response;
-
-        const result = await updateArtifactMetadata(
-          new D1ArtifactRepository(c.env.DB),
-          { projectId, artifactId: c.req.param("artifactId"), archived },
-        );
-        if (result.isErr()) return artifactErrorResponse(c, result.error);
-        return c.json({ artifact: toArtifactResponse(result.value) });
-      },
-    );
-  }
+  app.route("/", createArtifactArchiveRoutes(options));
 
   app.post("/:projectId/artifact-uploads", writeMw, async (c) => {
     const projectId = c.req.param("projectId");

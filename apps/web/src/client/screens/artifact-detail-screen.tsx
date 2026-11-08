@@ -10,6 +10,7 @@ import {
   useArtifactDetail,
   useArtifactVersions,
   useMembers,
+  useSetArtifactArchived,
 } from "../hooks/use-artifact-queries";
 import { isAuthError, isHttpStatusError } from "../lib/api-error";
 import {
@@ -38,6 +39,7 @@ export function ArtifactDetailScreen() {
   const versions = useArtifactVersions(projectId, artifactId);
   const members = useMembers(projectId);
   const [expanded, setExpanded] = useState(false);
+  const setArchived = useSetArtifactArchived(projectId);
 
   const sessionExpired = [detail.error, versions.error].some(
     (error) => isHttpStatusError(error) && isAuthError(error.status),
@@ -143,6 +145,27 @@ export function ArtifactDetailScreen() {
         ) : null}
         <button
           type="button"
+          className="shrink-0 rounded border border-gray-300 px-2 py-0.5 text-xs text-gray-900"
+          disabled={setArchived.isPending}
+          onClick={() =>
+            setArchived.mutate(
+              { artifactId, archived: !artifact.archivedAt },
+              {
+                onSuccess: () => {
+                  void detail.refetch();
+                },
+              },
+            )
+          }
+        >
+          {t(
+            artifact.archivedAt
+              ? "artifactScreens.detail.restoreAction"
+              : "artifactScreens.detail.archiveAction",
+          )}
+        </button>
+        <button
+          type="button"
           className="inline-flex size-7 shrink-0 items-center justify-center rounded text-gray-600 hover:bg-gray-100"
           aria-expanded={expanded}
           aria-controls="artifact-details"
@@ -156,6 +179,17 @@ export function ArtifactDetailScreen() {
           <Info className="size-4" aria-hidden="true" />
         </button>
       </div>
+
+      {setArchived.isError ? (
+        <p role="alert" className="mt-1 text-sm text-red-700">
+          {t(
+            isHttpStatusError(setArchived.error) &&
+              setArchived.error.status === 403
+              ? "artifactScreens.list.archiveForbidden"
+              : "artifactScreens.list.archiveError",
+          )}
+        </p>
+      ) : null}
 
       {expanded ? (
         <div id="artifact-details" className="mt-2 text-sm">
