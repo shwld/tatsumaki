@@ -49,6 +49,19 @@ function toPlan(draft: Draft): EpicPlanInput {
   };
 }
 
+/** Fields the user has not edited follow the latest epic, so unsaved edits survive and nothing newer is overwritten. */
+function mergeDraft(current: Draft, before: Epic | null, latest: Epic): Draft {
+  const base = toDraft(before);
+  const next = toDraft(latest);
+  const merged = { ...current };
+  for (const key of Object.keys(base) as (keyof Draft)[]) {
+    if (current[key] === base[key]) {
+      (merged[key] as string) = next[key];
+    }
+  }
+  return merged;
+}
+
 type FieldErrorKey = "description" | "successCriteria" | "period";
 
 export function validateDraft(draft: Draft): FieldErrorKey[] {
@@ -125,7 +138,7 @@ export function LabelPlanRow({
       return;
     }
     onEpicChange(result.value);
-    setDraft(toDraft(result.value));
+    setDraft((current) => mergeDraft(current, epic, result.value));
   };
 
   const handleSave = async (event: FormEvent) => {
@@ -172,18 +185,7 @@ export function LabelPlanRow({
       });
       return;
     }
-    const base = toDraft(epic);
-    const latest = toDraft(result.value);
-    // Fields this user did not touch follow the latest version, so saving again cannot overwrite someone else's change.
-    setDraft((current) => {
-      const merged = { ...current };
-      for (const key of Object.keys(base) as (keyof Draft)[]) {
-        if (current[key] === base[key]) {
-          (merged[key] as string) = latest[key];
-        }
-      }
-      return merged;
-    });
+    setDraft((current) => mergeDraft(current, epic, result.value));
     onEpicChange(result.value);
     setNotice({ kind: "refreshed" });
   };

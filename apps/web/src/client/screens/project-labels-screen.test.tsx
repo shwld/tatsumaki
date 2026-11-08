@@ -225,6 +225,43 @@ describe("ProjectLabelsScreen", () => {
     expect(enable?.body).toEqual({ revision: 2 });
   });
 
+  it("keeps unsaved edits when planning is turned off and on again", async () => {
+    mockApi({
+      epics: [epicOf({ description: "Saved" })],
+      onRequest: (call) => {
+        if (call.url.endsWith("/epic/disable")) {
+          return new Response(
+            JSON.stringify({
+              epic: epicOf({
+                enabled: false,
+                description: "Saved",
+                revision: 2,
+              }),
+            }),
+            { status: 200 },
+          );
+        }
+        if (call.url.endsWith("/epic/enable")) {
+          return new Response(
+            JSON.stringify({
+              epic: epicOf({ description: "Saved", revision: 3 }),
+            }),
+            { status: 200 },
+          );
+        }
+        return undefined;
+      },
+    });
+    const user = userEvent.setup();
+    renderScreen();
+
+    await user.type(await screen.findByLabelText("目的"), " + unsaved");
+    await user.click(growthSwitch());
+    await waitFor(() => expect(screen.queryByLabelText("目的")).toBeNull());
+    await user.click(growthSwitch());
+    expect(await screen.findByLabelText("目的")).toHaveValue("Saved + unsaved");
+  });
+
   it("keeps the input on a conflict and retries with the latest revision", async () => {
     let patchCount = 0;
     const calls = mockApi({
