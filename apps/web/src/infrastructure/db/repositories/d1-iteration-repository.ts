@@ -17,6 +17,7 @@ import type {
 import {
   ITERATION_DATE_OVERLAP_ERROR,
   ITERATION_NOT_FOUND_ERROR,
+  ITERATION_STORY_STATUS_CONFLICT_ERROR,
   ITERATION_REPOSITORY_ERROR,
 } from "../../../domain/repositories/iteration-repository";
 import { STORY_ARCHIVED_ERROR } from "../../../domain/repositories/story-repository";
@@ -433,11 +434,21 @@ export class D1IterationRepository implements IterationRepository {
           eq(storiesTable.projectId, input.projectId),
           eq(storiesTable.id, input.storyId),
           isNull(storiesTable.archivedAt),
+          ...(input.requiredStatus
+            ? [eq(storiesTable.status, input.requiredStatus)]
+            : []),
         ),
       )
       .returning({ id: storiesTable.id });
 
-    return updated.length > 0 ? ok(true) : err(STORY_ARCHIVED_ERROR);
+    if (updated.length > 0) {
+      return ok(true);
+    }
+    return err(
+      input.requiredStatus
+        ? ITERATION_STORY_STATUS_CONFLICT_ERROR
+        : STORY_ARCHIVED_ERROR,
+    );
   }
 
   async updateUtilization(

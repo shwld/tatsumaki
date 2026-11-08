@@ -1,5 +1,6 @@
 import type { Result } from "neverthrow";
 import type { Iteration, IterationOverride } from "../entities/iteration";
+import type { StoryStatus } from "../entities/story";
 import type { STORY_ARCHIVED_ERROR } from "./story-repository";
 
 export type CreateIterationInput = {
@@ -17,6 +18,8 @@ export type AssignStoryInput = {
 export type UnassignStoryInput = {
   projectId: string;
   storyId: string;
+  /** When set, the assignment is cleared only while the story still has this status. */
+  requiredStatus?: StoryStatus;
 };
 
 export type UpdateIterationUtilizationInput = {
@@ -31,11 +34,14 @@ export const ITERATION_REPOSITORY_ERROR = "ITERATION_REPOSITORY_ERROR" as const;
 export const ITERATION_NOT_FOUND_ERROR = "ITERATION_NOT_FOUND_ERROR" as const;
 export const ITERATION_DATE_OVERLAP_ERROR =
   "ITERATION_DATE_OVERLAP_ERROR" as const;
+export const ITERATION_STORY_STATUS_CONFLICT_ERROR =
+  "ITERATION_STORY_STATUS_CONFLICT_ERROR" as const;
 
 export type IterationRepositoryError =
   | typeof ITERATION_REPOSITORY_ERROR
   | typeof ITERATION_NOT_FOUND_ERROR
   | typeof ITERATION_DATE_OVERLAP_ERROR
+  | typeof ITERATION_STORY_STATUS_CONFLICT_ERROR
   | typeof STORY_ARCHIVED_ERROR;
 
 export interface IterationRepository {

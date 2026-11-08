@@ -1,8 +1,9 @@
 import { err, ok, type Result } from "neverthrow";
 import type { Story } from "../../domain/entities/story";
-import type {
-  IterationRepository,
-  IterationRepositoryError,
+import {
+  ITERATION_STORY_STATUS_CONFLICT_ERROR,
+  type IterationRepository,
+  type IterationRepositoryError,
 } from "../../domain/repositories/iteration-repository";
 import {
   STORY_ARCHIVED_ERROR,
@@ -52,9 +53,14 @@ export async function unassignStoryIterationByNumber(
   const unassigned = await iterationRepository.unassignStory({
     projectId: input.projectId,
     storyId: story.id,
+    requiredStatus: "Unstarted",
   });
   if (unassigned.isErr()) {
-    return err(unassigned.error);
+    return err(
+      unassigned.error === ITERATION_STORY_STATUS_CONFLICT_ERROR
+        ? STORY_ITERATION_UNASSIGN_INVALID_STATUS_ERROR
+        : unassigned.error,
+    );
   }
   if (!unassigned.value) {
     return err(STORY_ITERATION_UNASSIGN_NOT_FOUND_ERROR);
