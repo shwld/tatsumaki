@@ -59,15 +59,15 @@ function epicsProgress() {
   });
   return [
     {
-      epic: epic("growth", "growth", "#2563eb", "2026-10-01", "2027-01-31"),
+      epic: epic("growth", "growth", "#2563eb", "2026-06-01", "2026-09-30"),
       progress: progress(10, 4),
     },
     {
-      epic: epic("ops", "ops", "#16a34a", "2026-09-01", "2026-10-31"),
+      epic: epic("ops", "ops", "#16a34a", "2026-04-15", "2026-06-30"),
       progress: progress(5, 3, true),
     },
     {
-      epic: epic("research", "research", "#9333ea", "2026-12-01", "2027-02-28"),
+      epic: epic("research", "research", "#9333ea", "2026-07-01", "2026-08-31"),
       progress: progress(0, 0),
     },
     {
@@ -77,6 +77,10 @@ function epicsProgress() {
     {
       epic: epic("someday", "someday", "#f59e0b", null, null),
       progress: progress(2, 0),
+    },
+    {
+      epic: epic("far", "far", "#db2777", "2027-02-01", "2027-03-31"),
+      progress: progress(3, 1),
     },
   ];
 }
@@ -186,7 +190,6 @@ for (const theme of themeVariants) {
   });
 
   test(`project epics timeline screen (${theme})`, async ({ page }) => {
-    await page.clock.setFixedTime(new Date("2026-11-08T00:00:00Z"));
     await setThemeMode(page, theme);
     await mockAuthMe(page);
     await mockStoriesList(page);
@@ -197,7 +200,7 @@ for (const theme of themeVariants) {
     await page.goto("/projects/project-1/epics");
     await expect(page.getByRole("heading", { name: "Epics" })).toBeVisible();
     await expect(
-      page.getByRole("link", { name: /growth: 2026-10-01/ }),
+      page.getByRole("link", { name: /growth: 2026-06-01/ }),
     ).toBeVisible();
     await expect(page).toHaveScreenshot(
       resolveSnapshotName("project-epics.png", theme),
@@ -205,7 +208,6 @@ for (const theme of themeVariants) {
   });
 
   test(`project epic detail screen (${theme})`, async ({ page }) => {
-    await page.clock.setFixedTime(new Date("2026-11-08T00:00:00Z"));
     await setThemeMode(page, theme);
     await mockAuthMe(page);
     await mockStoriesList(page);
