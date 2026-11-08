@@ -10,6 +10,7 @@ type SiteverifyResponse = {
   success?: boolean;
   hostname?: string;
   action?: string;
+  "error-codes"?: string[];
 };
 
 // Cloudflare invalidates a token after one Siteverify call, which is what makes it single use.
@@ -35,17 +36,31 @@ export class CloudflareTurnstileVerifier implements TurnstileVerifier {
         body,
       });
       if (!response.ok) {
+        console.warn("Turnstile Siteverify request failed", {
+          status: response.status,
+        });
         return false;
       }
       result = (await response.json()) as SiteverifyResponse;
-    } catch {
+    } catch (error) {
+      console.warn("Turnstile Siteverify request errored", {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return false;
     }
 
-    return (
+    const verified =
       result.success === true &&
       result.hostname === input.hostname &&
-      result.action === input.action
-    );
+      result.action === input.action;
+    if (!verified) {
+      console.warn("Turnstile verification rejected", {
+        success: result.success === true,
+        errorCodes: result["error-codes"] ?? [],
+        hostnameMatches: result.hostname === input.hostname,
+        actionMatches: result.action === input.action,
+      });
+    }
+    return verified;
   }
 }
