@@ -2,6 +2,21 @@ export function projectStoriesPath(projectId: string): string {
   return `/projects/${projectId}/stories`;
 }
 
+export function projectEpicsPath(projectId: string): string {
+  return `/projects/${projectId}/epics`;
+}
+
+export function projectEpicPath(projectId: string, labelId: string): string {
+  return `${projectEpicsPath(projectId)}/${encodeURIComponent(labelId)}`;
+}
+
+export function projectStoriesByLabelPath(
+  projectId: string,
+  labelId: string,
+): string {
+  return `${projectStoriesPath(projectId)}?labelIds=${encodeURIComponent(labelId)}`;
+}
+
 export function projectVelocityDashboardPath(projectId: string): string {
   return `/projects/${projectId}/velocity`;
 }

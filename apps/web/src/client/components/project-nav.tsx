@@ -5,6 +5,7 @@ import { Link, useLocation, useMatch } from "react-router";
 import { useBreakpoint } from "../hooks/use-breakpoint";
 import { projectArtifactsPath } from "../lib/artifact-routes";
 import {
+  projectEpicsPath,
   projectHistoryPath,
   projectMembersPath,
   projectSettingsPath,
@@ -80,6 +81,7 @@ function ProjectNavContent({ projectId }: { projectId: string }) {
       to: projectVelocityDashboardPath(projectId),
       label: t("projectNav.velocity"),
     },
+    { to: projectEpicsPath(projectId), label: t("projectNav.epics") },
     { to: projectHistoryPath(projectId), label: t("projectNav.history") },
     { to: projectArtifactsPath(projectId), label: t("projectNav.artifacts") },
     { to: projectMembersPath(projectId), label: t("projectNav.members") },

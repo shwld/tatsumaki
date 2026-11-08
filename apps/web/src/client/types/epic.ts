@@ -31,3 +31,33 @@ export type EpicPlanInput = {
   plannedEnd: string | null;
   outcomeStatus: EpicOutcomeStatus;
 };
+
+export type EpicProgressState =
+  | "no_stories"
+  | "not_started"
+  | "in_progress"
+  | "completed";
+
+export type EpicStoryCounts = {
+  total: number;
+  accepted: number;
+  inProgress: number;
+  unstarted: number;
+  icebox: number;
+  blocked: number;
+};
+
+export type EpicProgress = {
+  state: EpicProgressState;
+  storyCompletionRate: number | null;
+  stories: EpicStoryCounts;
+  pointCompletionRate: number | null;
+  points: {
+    estimatedPoints: number;
+    acceptedPoints: number;
+    excludedStories: number;
+  };
+  overdue: boolean;
+};
+
+export type EpicWithProgress = { epic: Epic; progress: EpicProgress };
