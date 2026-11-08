@@ -696,6 +696,137 @@ describe("cli route", () => {
       expect(response.status).toBe(400);
     });
   });
+
+  describe("story iteration unassign", () => {
+    const apiBase = (projectId: string) =>
+      `https://localhost/programmatic-api/v1/projects/${projectId}`;
+
+    const createStory = async (projectId: string) => {
+      const accessToken = await issueAccessTokenForCliV1();
+      const response = await SELF.fetch(`${apiBase(projectId)}/stories`, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${accessToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ title: "Assigned", type: "feature" }),
+      });
+      expect(response.status).toBe(201);
+      return (
+        (await response.json()) as {
+          story: { id: string; storyNumber: number };
+        }
+      ).story;
+    };
+
+    const assignToIteration = async (projectId: string, storyId: string) => {
+      await env.DB.prepare(
+        "insert into iterations (id, project_id, iteration_number, start_date, end_date) values (?, ?, ?, ?, ?)",
+      )
+        .bind("iter-1", projectId, 1, "2026-01-01", "2026-01-15")
+        .run();
+      await env.DB.prepare("update stories set iteration_id = ? where id = ?")
+        .bind("iter-1", storyId)
+        .run();
+    };
+
+    const readStoryRow = (storyId: string) =>
+      env.DB.prepare(
+        "select iteration_id, status, position from stories where id = ?",
+      )
+        .bind(storyId)
+        .first<{
+          iteration_id: string | null;
+          status: string;
+          position: number;
+        }>();
+
+    const unassign = async (
+      projectId: string,
+      storyNumber: number | string,
+    ) => {
+      const accessToken = await issueAccessTokenForCliV1();
+      return SELF.fetch(
+        `${apiBase(projectId)}/stories/${storyNumber}/iteration`,
+        {
+          method: "DELETE",
+          headers: { authorization: `Bearer ${accessToken}` },
+        },
+      );
+    };
+
+    it("clears the iteration without touching status or position", async () => {
+      const projectId = await createProject();
+      const story = await createStory(projectId);
+      await assignToIteration(projectId, story.id);
+      const before = await readStoryRow(story.id);
+
+      const response = await unassign(projectId, story.storyNumber);
+      expect(response.status).toBe(200);
+      const body = (await response.json()) as {
+        story: { iterationId: string | null; status: string };
+        changed: boolean;
+      };
+      expect(body.changed).toBe(true);
+      expect(body.story.iterationId).toBeNull();
+      expect(body.story.status).toBe("Unstarted");
+
+      const after = await readStoryRow(story.id);
+      expect(after).toEqual({ ...before, iteration_id: null });
+    });
+
+    it("is idempotent when the story has no iteration", async () => {
+      const projectId = await createProject();
+      const story = await createStory(projectId);
+
+      const response = await unassign(projectId, story.storyNumber);
+      expect(response.status).toBe(200);
+      expect(((await response.json()) as { changed: boolean }).changed).toBe(
+        false,
+      );
+    });
+
+    it("rejects stories that are not Unstarted", async () => {
+      const projectId = await createProject();
+      const story = await createStory(projectId);
+      await assignToIteration(projectId, story.id);
+      await env.DB.prepare("update stories set status = 'Started' where id = ?")
+        .bind(story.id)
+        .run();
+
+      const response = await unassign(projectId, story.storyNumber);
+      expect(response.status).toBe(409);
+      expect((await readStoryRow(story.id))?.iteration_id).toBe("iter-1");
+    });
+
+    it("rejects archived stories", async () => {
+      const projectId = await createProject();
+      const story = await createStory(projectId);
+      await assignToIteration(projectId, story.id);
+      await env.DB.prepare(
+        "update stories set archived_at = CURRENT_TIMESTAMP where id = ?",
+      )
+        .bind(story.id)
+        .run();
+
+      const response = await unassign(projectId, story.storyNumber);
+      expect(response.status).toBe(409);
+      expect((await readStoryRow(story.id))?.iteration_id).toBe("iter-1");
+    });
+
+    it("returns 404 for unknown stories and does not cross projects", async () => {
+      const projectId = await createProject();
+      const otherProjectId = await createProject();
+      const story = await createStory(projectId);
+      await assignToIteration(projectId, story.id);
+
+      expect((await unassign(projectId, 9999)).status).toBe(404);
+      expect((await unassign(projectId, "abc")).status).toBe(404);
+      const crossProject = await unassign(otherProjectId, story.storyNumber);
+      expect(crossProject.status).toBe(404);
+      expect((await readStoryRow(story.id))?.iteration_id).toBe("iter-1");
+    });
+  });
 });
 
 async function createProject() {

@@ -242,6 +242,15 @@ enum StorySubcommand {
         #[arg(long = "ordered-id")]
         ordered_ids: Vec<String>,
     },
+    /// Remove an Unstarted story from its iteration so it returns to the Backlog
+    ///
+    /// Only the iteration assignment is cleared; status, position and points are unchanged.
+    /// Re-running on a story that is not assigned succeeds with `changed: false`.
+    UnassignIteration {
+        #[arg(long)]
+        project: Option<String>,
+        story_number: i64,
+    },
 }
 
 impl StorySubcommand {
@@ -256,7 +265,8 @@ impl StorySubcommand {
             | Self::Comment { project, .. }
             | Self::Block { project, .. }
             | Self::Unblock { project, .. }
-            | Self::Reorder { project, .. } => project,
+            | Self::Reorder { project, .. }
+            | Self::UnassignIteration { project, .. } => project,
         }
     }
 
@@ -313,6 +323,14 @@ fn describe_story_blocker_change(
         (StoryBlockerAction::Remove, false) => {
             format!("登録されていません: #{blocked} は #{blocking} にブロックされていません")
         }
+    }
+}
+
+fn describe_story_iteration_unassign(story_number: i64, changed: bool) -> String {
+    if changed {
+        format!("#{story_number} を iteration から外しました(Backlog に戻りました)")
+    } else {
+        format!("iteration に割り当てられていません: #{story_number}")
     }
 }
 
@@ -934,6 +952,28 @@ async fn run() -> Result<(), (CliError, i32)> {
                         );
                     }
                 }
+                StorySubcommand::UnassignIteration {
+                    project,
+                    story_number,
+                } => {
+                    let project = require_project(project)?;
+                    let body = service
+                        .unassign_story_iteration(&base_url, &project, story_number)
+                        .await?;
+                    if cli.json {
+                        println!(
+                            "{}",
+                            serde_json::to_string_pretty(&body)
+                                .map_err(|e| (CliError::Json(e), EXIT_GENERAL))?
+                        );
+                    } else {
+                        let changed = body
+                            .get("changed")
+                            .and_then(|v| v.as_bool())
+                            .unwrap_or(true);
+                        println!("{}", describe_story_iteration_unassign(story_number, changed));
+                    }
+                }
                 StorySubcommand::Reorder {
                     project,
                     ordered_ids,
@@ -1168,6 +1208,31 @@ mod tests {
         }
         let parsed = Cli::try_parse_from(["tm", "story", "list", "--archived"]).unwrap();
         assert!(matches!(parsed.command, Commands::Story(StoryCommand { command: StorySubcommand::List { archived: true, .. } })));
+    }
+
+    #[test]
+    fn story_unassign_iteration_parses_and_reports_result() {
+        let parsed = Cli::try_parse_from([
+            "tm",
+            "story",
+            "unassign-iteration",
+            "--project",
+            "p",
+            "389",
+        ])
+        .expect("unassign-iteration should parse");
+        assert!(matches!(
+            parsed.command,
+            Commands::Story(StoryCommand {
+                command: StorySubcommand::UnassignIteration {
+                    story_number: 389,
+                    ..
+                }
+            })
+        ));
+        assert!(Cli::try_parse_from(["tm", "story", "unassign-iteration"]).is_err());
+        assert!(describe_story_iteration_unassign(389, true).contains("Backlog"));
+        assert!(describe_story_iteration_unassign(389, false).contains("割り当てられていません"));
     }
 
     #[test]

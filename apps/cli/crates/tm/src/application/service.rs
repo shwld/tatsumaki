@@ -283,6 +283,25 @@ where
         }
     }
 
+    pub async fn unassign_story_iteration(&self, base_url: &str, project: &str, story_number: i64) -> Result<serde_json::Value, (CliError, i32)> {
+        let mut token = self.ensure_access_token(base_url).await?;
+        match self.story_gateway.unassign_story_iteration(project, story_number, &token).await {
+            Ok(body) => Ok(body),
+            Err(e) if crate::is_unauthorized(&e) => {
+                let mut cache = self.token_store.load().map_err(|err| (err, EXIT_AUTH))?;
+                token = self.refresh_access_token(base_url, &mut cache).await?;
+                self.story_gateway.unassign_story_iteration(project, story_number, &token).await.map_err(|err| {
+                    let code = crate::exit_code_for_error(&err);
+                    (err, code)
+                })
+            }
+            Err(e) => {
+                let code = crate::exit_code_for_error(&e);
+                Err((e, code))
+            }
+        }
+    }
+
     pub async fn whoami(&self, base_url: &str) -> Result<WhoamiResponse, (CliError, i32)> {
         let mut token = self.ensure_access_token(base_url).await?;
         match self.user_gateway.whoami(&token).await {

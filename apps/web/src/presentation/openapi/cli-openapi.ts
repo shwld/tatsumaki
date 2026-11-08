@@ -142,6 +142,13 @@ const StoryGetResponseSchema = z
   })
   .openapi("StoryGetResponse");
 
+const StoryIterationUnassignResponseSchema = z
+  .object({
+    story: StoryDetailSchema,
+    changed: z.boolean(),
+  })
+  .openapi("StoryIterationUnassignResponse");
+
 const StoryListResponseSchema = z
   .object({
     stories: z.array(StorySummarySchema),
@@ -581,6 +588,29 @@ export function buildCliOpenApiDoc() {
     });
     app.openapi(route, (c) => c.json({ story: storyDetailExample() }));
   }
+
+  const unassignStoryIterationRoute = createRoute({
+    operationId: "unassignStoryIteration",
+    method: "delete",
+    path: "/programmatic-api/v1/projects/{projectId}/stories/{storyNumber}/iteration",
+    request: { params: StoryByNumberParamsSchema },
+    responses: {
+      200: {
+        description:
+          "Story removed from its iteration (changed=false when it was not assigned)",
+        content: {
+          "application/json": { schema: StoryIterationUnassignResponseSchema },
+        },
+      },
+      401: { description: "Unauthorized" },
+      403: { description: "Forbidden" },
+      404: { description: "Story not found" },
+      409: { description: "Story is archived or not Unstarted" },
+    },
+  });
+  app.openapi(unassignStoryIterationRoute, (c) =>
+    c.json({ story: storyDetailExample(), changed: true }, 200),
+  );
 
   const createStoryCommentRoute = createRoute({
     operationId: "createStoryComment",

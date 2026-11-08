@@ -246,6 +246,15 @@ impl StoryGateway for HttpStoryGateway {
     }
     Err(Self::error_from_response(response).await)
   }
+
+  async fn unassign_story_iteration(&self, project: &str, story_number: i64, bearer_token: &str) -> Result<serde_json::Value, CliError> {
+    let url = format!("{}/programmatic-api/v1/projects/{project}/stories/{story_number}/iteration", self.base_url);
+    let response = self.client.delete(url).bearer_auth(bearer_token).send().await?;
+    if response.status().is_success() {
+      return Ok(response.json().await?);
+    }
+    Err(Self::error_from_response(response).await)
+  }
 }
 
 fn story_update_payload(input: &StoryUpdateInput) -> serde_json::Value {

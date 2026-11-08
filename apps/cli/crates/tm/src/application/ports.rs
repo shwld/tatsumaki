@@ -205,6 +205,12 @@ pub trait StoryGateway {
         input: &StoryBlockerInput,
         bearer_token: &str,
     ) -> Result<serde_json::Value, CliError>;
+    async fn unassign_story_iteration(
+        &self,
+        project: &str,
+        story_number: i64,
+        bearer_token: &str,
+    ) -> Result<serde_json::Value, CliError>;
 }
 
 #[async_trait::async_trait]
