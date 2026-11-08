@@ -196,7 +196,7 @@ describe("ProjectEpicsScreen", () => {
       "Epic の読み込みに失敗しました",
     );
   });
-  it("keeps a bar for a very short epic wide enough to read and click", async () => {
+  it("keeps a very short epic bar tied to its dates and labels it beside the bar", async () => {
     mockFetch(() => ({
       epics: [
         item({
@@ -211,6 +211,8 @@ describe("ProjectEpicsScreen", () => {
 
     const link = await screen.findByRole("link", { name: /short: 2026-11-02/ });
     expect(link.style.minWidth).not.toBe("");
+    expect(link).not.toHaveTextContent("short");
+    expect(screen.getByText("short")).toBeInTheDocument();
   });
 });
 
@@ -279,7 +281,7 @@ describe("ProjectEpicDetailScreen", () => {
     expect(await screen.findAllByText("story 未登録")).not.toHaveLength(0);
     expect(screen.getByText("期間未設定")).toBeInTheDocument();
     expect(
-      screen.getByText("見積り済みの feature がありません"),
+      screen.getByText(/ポイントの集計対象がありません/),
     ).toBeInTheDocument();
   });
 

@@ -69,7 +69,8 @@ export const projectEpicsScreenJa = {
     },
     points: "ポイント（補助）",
     pointsRate: "{{accepted}}/{{estimated}} pt（{{percent}}%）",
-    pointsNone: "見積り済みの feature がありません",
+    pointsNone:
+      "ポイントの集計対象がありません（見積り済みの feature が無い、またはポイントが 0）",
     pointsExcluded: "集計対象外の story: {{count}} 件",
     openStories: "この Label の Stories を開く",
     editPlan: "計画を編集",
@@ -148,7 +149,8 @@ export const projectEpicsScreenEn = {
     },
     points: "Points (supplementary)",
     pointsRate: "{{accepted}}/{{estimated}} pts ({{percent}}%)",
-    pointsNone: "No estimated features",
+    pointsNone:
+      "Nothing to measure in points (no estimated features, or all estimates are 0)",
     pointsExcluded: "Stories outside the point basis: {{count}}",
     openStories: "Open Stories filtered by this label",
     editPlan: "Edit plan",

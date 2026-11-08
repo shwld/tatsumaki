@@ -23,7 +23,8 @@ import {
 } from "../lib/story-routes";
 import type { EpicWithProgress } from "../types/epic";
 
-const MIN_BAR_WIDTH = "6rem";
+const MIN_BAR_WIDTH = "0.5rem";
+const INLINE_LABEL_MIN_PERCENT = 18;
 
 const percent = (rate: number | null) => Math.round((rate ?? 0) * 100);
 
@@ -323,6 +324,18 @@ function TimelineRow({
 }) {
   const { t } = useTranslation();
   const { epic, progress } = item;
+  const inlineLabel = bar.widthPercent >= INLINE_LABEL_MIN_PERCENT;
+  const labelContent = (
+    <>
+      <span className="font-medium">{epic.labelName}</span>
+      <span>
+        {t("projectEpicsScreen.progress", {
+          percent: percent(progress.storyCompletionRate),
+        })}
+      </span>
+      <EpicBadges item={item} />
+    </>
+  );
   return (
     <li className="relative h-9">
       <Link
@@ -346,7 +359,7 @@ function TimelineRow({
           progress.overdue ? "border-red-600" : ""
         }`}
         style={{
-          left: `min(${bar.leftPercent}%, calc(100% - ${MIN_BAR_WIDTH}))`,
+          left: `${bar.leftPercent}%`,
           width: `${bar.widthPercent}%`,
           minWidth: MIN_BAR_WIDTH,
         }}
@@ -359,16 +372,27 @@ function TimelineRow({
             backgroundColor: epic.labelColor,
           }}
         />
-        <span className="relative flex items-center gap-2 whitespace-nowrap px-2">
-          <span className="font-medium">{epic.labelName}</span>
-          <span>
-            {t("projectEpicsScreen.progress", {
-              percent: percent(progress.storyCompletionRate),
-            })}
+        {inlineLabel ? (
+          <span className="relative flex items-center gap-2 whitespace-nowrap px-2">
+            {labelContent}
           </span>
-          <EpicBadges item={item} />
-        </span>
+        ) : null}
       </Link>
+      {inlineLabel ? null : (
+        <Link
+          to={projectEpicPath(projectId, epic.labelId)}
+          aria-hidden
+          tabIndex={-1}
+          className="absolute inset-y-0 flex items-center gap-2 whitespace-nowrap px-2 text-xs text-gray-900"
+          style={
+            bar.leftPercent < 60
+              ? { left: `${bar.leftPercent + bar.widthPercent}%` }
+              : { right: `${100 - bar.leftPercent}%` }
+          }
+        >
+          {labelContent}
+        </Link>
+      )}
     </li>
   );
 }
