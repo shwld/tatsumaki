@@ -402,6 +402,55 @@ describe("label strategy planning (epics)", () => {
     expect(JSON.stringify(await response.json())).toContain("addLabelIds");
   });
 
+  it("does not let viewers delete a label and its plan with it", async () => {
+    const labelId = await createLabel("onboarding");
+    await enable(labelId);
+    await addMember(VIEWER, "viewer");
+
+    for (const response of [
+      await call("DELETE", web(`/labels/${labelId}`), { as: VIEWER }),
+      await call("PATCH", web(`/labels/${labelId}`), {
+        as: VIEWER,
+        body: { name: "renamed" },
+      }),
+      await call("POST", web("/labels"), {
+        as: VIEWER,
+        body: { name: "new", color: "#3b82f6" },
+      }),
+    ]) {
+      expect(response.status).toBe(403);
+    }
+    const listed = await json<{ epics: EpicPayload[] }>(
+      await call("GET", api("/epics")),
+    );
+    expect(listed.epics.map((epic) => epic.labelName)).toEqual(["onboarding"]);
+  });
+
+  it("filters an epic's stories by its label", async () => {
+    const labelId = await createLabel("onboarding");
+    const epic = await epicOf(await enable(labelId));
+    const created = await json<{ story: { id: string; storyNumber: number } }>(
+      await call("POST", web("/stories"), { body: { title: "with label" } }),
+    );
+    await call("POST", web("/stories"), { body: { title: "without label" } });
+    const titles = async () =>
+      (
+        await json<{ stories: Array<{ title: string }> }>(
+          await call("GET", web(`/stories?epicIds=${epic.id}`)),
+        )
+      ).stories.map((story) => story.title);
+
+    expect(await titles()).toEqual([]);
+    await call("PATCH", web(`/stories/${created.story.storyNumber}`), {
+      body: { addLabelIds: [labelId] },
+    });
+    expect(await titles()).toEqual(["with label"]);
+    await call("PATCH", web(`/stories/${created.story.storyNumber}`), {
+      body: { removeLabelIds: [labelId] },
+    });
+    expect(await titles()).toEqual([]);
+  });
+
   describe("MCP", () => {
     const callTool = async (name: string, args: Record<string, unknown>) => {
       tokens.mcp ??= await issueAccessToken(
