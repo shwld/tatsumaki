@@ -952,6 +952,8 @@ export function StoryMultiPanelScreen() {
             story: latestServerStory,
             nextStatus: queuedStatus,
             currentIterationId: currentIteration?.id ?? null,
+            hasNewerPendingStatus: () =>
+              (pendingStatusRef.current.get(story.id)?.length ?? 0) > 0,
           });
           const latestOptimistic = optimisticStoryRef.current.get(story.id);
           if (
