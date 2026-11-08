@@ -34,7 +34,7 @@ export function ArtifactListScreen() {
           {t("artifactScreens.list.empty")}
         </p>
       ) : (
-        <ul className="max-w-3xl space-y-2">
+        <ul className="space-y-2">
           {query.data.artifacts.map((artifact) => (
             <li
               key={artifact.id}
