@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router";
+import { MemoryRouter, Route, Routes, useNavigate } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthErrorProvider } from "../contexts/auth-error-context";
@@ -79,6 +79,15 @@ function renderAt(path: string) {
         </Routes>
       </AuthErrorProvider>
     </MemoryRouter>,
+  );
+}
+
+function NavigateOnClick({ to }: { to: string }) {
+  const navigate = useNavigate();
+  return (
+    <button type="button" onClick={() => navigate(to)}>
+      go-b
+    </button>
   );
 }
 
@@ -187,6 +196,22 @@ describe("ProjectEpicsScreen", () => {
       "Epic の読み込みに失敗しました",
     );
   });
+  it("keeps a bar for a very short epic wide enough to read and click", async () => {
+    mockFetch(() => ({
+      epics: [
+        item({
+          labelId: "label-short",
+          labelName: "short",
+          plannedStart: "2026-11-02",
+          plannedEnd: "2026-11-03",
+        }),
+      ],
+    }));
+    renderAt(`/projects/${PROJECT_ID}/epics`);
+
+    const link = await screen.findByRole("link", { name: /short: 2026-11-02/ });
+    expect(link.style.minWidth).not.toBe("");
+  });
 });
 
 describe("ProjectEpicDetailScreen", () => {
@@ -265,5 +290,57 @@ describe("ProjectEpicDetailScreen", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "計画管理が OFF の可能性があります",
     );
+  });
+
+  it("does not keep showing the previous epic while another one loads", async () => {
+    let release: (() => void) | undefined;
+    vi.mocked(fetch).mockImplementation(async (input) => {
+      const url = typeof input === "string" ? input : "";
+      if (url.includes("label-b")) {
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+      }
+      const labelName = url.includes("label-b") ? "beta" : "alpha";
+      return new Response(
+        JSON.stringify(
+          item({
+            labelId: url.includes("label-b") ? "label-b" : "label-a",
+            labelName,
+          }),
+        ),
+        { status: 200 },
+      );
+    });
+    const view = render(
+      <MemoryRouter initialEntries={[`/projects/${PROJECT_ID}/epics/label-a`]}>
+        <AuthErrorProvider>
+          <Routes>
+            <Route
+              path="/projects/:projectId/epics/:labelId"
+              element={<ProjectEpicDetailScreen />}
+            />
+          </Routes>
+          <NavigateOnClick to={`/projects/${PROJECT_ID}/epics/label-b`} />
+        </AuthErrorProvider>
+      </MemoryRouter>,
+    );
+    expect(
+      await screen.findByRole("heading", { name: "alpha" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "go-b" }));
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("heading", { name: "alpha" }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(screen.getByRole("status")).toBeInTheDocument();
+    release?.();
+    expect(
+      await screen.findByRole("heading", { name: "beta" }),
+    ).toBeInTheDocument();
+    view.unmount();
   });
 });

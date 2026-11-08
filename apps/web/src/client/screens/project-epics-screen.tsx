@@ -23,6 +23,8 @@ import {
 } from "../lib/story-routes";
 import type { EpicWithProgress } from "../types/epic";
 
+const MIN_BAR_WIDTH = "6rem";
+
 const percent = (rate: number | null) => Math.round((rate ?? 0) * 100);
 
 function currentMonth(): MonthIndex {
@@ -344,8 +346,9 @@ function TimelineRow({
           progress.overdue ? "border-red-600" : ""
         }`}
         style={{
-          left: `${bar.leftPercent}%`,
+          left: `min(${bar.leftPercent}%, calc(100% - ${MIN_BAR_WIDTH}))`,
           width: `${bar.widthPercent}%`,
+          minWidth: MIN_BAR_WIDTH,
         }}
       >
         <span
@@ -385,6 +388,8 @@ export function ProjectEpicDetailScreen() {
   useEffect(() => {
     if (!projectId || !labelId) return;
     let ignore = false;
+    setItem(null);
+    setOwnerName(null);
     setLoadError(false);
     const run = async () => {
       const result = await fetchEpicProgress(projectId, labelId);
