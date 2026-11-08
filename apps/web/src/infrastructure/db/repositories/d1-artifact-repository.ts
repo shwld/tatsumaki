@@ -13,6 +13,7 @@ import {
   ARTIFACT_PUBLISH_CONFLICT_ERROR,
   ARTIFACT_REPOSITORY_ERROR,
   ARTIFACT_UPLOAD_SESSION_EXPIRED_ERROR,
+  type ArtifactPin,
   type ArtifactRepository,
   type ArtifactRepositoryError,
   type ArtifactVersionDetail,
@@ -24,6 +25,7 @@ import {
 import { createDb, type DbClient } from "../client";
 import {
   artifactFilesTable,
+  artifactPinsTable,
   artifactUploadSessionFilesTable,
   artifactUploadSessionsTable,
   artifactVersionsTable,
@@ -134,6 +136,81 @@ export class D1ArtifactRepository implements ArtifactRepository {
         .orderBy(desc(artifactsTable.updatedAt), desc(artifactsTable.id))
         .all();
       return ok(rows.map(toArtifact));
+    } catch {
+      return err(ARTIFACT_REPOSITORY_ERROR);
+    }
+  }
+
+  async listPins(
+    projectId: string,
+    userId: string,
+  ): Promise<Result<ArtifactPin[], ArtifactRepositoryError>> {
+    try {
+      const rows = await this.db
+        .select({
+          artifactId: artifactPinsTable.artifactId,
+          pinnedAt: artifactPinsTable.pinnedAt,
+        })
+        .from(artifactPinsTable)
+        .where(
+          and(
+            eq(artifactPinsTable.projectId, projectId),
+            eq(artifactPinsTable.userId, userId),
+          ),
+        )
+        .orderBy(
+          desc(artifactPinsTable.pinnedAt),
+          desc(artifactPinsTable.artifactId),
+        )
+        .all();
+      return ok(rows);
+    } catch {
+      return err(ARTIFACT_REPOSITORY_ERROR);
+    }
+  }
+
+  async setPinned(input: {
+    projectId: string;
+    artifactId: string;
+    userId: string;
+    pinned: boolean;
+  }): Promise<Result<void, ArtifactRepositoryError>> {
+    try {
+      const existing = await this.db
+        .select({ id: artifactsTable.id })
+        .from(artifactsTable)
+        .where(
+          and(
+            eq(artifactsTable.id, input.artifactId),
+            eq(artifactsTable.projectId, input.projectId),
+          ),
+        )
+        .get();
+      if (!existing) return err(ARTIFACT_NOT_FOUND_ERROR);
+
+      if (input.pinned) {
+        await this.db
+          .insert(artifactPinsTable)
+          .values({
+            artifactId: input.artifactId,
+            userId: input.userId,
+            projectId: input.projectId,
+            pinnedAt: new Date().toISOString(),
+          })
+          .onConflictDoNothing()
+          .run();
+      } else {
+        await this.db
+          .delete(artifactPinsTable)
+          .where(
+            and(
+              eq(artifactPinsTable.artifactId, input.artifactId),
+              eq(artifactPinsTable.userId, input.userId),
+            ),
+          )
+          .run();
+      }
+      return ok(undefined);
     } catch {
       return err(ARTIFACT_REPOSITORY_ERROR);
     }

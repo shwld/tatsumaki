@@ -9,6 +9,7 @@ import {
   getArtifactVersion,
   listArtifactVersions,
   listArtifacts,
+  setArtifactPinned,
   updateArtifactMetadata,
 } from "../../../application/usecases/artifacts/artifact-queries";
 import { uploadArtifactFile } from "../../../application/usecases/artifacts/upload-artifact-file";
@@ -89,10 +90,16 @@ export function createArtifactReadRoutes(options: ReadOptions) {
 
     const result = await listArtifacts(new D1ArtifactRepository(c.env.DB), {
       projectId,
+      userId: access.userId,
       archived: c.req.query("archived") === "true",
     });
     if (result.isErr()) return artifactErrorResponse(c, result.error);
-    return c.json({ artifacts: result.value.map(toArtifactResponse) });
+    return c.json({
+      artifacts: result.value.map(({ artifact, pinned }) => ({
+        ...toArtifactResponse(artifact),
+        pinned,
+      })),
+    });
   });
 
   app.get("/:projectId/artifacts/:artifactId", readMw, async (c) => {
@@ -230,6 +237,42 @@ export function createArtifactFileRoutes(options: ReadOptions) {
       });
     },
   );
+
+  return app;
+}
+
+/**
+ * Personal pins. They only change the caller's own view, so any member
+ * (viewers included) may pin and the route is session-only: it needs no API
+ * key scope and is mounted on /api next to the read routes.
+ */
+export function createArtifactPinRoutes() {
+  const app = new Hono<Env>();
+
+  for (const [method, pinned] of [
+    ["put", true],
+    ["delete", false],
+  ] as const) {
+    app[method]("/:projectId/artifacts/:artifactId/pin", async (c) => {
+      const projectId = c.req.param("projectId");
+      const access = await requireArtifactAccess(c, projectId, {
+        write: false,
+      });
+      if (!access.ok) return access.response;
+
+      const result = await setArtifactPinned(
+        new D1ArtifactRepository(c.env.DB),
+        {
+          projectId,
+          artifactId: c.req.param("artifactId"),
+          userId: access.userId,
+          pinned,
+        },
+      );
+      if (result.isErr()) return artifactErrorResponse(c, result.error);
+      return c.json({ pinned });
+    });
+  }
 
   return app;
 }

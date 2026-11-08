@@ -31,7 +31,10 @@ import {
   routeByContentHost,
 } from "./presentation/artifact-content-host";
 import { artifactPreviewTokenRoute } from "./presentation/routes/artifacts/preview-token";
-import { createArtifactReadRoutes } from "./presentation/routes/artifacts/routes";
+import {
+  createArtifactPinRoutes,
+  createArtifactReadRoutes,
+} from "./presentation/routes/artifacts/routes";
 import { isRateLimited } from "./presentation/rate-limit";
 import { spaIndexHeaders } from "./presentation/spa-headers";
 import { PlanningPokerDO } from "./durable-objects/planning-poker-do";
@@ -127,12 +130,14 @@ protectedApi.route("/", myWorkRoute);
 protectedApi.route("/", projectApiKeysRoute);
 protectedApi.route("/", billingRoute);
 protectedApi.route("/", artifactPreviewTokenRoute);
-// Read-only on purpose: the Web shows artifacts but never creates, edits or
-// downloads them (ADR-0010 §7); those stay on the CLI / API key routes.
+// The Web shows artifacts but never creates, edits or downloads them
+// (ADR-0010 §7); those stay on the CLI / API key routes. Personal pins are the
+// only write, mounted separately.
 protectedApi.route(
   "/projects",
   createArtifactReadRoutes({ readMiddleware: [] }),
 );
+protectedApi.route("/projects", createArtifactPinRoutes());
 
 api.route("/", protectedApi);
 

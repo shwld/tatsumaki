@@ -23,6 +23,8 @@ export type ArtifactRepositoryError =
   | typeof ARTIFACT_PUBLISH_CONFLICT_ERROR
   | typeof ARTIFACT_UPLOAD_SESSION_EXPIRED_ERROR;
 
+export type ArtifactPin = { artifactId: string; pinnedAt: string };
+
 export type CreateArtifactInput = {
   id: string;
   projectId: string;
@@ -81,6 +83,20 @@ export interface ArtifactRepository {
     artifactId: string,
     input: UpdateArtifactMetadataInput,
   ): Promise<Result<Artifact, ArtifactRepositoryError>>;
+
+  /** Pins are personal: only the given user's pins, newest first. */
+  listPins(
+    projectId: string,
+    userId: string,
+  ): Promise<Result<ArtifactPin[], ArtifactRepositoryError>>;
+
+  /** Idempotent. ARTIFACT_NOT_FOUND_ERROR when the artifact is not in the project. */
+  setPinned(input: {
+    projectId: string;
+    artifactId: string;
+    userId: string;
+    pinned: boolean;
+  }): Promise<Result<void, ArtifactRepositoryError>>;
 
   listVersions(
     projectId: string,

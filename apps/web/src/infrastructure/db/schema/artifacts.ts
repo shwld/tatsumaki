@@ -102,3 +102,18 @@ export const artifactUploadSessionFilesTable = sqliteTable(
   },
   (table) => [primaryKey({ columns: [table.sessionId, table.path] })],
 );
+
+export const artifactPinsTable = sqliteTable(
+  "artifact_pins",
+  {
+    artifactId: text("artifact_id")
+      .notNull()
+      .references(() => artifactsTable.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projectsTable.id, { onDelete: "cascade" }),
+    pinnedAt: text("pinned_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [primaryKey({ columns: [table.artifactId, table.userId] })],
+);

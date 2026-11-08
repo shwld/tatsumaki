@@ -19,6 +19,7 @@ export { notificationSettingsTable } from "./notification-settings";
 export { notificationsTable } from "./notifications";
 export { projectApiKeysTable } from "./project-api-keys";
 export {
+  artifactPinsTable,
   artifactsTable,
   artifactVersionsTable,
   artifactFilesTable,

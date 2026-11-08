@@ -24,3 +24,5 @@ export type ArtifactPreviewToken = {
   expiresAt: string;
   contentUrl: string;
 };
+
+export type ArtifactListItem = Artifact & { pinned: boolean };
