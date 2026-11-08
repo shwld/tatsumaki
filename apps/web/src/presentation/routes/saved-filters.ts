@@ -91,9 +91,7 @@ savedFiltersRoute.post("/projects/:projectId/saved-filters", async (c) => {
     (f.ownerIds !== undefined &&
       (!Array.isArray(f.ownerIds) || f.ownerIds.length > MAX_ARRAY_ITEMS)) ||
     (f.labelIds !== undefined &&
-      (!Array.isArray(f.labelIds) || f.labelIds.length > MAX_ARRAY_ITEMS)) ||
-    (f.epicIds !== undefined &&
-      (!Array.isArray(f.epicIds) || f.epicIds.length > MAX_ARRAY_ITEMS))
+      (!Array.isArray(f.labelIds) || f.labelIds.length > MAX_ARRAY_ITEMS))
   ) {
     return c.json({ error: "Invalid filter conditions" }, 400);
   }

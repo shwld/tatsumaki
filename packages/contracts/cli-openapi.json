@@ -97,10 +97,6 @@
                   "type": "string"
                 }
               },
-              "epicId": {
-                "type": "string",
-                "nullable": true
-              },
               "iterationId": {
                 "type": "string",
                 "nullable": true
@@ -155,7 +151,6 @@
               "storyPoint",
               "labels",
               "labelIds",
-              "epicId",
               "iterationId",
               "ownerIds",
               "requesterId",

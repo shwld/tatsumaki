@@ -1,6 +1,5 @@
 import { sql } from "drizzle-orm";
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
-import { epicsTable } from "./epics";
 import { iterationsTable } from "./iterations";
 import { projectsTable } from "./projects";
 
@@ -21,9 +20,6 @@ export const storiesTable = sqliteTable("stories", {
   archivedAt: text("archived_at"),
   storyPoint: integer("story_point"),
   requesterId: text("requester_id"),
-  epicId: text("epic_id").references(() => epicsTable.id, {
-    onDelete: "set null",
-  }),
   iterationId: text("iteration_id").references(() => iterationsTable.id, {
     onDelete: "set null",
   }),

@@ -31,7 +31,6 @@ function buildStory(overrides: Partial<Story>): Story {
     storyPoint: 3,
     labels: [],
     labelIds: [],
-    epicId: null,
     iterationId: "iter-1",
     isIcebox: false,
     ownerIds: [],

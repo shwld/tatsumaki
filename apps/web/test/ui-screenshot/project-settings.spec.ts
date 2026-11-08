@@ -34,6 +34,75 @@ for (const theme of themeVariants) {
     );
   });
 
+  test(`project labels screen (${theme})`, async ({ page }) => {
+    await setThemeMode(page, theme);
+    await mockAuthMe(page);
+    await mockStoriesList(page);
+
+    const json = (body: unknown) => ({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(body),
+    });
+    const label = (id: string, name: string, color: string) => ({
+      __typename: "ProjectLabel",
+      id,
+      projectId: "project-1",
+      name,
+      color,
+      createdAt: "2026-01-01 00:00:00",
+      updatedAt: "2026-01-01 00:00:00",
+    });
+    await page.route("**/api/projects/project-1/labels", (route) =>
+      route.fulfill(
+        json({
+          labels: [
+            label("label-growth", "growth", "#2563eb"),
+            label("label-ops", "ops", "#16a34a"),
+          ],
+        }),
+      ),
+    );
+    await page.route("**/api/projects/project-1/members", (route) =>
+      route.fulfill(
+        json({
+          currentMemberRole: "owner",
+          members: [{ userId: "github|owner", displayName: "Owner" }],
+        }),
+      ),
+    );
+    await page.route("**/api/projects/project-1/epics", (route) =>
+      route.fulfill(
+        json({
+          epics: [
+            {
+              id: "epic-growth",
+              projectId: "project-1",
+              labelId: "label-growth",
+              labelName: "growth",
+              labelColor: "#2563eb",
+              enabled: true,
+              description: "新規登録を増やす",
+              successCriteria: "月間登録数 1,000 件",
+              ownerId: "github|owner",
+              plannedStart: "2026-04-01",
+              plannedEnd: "2026-06-30",
+              outcomeStatus: "unevaluated",
+              revision: 2,
+            },
+          ],
+        }),
+      ),
+    );
+
+    await page.goto("/projects/project-1/labels");
+    await expect(page.getByRole("heading", { name: "Labels" })).toBeVisible();
+    await expect(page.getByLabel("目的")).toHaveValue("新規登録を増やす");
+    await expect(page).toHaveScreenshot(
+      resolveSnapshotName("project-labels.png", theme),
+    );
+  });
+
   test(`project settings screen (${theme})`, async ({ page }) => {
     await setThemeMode(page, theme);
     await mockAuthMe(page);
