@@ -205,3 +205,7 @@ README の R2 bucket 記述、setup script（3 つ目の bucket、`ARTIFACT_CONT
 ### 2026-11-06 (story #329)
 
 - §4 の「別 origin を採用しない」は [ADR-0012](adr-0012-artifact-content-separate-site.md) で改訂した。別 site 配信を設定した環境では本体 host の `/artifact-content/*` を 404 とし、Access bypass を作らない。公式ホスト版は未設定なら preview を無効にする。
+
+### 2026-11-09 (story #385)
+
+- §7 の「Web は作成・編集・download の UI を持たない」は維持したまま、アーカイブ／復元だけを Web の `/api` セッション経路（`POST /projects/{id}/artifacts/{artifactId}/archive|unarchive`）に追加した。使わなくなった Artifact を CLI なしで一覧から外し、戻せるようにするため。認可は CLI/API と同じ owner/member のみ（viewer は 403、非 member は 404）で、内容・版は失わない。PivotalTracker に該当機能はなく、アーカイブ済み一覧はタブで通常一覧と切り替える最小構成にとどめる。

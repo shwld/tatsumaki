@@ -173,6 +173,35 @@ describe("artifact screens", () => {
       ).toBeInTheDocument();
     });
 
+    it("archives and restores from the detail", async () => {
+      let archivedAt: string | null = null;
+      mockApi({
+        ...baseRoutes(),
+        "GET /api/projects/p1/artifacts/art-1": () =>
+          json({
+            artifact: { ...artifact, archivedAt },
+            latestVersion: versionOf(2),
+          }),
+        "POST /api/projects/p1/artifacts/art-1/archive": () => {
+          archivedAt = "2026-01-04T00:00:00.000Z";
+          return json({ artifact });
+        },
+        "POST /api/projects/p1/artifacts/art-1/unarchive": () => {
+          archivedAt = null;
+          return json({ artifact });
+        },
+      });
+      renderAt("/projects/p1/artifacts/art-1");
+
+      fireEvent.click(
+        await screen.findByRole("button", { name: "アーカイブする" }),
+      );
+      expect(await screen.findByText("アーカイブ済み")).toBeInTheDocument();
+      fireEvent.click(await screen.findByRole("button", { name: "復元する" }));
+      await screen.findByRole("button", { name: "アーカイブする" });
+      expect(screen.queryByText("アーカイブ済み")).toBeNull();
+    });
+
     it("renders in English", async () => {
       await i18n.changeLanguage("en");
       mockApi({
@@ -242,6 +271,85 @@ describe("artifact screens", () => {
       );
       expect(await screen.findByRole("alert")).toHaveTextContent(
         "ピン留めの更新に失敗しました",
+      );
+    });
+  });
+
+  describe("list archive", () => {
+    it("archives from the active list and restores from the archived list", async () => {
+      let archived = false;
+      const calls: string[] = [];
+      mockApi({
+        ...baseRoutes(),
+        "GET /api/projects/p1/artifacts": () =>
+          json({
+            artifacts: archived ? [] : [{ ...artifact, pinned: false }],
+          }),
+        "GET /api/projects/p1/artifacts?archived=true": () =>
+          json({
+            artifacts: archived
+              ? [
+                  {
+                    ...artifact,
+                    archivedAt: "2026-01-04T00:00:00.000Z",
+                    pinned: false,
+                  },
+                ]
+              : [],
+          }),
+        "POST /api/projects/p1/artifacts/art-1/archive": () => {
+          calls.push("archive");
+          archived = true;
+          return json({ artifact });
+        },
+        "POST /api/projects/p1/artifacts/art-1/unarchive": () => {
+          calls.push("unarchive");
+          archived = false;
+          return json({ artifact });
+        },
+      });
+      renderAt("/projects/p1/artifacts");
+
+      fireEvent.click(
+        await screen.findByRole("button", {
+          name: "Release report をアーカイブする",
+        }),
+      );
+      expect(
+        await screen.findByText(
+          "このプロジェクトにはまだ Artifact がありません。",
+        ),
+      ).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("tab", { name: "アーカイブ" }));
+      fireEvent.click(
+        await screen.findByRole("button", {
+          name: "Release report を復元する",
+        }),
+      );
+      expect(
+        await screen.findByText("アーカイブ済みの Artifact はありません。"),
+      ).toBeInTheDocument();
+      expect(calls).toEqual(["archive", "unarchive"]);
+    });
+
+    it("tells a viewer they lack permission", async () => {
+      mockApi({
+        ...baseRoutes(),
+        "GET /api/projects/p1/artifacts": () =>
+          json({ artifacts: [{ ...artifact, pinned: false }] }),
+        "POST /api/projects/p1/artifacts/art-1/archive": () =>
+          json({ error: "no", code: "FORBIDDEN" }, 403),
+      });
+      renderAt("/projects/p1/artifacts");
+
+      fireEvent.click(
+        await screen.findByRole("button", {
+          name: "Release report をアーカイブする",
+        }),
+      );
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "アーカイブ状態を変更する権限がありません",
       );
     });
   });
@@ -437,7 +545,7 @@ describe("artifact screens", () => {
       ).toBeInTheDocument();
     });
 
-    it("offers no create, edit, download or archive controls", async () => {
+    it("offers no create, edit or download controls", async () => {
       mockApi(baseRoutes());
       renderAt("/projects/p1/artifacts/art-1");
       await screen.findByTitle(/のプレビュー（v2）/);
@@ -447,7 +555,7 @@ describe("artifact screens", () => {
         ...screen.queryAllByRole("link"),
       ].map((element) => element.textContent ?? "");
       expect(names.join(" ")).not.toMatch(
-        /download|ダウンロード|upload|アップロード|edit|編集|archive|アーカイブ|delete|削除|作成|create/i,
+        /download|ダウンロード|upload|アップロード|edit|編集|delete|削除|作成|create/i,
       );
     });
 

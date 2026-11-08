@@ -32,6 +32,7 @@ import {
 } from "./presentation/artifact-content-host";
 import { artifactPreviewTokenRoute } from "./presentation/routes/artifacts/preview-token";
 import {
+  createArtifactArchiveRoutes,
   createArtifactPinRoutes,
   createArtifactReadRoutes,
 } from "./presentation/routes/artifacts/routes";
@@ -131,13 +132,17 @@ protectedApi.route("/", projectApiKeysRoute);
 protectedApi.route("/", billingRoute);
 protectedApi.route("/", artifactPreviewTokenRoute);
 // The Web shows artifacts but never creates, edits or downloads them
-// (ADR-0010 §7); those stay on the CLI / API key routes. Personal pins are the
-// only write, mounted separately.
+// (ADR-0010 §7); those stay on the CLI / API key routes. Only personal pins and
+// archive / restore are writes here.
 protectedApi.route(
   "/projects",
   createArtifactReadRoutes({ readMiddleware: [] }),
 );
 protectedApi.route("/projects", createArtifactPinRoutes());
+protectedApi.route(
+  "/projects",
+  createArtifactArchiveRoutes({ writeMiddleware: [] }),
+);
 
 api.route("/", protectedApi);
 

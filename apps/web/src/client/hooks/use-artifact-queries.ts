@@ -32,6 +32,8 @@ function retryTransientOnly(failureCount: number, error: unknown): boolean {
 
 export const artifactQueryKeys = {
   list: (projectId: string) => ["artifacts", projectId] as const,
+  archivedList: (projectId: string) =>
+    ["artifacts", projectId, "archived"] as const,
   detail: (projectId: string, artifactId: string) =>
     ["artifacts", projectId, artifactId] as const,
   versions: (projectId: string, artifactId: string) =>
@@ -39,12 +41,18 @@ export const artifactQueryKeys = {
   members: (projectId: string) => ["artifacts", projectId, "members"] as const,
 };
 
-export function useArtifactList(projectId: string) {
+export function useArtifactList(projectId: string, archived = false) {
   return useQuery({
-    queryKey: artifactQueryKeys.list(projectId),
+    queryKey: archived
+      ? artifactQueryKeys.archivedList(projectId)
+      : artifactQueryKeys.list(projectId),
     retry: retryTransientOnly,
     queryFn: () =>
-      getJson<{ artifacts: ArtifactListItem[] }>(artifactsApiPath(projectId)),
+      getJson<{ artifacts: ArtifactListItem[] }>(
+        archived
+          ? `${artifactsApiPath(projectId)}?archived=true`
+          : artifactsApiPath(projectId),
+      ),
   });
 }
 
@@ -160,6 +168,31 @@ export function useSetArtifactPinned(projectId: string) {
       queryClient.invalidateQueries({
         queryKey: artifactQueryKeys.list(projectId),
         exact: true,
+      }),
+  });
+}
+
+/** Both lists and the detail change when an artifact moves in or out of the archive. */
+export function useSetArtifactArchived(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { artifactId: string; archived: boolean }) => {
+      const response = await fetch(
+        `${artifactApiPath(projectId, input.artifactId)}/${
+          input.archived ? "archive" : "unarchive"
+        }`,
+        { method: "POST" },
+      );
+      if (!response.ok) {
+        throw new HttpStatusError(
+          await parseErrorMessage(response),
+          response.status,
+        );
+      }
+    },
+    onSettled: () =>
+      queryClient.invalidateQueries({
+        queryKey: artifactQueryKeys.list(projectId),
       }),
   });
 }

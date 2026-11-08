@@ -232,7 +232,7 @@ describe("artifact read API for the web app (/api)", () => {
   });
 
   describe("what the web app can not do", () => {
-    it("exposes no way to create, change, archive or download from /api", async () => {
+    it("exposes no way to create, edit or download from /api", async () => {
       const base = `/${projectId}/artifacts/${artifactId}`;
       const attempts: Array<[string, string, BodyInit | undefined]> = [
         ["POST", `/${projectId}/artifact-uploads`, "{}"],
@@ -247,8 +247,6 @@ describe("artifact read API for the web app (/api)", () => {
           undefined,
         ],
         ["PATCH", base, JSON.stringify({ title: "hijacked" })],
-        ["POST", `${base}/archive`, undefined],
-        ["POST", `${base}/unarchive`, undefined],
         ["DELETE", base, undefined],
       ];
       for (const [method, path, body] of attempts) {
@@ -277,6 +275,41 @@ describe("artifact read API for the web app (/api)", () => {
       });
     });
   });
+  describe("archiving", () => {
+    type ListBody = { artifacts: Array<{ id: string }> };
+    const listIds = async (archived: boolean) =>
+      (
+        await json<ListBody>(
+          await web(
+            "GET",
+            `/${projectId}/artifacts${archived ? "?archived=true" : ""}`,
+          ),
+        )
+      ).artifacts.map((a) => a.id);
+    const actionPath = (action: string) =>
+      `/${projectId}/artifacts/${artifactId}/${action}`;
+
+    it("moves an artifact between the lists and keeps it restorable", async () => {
+      expect((await web("POST", actionPath("archive"))).status).toBe(200);
+      expect(await listIds(false)).toEqual([]);
+      expect(await listIds(true)).toEqual([artifactId]);
+
+      expect((await web("POST", actionPath("unarchive"))).status).toBe(200);
+      expect(await listIds(false)).toEqual([artifactId]);
+      expect(await listIds(true)).toEqual([]);
+    });
+
+    it("rejects viewers and hides the artifact from non-members", async () => {
+      expect(
+        (await web("POST", actionPath("archive"), { as: VIEWER })).status,
+      ).toBe(403);
+      expect(
+        (await web("POST", actionPath("archive"), { as: OUTSIDER })).status,
+      ).toBe(404);
+      expect(await listIds(false)).toEqual([artifactId]);
+    });
+  });
+
   describe("pinning", () => {
     type ListBody = { artifacts: Array<{ id: string; pinned: boolean }> };
     const listAs = async (as: Identity, archived = false) =>
