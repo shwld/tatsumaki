@@ -1285,12 +1285,12 @@ export class D1StoryRepository implements StoryRepository {
       input.projectId,
       input.id,
       input,
-      storyUnchangedGuard(input.id, current),
+      sql`${storyUnchangedGuard(input.id, current)} and ${ownerIdsAreAllCurrentOwners}`,
     );
     const preStatements: BatchItem<"sqlite">[] = [
-      ...labelStatements,
       ...ownerStatements,
       ...shiftStatement,
+      ...labelStatements,
     ];
     const batchStatements: BatchItem<"sqlite">[] = [
       ...preStatements,
