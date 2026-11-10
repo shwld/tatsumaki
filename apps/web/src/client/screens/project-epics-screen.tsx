@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useParams } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
 
+import { EpicCreateDialog } from "../components/epic-create-dialog";
 import { ProjectPage } from "../components/project-page";
 import { useAuthError } from "../contexts/auth-error-context";
 import {
@@ -92,7 +93,9 @@ function ErrorRetry({
 export function ProjectEpicsScreen() {
   const { t } = useTranslation();
   const { projectId = "" } = useParams<{ projectId: string }>();
+  const navigate = useNavigate();
   const { items, loadError, reload } = useEpicsProgress(projectId);
+  const [creating, setCreating] = useState(false);
   const [windowStart, setWindowStart] = useState<MonthIndex>(
     () => currentMonth() - 1,
   );
@@ -124,6 +127,23 @@ export function ProjectEpicsScreen() {
       <p className="mb-4 max-w-3xl text-sm text-gray-600">
         {t("projectEpicsScreen.description")}
       </p>
+      <button
+        type="button"
+        className="mb-4 rounded-md border border-blue-600 bg-blue-600 px-3 py-1 text-sm text-white hover:bg-blue-700"
+        onClick={() => setCreating(true)}
+      >
+        {t("projectEpicsScreen.create")}
+      </button>
+      {creating ? (
+        <EpicCreateDialog
+          projectId={projectId}
+          onClose={() => setCreating(false)}
+          onCreated={(epic) => {
+            setCreating(false);
+            navigate(projectEpicPath(projectId, epic.labelId));
+          }}
+        />
+      ) : null}
       {loadError ? (
         <ErrorRetry
           message={t("projectEpicsScreen.loadError")}

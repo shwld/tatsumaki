@@ -6,8 +6,9 @@ export const projectEpicsScreenJa = {
     loading: "Epic を読み込み中...",
     loadError: "Epic の読み込みに失敗しました",
     retry: "再読み込み",
+    create: "Epic を作成",
     empty:
-      "戦略・計画管理が ON の Label がありません。Label 設定から ON にすると表示されます。",
+      "Epic がありません。Epic を作成するか、Label 設定で戦略・計画管理を ON にすると表示されます。",
     openLabels: "Label 設定を開く",
     timelineLabel: "Epic の計画期間",
     prev: "前の月へ",
@@ -85,8 +86,9 @@ export const projectEpicsScreenEn = {
     loading: "Loading epics...",
     loadError: "Failed to load epics",
     retry: "Reload",
+    create: "Create epic",
     empty:
-      "No label has strategy planning on. Turn it on from the label settings.",
+      "No epics yet. Create one, or turn on strategy planning for a label in the label settings.",
     openLabels: "Open label settings",
     timelineLabel: "Epic planned periods",
     prev: "Previous months",
