@@ -177,17 +177,15 @@ describe("story map HTTP command limits", () => {
     expect(big.status).toBe(413);
     expect(await big.json()).toMatchObject({ code: "invalid" });
 
-    const statuses: number[] = [];
-    for (let i = 0; i < 30; i += 1) {
-      statuses.push(
-        (
-          await command(MEMBER, created.storyMap.id, {
-            type: "updateMap",
-            title: `T${i}`,
-          })
-        ).status,
-      );
-    }
+    const responses = await Promise.all(
+      Array.from({ length: 40 }, (_, i) =>
+        command(MEMBER, created.storyMap.id, {
+          type: "updateMap",
+          title: `T${i}`,
+        }),
+      ),
+    );
+    const statuses = responses.map((response) => response.status);
     expect(statuses).toContain(429);
   });
 });
