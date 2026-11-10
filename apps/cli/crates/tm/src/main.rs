@@ -526,7 +526,7 @@ fn story_section_rank(section: &str) -> u8 {
     }
 }
 
-/// Rows in the order of the UI panels: Done, Current, Backlog, Icebox, then by position.
+/// Rows in the order of the UI panels: Done (newest status change first), Current, Backlog, Icebox (by position).
 fn story_list_rows(stories: &[serde_json::Value]) -> Vec<StoryListRow> {
     let mut sorted: Vec<&serde_json::Value> = stories.iter().collect();
     sorted.sort_by(|a, b| {
@@ -534,9 +534,16 @@ fn story_list_rows(stories: &[serde_json::Value]) -> Vec<StoryListRow> {
             story_section_rank(s.get("section").and_then(|v| v.as_str()).unwrap_or(""))
         };
         let position = |s: &serde_json::Value| s.get("position").and_then(|v| v.as_f64()).unwrap_or(0.0);
-        rank(a)
-            .cmp(&rank(b))
-            .then(position(a).partial_cmp(&position(b)).unwrap_or(std::cmp::Ordering::Equal))
+        let changed_at = |s: &serde_json::Value| {
+            s.get("statusChangedAt").and_then(|v| v.as_str()).unwrap_or("").to_string()
+        };
+        rank(a).cmp(&rank(b)).then_with(|| {
+            if rank(a) == story_section_rank("Done") {
+                changed_at(b).cmp(&changed_at(a))
+            } else {
+                position(a).partial_cmp(&position(b)).unwrap_or(std::cmp::Ordering::Equal)
+            }
+        })
     });
     sorted
         .into_iter()
@@ -1641,6 +1648,13 @@ mod tests {
         let rows = story_list_rows(&stories);
         let numbers: Vec<&str> = rows.iter().map(|r| r.number.as_str()).collect();
         assert_eq!(numbers, vec!["#1", "#4", "#2", "#3"]);
+
+        let done = vec![
+            serde_json::json!({ "storyNumber": 5, "section": "Done", "position": 1.0, "statusChangedAt": "2026-11-01 00:00:00", "title": "old" }),
+            serde_json::json!({ "storyNumber": 6, "section": "Done", "position": 9.0, "statusChangedAt": "2026-11-05 00:00:00", "title": "new" }),
+        ];
+        let numbers: Vec<String> = story_list_rows(&done).into_iter().map(|r| r.number).collect();
+        assert_eq!(numbers, vec!["#6", "#5"]);
         assert_eq!(rows[0].iteration, "4");
         assert_eq!(rows[1].iteration, "-");
         assert_eq!(rows[0].section, "Current");
