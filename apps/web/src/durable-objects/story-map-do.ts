@@ -232,16 +232,19 @@ export class StoryMapDO {
       return Response.json({ code: "invalid" }, { status: 400 });
     }
     const opId = message.opId;
-    const outcome = await this.serialized(() =>
-      this.runCommand(attachment, opId, message.command),
-    );
+    // Publishing stays inside the serialized step so a later command cannot
+    // be applied or broadcast before this one's event goes out.
+    const outcome = await this.serialized(async () => {
+      const ran = await this.runCommand(attachment, opId, message.command);
+      if (ran.kind === "acked") await ran.publish?.();
+      return ran;
+    });
     if (outcome.kind === "rejected") {
       return Response.json(
         { code: outcome.code },
         { status: REJECTION_STATUS[outcome.code] },
       );
     }
-    await outcome.publish?.();
     return Response.json({
       seq: outcome.seq,
       result: outcome.result,

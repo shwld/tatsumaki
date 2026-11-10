@@ -169,6 +169,33 @@ describe("Story Map screens", () => {
     expect(screen.queryByLabelText("主要ユーザー名")).toBeNull();
   });
 
+  it("keeps an unsaved title when a persona change reloads the map", async () => {
+    const posts: unknown[] = [];
+    mockFetch((_url, init) => {
+      if (init?.method === "POST") {
+        posts.push(JSON.parse(String(init.body)));
+        return [200, { seq: 1, result: null, duplicate: false }];
+      }
+      return [200, { role: "owner", structure: structure() }];
+    });
+    renderAt("/projects/p1/story-maps/map-1");
+    const title = (await screen.findByLabelText(
+      "タイトル",
+    )) as HTMLInputElement;
+    fireEvent.change(title, { target: { value: "Draft title" } });
+    fireEvent.change(screen.getByLabelText("主要ユーザーを追加"), {
+      target: { value: "Member" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "追加" }));
+    await waitFor(() => expect(posts).toHaveLength(1));
+    await waitFor(() =>
+      expect(vi.mocked(fetch).mock.calls.length).toBeGreaterThan(2),
+    );
+    expect((screen.getByLabelText("タイトル") as HTMLInputElement).value).toBe(
+      "Draft title",
+    );
+  });
+
   it("asks to restore an archived map and offers no edit form", async () => {
     mockFetch(() => [
       200,

@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router";
 
@@ -78,11 +84,16 @@ export function StoryMapEditScreen() {
   const [title, setTitle] = useState("");
   const [goal, setGoal] = useState("");
   const [newPersona, setNewPersona] = useState("");
+  const savedMeta = useRef<{ title: string; goal: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{
     kind: "error" | "status";
     text: string;
   } | null>(null);
+
+  useEffect(() => {
+    savedMeta.current = null;
+  }, [projectId, mapId]);
 
   useEffect(() => {
     let ignore = false;
@@ -94,8 +105,20 @@ export function StoryMapEditScreen() {
         return setLoadError(true);
       }
       setDetail(result.value);
-      setTitle(result.value.structure.map.title);
-      setGoal(result.value.structure.map.achievementGoal);
+      // A reload after a persona change or a failed command must not replace
+      // a draft the user has not saved.
+      const previous = savedMeta.current;
+      const next = {
+        title: result.value.structure.map.title,
+        goal: result.value.structure.map.achievementGoal,
+      };
+      savedMeta.current = next;
+      setTitle((draft) =>
+        previous === null || draft === previous.title ? next.title : draft,
+      );
+      setGoal((draft) =>
+        previous === null || draft === previous.goal ? next.goal : draft,
+      );
     });
     return () => {
       ignore = true;
