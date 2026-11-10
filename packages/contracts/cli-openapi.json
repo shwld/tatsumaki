@@ -229,7 +229,26 @@
           "stories": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/StorySummary"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/StorySummary"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "section": {
+                      "type": "string",
+                      "enum": ["Done", "Current", "Backlog", "Icebox"],
+                      "description": "Panel the story belongs to in the UI. Set by listStories only."
+                    },
+                    "iterationNumber": {
+                      "type": "integer",
+                      "description": "Number of the iteration the story is assigned to. Set by listStories only.",
+                      "nullable": true
+                    }
+                  }
+                }
+              ]
             }
           }
         },
@@ -246,6 +265,45 @@
           "Rejected"
         ],
         "example": "Unstarted"
+      },
+      "StoryPlacement": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "position": {
+                "type": "string",
+                "enum": ["top"]
+              }
+            },
+            "required": ["position"]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "position": {
+                "type": "string",
+                "enum": ["end"]
+              }
+            },
+            "required": ["position"]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "position": {
+                "type": "string",
+                "enum": ["after", "before"]
+              },
+              "relativeToStoryNumber": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "required": ["position", "relativeToStoryNumber"]
+          }
+        ],
+        "description": "Where to put a story among the stories outside the Icebox, keeping the others' relative order."
       },
       "StoryIterationUnassignResponse": {
         "type": "object",
@@ -1183,6 +1241,9 @@
                   },
                   "status": {
                     "$ref": "#/components/schemas/StoryStatus"
+                  },
+                  "placement": {
+                    "$ref": "#/components/schemas/StoryPlacement"
                   }
                 }
               }
@@ -1346,11 +1407,18 @@
                   "isIcebox": {
                     "type": "boolean"
                   },
+                  "storyPoint": {
+                    "type": "integer",
+                    "nullable": true
+                  },
                   "labelIds": {
                     "type": "array",
                     "items": {
                       "type": "string"
                     }
+                  },
+                  "placement": {
+                    "$ref": "#/components/schemas/StoryPlacement"
                   }
                 },
                 "required": ["title", "type", "description"]
@@ -1403,18 +1471,35 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "orderedIds": {
-                    "type": "array",
-                    "items": {
-                      "type": "string",
-                      "minLength": 1
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "orderedIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "minItems": 1
+                      }
                     },
-                    "minItems": 1
+                    "required": ["orderedIds"]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "storyNumber": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "placement": {
+                        "$ref": "#/components/schemas/StoryPlacement"
+                      }
+                    },
+                    "required": ["storyNumber", "placement"]
                   }
-                },
-                "required": ["orderedIds"]
+                ]
               }
             }
           }

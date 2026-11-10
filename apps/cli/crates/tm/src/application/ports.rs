@@ -29,12 +29,32 @@ pub struct StoryGetBody {
 pub struct StoryListBody {
     pub stories: Vec<serde_json::Value>,
 }
+/// Where a story goes among the stories outside the Icebox.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum StoryPlacement {
+    Top,
+    End,
+    After(i64),
+    Before(i64),
+}
+impl StoryPlacement {
+    pub fn to_json(self) -> serde_json::Value {
+        match self {
+            Self::Top => serde_json::json!({ "position": "top" }),
+            Self::End => serde_json::json!({ "position": "end" }),
+            Self::After(n) => serde_json::json!({ "position": "after", "relativeToStoryNumber": n }),
+            Self::Before(n) => serde_json::json!({ "position": "before", "relativeToStoryNumber": n }),
+        }
+    }
+}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StoryCreateInput {
     pub title: String,
     pub r#type: String,
     pub description: String,
     pub is_icebox: bool,
+    pub story_point: Option<i64>,
+    pub placement: Option<StoryPlacement>,
     pub label_ids: Vec<String>,
 }
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -45,6 +65,7 @@ pub struct StoryUpdateInput {
     pub story_point: Option<StoryPointUpdate>,
     pub status: Option<String>,
     pub is_icebox: Option<bool>,
+    pub placement: Option<StoryPlacement>,
     pub owner_ids: Option<Vec<String>>,
     /// Replaces the whole label set.
     pub label_ids: Option<Vec<String>>,
@@ -57,8 +78,9 @@ pub enum StoryPointUpdate {
     Clear,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StoryReorderInput {
-    pub ordered_ids: Vec<String>,
+pub enum StoryReorderInput {
+    OrderedIds(Vec<String>),
+    Place { story_number: i64, placement: StoryPlacement },
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StoryCommentInput {

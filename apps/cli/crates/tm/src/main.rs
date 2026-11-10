@@ -10,7 +10,7 @@ mod update;
 
 use crate::application::ports::{
     StoryBlockerAction, StoryBlockerInput, StoryBlockerRelation, StoryCommentInput,
-    StoryCreateInput, StoryListFilter, StoryPointUpdate, StoryReorderInput, StoryUpdateInput,
+    StoryCreateInput, StoryListFilter, StoryPlacement, StoryPointUpdate, StoryReorderInput, StoryUpdateInput,
     TokenStore,
 };
 use adapters::{
@@ -167,9 +167,14 @@ enum StorySubcommand {
         description: String,
         #[arg(long, default_value_t = false)]
         is_icebox: bool,
+        /// Estimate for the story
+        #[arg(long)]
+        story_point: Option<i64>,
         /// Label to attach (label ID or name; repeatable)
         #[arg(long = "label", value_name = "ID_OR_NAME")]
         labels: Vec<String>,
+        #[command(flatten)]
+        placement: StoryPlacementArgs,
     },
     Update {
         #[arg(long)]
@@ -205,6 +210,10 @@ enum StorySubcommand {
         /// Remove every label
         #[arg(long, conflicts_with_all = ["labels", "add_labels", "remove_labels"])]
         clear_labels: bool,
+        /// Position among the stories outside the Icebox (with --no-icebox: where the story lands
+        /// when it leaves the Icebox; without a position it goes first)
+        #[command(flatten)]
+        placement: StoryPlacementArgs,
     },
     Status {
         #[arg(long)]
@@ -236,18 +245,32 @@ enum StorySubcommand {
         #[command(flatten)]
         relation: StoryBlockerRelationArgs,
     },
-    /// Change story priority (order) by listing story IDs from highest to lowest priority
+    /// Change story priority (order), by story number and position or by listing story IDs
     ///
-    /// Earlier --ordered-id values get higher priority. --ordered-id takes the internal story ID
-    /// (the `id` field of `tm --json story list`), not the story number. Only the stories you list
-    /// are rearranged, and only among the positions they already occupy; unlisted stories keep
-    /// their positions, so a newly listed story does not move to the end of the Backlog on its own.
-    /// To move story N to the end of the Backlog, list the current last Backlog story first, then N.
+    /// With <STORY_NUMBER> and one of --to-top / --to-end / --after / --before, the story moves
+    /// there among the stories outside the Icebox and every other story keeps its relative order.
+    /// The story and the reference story must be outside the Icebox (use `story update --no-icebox`
+    /// with a position to bring a story out of the Icebox).
+    ///
+    /// With --ordered-id, earlier values get higher priority. --ordered-id takes the internal story
+    /// ID (the `id` field of `tm --json story list`), not the story number. Only the stories you
+    /// list are rearranged, and only among the positions they already occupy; unlisted stories keep
+    /// their positions.
+    ///
     /// This changes priority only: status, Icebox and iteration assignment are untouched, so Current
     /// assignment is not released (use `unassign-iteration` for that).
     Reorder {
         #[arg(long)]
         project: Option<String>,
+        /// Story number to move (use with a position flag)
+        #[arg(
+            value_name = "STORY_NUMBER",
+            conflicts_with = "ordered_ids",
+            required_unless_present = "ordered_ids"
+        )]
+        story_number: Option<i64>,
+        #[command(flatten)]
+        placement: StoryPlacementArgs,
         /// Internal story ID (not the story number); repeat from highest to lowest priority
         #[arg(long = "ordered-id")]
         ordered_ids: Vec<String>,
@@ -285,6 +308,38 @@ impl StorySubcommand {
             Self::Block { .. } => Some(StoryBlockerAction::Add),
             Self::Unblock { .. } => Some(StoryBlockerAction::Remove),
             _ => None,
+        }
+    }
+}
+
+/// Position among the stories outside the Icebox; the others keep their relative order.
+#[derive(Args, Debug, Default, Clone, Copy)]
+#[group(multiple = false)]
+struct StoryPlacementArgs {
+    /// Put the story first
+    #[arg(long)]
+    to_top: bool,
+    /// Put the story last
+    #[arg(long)]
+    to_end: bool,
+    /// Put the story right after this story number
+    #[arg(long, value_name = "STORY_NUMBER")]
+    after: Option<i64>,
+    /// Put the story right before this story number
+    #[arg(long, value_name = "STORY_NUMBER")]
+    before: Option<i64>,
+}
+
+impl StoryPlacementArgs {
+    fn into_placement(self) -> Option<StoryPlacement> {
+        if self.to_top {
+            Some(StoryPlacement::Top)
+        } else if self.to_end {
+            Some(StoryPlacement::End)
+        } else if let Some(n) = self.after {
+            Some(StoryPlacement::After(n))
+        } else {
+            self.before.map(StoryPlacement::Before)
         }
     }
 }
@@ -447,12 +502,80 @@ impl IterationScopeArg {
 struct StoryListRow {
     #[tabled(rename = "#")]
     number: String,
+    #[tabled(rename = "section")]
+    section: String,
+    #[tabled(rename = "iteration")]
+    iteration: String,
+    #[tabled(rename = "position")]
+    position: String,
     #[tabled(rename = "status")]
     status: String,
     #[tabled(rename = "point")]
     point: String,
     #[tabled(rename = "title")]
     title: String,
+}
+
+fn story_section_rank(section: &str) -> u8 {
+    match section {
+        "Done" => 0,
+        "Current" => 1,
+        "Backlog" => 2,
+        "Icebox" => 3,
+        _ => 4,
+    }
+}
+
+/// Rows in the order of the UI panels: Done (newest status change first), Current, Backlog, Icebox (by position).
+fn story_list_rows(stories: &[serde_json::Value]) -> Vec<StoryListRow> {
+    let mut sorted: Vec<&serde_json::Value> = stories.iter().collect();
+    sorted.sort_by(|a, b| {
+        let rank = |s: &serde_json::Value| {
+            story_section_rank(s.get("section").and_then(|v| v.as_str()).unwrap_or(""))
+        };
+        let position = |s: &serde_json::Value| s.get("position").and_then(|v| v.as_f64()).unwrap_or(0.0);
+        let changed_at = |s: &serde_json::Value| {
+            s.get("statusChangedAt").and_then(|v| v.as_str()).unwrap_or("").to_string()
+        };
+        rank(a).cmp(&rank(b)).then_with(|| {
+            if rank(a) == story_section_rank("Done") {
+                changed_at(b).cmp(&changed_at(a))
+            } else {
+                position(a).partial_cmp(&position(b)).unwrap_or(std::cmp::Ordering::Equal)
+            }
+        })
+    });
+    sorted
+        .into_iter()
+        .map(|s| {
+            let text = |key: &str| s.get(key).and_then(|v| v.as_str()).unwrap_or("").to_string();
+            StoryListRow {
+                number: s
+                    .get("storyNumber")
+                    .and_then(|v| v.as_i64())
+                    .map(|n| format!("#{n}"))
+                    .unwrap_or_default(),
+                section: text("section"),
+                iteration: s
+                    .get("iterationNumber")
+                    .and_then(|v| v.as_i64())
+                    .map(|n| n.to_string())
+                    .unwrap_or("-".to_string()),
+                position: s
+                    .get("position")
+                    .and_then(|v| v.as_f64())
+                    .map(|p| p.to_string())
+                    .unwrap_or("-".to_string()),
+                status: text("status"),
+                point: s
+                    .get("storyPoint")
+                    .and_then(|v| v.as_i64())
+                    .map(|p| p.to_string())
+                    .unwrap_or("-".to_string()),
+                title: text("title"),
+            }
+        })
+        .collect()
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -727,32 +850,7 @@ async fn run() -> Result<(), (CliError, i32)> {
                                 .map_err(|e| (CliError::Json(e), EXIT_GENERAL))?
                         );
                     } else {
-                        let rows: Vec<StoryListRow> = body
-                            .stories
-                            .iter()
-                            .map(|s| StoryListRow {
-                                number: s
-                                    .get("storyNumber")
-                                    .and_then(|v| v.as_i64())
-                                    .map(|n| format!("#{n}"))
-                                    .unwrap_or_default(),
-                                status: s
-                                    .get("status")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("")
-                                    .to_string(),
-                                point: s
-                                    .get("storyPoint")
-                                    .and_then(|v| v.as_i64())
-                                    .map(|p| p.to_string())
-                                    .unwrap_or("-".to_string()),
-                                title: s
-                                    .get("title")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("")
-                                    .to_string(),
-                            })
-                            .collect();
+                        let rows = story_list_rows(&body.stories);
                         println!("{}", Table::new(rows).with(Style::sharp()));
                     }
                 }
@@ -762,7 +860,9 @@ async fn run() -> Result<(), (CliError, i32)> {
                     story_type,
                     description,
                     is_icebox,
+                    story_point,
                     labels,
+                    placement,
                 } => {
                     let project = require_project(project)?;
                     let label_ids =
@@ -772,6 +872,8 @@ async fn run() -> Result<(), (CliError, i32)> {
                         r#type: story_type.as_api_str().to_string(),
                         description,
                         is_icebox,
+                        story_point,
+                        placement: placement.into_placement(),
                         label_ids,
                     };
                     let body = service.create_story(&base_url, &project, &input).await?;
@@ -805,6 +907,7 @@ async fn run() -> Result<(), (CliError, i32)> {
                     add_labels,
                     remove_labels,
                     clear_labels,
+                    placement,
                 } => {
                     let project = require_project(project)?;
                     let label_ids = if clear_labels {
@@ -840,6 +943,7 @@ async fn run() -> Result<(), (CliError, i32)> {
                         } else {
                             None
                         },
+                        placement: placement.into_placement(),
                         owner_ids: if clear_owners {
                             Some(Vec::new())
                         } else if owners.is_empty() {
@@ -986,10 +1090,35 @@ async fn run() -> Result<(), (CliError, i32)> {
                 }
                 StorySubcommand::Reorder {
                     project,
+                    story_number,
+                    placement,
                     ordered_ids,
                 } => {
                     let project = require_project(project)?;
-                    let input = StoryReorderInput { ordered_ids };
+                    let input = match (story_number, placement.into_placement()) {
+                        (Some(story_number), Some(placement)) => {
+                            StoryReorderInput::Place { story_number, placement }
+                        }
+                        (Some(_), None) => {
+                            return Err((
+                                CliError::Message(
+                                    "--to-top, --to-end, --after or --before is required with a story number"
+                                        .to_string(),
+                                ),
+                                EXIT_INVALID_ARGUMENT,
+                            ));
+                        }
+                        (None, Some(_)) => {
+                            return Err((
+                                CliError::Message(
+                                    "a position flag needs a story number; --ordered-id takes no position flag"
+                                        .to_string(),
+                                ),
+                                EXIT_INVALID_ARGUMENT,
+                            ));
+                        }
+                        (None, None) => StoryReorderInput::OrderedIds(ordered_ids),
+                    };
                     let body = service.reorder_stories(&base_url, &project, &input).await?;
                     if cli.json {
                         println!(
@@ -998,32 +1127,7 @@ async fn run() -> Result<(), (CliError, i32)> {
                                 .map_err(|e| (CliError::Json(e), EXIT_GENERAL))?
                         );
                     } else {
-                        let rows: Vec<StoryListRow> = body
-                            .stories
-                            .iter()
-                            .map(|s| StoryListRow {
-                                number: s
-                                    .get("storyNumber")
-                                    .and_then(|v| v.as_i64())
-                                    .map(|n| format!("#{n}"))
-                                    .unwrap_or_default(),
-                                status: s
-                                    .get("status")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("")
-                                    .to_string(),
-                                point: s
-                                    .get("storyPoint")
-                                    .and_then(|v| v.as_i64())
-                                    .map(|p| p.to_string())
-                                    .unwrap_or("-".to_string()),
-                                title: s
-                                    .get("title")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("")
-                                    .to_string(),
-                            })
-                            .collect();
+                        let rows = story_list_rows(&body.stories);
                         println!("{}", Table::new(rows).with(Style::sharp()));
                     }
                 }
@@ -1451,6 +1555,124 @@ mod tests {
         };
         assert_eq!(owners, vec!["user-1".to_string(), "user-2".to_string()]);
         assert!(!clear_owners);
+    }
+
+    fn parse_placement(args: &[&str]) -> Result<Option<StoryPlacement>, clap::Error> {
+        let mut argv = vec!["tm", "story", "update", "--project", "p", "1"];
+        argv.extend_from_slice(args);
+        let parsed = Cli::try_parse_from(argv)?;
+        let Commands::Story(StoryCommand {
+            command: StorySubcommand::Update { placement, .. },
+        }) = parsed.command
+        else {
+            panic!("expected story update command");
+        };
+        Ok(placement.into_placement())
+    }
+
+    #[test]
+    fn story_update_takes_one_position_flag() {
+        assert_eq!(parse_placement(&["--no-icebox"]).unwrap(), None);
+        assert_eq!(parse_placement(&["--to-top"]).unwrap(), Some(StoryPlacement::Top));
+        assert_eq!(parse_placement(&["--to-end"]).unwrap(), Some(StoryPlacement::End));
+        assert_eq!(
+            parse_placement(&["--after", "12"]).unwrap(),
+            Some(StoryPlacement::After(12))
+        );
+        assert_eq!(
+            parse_placement(&["--before", "7"]).unwrap(),
+            Some(StoryPlacement::Before(7))
+        );
+        assert!(parse_placement(&["--to-top", "--to-end"]).is_err());
+        assert!(parse_placement(&["--after", "1", "--before", "2"]).is_err());
+    }
+
+    #[test]
+    fn story_create_takes_story_point_and_position() {
+        let parsed = Cli::try_parse_from([
+            "tm", "story", "create", "--project", "p", "--title", "t", "--type", "feature",
+            "--description", "d", "--story-point", "3", "--after", "5",
+        ])
+        .expect("create should accept a point and a position");
+        let Commands::Story(StoryCommand {
+            command:
+                StorySubcommand::Create {
+                    story_point,
+                    placement,
+                    ..
+                },
+        }) = parsed.command
+        else {
+            panic!("expected story create command");
+        };
+        assert_eq!(story_point, Some(3));
+        assert_eq!(placement.into_placement(), Some(StoryPlacement::After(5)));
+    }
+
+    #[test]
+    fn story_reorder_takes_a_story_number_with_a_position_or_ordered_ids() {
+        let parsed = Cli::try_parse_from(["tm", "story", "reorder", "--project", "p", "9", "--to-end"])
+            .expect("number with position should parse");
+        let Commands::Story(StoryCommand {
+            command:
+                StorySubcommand::Reorder {
+                    story_number,
+                    placement,
+                    ordered_ids,
+                    ..
+                },
+        }) = parsed.command
+        else {
+            panic!("expected story reorder command");
+        };
+        assert_eq!(story_number, Some(9));
+        assert_eq!(placement.into_placement(), Some(StoryPlacement::End));
+        assert!(ordered_ids.is_empty());
+
+        assert!(Cli::try_parse_from(["tm", "story", "reorder", "--project", "p", "--ordered-id", "a"]).is_ok());
+        assert!(Cli::try_parse_from(["tm", "story", "reorder", "--project", "p"]).is_err());
+        assert!(Cli::try_parse_from([
+            "tm", "story", "reorder", "--project", "p", "9", "--ordered-id", "a"
+        ])
+        .is_err());
+    }
+
+    #[test]
+    fn story_list_rows_follow_the_ui_panel_order() {
+        let stories = vec![
+            serde_json::json!({ "storyNumber": 3, "section": "Icebox", "position": 1.0, "status": "Unstarted", "title": "c" }),
+            serde_json::json!({ "storyNumber": 2, "section": "Backlog", "position": 5.0, "status": "Unstarted", "storyPoint": 2, "title": "b" }),
+            serde_json::json!({ "storyNumber": 1, "section": "Current", "position": 9.0, "iterationNumber": 4, "status": "Started", "title": "a" }),
+            serde_json::json!({ "storyNumber": 4, "section": "Backlog", "position": 2.0, "status": "Unstarted", "title": "d" }),
+        ];
+        let rows = story_list_rows(&stories);
+        let numbers: Vec<&str> = rows.iter().map(|r| r.number.as_str()).collect();
+        assert_eq!(numbers, vec!["#1", "#4", "#2", "#3"]);
+
+        let done = vec![
+            serde_json::json!({ "storyNumber": 5, "section": "Done", "position": 1.0, "statusChangedAt": "2026-11-01 00:00:00", "title": "old" }),
+            serde_json::json!({ "storyNumber": 6, "section": "Done", "position": 9.0, "statusChangedAt": "2026-11-05 00:00:00", "title": "new" }),
+        ];
+        let numbers: Vec<String> = story_list_rows(&done).into_iter().map(|r| r.number).collect();
+        assert_eq!(numbers, vec!["#6", "#5"]);
+        assert_eq!(rows[0].iteration, "4");
+        assert_eq!(rows[1].iteration, "-");
+        assert_eq!(rows[0].section, "Current");
+    }
+
+    #[test]
+    fn label_create_takes_name_and_color() {
+        let parsed = Cli::try_parse_from([
+            "tm", "label", "create", "--project", "p", "--name", "epic-a", "--color", "#ff0000",
+        ])
+        .expect("label create should parse");
+        assert!(matches!(
+            parsed.command,
+            Commands::Label(epic_cli::LabelCommand {
+                command: epic_cli::LabelSubcommand::Create { .. }
+            })
+        ));
+        assert!(Cli::try_parse_from(["tm", "label", "create", "--project", "p", "--name", "x"]).is_err());
     }
 
     #[test]

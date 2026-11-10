@@ -114,6 +114,8 @@ tm story list --project <project-id> --status Started --limit 10
 tm --json story list --project <project-id>
 ```
 
+The table shows `section` (Done / Current / Backlog / Icebox), `iteration` (number, `-` when unassigned) and `position`, in the order of the UI panels (Done, Current, Backlog, Icebox; Done newest status change first, the others by position), so you can compare it with the UI directly. `--limit` still selects stories by position before they are shown in this order. `--json` includes `section` and `iterationNumber` on every story.
+
 ## Story archive
 
 Unstarted and rejected stories can be archived without deleting their history.
@@ -129,7 +131,10 @@ tm story unarchive --project <project-id> 95
 tm story create --project <project-id> --title "New story" --type feature --description "details"
 tm story create --project <project-id> --title "Release v1" --type release --description "release marker"
 tm --json story create --project <project-id> --title "New story" --type bug --description "details" --is-icebox
+tm story create --project <project-id> --title "Estimated" --type feature --description "details" --story-point 3 --after 120
 ```
+
+`--story-point` sets the estimate at creation. A position (`--to-top`, `--to-end`, `--after <story-number>`, `--before <story-number>`; at most one) places the new story among the stories outside the Icebox; it cannot be combined with `--is-icebox`.
 
 ## Story update
 
@@ -173,9 +178,28 @@ tm --json story block --project <project-id> 328 --by 325
 
 `tm story get` lists the stories involved under `blockingStories` (blocking this story) and `blockedStories` (blocked by this story), with their number, title and status.
 
+### Taking a story out of the Icebox at a position
+
+`tm story update --no-icebox` puts the story first by default. Add one position flag to choose where it lands; the other stories keep their relative order.
+
+```bash
+tm story update --project <project-id> 120 --no-icebox --to-end
+tm story update --project <project-id> 120 --no-icebox --after 95
+tm story update --project <project-id> 120 --no-icebox --before 95
+```
+
+A position flag without `--no-icebox` repositions a story that is already outside the Icebox. A story that stays in the Icebox, an Icebox reference story, a reference story of another project or the story itself are rejected without any change.
+
 ## Story reorder
 
-Changes story priority (order). `--ordered-id` is repeated from highest to lowest priority and takes the internal story ID (the `id` field of `tm --json story list`), not the story number. Only the listed stories are rearranged, and only among the positions they already occupy; unlisted stories keep their positions. A story you list is therefore not moved to the end of the Backlog by itself: to move story N to the end, list the current last Backlog story first, then N.
+Changes story priority (order). By story number: `tm story reorder <story-number>` with one of `--to-top`, `--to-end`, `--after <story-number>`, `--before <story-number>` moves that story among the stories outside the Icebox, and every other story keeps its relative order. The story and the reference story must be outside the Icebox; stories of other projects are not found.
+
+```bash
+tm story reorder --project <project-id> 120 --to-end
+tm story reorder --project <project-id> 120 --after 95
+```
+
+By ID: `--ordered-id` is repeated from highest to lowest priority and takes the internal story ID (the `id` field of `tm --json story list`), not the story number. Only the listed stories are rearranged, and only among the positions they already occupy; unlisted stories keep their positions. To move one story to a place, prefer the story-number form above.
 
 Reorder changes priority only. Status, Icebox and iteration assignment are untouched, so it does not release a Current assignment; use `tm story unassign-iteration` for that.
 
@@ -210,6 +234,7 @@ An epic is the strategy plan of one label: purpose, success criteria, owner, pla
 
 ```bash
 tm label list --project <project-id>
+tm label create --project <project-id> --name "Onboarding" --color "#3366ff"
 tm label deletion-impact --project <project-id> <label-id>
 tm epic list --project <project-id>
 tm epic get --project <project-id> <label-id>
