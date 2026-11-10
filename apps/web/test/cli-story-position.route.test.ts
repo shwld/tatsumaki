@@ -82,6 +82,25 @@ describe("cli story positioning", () => {
     expect(await backlogTitles()).toEqual(["B", "C", "D", "A"]);
   });
 
+  it("returns the same story set whether or not the order changed", async () => {
+    const [a, b] = await seedBacklog();
+    await createStory("Iced", { isIcebox: true });
+    const ids = async (storyNumber: number, position: string) => {
+      const response = await call("/reorder", "POST", {
+        storyNumber,
+        placement:
+          position === "end"
+            ? { position }
+            : { position, relativeToStoryNumber: a.storyNumber },
+      });
+      const { stories } = (await response.json()) as { stories: Story[] };
+      return stories.map((s) => s.title).sort();
+    };
+    const noOp = await ids(b.storyNumber, "after");
+    const changed = await ids(b.storyNumber, "end");
+    expect(noOp).toEqual(changed);
+  });
+
   it("moves a story to the top, and before/after another story", async () => {
     const [a, b, c, d] = await seedBacklog();
     await call("/reorder", "POST", {

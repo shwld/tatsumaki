@@ -114,7 +114,7 @@ tm story list --project <project-id> --status Started --limit 10
 tm --json story list --project <project-id>
 ```
 
-The table shows `section` (Done / Current / Backlog / Icebox), `iteration` (number, `-` when unassigned) and `position`, in the order of the UI panels (Done, Current, Backlog, Icebox; Done newest status change first, the others by position), so you can compare it with the UI directly. `--json` includes `section` and `iterationNumber` on every story.
+The table shows `section` (Done / Current / Backlog / Icebox), `iteration` (number, `-` when unassigned) and `position`, in the order of the UI panels (Done, Current, Backlog, Icebox; Done newest status change first, the others by position), so you can compare it with the UI directly. `--limit` still selects stories by position before they are shown in this order. `--json` includes `section` and `iterationNumber` on every story.
 
 ## Story archive
 

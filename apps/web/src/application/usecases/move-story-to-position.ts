@@ -170,7 +170,12 @@ export async function moveStoryToPosition(
     anchor.value?.id ?? null,
   );
   if (orderedIds.length <= 1) {
-    return ok(listed.value);
+    return repository.list({
+      projectId,
+      archived: "exclude",
+      order: "positionAsc",
+      detailLevel: "summary",
+    });
   }
 
   const reordered = await reorderStories(repository, projectId, orderedIds);
