@@ -18,6 +18,7 @@ import { iterationsRoute } from "./presentation/routes/iterations";
 import { mcpRoute } from "./presentation/routes/mcp";
 import { cliRoute } from "./presentation/routes/cli";
 import { planningPokerRoute } from "./presentation/routes/planning-poker";
+import { storyMapLiveRoute } from "./presentation/routes/story-map-live";
 import { projectHistoryRoute } from "./presentation/routes/project-history";
 import { savedFiltersRoute } from "./presentation/routes/saved-filters";
 import { projectApiKeysRoute } from "./presentation/routes/project-api-keys";
@@ -39,6 +40,7 @@ import {
 import { isRateLimited } from "./presentation/rate-limit";
 import { spaIndexHeaders } from "./presentation/spa-headers";
 import { PlanningPokerDO } from "./durable-objects/planning-poker-do";
+import { StoryMapDO } from "./durable-objects/story-map-do";
 import { requireAccessAuth } from "./presentation/middleware/access-auth";
 import {
   getAppEntitlementDenial,
@@ -74,6 +76,7 @@ export type Bindings = {
   ACCESS_JWKS_JSON?: string;
   DEV_AUTH_EMAIL?: string;
   PLANNING_POKER_DO: DurableObjectNamespace;
+  STORY_MAP_DO: DurableObjectNamespace;
   CONTROL_PLANE?: ControlPlaneRpc;
   ENTITLEMENT_MODE?: string;
   CHECKOUT_ENABLED?: string;
@@ -125,6 +128,7 @@ protectedApi.route("/", projectLabelsRoute);
 protectedApi.route("/projects", createEpicRoutes());
 protectedApi.route("/", iterationsRoute);
 protectedApi.route("/", planningPokerRoute);
+protectedApi.route("/", storyMapLiveRoute);
 protectedApi.route("/", projectHistoryRoute);
 protectedApi.route("/", savedFiltersRoute);
 protectedApi.route("/", myWorkRoute);
@@ -338,4 +342,4 @@ export default {
   },
 };
 
-export { PlanningPokerDO };
+export { PlanningPokerDO, StoryMapDO };

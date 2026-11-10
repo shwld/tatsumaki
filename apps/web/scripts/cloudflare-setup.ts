@@ -593,9 +593,17 @@ crons = ["0 * * * *"]
 name = "PLANNING_POKER_DO"
 class_name = "PlanningPokerDO"
 
+[[durable_objects.bindings]]
+name = "STORY_MAP_DO"
+class_name = "StoryMapDO"
+
 [[migrations]]
 tag = "v1-planning-poker-do"
 new_sqlite_classes = ["PlanningPokerDO"]
+
+[[migrations]]
+tag = "v2-story-map-do"
+new_sqlite_classes = ["StoryMapDO"]
 `;
 }
 

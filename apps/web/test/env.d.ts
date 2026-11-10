@@ -9,6 +9,9 @@ declare module "cloudflare:test" {
   export const SELF: {
     fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
   };
+  export function runDurableObjectAlarm(
+    stub: DurableObjectStub,
+  ): Promise<boolean>;
   export function applyD1Migrations(
     db: D1Database,
     migrations: D1Migration[],

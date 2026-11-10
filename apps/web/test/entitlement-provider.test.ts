@@ -7,6 +7,7 @@ const bindings = {
   DB: {} as D1Database,
   ASSETS: {} as Fetcher,
   PLANNING_POKER_DO: {} as DurableObjectNamespace,
+  STORY_MAP_DO: {} as DurableObjectNamespace,
 };
 
 describe("ControlPlaneEntitlementProvider", () => {
