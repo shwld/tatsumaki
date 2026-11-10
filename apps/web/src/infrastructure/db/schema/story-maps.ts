@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   index,
   integer,
+  primaryKey,
   sqliteTable,
   text,
   uniqueIndex,
@@ -18,6 +19,7 @@ export const storyMapsTable = sqliteTable(
     title: text("title").notNull(),
     achievementGoal: text("achievement_goal").notNull().default(""),
     archivedAt: text("archived_at"),
+    seq: integer("seq").notNull().default(0),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
     updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
@@ -124,5 +126,23 @@ export const storyMapCardsTable = sqliteTable(
     uniqueIndex("idx_story_map_cards_story")
       .on(table.mapId, table.storyId)
       .where(sql`${table.storyId} IS NOT NULL`),
+  ],
+);
+
+export const storyMapOpsTable = sqliteTable(
+  "story_map_ops",
+  {
+    mapId: text("map_id")
+      .notNull()
+      .references(() => storyMapsTable.id, { onDelete: "cascade" }),
+    opId: text("op_id").notNull(),
+    userId: text("user_id").notNull(),
+    seq: integer("seq").notNull(),
+    result: text("result").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.mapId, table.opId] }),
+    index("idx_story_map_ops_created").on(table.mapId, table.createdAt),
   ],
 );

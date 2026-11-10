@@ -12,6 +12,7 @@ import type {
 } from "../../../domain/entities/story-map";
 import {
   STORY_MAP_REPOSITORY_ERROR,
+  type StoryMapRecordedOp,
   type StoryMapRepository,
   type StoryMapRepositoryError,
 } from "../../../domain/repositories/story-map-repository";
@@ -709,6 +710,70 @@ export class D1StoryMapRepository implements StoryMapRepository {
           .bind(cardId, mapId),
         this.touch(mapId),
       ]);
+    });
+  }
+
+  async getSeq(mapId: string): Repo<number> {
+    return this.guard(async () => {
+      const row = await this.d1
+        .prepare("SELECT seq FROM story_maps WHERE id = ?")
+        .bind(mapId)
+        .first<{ seq: number }>();
+      return row?.seq ?? 0;
+    });
+  }
+
+  async findOp(mapId: string, opId: string): Repo<StoryMapRecordedOp | null> {
+    return this.guard(async () => {
+      const row = await this.d1
+        .prepare(
+          "SELECT user_id, seq, result FROM story_map_ops WHERE map_id = ? AND op_id = ?",
+        )
+        .bind(mapId, opId)
+        .first<{ user_id: string; seq: number; result: string }>();
+      return row
+        ? { userId: row.user_id, seq: row.seq, result: row.result }
+        : null;
+    });
+  }
+
+  async recordOp(input: {
+    mapId: string;
+    opId: string;
+    userId: string;
+    result: string;
+  }): Repo<number> {
+    return this.guard(async () => {
+      const now = new Date().toISOString();
+      await this.d1.batch([
+        this.d1
+          .prepare(
+            "UPDATE story_maps SET seq = seq + 1, updated_at = ? WHERE id = ?",
+          )
+          .bind(now, input.mapId),
+        this.d1
+          .prepare(
+            `INSERT INTO story_map_ops (map_id, op_id, user_id, seq, result, created_at)
+             SELECT id, ?, ?, seq, ?, ? FROM story_maps WHERE id = ?`,
+          )
+          .bind(input.opId, input.userId, input.result, now, input.mapId),
+      ]);
+      const row = await this.d1
+        .prepare("SELECT seq FROM story_maps WHERE id = ?")
+        .bind(input.mapId)
+        .first<{ seq: number }>();
+      return row?.seq ?? 0;
+    });
+  }
+
+  async pruneOps(mapId: string, before: string): Repo<void> {
+    return this.guard(async () => {
+      await this.d1
+        .prepare(
+          "DELETE FROM story_map_ops WHERE map_id = ? AND created_at < ?",
+        )
+        .bind(mapId, before)
+        .run();
     });
   }
 

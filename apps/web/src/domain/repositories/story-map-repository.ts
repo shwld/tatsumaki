@@ -9,6 +9,12 @@ import type {
   StoryMapTask,
 } from "../entities/story-map";
 
+export type StoryMapRecordedOp = {
+  userId: string;
+  seq: number;
+  result: string;
+};
+
 export const STORY_MAP_REPOSITORY_ERROR = "STORY_MAP_REPOSITORY_ERROR" as const;
 
 export type StoryMapRepositoryError = typeof STORY_MAP_REPOSITORY_ERROR;
@@ -99,6 +105,20 @@ export interface StoryMapRepository {
     storyId: string | null,
   ): Repo<void>;
   deleteCard(mapId: string, cardId: string): Repo<void>;
+
+  /** Operation counter of the map, advanced once per applied live command. */
+  getSeq(mapId: string): Repo<number>;
+  /** The recorded result of a command, or null when the op was not applied. */
+  findOp(mapId: string, opId: string): Repo<StoryMapRecordedOp | null>;
+  /** Advances `seq` and records the op together; returns the new `seq`. */
+  recordOp(input: {
+    mapId: string;
+    opId: string;
+    userId: string;
+    result: string;
+  }): Repo<number>;
+  /** Drops records older than `before` (ISO timestamp). */
+  pruneOps(mapId: string, before: string): Repo<void>;
 
   /** Whether the story exists in the project (archived stories count). */
   storyExistsInProject(projectId: string, storyId: string): Repo<boolean>;

@@ -13,7 +13,7 @@ When the user explicitly requests remote setup, `bun apps/web/scripts/setup-clou
 | KV namespace | Bound as `OAUTH_KV` |
 | R2 bucket | `tatsumaki-story-attachments` |
 | R2 bucket | `tatsumaki-user-avatars` |
-| Durable Object | `PLANNING_POKER_DO` from `apps/web/wrangler.toml` |
+| Durable Object | `PLANNING_POKER_DO` and `STORY_MAP_DO` from `apps/web/wrangler.toml` |
 | Access Application | Protects the Worker destination |
 | Access Policy | Explicitly allowed email addresses or email domains |
 
