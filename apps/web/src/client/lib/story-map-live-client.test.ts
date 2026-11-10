@@ -93,6 +93,14 @@ describe("StoryMapLiveClient", () => {
     ]);
   });
 
+  it("does not resend pending commands when a snapshot arrives on a live connection", () => {
+    sockets[0].receive(snapshot(0));
+    client.send({ type: "addPersona", name: "A" });
+    expect(sockets[0].sent).toHaveLength(1);
+    sockets[0].receive(snapshot(0));
+    expect(sockets[0].sent).toHaveLength(1);
+  });
+
   it("gives up after the retry delays run out", () => {
     sockets[0].receive(snapshot(0));
     sockets[0].emit("close");

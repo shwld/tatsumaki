@@ -52,6 +52,7 @@ const DEFAULT_RETRY_DELAYS_MS = [500, 1000, 2000, 4000, 8000];
  */
 export class StoryMapLiveClient {
   private socket: LiveSocket | null = null;
+  private flushedSocket: LiveSocket | null = null;
   private retry = 0;
   private closed = false;
   private timer: ReturnType<typeof setTimeout> | null = null;
@@ -154,7 +155,12 @@ export class StoryMapLiveClient {
           role: message.role,
           structure: message.structure,
         });
-        this.flush();
+        // Later snapshots on the same connection answer a refusal or a resync
+        // request; resending then would race the commands still in flight.
+        if (this.flushedSocket !== this.socket) {
+          this.flushedSocket = this.socket;
+          this.flush();
+        }
         return;
       case "applied":
         if (message.seq <= this.state.seq) return;

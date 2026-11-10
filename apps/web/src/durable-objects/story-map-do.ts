@@ -261,6 +261,11 @@ export class StoryMapDO {
 
     const next = await this.load(attachment);
     if (typeof next === "string") {
+      // The edit is saved but cannot be shown. Reconnecting makes every client
+      // fetch a snapshot instead of staying stale with no gap to detect.
+      for (const peer of this.state.getWebSockets()) {
+        peer.close(1011, "state unavailable");
+      }
       return;
     }
     for (const peer of this.state.getWebSockets()) {
