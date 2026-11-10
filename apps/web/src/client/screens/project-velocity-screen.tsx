@@ -49,14 +49,16 @@ export function ProjectVelocityScreen() {
     null,
   );
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<"projectNotFound" | "loadError" | null>(
+    null,
+  );
 
   useEffect(() => {
     let ignore = false;
 
     const loadVelocity = async () => {
       if (!projectId) {
-        setError(t("projectVelocityScreen.projectNotFound"));
+        setError("projectNotFound");
         setIsLoading(false);
         return;
       }
@@ -74,7 +76,7 @@ export function ProjectVelocityScreen() {
             return;
           }
           if (!ignore) {
-            setError(t("projectVelocityScreen.loadError"));
+            setError("loadError");
           }
           return;
         }
@@ -148,7 +150,7 @@ export function ProjectVelocityScreen() {
         }
       } catch {
         if (!ignore) {
-          setError(t("projectVelocityScreen.loadError"));
+          setError("loadError");
         }
       } finally {
         if (!ignore) {
@@ -162,7 +164,7 @@ export function ProjectVelocityScreen() {
     return () => {
       ignore = true;
     };
-  }, [notifySessionExpired, projectId, t]);
+  }, [notifySessionExpired, projectId]);
 
   const completedIterations = useMemo(() => {
     const today = todayIso();
@@ -206,7 +208,7 @@ export function ProjectVelocityScreen() {
 
         {error ? (
           <div className="mt-6 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {error}
+            {t(`projectVelocityScreen.${error}`)}
           </div>
         ) : null}
 

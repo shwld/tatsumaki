@@ -36,6 +36,7 @@ export function ProjectSettingsScreen() {
   const [project, setProject] = useState<Project | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   const [nameInput, setNameInput] = useState("");
   const [descriptionInput, setDescriptionInput] = useState("");
@@ -67,7 +68,7 @@ export function ProjectSettingsScreen() {
           return;
         }
         if (!response.ok) {
-          setError(t("projectSettingsScreen.loadError"));
+          setLoadFailed(true);
           return;
         }
         const data = (await response.json()) as { project: Project };
@@ -83,14 +84,14 @@ export function ProjectSettingsScreen() {
           setCustomScaleInput(data.project.customPointScale.join(", "));
         }
       } catch {
-        setError(t("projectSettingsScreen.loadError"));
+        setLoadFailed(true);
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchProject();
-  }, [projectId, notifySessionExpired, t]);
+  }, [projectId, notifySessionExpired]);
 
   const handleGeneralSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
@@ -363,8 +364,10 @@ export function ProjectSettingsScreen() {
     );
   }
 
-  if (error && !project) {
-    return <p className="p-4 text-red-600">{error}</p>;
+  if (loadFailed && !project) {
+    return (
+      <p className="p-4 text-red-600">{t("projectSettingsScreen.loadError")}</p>
+    );
   }
 
   const isOwner = project?.currentUserRole === "owner";
