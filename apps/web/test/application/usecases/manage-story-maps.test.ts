@@ -374,6 +374,31 @@ describe("manage story maps", () => {
     expect(s.cards.map((c) => c.id)).toEqual([c2.id, c1.id]);
   });
 
+  it("appends the cards of a deleted slice after the unplanned cards", async () => {
+    const { target, task, slice, map } = await setup();
+    const planned = (
+      await addCard(deps, {
+        ...target,
+        taskId: task.id,
+        sliceId: slice.id,
+        ideaTitle: "planned",
+      })
+    )._unsafeUnwrap();
+    const first = (
+      await addCard(deps, { ...target, taskId: task.id, ideaTitle: "u1" })
+    )._unsafeUnwrap();
+    const second = (
+      await addCard(deps, { ...target, taskId: task.id, ideaTitle: "u2" })
+    )._unsafeUnwrap();
+    await deleteSlice(deps, { ...target, sliceId: slice.id });
+
+    const { cards } = (
+      await getStoryMap(deps, { ...target, mapId: map.id })
+    )._unsafeUnwrap();
+    expect(cards.map((c) => c.id)).toEqual([first.id, second.id, planned.id]);
+    expect(cards.map((c) => c.position)).toEqual([0, 1, 2]);
+  });
+
   it("refuses edits on an archived map until it is restored", async () => {
     const { target, activity } = await setup();
     await updateStoryMap(deps, { ...target, archived: true });

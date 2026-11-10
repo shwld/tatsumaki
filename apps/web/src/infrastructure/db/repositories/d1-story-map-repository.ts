@@ -547,7 +547,39 @@ export class D1StoryMapRepository implements StoryMapRepository {
 
   async deleteSlice(mapId: string, sliceId: string): Repo<void> {
     return this.guard(async () => {
+      const moving = await this.d1
+        .prepare(
+          "SELECT id, task_id FROM story_map_cards WHERE map_id = ? AND slice_id = ? ORDER BY position, id",
+        )
+        .bind(mapId, sliceId)
+        .all<{ id: string; task_id: string }>();
+      const taskIds = [...new Set(moving.results.map((row) => row.task_id))];
+      const renumber: D1PreparedStatement[] = [];
+      for (const taskId of taskIds) {
+        const unplanned = await this.d1
+          .prepare(
+            "SELECT id FROM story_map_cards WHERE task_id = ? AND slice_id IS NULL ORDER BY position, id",
+          )
+          .bind(taskId)
+          .all<{ id: string }>();
+        const ids = [
+          ...unplanned.results.map((row) => row.id),
+          ...moving.results
+            .filter((row) => row.task_id === taskId)
+            .map((row) => row.id),
+        ];
+        ids.forEach((id, position) => {
+          renumber.push(
+            this.d1
+              .prepare(
+                "UPDATE story_map_cards SET slice_id = NULL, position = ? WHERE id = ?",
+              )
+              .bind(position, id),
+          );
+        });
+      }
       await this.d1.batch([
+        ...renumber,
         this.d1
           .prepare("DELETE FROM story_map_slices WHERE id = ? AND map_id = ?")
           .bind(sliceId, mapId),
