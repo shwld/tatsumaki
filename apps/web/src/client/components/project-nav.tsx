@@ -10,6 +10,7 @@ import {
   projectMembersPath,
   projectSettingsPath,
   projectStoriesPath,
+  projectStoryMapsPath,
   projectVelocityDashboardPath,
 } from "../lib/story-routes";
 import type { ProjectsResponse } from "../types/project";
@@ -88,6 +89,10 @@ function ProjectNavContent({ projectId }: { projectId: string }) {
       label: t("projectNav.velocity"),
     },
     { to: projectEpicsPath(projectId), label: t("projectNav.epics") },
+    {
+      to: projectStoryMapsPath(projectId),
+      label: t("projectNav.storyMaps"),
+    },
     { to: projectHistoryPath(projectId), label: t("projectNav.history") },
     { to: projectArtifactsPath(projectId), label: t("projectNav.artifacts") },
     { to: projectMembersPath(projectId), label: t("projectNav.members") },

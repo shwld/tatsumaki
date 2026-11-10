@@ -18,6 +18,13 @@ import type {
   StoryMapRepositoryError,
 } from "../../domain/repositories/story-map-repository";
 
+import {
+  STORY_MAP_GOAL_MAX,
+  STORY_MAP_NOTE_MAX,
+  STORY_MAP_PERSONA_MAX,
+  STORY_MAP_TITLE_MAX,
+} from "../../shared/story-map-limits";
+
 export const STORY_MAP_FORBIDDEN_ERROR = "STORY_MAP_FORBIDDEN_ERROR" as const;
 export const STORY_MAP_NOT_FOUND_ERROR = "STORY_MAP_NOT_FOUND_ERROR" as const;
 export const STORY_MAP_ARCHIVED_ERROR = "STORY_MAP_ARCHIVED_ERROR" as const;
@@ -48,10 +55,12 @@ export type StoryMapDependencies = {
 
 type Result_<T> = Promise<Result<T, ManageStoryMapError>>;
 
-export const STORY_MAP_TITLE_MAX = 200;
-export const STORY_MAP_GOAL_MAX = 2000;
-export const STORY_MAP_NOTE_MAX = 2000;
-export const STORY_MAP_PERSONA_MAX = 20;
+export {
+  STORY_MAP_GOAL_MAX,
+  STORY_MAP_NOTE_MAX,
+  STORY_MAP_PERSONA_MAX,
+  STORY_MAP_TITLE_MAX,
+};
 
 type Actor = { projectId: string; userId: string };
 type MapTarget = Actor & { mapId: string };

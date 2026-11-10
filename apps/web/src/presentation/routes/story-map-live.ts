@@ -53,3 +53,50 @@ storyMapLiveRoute.get(
     return stub.fetch(new Request("https://story-map/live", { headers }));
   },
 );
+
+/**
+ * HTTP write path: the command goes to the same Durable Object as the socket
+ * commands, so it is serialized with live edits and shown to live editors.
+ */
+storyMapLiveRoute.post(
+  "/projects/:projectId/story-maps/:mapId/commands",
+  async (c) => {
+    const projectId = c.req.param("projectId");
+    const mapId = c.req.param("mapId");
+    const currentUser = c.get("currentUser");
+
+    const member = await new D1ProjectRepository(c.env.DB).findMember(
+      projectId,
+      currentUser.id,
+    );
+    if (member.isErr()) {
+      return c.json({ error: "Failed to load project membership" }, 500);
+    }
+    if (!member.value) return notFound();
+
+    const structure = await new D1StoryMapRepository(c.env.DB).getStructure(
+      projectId,
+      mapId,
+    );
+    if (structure.isErr()) {
+      return c.json({ error: "Failed to load story map" }, 500);
+    }
+    if (!structure.value) return notFound();
+
+    const headers = new Headers({
+      "content-type": "application/json",
+      "x-user-id": currentUser.id,
+      "x-member-role": member.value.role,
+      "x-project-id": projectId,
+      "x-map-id": mapId,
+    });
+    const stub = c.env.STORY_MAP_DO.get(c.env.STORY_MAP_DO.idFromName(mapId));
+    return stub.fetch(
+      new Request("https://story-map/command", {
+        method: "POST",
+        headers,
+        body: await c.req.text(),
+      }),
+    );
+  },
+);

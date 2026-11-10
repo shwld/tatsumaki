@@ -6,6 +6,14 @@ export function projectEpicsPath(projectId: string): string {
   return `/projects/${projectId}/epics`;
 }
 
+export function projectStoryMapsPath(projectId: string): string {
+  return `/projects/${projectId}/story-maps`;
+}
+
+export function projectStoryMapPath(projectId: string, mapId: string): string {
+  return `${projectStoryMapsPath(projectId)}/${encodeURIComponent(mapId)}`;
+}
+
 export function projectEpicPath(projectId: string, labelId: string): string {
   return `${projectEpicsPath(projectId)}/${encodeURIComponent(labelId)}`;
 }

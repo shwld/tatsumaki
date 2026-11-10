@@ -75,6 +75,10 @@ import {
   projectEpicsScreenJa,
 } from "../screens/project-epics-screen.i18n";
 import {
+  projectStoryMapsScreenEn,
+  projectStoryMapsScreenJa,
+} from "../screens/project-story-maps-screen.i18n";
+import {
   projectLabelsScreenEn,
   projectLabelsScreenJa,
 } from "../screens/project-labels-screen.i18n";
@@ -127,6 +131,7 @@ i18n.use(initReactI18next).init({
         ...projectCreateFormJa,
         ...projectLabelsScreenJa,
         ...projectEpicsScreenJa,
+        ...projectStoryMapsScreenJa,
         ...projectMembersScreenJa,
         ...storyMultiPanelScreenJa,
         ...storyEditScreenJa,
@@ -159,6 +164,7 @@ i18n.use(initReactI18next).init({
         ...projectCreateFormEn,
         ...projectLabelsScreenEn,
         ...projectEpicsScreenEn,
+        ...projectStoryMapsScreenEn,
         ...projectMembersScreenEn,
         ...storyMultiPanelScreenEn,
         ...storyEditScreenEn,
