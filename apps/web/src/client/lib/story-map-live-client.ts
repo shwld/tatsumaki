@@ -42,6 +42,10 @@ const OPEN = 1;
 /** The map is gone or the user lost access; retrying cannot help. */
 const DENIED_CLOSE_CODE = 4404;
 const REVOKED_CLOSE_CODE = 4403;
+/** A connection counts as recovered only after it stayed up this long. */
+const HEALTHY_AFTER_MS = 10_000;
+/** The server allows 20 commands per second per socket, so wait a second. */
+const RATE_LIMIT_RETRY_MS = 1000;
 const DEFAULT_RETRY_DELAYS_MS = [500, 1000, 2000, 4000, 8000];
 
 /**
@@ -56,6 +60,7 @@ export class StoryMapLiveClient {
   private retry = 0;
   private closed = false;
   private timer: ReturnType<typeof setTimeout> | null = null;
+  private healthyTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly pending = new Map<string, unknown>();
   private state: StoryMapLiveState = {
     connection: "connecting",
@@ -84,6 +89,7 @@ export class StoryMapLiveClient {
   close(): void {
     this.closed = true;
     if (this.timer) clearTimeout(this.timer);
+    if (this.healthyTimer) clearTimeout(this.healthyTimer);
     this.socket?.close(1000, "client closed");
     this.update({ connection: "disconnected" });
   }
@@ -99,6 +105,7 @@ export class StoryMapLiveClient {
     });
     socket.addEventListener("close", (event) => {
       if (this.socket !== socket || this.closed) return;
+      if (this.healthyTimer) clearTimeout(this.healthyTimer);
       const code = (event as CloseEvent).code;
       if (code === DENIED_CLOSE_CODE || code === REVOKED_CLOSE_CODE) {
         this.socket = null;
@@ -148,7 +155,10 @@ export class StoryMapLiveClient {
     }
     switch (message.type) {
       case "snapshot":
-        this.retry = 0;
+        if (this.healthyTimer) clearTimeout(this.healthyTimer);
+        this.healthyTimer = setTimeout(() => {
+          this.retry = 0;
+        }, HEALTHY_AFTER_MS);
         this.update({
           connection: "connected",
           seq: message.seq,
@@ -174,6 +184,11 @@ export class StoryMapLiveClient {
         this.settle(message.opId);
         return;
       case "reject":
+        if (message.code === "rate_limited") {
+          // Refused before it ran, so nothing was applied; send it again.
+          setTimeout(() => this.flush(message.opId), RATE_LIMIT_RETRY_MS);
+          return;
+        }
         this.settle(message.opId, message.code);
         return;
     }

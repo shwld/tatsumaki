@@ -101,6 +101,28 @@ describe("StoryMapLiveClient", () => {
     expect(sockets[0].sent).toHaveLength(1);
   });
 
+  it("sends a rate-limited command again instead of dropping it", () => {
+    sockets[0].receive(snapshot(0));
+    const opId = client.send({ type: "addPersona", name: "A" });
+    sockets[0].receive({ type: "reject", opId, code: "rate_limited" });
+    expect(state.save).toBe("saving");
+    expect(state.rejections).toEqual([]);
+    vi.advanceTimersByTime(1000);
+    expect(sockets[0].sent.filter((m) => m.opId === opId)).toHaveLength(2);
+  });
+
+  it("keeps counting retries when connections drop right after their snapshot", () => {
+    sockets[0].receive(snapshot(0));
+    sockets[0].emit("close");
+    vi.advanceTimersByTime(100);
+    sockets[1].receive(snapshot(0));
+    sockets[1].emit("close");
+    vi.advanceTimersByTime(200);
+    sockets[2].receive(snapshot(0));
+    sockets[2].emit("close");
+    expect(state.connection).toBe("disconnected");
+  });
+
   it("gives up after the retry delays run out", () => {
     sockets[0].receive(snapshot(0));
     sockets[0].emit("close");
