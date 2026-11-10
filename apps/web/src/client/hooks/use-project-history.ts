@@ -1,5 +1,6 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { projectHistoryApiPath } from "../lib/story-routes";
 import type {
   ProjectHistoryEntry,
@@ -8,6 +9,8 @@ import type {
 import { storyQueryKeys } from "./story-query-keys";
 
 export const PROJECT_HISTORY_PAGE_SIZE = 30;
+
+class ProjectHistoryLoadError extends Error {}
 
 async function fetchProjectHistoryPage(
   projectId: string,
@@ -21,7 +24,7 @@ async function fetchProjectHistoryPage(
   );
 
   if (!response.ok) {
-    throw new Error("プロジェクト履歴の取得に失敗しました");
+    throw new ProjectHistoryLoadError();
   }
 
   return (await response.json()) as ProjectHistoryResponse;
@@ -37,6 +40,7 @@ type UseProjectHistoryResult = {
 };
 
 export function useProjectHistory(projectId: string): UseProjectHistoryResult {
+  const { t } = useTranslation();
   const enabled = Boolean(projectId);
   const query = useInfiniteQuery({
     queryKey: storyQueryKeys.projectHistory(projectId),
@@ -64,7 +68,12 @@ export function useProjectHistory(projectId: string): UseProjectHistoryResult {
   return {
     history,
     isLoading: query.isPending,
-    error: query.error instanceof Error ? query.error.message : null,
+    error:
+      query.error instanceof ProjectHistoryLoadError
+        ? t("projectHistoryScreen.loadError")
+        : query.error instanceof Error
+          ? query.error.message
+          : null,
     hasMore: Boolean(query.hasNextPage),
     loadMore,
     isLoadingMore: query.isFetchingNextPage,

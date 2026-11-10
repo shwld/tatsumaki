@@ -1,4 +1,5 @@
 import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router";
 
 import { ProjectPage } from "../components/project-page";
@@ -26,31 +27,8 @@ import {
   TIMEZONE_OPTIONS,
 } from "../types/project";
 
-const POINT_SCALE_LABELS: Record<PointScaleType, string> = {
-  fibonacci: "フィボナッチ (0, 1, 2, 3, 5, 8, 13)",
-  linear: "リニア (0, 1, 2, 3, 4, 5)",
-  powers_of_2: "2のべき乗 (0, 1, 2, 4, 8, 16)",
-  custom: "カスタム",
-};
-
-const SPRINT_DURATION_LABELS: Record<SprintDuration, string> = {
-  7: "1週間",
-  14: "2週間",
-  21: "3週間",
-  28: "4週間",
-};
-
-const ITERATION_START_DAY_LABELS: Record<IterationStartDay, string> = {
-  0: "日曜日",
-  1: "月曜日",
-  2: "火曜日",
-  3: "水曜日",
-  4: "木曜日",
-  5: "金曜日",
-  6: "土曜日",
-};
-
 export function ProjectSettingsScreen() {
+  const { t } = useTranslation();
   const { projectId } = useParams();
   const navigate = useNavigate();
   const { notifySessionExpired } = useAuthError();
@@ -89,7 +67,7 @@ export function ProjectSettingsScreen() {
           return;
         }
         if (!response.ok) {
-          setError("プロジェクトの読み込みに失敗しました");
+          setError(t("projectSettingsScreen.loadError"));
           return;
         }
         const data = (await response.json()) as { project: Project };
@@ -105,14 +83,14 @@ export function ProjectSettingsScreen() {
           setCustomScaleInput(data.project.customPointScale.join(", "));
         }
       } catch {
-        setError("プロジェクトの読み込みに失敗しました");
+        setError(t("projectSettingsScreen.loadError"));
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchProject();
-  }, [projectId, notifySessionExpired]);
+  }, [projectId, notifySessionExpired, t]);
 
   const handleGeneralSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
@@ -121,7 +99,7 @@ export function ProjectSettingsScreen() {
 
       const trimmedName = nameInput.trim();
       if (trimmedName.length === 0) {
-        showToast("error", "プロジェクト名は必須です");
+        showToast("error", t("projectSettingsScreen.toast.nameRequired"));
         return;
       }
 
@@ -146,7 +124,10 @@ export function ProjectSettingsScreen() {
 
         if (!response.ok) {
           const errorMessage = await parseErrorMessage(response);
-          showToast("error", errorMessage ?? "設定の更新に失敗しました");
+          showToast(
+            "error",
+            errorMessage ?? t("projectSettingsScreen.toast.updateFailed"),
+          );
           return;
         }
 
@@ -154,9 +135,9 @@ export function ProjectSettingsScreen() {
         if (data.project) {
           setProject(data.project);
         }
-        showToast("success", "プロジェクト設定を更新しました");
+        showToast("success", t("projectSettingsScreen.toast.projectUpdated"));
       } catch {
-        showToast("error", "設定の更新に失敗しました");
+        showToast("error", t("projectSettingsScreen.toast.updateFailed"));
       } finally {
         setIsSavingGeneral(false);
       }
@@ -170,6 +151,7 @@ export function ProjectSettingsScreen() {
       timezoneInput,
       notifySessionExpired,
       showToast,
+      t,
     ],
   );
 
@@ -193,9 +175,7 @@ export function ProjectSettingsScreen() {
           parsed.length === 0 ||
           parsed.some((n) => !Number.isInteger(n) || n < 0)
         ) {
-          setError(
-            "カスタムスケールは0以上の整数をカンマ区切りで入力してください",
-          );
+          setError(t("projectSettingsScreen.pointScale.customInvalid"));
           setIsSaving(false);
           return;
         }
@@ -215,15 +195,15 @@ export function ProjectSettingsScreen() {
 
       if (!response.ok) {
         const data = (await response.json()) as { error?: string };
-        setError(data.error ?? "保存に失敗しました");
+        setError(data.error ?? t("projectSettingsScreen.saveFailed"));
         return;
       }
 
       const data = (await response.json()) as { project: Project };
       setProject(data.project);
-      showToast("success", "ポイントスケールを更新しました");
+      showToast("success", t("projectSettingsScreen.toast.pointScaleUpdated"));
     } catch {
-      setError("保存に失敗しました");
+      setError(t("projectSettingsScreen.saveFailed"));
     } finally {
       setIsSaving(false);
     }
@@ -251,7 +231,10 @@ export function ProjectSettingsScreen() {
 
       if (!response.ok) {
         const errorMessage = await parseErrorMessage(response);
-        showToast("error", errorMessage ?? "設定の更新に失敗しました");
+        showToast(
+          "error",
+          errorMessage ?? t("projectSettingsScreen.toast.updateFailed"),
+        );
         return;
       }
 
@@ -259,9 +242,9 @@ export function ProjectSettingsScreen() {
       if (data.project) {
         setProject(data.project);
       }
-      showToast("success", "設定を更新しました");
+      showToast("success", t("projectSettingsScreen.toast.settingsUpdated"));
     } catch {
-      showToast("error", "設定の更新に失敗しました");
+      showToast("error", t("projectSettingsScreen.toast.updateFailed"));
     } finally {
       setIsSavingEstimate(false);
     }
@@ -275,7 +258,7 @@ export function ProjectSettingsScreen() {
       project.sprintDurationDays !== sprintDurationInput ||
       project.iterationStartDay !== iterationStartDayInput;
     if (!hasChanged) {
-      showToast("success", "変更はありません");
+      showToast("success", t("projectSettingsScreen.toast.noChanges"));
       return;
     }
 
@@ -298,7 +281,10 @@ export function ProjectSettingsScreen() {
 
       if (!response.ok) {
         const errorMessage = await parseErrorMessage(response);
-        showToast("error", errorMessage ?? "設定の更新に失敗しました");
+        showToast(
+          "error",
+          errorMessage ?? t("projectSettingsScreen.toast.updateFailed"),
+        );
         return;
       }
 
@@ -308,9 +294,9 @@ export function ProjectSettingsScreen() {
         setSprintDurationInput(data.project.sprintDurationDays);
         setIterationStartDayInput(data.project.iterationStartDay);
       }
-      showToast("success", "イテレーション設定を更新しました");
+      showToast("success", t("projectSettingsScreen.toast.iterationUpdated"));
     } catch {
-      showToast("error", "設定の更新に失敗しました");
+      showToast("error", t("projectSettingsScreen.toast.updateFailed"));
     } finally {
       setIsSavingIteration(false);
     }
@@ -321,7 +307,7 @@ export function ProjectSettingsScreen() {
     if (!projectId || !project || isDeletingProject) return;
 
     if (confirmProjectName !== project.name) {
-      showToast("error", "確認用のプロジェクト名が一致しません");
+      showToast("error", t("projectSettingsScreen.toast.deleteNameMismatch"));
       return;
     }
 
@@ -344,38 +330,37 @@ export function ProjectSettingsScreen() {
           error?: string;
         };
         if (response.status === 400 && data.code === "project_name_mismatch") {
-          showToast("error", "確認用のプロジェクト名が一致しません");
+          showToast(
+            "error",
+            t("projectSettingsScreen.toast.deleteNameMismatch"),
+          );
           return;
         }
         if (response.status === 403) {
-          showToast(
-            "error",
-            "プロジェクトを削除する権限がありません。オーナーに依頼してください。",
-          );
+          showToast("error", t("projectSettingsScreen.toast.deleteForbidden"));
           return;
         }
         if (response.status === 404) {
-          showToast(
-            "error",
-            "対象プロジェクトが見つかりません。既に削除されている可能性があります。",
-          );
+          showToast("error", t("projectSettingsScreen.toast.deleteNotFound"));
           return;
         }
-        showToast("error", "プロジェクトの削除に失敗しました");
+        showToast("error", t("projectSettingsScreen.toast.deleteFailed"));
         return;
       }
 
-      showToast("success", "プロジェクトを削除しました");
+      showToast("success", t("projectSettingsScreen.toast.deleted"));
       void navigate("/projects");
     } catch {
-      showToast("error", "プロジェクトの削除に失敗しました");
+      showToast("error", t("projectSettingsScreen.toast.deleteFailed"));
     } finally {
       setIsDeletingProject(false);
     }
   };
 
   if (isLoading) {
-    return <p className="p-4 text-gray-500">読み込み中...</p>;
+    return (
+      <p className="p-4 text-gray-500">{t("projectSettingsScreen.loading")}</p>
+    );
   }
 
   if (error && !project) {
@@ -385,20 +370,22 @@ export function ProjectSettingsScreen() {
   const isOwner = project?.currentUserRole === "owner";
 
   return (
-    <ProjectPage title="プロジェクト設定">
+    <ProjectPage title={t("projectSettingsScreen.title")}>
       <div className="space-y-6">
         {project ? (
-          <ProjectSection title="基本設定">
+          <ProjectSection title={t("projectSettingsScreen.general.title")}>
             <form onSubmit={handleGeneralSubmit} className="mt-3 space-y-4">
               <fieldset>
-                <legend className="sr-only">基本設定</legend>
+                <legend className="sr-only">
+                  {t("projectSettingsScreen.general.title")}
+                </legend>
                 <div className="space-y-4">
                   <div>
                     <label
                       htmlFor="projectName"
                       className="block text-sm font-medium text-gray-700"
                     >
-                      プロジェクト名
+                      {t("projectSettingsScreen.general.name")}
                     </label>
                     <input
                       id="projectName"
@@ -415,7 +402,7 @@ export function ProjectSettingsScreen() {
                       htmlFor="projectDescription"
                       className="block text-sm font-medium text-gray-700"
                     >
-                      説明
+                      {t("projectSettingsScreen.general.description")}
                     </label>
                     <textarea
                       id="projectDescription"
@@ -436,7 +423,7 @@ export function ProjectSettingsScreen() {
                       onChange={(e) => setIsPublicInput(e.target.checked)}
                     />
                     <span className="text-sm text-gray-700">
-                      プロジェクトを公開する
+                      {t("projectSettingsScreen.general.isPublic")}
                     </span>
                   </label>
 
@@ -445,7 +432,7 @@ export function ProjectSettingsScreen() {
                       htmlFor="projectTimezone"
                       className="block text-sm font-medium text-gray-700"
                     >
-                      タイムゾーン
+                      {t("projectSettingsScreen.general.timezone")}
                     </label>
                     <select
                       id="projectTimezone"
@@ -470,23 +457,27 @@ export function ProjectSettingsScreen() {
                   disabled={isSavingGeneral}
                   className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
                 >
-                  {isSavingGeneral ? "保存中..." : "保存"}
+                  {isSavingGeneral
+                    ? t("projectSettingsScreen.saving")
+                    : t("projectSettingsScreen.save")}
                 </button>
               )}
 
               {!isOwner && (
                 <p className="text-xs text-gray-500">
-                  設定を変更するにはオーナー権限が必要です。
+                  {t("projectSettingsScreen.ownerRequired")}
                 </p>
               )}
             </form>
           </ProjectSection>
         ) : null}
 
-        <ProjectSection title="ポイントスケール">
+        <ProjectSection title={t("projectSettingsScreen.pointScale.title")}>
           <form onSubmit={handleSubmit} className="mt-3 space-y-6">
             <fieldset>
-              <legend className="sr-only">ポイントスケール</legend>
+              <legend className="sr-only">
+                {t("projectSettingsScreen.pointScale.title")}
+              </legend>
               <div className="space-y-2">
                 {POINT_SCALE_TYPES.map((scaleType) => (
                   <label key={scaleType} className="flex items-center gap-2">
@@ -499,7 +490,7 @@ export function ProjectSettingsScreen() {
                       className="text-blue-600"
                     />
                     <span className="text-sm text-gray-700">
-                      {POINT_SCALE_LABELS[scaleType]}
+                      {t(`projectSettingsScreen.pointScale.types.${scaleType}`)}
                     </span>
                   </label>
                 ))}
@@ -508,7 +499,7 @@ export function ProjectSettingsScreen() {
               {pointScaleType === "custom" ? (
                 <div className="mt-3">
                   <label className="block text-sm font-medium text-gray-700">
-                    カスタム値（カンマ区切り）
+                    {t("projectSettingsScreen.pointScale.customValues")}
                     <input
                       type="text"
                       value={customScaleInput}
@@ -528,15 +519,17 @@ export function ProjectSettingsScreen() {
               disabled={isSaving}
               className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
             >
-              {isSaving ? "保存中..." : "保存"}
+              {isSaving
+                ? t("projectSettingsScreen.saving")
+                : t("projectSettingsScreen.save")}
             </button>
           </form>
         </ProjectSection>
 
         {project ? (
-          <ProjectSection title="見積もり設定">
+          <ProjectSection title={t("projectSettingsScreen.estimate.title")}>
             <p className="mb-4 text-sm text-gray-600">
-              Bug・Choreタイプのストーリーにポイント見積もりを付けるかどうかを設定します。
+              {t("projectSettingsScreen.estimate.description")}
             </p>
 
             <div className="space-y-4">
@@ -551,7 +544,7 @@ export function ProjectSettingsScreen() {
                   }
                 />
                 <span className="text-sm text-gray-700">
-                  Bugの見積もりを有効にする
+                  {t("projectSettingsScreen.estimate.bugs")}
                 </span>
               </label>
 
@@ -566,23 +559,23 @@ export function ProjectSettingsScreen() {
                   }
                 />
                 <span className="text-sm text-gray-700">
-                  Choreの見積もりを有効にする
+                  {t("projectSettingsScreen.estimate.chores")}
                 </span>
               </label>
             </div>
 
             {!isOwner && (
               <p className="mt-3 text-xs text-gray-500">
-                設定を変更するにはオーナー権限が必要です。
+                {t("projectSettingsScreen.ownerRequired")}
               </p>
             )}
           </ProjectSection>
         ) : null}
 
         {project ? (
-          <ProjectSection title="イテレーション設定">
+          <ProjectSection title={t("projectSettingsScreen.iteration.title")}>
             <p className="mb-4 text-sm text-gray-600">
-              スプリントの長さと開始曜日を設定します。保存後に再計算が完了すると反映されます。
+              {t("projectSettingsScreen.iteration.description")}
             </p>
             <form onSubmit={handleIterationSubmit} className="space-y-4">
               <div>
@@ -590,7 +583,7 @@ export function ProjectSettingsScreen() {
                   htmlFor="sprintDuration"
                   className="block text-sm font-medium text-gray-700"
                 >
-                  イテレーション長
+                  {t("projectSettingsScreen.iteration.length")}
                 </label>
                 <select
                   id="sprintDuration"
@@ -605,7 +598,7 @@ export function ProjectSettingsScreen() {
                 >
                   {SPRINT_DURATION_OPTIONS.map((days) => (
                     <option key={days} value={days}>
-                      {SPRINT_DURATION_LABELS[days]}
+                      {t(`projectSettingsScreen.iteration.durations.${days}`)}
                     </option>
                   ))}
                 </select>
@@ -616,7 +609,7 @@ export function ProjectSettingsScreen() {
                   htmlFor="iterationStartDay"
                   className="block text-sm font-medium text-gray-700"
                 >
-                  開始曜日
+                  {t("projectSettingsScreen.iteration.startDay")}
                 </label>
                 <select
                   id="iterationStartDay"
@@ -631,7 +624,7 @@ export function ProjectSettingsScreen() {
                 >
                   {ITERATION_START_DAYS.map((day) => (
                     <option key={day} value={day}>
-                      {ITERATION_START_DAY_LABELS[day]}
+                      {t(`projectSettingsScreen.iteration.days.${day}`)}
                     </option>
                   ))}
                 </select>
@@ -643,59 +636,63 @@ export function ProjectSettingsScreen() {
                   disabled={isSavingIteration}
                   className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
                 >
-                  {isSavingIteration ? "再計算中..." : "保存"}
+                  {isSavingIteration
+                    ? t("projectSettingsScreen.iteration.recalculating")
+                    : t("projectSettingsScreen.save")}
                 </button>
               ) : null}
             </form>
 
             {!isOwner && (
               <p className="mt-3 text-xs text-gray-500">
-                設定を変更するにはオーナー権限が必要です。
+                {t("projectSettingsScreen.ownerRequired")}
               </p>
             )}
           </ProjectSection>
         ) : null}
 
         {projectId ? (
-          <ProjectSection title="Label と戦略・計画管理">
+          <ProjectSection title={t("projectSettingsScreen.labels.title")}>
             <p className="mb-3 text-sm text-gray-600">
-              Label ごとに戦略・計画管理を ON/OFF
-              し、目的・成功条件・期間を記録します。
+              {t("projectSettingsScreen.labels.description")}
             </p>
             <Link
               to={projectLabelsPath(projectId)}
               className="inline-flex rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
             >
-              Label 設定を開く
+              {t("projectSettingsScreen.labels.open")}
             </Link>
           </ProjectSection>
         ) : null}
 
         {projectId && isOwner ? (
-          <ProjectSection title="APIキー管理">
+          <ProjectSection title={t("projectSettingsScreen.apiKeys.title")}>
             <p className="mb-3 text-sm text-gray-600">
-              CLI や外部ツール向けの API キーを発行・失効します。
+              {t("projectSettingsScreen.apiKeys.description")}
             </p>
             <Link
               to={projectApiKeysPath(projectId)}
               className="inline-flex rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
             >
-              APIキー管理を開く
+              {t("projectSettingsScreen.apiKeys.open")}
             </Link>
           </ProjectSection>
         ) : null}
 
         {project && projectId && isOwner ? (
-          <ProjectSection title="危険操作: プロジェクト削除" tone="danger">
+          <ProjectSection
+            title={t("projectSettingsScreen.danger.title")}
+            tone="danger"
+          >
             <p className="mb-3 text-sm text-red-800">
-              この操作は取り消せません。削除するにはプロジェクト名を正確に入力してください。
+              {t("projectSettingsScreen.danger.description")}
             </p>
             <form onSubmit={handleDeleteProject} className="space-y-3">
               <label
                 htmlFor="confirmProjectName"
                 className="block text-sm font-medium text-red-900"
               >
-                確認用プロジェクト名
+                {t("projectSettingsScreen.danger.confirmName")}
               </label>
               <input
                 id="confirmProjectName"
@@ -713,7 +710,9 @@ export function ProjectSettingsScreen() {
                 }
                 className="rounded-md bg-red-700 px-4 py-2 text-sm font-medium text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:bg-red-300"
               >
-                {isDeletingProject ? "削除中..." : "プロジェクトを削除する"}
+                {isDeletingProject
+                  ? t("projectSettingsScreen.danger.deleting")
+                  : t("projectSettingsScreen.danger.delete")}
               </button>
             </form>
           </ProjectSection>

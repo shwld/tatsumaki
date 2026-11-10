@@ -41,6 +41,22 @@ import {
   artifactScreensEn,
   artifactScreensJa,
 } from "../screens/artifact-screens.i18n";
+import {
+  iterationProgressChartEn,
+  iterationProgressChartJa,
+} from "../components/iteration-progress-chart.i18n";
+import {
+  projectVelocityScreenEn,
+  projectVelocityScreenJa,
+} from "../screens/project-velocity-screen.i18n";
+import {
+  projectHistoryScreenEn,
+  projectHistoryScreenJa,
+} from "../screens/project-history-screen.i18n";
+import {
+  projectSettingsScreenEn,
+  projectSettingsScreenJa,
+} from "../screens/project-settings-screen.i18n";
 import { loginScreenEn, loginScreenJa } from "../screens/login-screen.i18n";
 import {
   onboardingScreenEn,
@@ -120,6 +136,10 @@ i18n.use(initReactI18next).init({
         ...storyPanelJa,
         ...storyAccordionJa,
         ...artifactScreensJa,
+        ...iterationProgressChartJa,
+        ...projectVelocityScreenJa,
+        ...projectHistoryScreenJa,
+        ...projectSettingsScreenJa,
       },
     },
     en: {
@@ -148,6 +168,10 @@ i18n.use(initReactI18next).init({
         ...storyPanelEn,
         ...storyAccordionEn,
         ...artifactScreensEn,
+        ...iterationProgressChartEn,
+        ...projectVelocityScreenEn,
+        ...projectHistoryScreenEn,
+        ...projectSettingsScreenEn,
       },
     },
   },

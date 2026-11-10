@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthErrorProvider } from "../contexts/auth-error-context";
 import { ToastProvider } from "../contexts/toast-context";
+import { i18n } from "../i18n/config";
 import { ProjectHistoryScreen } from "./project-history-screen";
 
 const PROJECT_ID = "project-1";
@@ -212,6 +213,66 @@ describe("ProjectHistoryScreen", () => {
     await waitFor(() => {
       expect(
         screen.getByText("プロジェクト履歴の取得に失敗しました"),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("renders English labels without Japanese text when the language is en", async () => {
+    await i18n.changeLanguage("en");
+    vi.mocked(fetch).mockImplementation(async (input) => {
+      const url = typeof input === "string" ? input : (input as Request).url;
+      if (url.includes("/history")) {
+        return new Response(
+          JSON.stringify({
+            history: [
+              {
+                __typename: "ProjectHistoryEntry",
+                id: "act-2",
+                storyId: "story-1",
+                storyTitle: "Set up authentication",
+                actorUserId: "user-1",
+                actorName: "user@example.com",
+                action: "field_changed",
+                fieldName: "status",
+                oldValue: "Unstarted",
+                newValue: "Started",
+                createdAt: "2026-01-04T10:00:00.000Z",
+              },
+            ],
+            hasMore: true,
+            nextCursor: "c1",
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response(JSON.stringify({ projects: [] }), { status: 200 });
+    });
+
+    const { container } = renderScreen();
+
+    await waitFor(() => {
+      expect(screen.getByText("Changed Status")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Show more")).toBeInTheDocument();
+    expect(screen.getByText("Actor")).toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/[\u3040-\u30ff\u3400-\u9fff]/);
+  });
+
+  it("shows the English load error when the language is en", async () => {
+    await i18n.changeLanguage("en");
+    vi.mocked(fetch).mockImplementation(async (input) => {
+      const url = typeof input === "string" ? input : (input as Request).url;
+      if (url.includes("/history")) {
+        return new Response(null, { status: 500 });
+      }
+      return new Response(JSON.stringify({ projects: [] }), { status: 200 });
+    });
+
+    renderScreen();
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Failed to load project history"),
       ).toBeInTheDocument();
     });
   });

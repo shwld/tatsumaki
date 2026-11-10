@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthErrorProvider } from "../contexts/auth-error-context";
+import { i18n } from "../i18n/config";
 import { ProjectVelocityScreen } from "./project-velocity-screen";
 
 const buildJsonResponse = (body: unknown, status = 200): Response => {
@@ -255,5 +256,49 @@ describe("ProjectVelocityScreen", () => {
         ),
       ).toBeInTheDocument();
     });
+  });
+
+  it("renders English labels without Japanese text when the language is en", async () => {
+    await i18n.changeLanguage("en");
+    vi.mocked(fetch).mockImplementation(async (input) => {
+      if (input === "/api/projects/p1/iterations") {
+        return buildJsonResponse({
+          iterations: [
+            {
+              __typename: "Iteration",
+              id: "it-1",
+              projectId: "p1",
+              startDate: offsetDate(-28),
+              endDate: offsetDate(-14),
+              totalPoints: 8,
+              createdAt: "2026-03-01T00:00:00.000Z",
+              updatedAt: "2026-03-15T00:00:00.000Z",
+            },
+          ],
+          velocity: 8,
+        });
+      }
+      return buildJsonResponse({});
+    });
+
+    const { container } = render(
+      <MemoryRouter initialEntries={["/projects/p1/velocity"]}>
+        <AuthErrorProvider>
+          <Routes>
+            <Route
+              path="/projects/:projectId/velocity"
+              element={<ProjectVelocityScreen />}
+            />
+          </Routes>
+        </AuthErrorProvider>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Past sprint results")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Velocity trend")).toBeInTheDocument();
+    expect(screen.getByText("Average of last 3 sprints")).toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/[\u3040-\u30ff\u3400-\u9fff]/);
   });
 });
