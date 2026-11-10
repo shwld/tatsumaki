@@ -345,6 +345,168 @@ describe("ProjectEpicDetailScreen", () => {
   });
 });
 
+describe("Epic creation", () => {
+  type Call = { url: string; method: string; body: unknown };
+  let calls: Call[];
+
+  beforeEach(() => {
+    calls = [];
+    vi.spyOn(globalThis, "fetch");
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function mockApi(options: {
+    labels?: { id: string; name: string }[];
+    epics?: Epic[];
+    createStatus?: number;
+    enableStatus?: number;
+  }) {
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      const url = typeof input === "string" ? input : "";
+      const method = init?.method ?? "GET";
+      calls.push({
+        url,
+        method,
+        body: init?.body ? JSON.parse(String(init.body)) : undefined,
+      });
+      const json = (body: unknown, status = 200) =>
+        new Response(JSON.stringify(body), { status });
+      if (url.endsWith("/epics/progress")) return json({ epics: [] });
+      if (url.endsWith("/epics")) return json({ epics: options.epics ?? [] });
+      if (url.endsWith("/labels") && method === "GET")
+        return json({ labels: options.labels ?? [] });
+      if (url.endsWith("/labels") && method === "POST") {
+        if (options.createStatus)
+          return json({ error: "x" }, options.createStatus);
+        return json({ label: { id: "label-new", name: "new" } }, 201);
+      }
+      if (url.endsWith("/epic/enable")) {
+        if (options.enableStatus)
+          return json({ error: "x" }, options.enableStatus);
+        return json({
+          epic: epicOf({ labelId: calls.at(-1)?.url.split("/").at(-3) }),
+        });
+      }
+      return json({}, 404);
+    });
+  }
+
+  async function openDialog(name: string) {
+    renderAt(`/projects/${PROJECT_ID}/epics`);
+    fireEvent.click(await screen.findByRole("button", { name: "Epic を作成" }));
+    fireEvent.change(screen.getByLabelText(/名前/), {
+      target: { value: name },
+    });
+  }
+
+  const submit = () =>
+    fireEvent.click(screen.getByRole("button", { name: "作成" }));
+
+  it("creates a label and turns planning on for a new name", async () => {
+    mockApi({});
+    await openDialog("  growth  ");
+    submit();
+
+    await waitFor(() =>
+      expect(calls.some((c) => c.url.endsWith("/label-new/epic/enable"))).toBe(
+        true,
+      ),
+    );
+    expect(
+      calls.find((c) => c.method === "POST" && c.url.endsWith("/labels"))?.body,
+    ).toEqual({
+      name: "growth",
+      color: "#6b7280",
+    });
+  });
+
+  it("reuses a same-named label whose planning is off", async () => {
+    mockApi({
+      labels: [{ id: "label-growth", name: "growth" }],
+      epics: [epicOf({ labelId: "label-growth", enabled: false, revision: 3 })],
+    });
+    await openDialog("growth");
+    submit();
+
+    await waitFor(() =>
+      expect(
+        calls.some((c) => c.url.endsWith("/label-growth/epic/enable")),
+      ).toBe(true),
+    );
+    expect(
+      calls.some((c) => c.method === "POST" && c.url.endsWith("/labels")),
+    ).toBe(false);
+    expect(calls.find((c) => c.url.endsWith("/epic/enable"))?.body).toEqual({
+      revision: 3,
+    });
+  });
+
+  it("rejects a name that is already an epic", async () => {
+    mockApi({
+      labels: [{ id: "label-growth", name: "growth" }],
+      epics: [epicOf({ labelId: "label-growth", enabled: true })],
+    });
+    await openDialog("growth");
+    submit();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "同じ名前の Epic が既にあります",
+    );
+    expect(calls.some((c) => c.url.endsWith("/epic/enable"))).toBe(false);
+  });
+
+  it("validates the name before calling the API", async () => {
+    mockApi({});
+    await openDialog("   ");
+    submit();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "名前を入力してください",
+    );
+    expect(calls.some((c) => c.method === "POST")).toBe(false);
+  });
+
+  it("explains a permission failure and closes on cancel", async () => {
+    mockApi({ createStatus: 403 });
+    await openDialog("growth");
+    submit();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "権限がありません",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "キャンセル" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("lets the user retry after a failure without duplicating the label", async () => {
+    mockApi({ enableStatus: 500 });
+    await openDialog("new");
+    submit();
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "もう一度お試しください",
+    );
+
+    mockApi({
+      labels: [{ id: "label-new", name: "new" }],
+      epics: [],
+    });
+    submit();
+    await waitFor(() =>
+      expect(
+        calls.filter((c) => c.method === "POST" && c.url.endsWith("/labels"))
+          .length,
+      ).toBe(1),
+    );
+    await waitFor(() =>
+      expect(calls.filter((c) => c.url.endsWith("/epic/enable")).length).toBe(
+        2,
+      ),
+    );
+  });
+});
+
 describe("Epics screens language", () => {
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ["Date"] });

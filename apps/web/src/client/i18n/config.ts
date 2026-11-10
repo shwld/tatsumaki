@@ -1,6 +1,10 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import { actorLabelEn, actorLabelJa } from "../components/actor-label.i18n";
+import {
+  epicCreateDialogEn,
+  epicCreateDialogJa,
+} from "../components/epic-create-dialog.i18n";
 import { errorRetryEn, errorRetryJa } from "../components/error-retry.i18n";
 import {
   billingStatusSectionEn,
@@ -112,6 +116,7 @@ i18n.use(initReactI18next).init({
         ...storyEditScreenJa,
         ...storyDeleteConfirmDialogJa,
         ...releaseMarkerCreateDialogJa,
+        ...epicCreateDialogJa,
         ...storyPanelJa,
         ...storyAccordionJa,
         ...artifactScreensJa,
@@ -139,6 +144,7 @@ i18n.use(initReactI18next).init({
         ...storyEditScreenEn,
         ...storyDeleteConfirmDialogEn,
         ...releaseMarkerCreateDialogEn,
+        ...epicCreateDialogEn,
         ...storyPanelEn,
         ...storyAccordionEn,
         ...artifactScreensEn,
