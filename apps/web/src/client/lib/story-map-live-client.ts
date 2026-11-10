@@ -56,6 +56,8 @@ const DEFAULT_RETRY_DELAYS_MS = [500, 1000, 2000, 4000, 8000];
  */
 export class StoryMapLiveClient {
   private socket: LiveSocket | null = null;
+  /** Held while rate-limited commands wait, so later ones cannot overtake them. */
+  private paused = false;
   private flushedSocket: LiveSocket | null = null;
   private retry = 0;
   private closed = false;
@@ -135,6 +137,7 @@ export class StoryMapLiveClient {
   }
 
   private flush(only?: string): void {
+    if (this.paused) return;
     if (this.state.connection !== "connected" || !this.socket) return;
     if (this.socket.readyState !== OPEN) return;
     const ids = only ? [only] : [...this.pending.keys()];
@@ -185,8 +188,15 @@ export class StoryMapLiveClient {
         return;
       case "reject":
         if (message.code === "rate_limited") {
-          // Refused before it ran, so nothing was applied; send it again.
-          setTimeout(() => this.flush(message.opId), RATE_LIMIT_RETRY_MS);
+          // Refused before it ran. Everything still pending goes out again in
+          // the original order once the limit window has passed.
+          if (!this.paused) {
+            this.paused = true;
+            setTimeout(() => {
+              this.paused = false;
+              this.flush();
+            }, RATE_LIMIT_RETRY_MS);
+          }
           return;
         }
         this.settle(message.opId, message.code);

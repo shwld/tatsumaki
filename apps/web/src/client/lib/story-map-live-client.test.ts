@@ -111,6 +111,24 @@ describe("StoryMapLiveClient", () => {
     expect(sockets[0].sent.filter((m) => m.opId === opId)).toHaveLength(2);
   });
 
+  it("keeps later commands behind a rate-limited one", () => {
+    sockets[0].receive(snapshot(0));
+    const first = client.send({
+      type: "renamePersona",
+      personaId: "p",
+      name: "1",
+    });
+    sockets[0].receive({ type: "reject", opId: first, code: "rate_limited" });
+    const second = client.send({
+      type: "renamePersona",
+      personaId: "p",
+      name: "2",
+    });
+    expect(sockets[0].sent.map((m) => m.opId)).toEqual([first]);
+    vi.advanceTimersByTime(1000);
+    expect(sockets[0].sent.map((m) => m.opId)).toEqual([first, first, second]);
+  });
+
   it("keeps counting retries when connections drop right after their snapshot", () => {
     sockets[0].receive(snapshot(0));
     sockets[0].emit("close");
