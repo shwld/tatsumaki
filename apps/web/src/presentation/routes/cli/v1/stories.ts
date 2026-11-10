@@ -4,12 +4,23 @@ import {
   STORY_NOT_FOUND_ERROR,
 } from "../../../../application/usecases/get-story-by-number";
 import { listStories } from "../../../../application/usecases/list-stories";
+import {
+  moveStoryToPosition,
+  parseStoryPlacement,
+  resolveStoryPlacementAnchor,
+  type StoryPlacement,
+} from "../../../../application/usecases/move-story-to-position";
 import { reorderStories } from "../../../../application/usecases/reorder-stories";
 import {
   STORY_ITERATION_UNASSIGN_INVALID_STATUS_ERROR,
   STORY_ITERATION_UNASSIGN_NOT_FOUND_ERROR,
   unassignStoryIterationByNumber,
 } from "../../../../application/usecases/unassign-story-iteration";
+import {
+  findCurrentIterationId,
+  resolveStorySection,
+} from "../../../../domain/entities/story-section";
+import { todayIso } from "../../../../shared/date/today-iso";
 import { STORY_ARCHIVED_ERROR } from "../../../../domain/repositories/story-repository";
 import { D1IterationRepository } from "../../../../infrastructure/db/repositories/d1-iteration-repository";
 import { INVALID_STORY_STATUS_ERROR } from "../../../../application/usecases/story-input";
@@ -25,6 +36,7 @@ import { parseStoryNumberReference } from "../../../lib/story-number-reference";
 import { requireProjectMembership } from "../../project-membership";
 import {
   toCreateStoryErrorResponse,
+  toMoveStoryErrorResponse,
   toReorderStoriesErrorResponse,
 } from "../../stories/error-responses";
 import {
@@ -147,7 +159,27 @@ cliV1StoriesRoute.get("/:projectId/stories", async (c) => {
     return c.json({ error: "Failed to fetch stories" }, 500);
   }
 
-  return c.json({ stories: result.value });
+  const iterations = await new D1IterationRepository(c.env.DB).list(projectId);
+  if (iterations.isErr()) {
+    return c.json({ error: "Failed to fetch stories" }, 500);
+  }
+  const currentIterationId = findCurrentIterationId(
+    iterations.value,
+    todayIso(),
+  );
+  const iterationNumberById = new Map(
+    iterations.value.map((iteration) => [
+      iteration.id,
+      iteration.iterationNumber,
+    ]),
+  );
+  return c.json({
+    stories: result.value.map((story) => ({
+      ...story,
+      section: resolveStorySection(story, currentIterationId),
+      iterationNumber: iterationNumberById.get(story.iterationId ?? "") ?? null,
+    })),
+  });
 });
 
 cliV1StoriesRoute.post("/:projectId/stories", async (c) => {
@@ -172,7 +204,36 @@ cliV1StoriesRoute.post("/:projectId/stories", async (c) => {
   ) {
     return c.json({ error: "labelIds must be an array of strings" }, 400);
   }
+  if (
+    payload.storyPoint !== undefined &&
+    payload.storyPoint !== null &&
+    typeof payload.storyPoint !== "number"
+  ) {
+    return c.json({ error: "Story point must be a number or null" }, 400);
+  }
+  let placement: StoryPlacement | null = null;
+  if (payload.placement !== undefined) {
+    const parsedPlacement = parseStoryPlacement(payload.placement);
+    if (parsedPlacement.isErr()) {
+      return c.json({ error: "Invalid placement" }, 400);
+    }
+    if (payload.isIcebox === true) {
+      return c.json({ error: "Icebox stories cannot be positioned" }, 400);
+    }
+    placement = parsedPlacement.value;
+  }
   const repository = new D1StoryRepository(c.env.DB);
+  if (placement) {
+    const anchor = await resolveStoryPlacementAnchor(
+      repository,
+      projectId,
+      placement,
+    );
+    if (anchor.isErr()) {
+      const response = toMoveStoryErrorResponse(anchor.error);
+      return c.json({ error: response.message }, response.status);
+    }
+  }
   const projectRepository = new D1ProjectRepository(c.env.DB);
   const projectResult = await projectRepository.findById(projectId);
   if (projectResult.isErr()) {
@@ -197,7 +258,7 @@ cliV1StoriesRoute.post("/:projectId/stories", async (c) => {
       description: payload.description ?? "",
       status: "Unstarted",
       isIcebox: payload.isIcebox ?? false,
-      storyPoint: null,
+      storyPoint: payload.storyPoint ?? null,
       allowedStoryPoints,
       labelIds: Array.isArray(payload.labelIds) ? payload.labelIds : [],
       actorUserId: membership.member.userId,
@@ -209,6 +270,31 @@ cliV1StoriesRoute.post("/:projectId/stories", async (c) => {
   if (result.isErr()) {
     const response = toCreateStoryErrorResponse(result.error);
     return c.json({ error: response.message }, response.status);
+  }
+
+  if (placement) {
+    const moved = await moveStoryToPosition(repository, {
+      projectId,
+      storyNumber: result.value.storyNumber,
+      placement,
+    });
+    if (moved.isErr()) {
+      const response = toMoveStoryErrorResponse(moved.error);
+      return c.json({ error: response.message }, response.status);
+    }
+    const positioned = await repository.findByStoryNumber(
+      projectId,
+      result.value.storyNumber,
+    );
+    return c.json(
+      {
+        story:
+          positioned.isOk() && positioned.value
+            ? positioned.value
+            : result.value,
+      },
+      201,
+    );
   }
 
   return c.json({ story: result.value }, 201);
@@ -224,6 +310,32 @@ cliV1StoriesRoute.post("/:projectId/stories/reorder", async (c) => {
   const payload = await parseJsonBody(c);
   if (payload === null) {
     return c.json({ error: "Invalid JSON body" }, 400);
+  }
+  if (payload.orderedIds !== undefined && payload.storyNumber !== undefined) {
+    return c.json(
+      { error: "orderedIds and storyNumber cannot be combined" },
+      400,
+    );
+  }
+  if (payload.storyNumber !== undefined) {
+    const placement = parseStoryPlacement(payload.placement);
+    if (
+      placement.isErr() ||
+      typeof payload.storyNumber !== "number" ||
+      !Number.isInteger(payload.storyNumber)
+    ) {
+      return c.json({ error: "storyNumber and placement must be valid" }, 400);
+    }
+    const moved = await moveStoryToPosition(new D1StoryRepository(c.env.DB), {
+      projectId,
+      storyNumber: payload.storyNumber,
+      placement: placement.value,
+    });
+    if (moved.isErr()) {
+      const response = toMoveStoryErrorResponse(moved.error);
+      return c.json({ error: response.message }, response.status);
+    }
+    return c.json({ stories: moved.value });
   }
   const orderedIds = Array.isArray(payload.orderedIds)
     ? payload.orderedIds.filter(

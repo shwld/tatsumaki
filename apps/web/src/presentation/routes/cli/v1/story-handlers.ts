@@ -6,8 +6,20 @@ import { D1ProjectRepository } from "../../../../infrastructure/db/repositories/
 import { D1StoryActivityRepository } from "../../../../infrastructure/db/repositories/d1-story-activity-repository";
 import { D1StoryRepository } from "../../../../infrastructure/db/repositories/d1-story-repository";
 import type { Env } from "../../../../index";
-import { updateStory } from "../../../../application/usecases/update-story";
-import { toUpdateStoryErrorResponse } from "../../stories/error-responses";
+import {
+  moveStoryToPosition,
+  parseStoryPlacement,
+  resolveStoryPlacementAnchor,
+  type StoryPlacement,
+} from "../../../../application/usecases/move-story-to-position";
+import {
+  NO_STORY_FIELDS_TO_UPDATE_ERROR,
+  updateStory,
+} from "../../../../application/usecases/update-story";
+import {
+  toMoveStoryErrorResponse,
+  toUpdateStoryErrorResponse,
+} from "../../stories/error-responses";
 import { parseUpdateStoryRequest } from "../../stories/request-parsers";
 import { parseStoryNumberReference } from "../../../lib/story-number-reference";
 
@@ -82,6 +94,37 @@ export async function handleCliStoryUpdate(
     return c.json({ error: parsed.message }, 400);
   }
 
+  let placement: StoryPlacement | null = null;
+  let storyNumberOfTarget = 0;
+  if (payload.placement !== undefined) {
+    const parsedPlacement = parseStoryPlacement(payload.placement);
+    if (parsedPlacement.isErr()) {
+      return c.json({ error: "Invalid placement" }, 400);
+    }
+    placement = parsedPlacement.value;
+    const current = await storyRepository.findById(projectId, resolvedStoryId);
+    if (current.isErr() || !current.value) {
+      return c.json({ error: "Story not found" }, 404);
+    }
+    if ((parsed.value.isIcebox ?? current.value.isIcebox) === true) {
+      return c.json(
+        { error: "Only stories outside the Icebox can be positioned" },
+        409,
+      );
+    }
+    const anchor = await resolveStoryPlacementAnchor(
+      storyRepository,
+      projectId,
+      placement,
+      current.value.storyNumber,
+    );
+    storyNumberOfTarget = current.value.storyNumber;
+    if (anchor.isErr()) {
+      const response = toMoveStoryErrorResponse(anchor.error);
+      return c.json({ error: response.message }, response.status);
+    }
+  }
+
   const activityRepository = new D1StoryActivityRepository(c.env.DB);
   const notificationRepository = new D1NotificationRepository(c.env.DB);
   const result = await updateStory(
@@ -101,10 +144,36 @@ export async function handleCliStoryUpdate(
     { notificationRepository, projectRepository },
   );
 
-  if (result.isErr()) {
+  const positionOnly =
+    placement !== null &&
+    result.isErr() &&
+    result.error === NO_STORY_FIELDS_TO_UPDATE_ERROR;
+  if (result.isErr() && !positionOnly) {
     const response = toUpdateStoryErrorResponse(result.error);
     return c.json({ error: response.message }, response.status);
   }
 
+  if (placement) {
+    const moved = await moveStoryToPosition(storyRepository, {
+      projectId,
+      storyNumber: storyNumberOfTarget,
+      placement,
+    });
+    if (moved.isErr()) {
+      const response = toMoveStoryErrorResponse(moved.error);
+      return c.json({ error: response.message }, response.status);
+    }
+    const positioned = await storyRepository.findById(
+      projectId,
+      resolvedStoryId,
+    );
+    if (positioned.isOk() && positioned.value) {
+      return c.json({ story: positioned.value });
+    }
+  }
+
+  if (result.isErr()) {
+    return c.json({ error: "Story not found" }, 404);
+  }
   return c.json({ story: result.value });
 }

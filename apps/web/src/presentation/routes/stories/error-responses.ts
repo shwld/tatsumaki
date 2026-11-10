@@ -10,6 +10,14 @@ import {
 } from "../../../application/usecases/create-story-for-panel";
 import { STORY_NOT_FOUND_ERROR as DELETE_STORY_NOT_FOUND_ERROR } from "../../../application/usecases/delete-story";
 import {
+  INVALID_STORY_PLACEMENT_ERROR,
+  STORY_MOVE_ANCHOR_IS_TARGET_ERROR,
+  STORY_MOVE_ANCHOR_NOT_FOUND_ERROR,
+  STORY_MOVE_NOT_IN_BACKLOG_ERROR,
+  STORY_MOVE_TARGET_NOT_FOUND_ERROR,
+  type MoveStoryToPositionError,
+} from "../../../application/usecases/move-story-to-position";
+import {
   INVALID_STORY_ORDER_ERROR,
   type ReorderStoriesError,
 } from "../../../application/usecases/reorder-stories";
@@ -304,4 +312,34 @@ export function toReorderStoriesErrorResponse(
   }
 
   return { message: "Unexpected error", status: 500 };
+}
+
+export function toMoveStoryErrorResponse(
+  error: MoveStoryToPositionError,
+): ErrorResponse {
+  if (error === STORY_MOVE_TARGET_NOT_FOUND_ERROR) {
+    return { message: "Story not found", status: 404 };
+  }
+  if (error === STORY_MOVE_ANCHOR_NOT_FOUND_ERROR) {
+    return { message: "Reference story not found", status: 404 };
+  }
+  if (error === STORY_MOVE_NOT_IN_BACKLOG_ERROR) {
+    return {
+      message: "Only stories outside the Icebox can be positioned",
+      status: 409,
+    };
+  }
+  if (error === STORY_MOVE_ANCHOR_IS_TARGET_ERROR) {
+    return {
+      message: "A story cannot be positioned relative to itself",
+      status: 400,
+    };
+  }
+  if (error === INVALID_STORY_PLACEMENT_ERROR) {
+    return { message: "Invalid placement", status: 400 };
+  }
+  if (error === STORY_ARCHIVED_ERROR) {
+    return { message: "Archived stories are read-only", status: 409 };
+  }
+  return { message: "Failed to position story", status: 500 };
 }

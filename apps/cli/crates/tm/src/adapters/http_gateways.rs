@@ -162,13 +162,7 @@ impl StoryGateway for HttpStoryGateway {
       .client
       .post(url)
       .bearer_auth(bearer_token)
-      .json(&serde_json::json!({
-        "title": input.title,
-        "type": input.r#type,
-        "description": input.description,
-        "isIcebox": input.is_icebox,
-        "labelIds": input.label_ids
-      }))
+      .json(&story_create_payload(input))
       .send()
       .await?;
     self.parse_story_response(response).await
@@ -199,7 +193,7 @@ impl StoryGateway for HttpStoryGateway {
       .client
       .post(url)
       .bearer_auth(bearer_token)
-      .json(&serde_json::json!({ "orderedIds": input.ordered_ids }))
+      .json(&story_reorder_payload(input))
       .send()
       .await?;
     if response.status().is_success() {
@@ -257,6 +251,32 @@ impl StoryGateway for HttpStoryGateway {
   }
 }
 
+fn story_create_payload(input: &StoryCreateInput) -> serde_json::Value {
+  let mut payload = serde_json::json!({
+    "title": input.title,
+    "type": input.r#type,
+    "description": input.description,
+    "isIcebox": input.is_icebox,
+    "labelIds": input.label_ids
+  });
+  if let Some(story_point) = input.story_point {
+    payload["storyPoint"] = story_point.into();
+  }
+  if let Some(placement) = input.placement {
+    payload["placement"] = placement.to_json();
+  }
+  payload
+}
+
+fn story_reorder_payload(input: &StoryReorderInput) -> serde_json::Value {
+  match input {
+    StoryReorderInput::OrderedIds(ids) => serde_json::json!({ "orderedIds": ids }),
+    StoryReorderInput::Place { story_number, placement } => {
+      serde_json::json!({ "storyNumber": story_number, "placement": placement.to_json() })
+    }
+  }
+}
+
 fn story_update_payload(input: &StoryUpdateInput) -> serde_json::Value {
   let mut payload = serde_json::Map::new();
   if let Some(title) = &input.title {
@@ -282,6 +302,9 @@ fn story_update_payload(input: &StoryUpdateInput) -> serde_json::Value {
   }
   if let Some(is_icebox) = input.is_icebox {
     payload.insert("isIcebox".to_string(), is_icebox.into());
+  }
+  if let Some(placement) = input.placement {
+    payload.insert("placement".to_string(), placement.to_json());
   }
   if let Some(owner_ids) = &input.owner_ids {
     payload.insert("ownerIds".to_string(), owner_ids.clone().into());
@@ -335,8 +358,8 @@ impl HttpStoryGateway {
 
 #[cfg(test)]
 mod tests {
-  use super::story_update_payload;
-  use crate::application::ports::{StoryGateway, StoryPointUpdate, StoryUpdateInput};
+  use super::{story_create_payload, story_reorder_payload, story_update_payload};
+  use crate::application::ports::{StoryCreateInput, StoryGateway, StoryPlacement, StoryPointUpdate, StoryReorderInput, StoryUpdateInput};
 
   #[tokio::test]
   async fn archive_and_unarchive_use_the_authenticated_api() {
@@ -371,6 +394,7 @@ mod tests {
       story_point: None,
       status: None,
       is_icebox: None,
+      placement: None,
       owner_ids: None,
       label_ids: None,
       add_label_ids: Vec::new(),
@@ -464,6 +488,63 @@ mod tests {
     assert_eq!(
       error.to_string(),
       "Only an Unstarted story can be in the Icebox (status 400 Bad Request)"
+    );
+  }
+
+  #[test]
+  fn story_update_payload_sends_placement() {
+    let payload = story_update_payload(&StoryUpdateInput {
+      is_icebox: Some(false),
+      placement: Some(StoryPlacement::After(12)),
+      ..empty_update()
+    });
+
+    assert_eq!(
+      payload,
+      serde_json::json!({
+        "isIcebox": false,
+        "placement": { "position": "after", "relativeToStoryNumber": 12 }
+      })
+    );
+  }
+
+  #[test]
+  fn story_create_payload_sends_point_and_placement_only_when_given() {
+    let mut input = StoryCreateInput {
+      title: "t".to_string(),
+      r#type: "feature".to_string(),
+      description: "d".to_string(),
+      is_icebox: false,
+      story_point: None,
+      placement: None,
+      label_ids: vec![],
+    };
+    let payload = story_create_payload(&input);
+    assert!(payload.get("storyPoint").is_none());
+    assert!(payload.get("placement").is_none());
+
+    input.story_point = Some(3);
+    input.placement = Some(StoryPlacement::End);
+    let payload = story_create_payload(&input);
+    assert_eq!(payload["storyPoint"], 3);
+    assert_eq!(payload["placement"], serde_json::json!({ "position": "end" }));
+  }
+
+  #[test]
+  fn story_reorder_payload_supports_ids_and_number_placement() {
+    assert_eq!(
+      story_reorder_payload(&StoryReorderInput::OrderedIds(vec!["a".to_string()])),
+      serde_json::json!({ "orderedIds": ["a"] })
+    );
+    assert_eq!(
+      story_reorder_payload(&StoryReorderInput::Place {
+        story_number: 7,
+        placement: StoryPlacement::Before(3)
+      }),
+      serde_json::json!({
+        "storyNumber": 7,
+        "placement": { "position": "before", "relativeToStoryNumber": 3 }
+      })
     );
   }
 

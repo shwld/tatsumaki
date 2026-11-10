@@ -151,19 +151,52 @@ const StoryIterationUnassignResponseSchema = z
 
 const StoryListResponseSchema = z
   .object({
-    stories: z.array(StorySummarySchema),
+    stories: z.array(
+      StorySummarySchema.extend({
+        section: z
+          .enum(["Done", "Current", "Backlog", "Icebox"])
+          .optional()
+          .openapi({
+            description:
+              "Panel the story belongs to in the UI. Set by listStories only.",
+          }),
+        iterationNumber: z.number().int().nullable().optional().openapi({
+          description:
+            "Number of the iteration the story is assigned to. Set by listStories only.",
+        }),
+      }),
+    ),
   })
   .openapi("StoryListResponse");
+const StoryPlacementSchema = z
+  .discriminatedUnion("position", [
+    z.object({ position: z.literal("top") }),
+    z.object({ position: z.literal("end") }),
+    z.object({
+      position: z.enum(["after", "before"]),
+      relativeToStoryNumber: z.number().int().min(1),
+    }),
+  ])
+  .openapi("StoryPlacement", {
+    description:
+      "Where to put a story among the stories outside the Icebox, keeping the others' relative order.",
+  });
 const StoryCreateBodySchema = z.object({
   title: z.string(),
   type: z.enum(STORY_TYPES),
   description: z.string(),
   isIcebox: z.boolean().optional(),
+  storyPoint: z.number().int().nullable().optional(),
   labelIds: z.array(z.string()).optional(),
+  placement: StoryPlacementSchema.optional(),
 });
-const StoryReorderBodySchema = z.object({
-  orderedIds: z.array(z.string().min(1)).min(1),
-});
+const StoryReorderBodySchema = z.union([
+  z.object({ orderedIds: z.array(z.string().min(1)).min(1) }),
+  z.object({
+    storyNumber: z.number().int().min(1),
+    placement: StoryPlacementSchema,
+  }),
+]);
 const StoryUpdateBodySchema = z.object({
   title: z.string().optional(),
   description: z.string().optional(),
@@ -175,6 +208,7 @@ const StoryUpdateBodySchema = z.object({
   isIcebox: z.boolean().optional(),
   ownerIds: z.array(z.string()).optional(),
   status: StoryStatusEnumSchema.optional(),
+  placement: StoryPlacementSchema.optional(),
 });
 const StoryCommentBodySchema = z.object({
   body: z.string().min(1),

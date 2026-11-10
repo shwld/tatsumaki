@@ -27,6 +27,15 @@ pub enum LabelSubcommand {
         #[arg(long)]
         project: Option<String>,
     },
+    /// Create a label (color is a hex value such as #ff0000)
+    Create {
+        #[arg(long)]
+        project: Option<String>,
+        #[arg(long)]
+        name: String,
+        #[arg(long)]
+        color: String,
+    },
     /// Show what deleting a label also removes: its story memberships and its epic with the plan
     DeletionImpact {
         #[arg(long)]
@@ -129,7 +138,9 @@ impl OutcomeArg {
 impl LabelSubcommand {
     pub fn project_slot(&mut self) -> &mut Option<String> {
         match self {
-            Self::List { project } | Self::DeletionImpact { project, .. } => project,
+            Self::List { project }
+            | Self::Create { project, .. }
+            | Self::DeletionImpact { project, .. } => project,
         }
     }
 }
@@ -337,6 +348,10 @@ fn story_row(story: &EpicStoryInfo) -> EpicStoryRow {
     }
 }
 
+#[derive(Deserialize)]
+struct LabelBody {
+    label: LabelInfo,
+}
 #[derive(Deserialize)]
 struct LabelsBody {
     labels: Vec<LabelInfo>,
@@ -596,6 +611,20 @@ pub async fn run_label<T: TokenProvider + Sync>(
                 })
                 .collect();
             println!("{}", Table::new(rows).with(Style::sharp()));
+            Ok(())
+        }
+        LabelSubcommand::Create { name, color, .. } => {
+            let body: LabelBody = client
+                .send(
+                    reqwest::Method::POST,
+                    client.url("/labels"),
+                    Some(&serde_json::json!({ "name": name, "color": color })),
+                )
+                .await?;
+            if json {
+                return print_json(&body.label);
+            }
+            println!("created label: {} ({})", body.label.name, body.label.id);
             Ok(())
         }
         LabelSubcommand::DeletionImpact { label_id, .. } => {
