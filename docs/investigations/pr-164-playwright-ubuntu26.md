@@ -12,6 +12,8 @@ PR #164 has no linked story. Update Playwright to a release supporting the CI ru
 
 Playwright added Ubuntu 26.04 support in 1.61. Update to the published stable 1.65.0 and regenerate the web lockfile. The existing CI installation step installs the matching Chromium and system dependencies. Keep the runner and screenshot assertions unchanged.
 
+PR #165's first Linux CI run confirms browser installation and sandbox tests pass. Screenshot comparison finds 12 changed images across 8 tests; 57 tests pass. Visual inspection of all 12 diffs identifies small glyph-edge and native textarea resize-grip rendering changes, without layout or content changes. Refresh only those baselines from the Linux CI actual images, following the screenshot guide. Ordinary CI tests also pass.
+
 ## Sources
 
 - [Failed browser installation](https://github.com/shwld/tatsumaki/actions/runs/42549338961/job/128941184150)
