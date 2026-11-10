@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import { i18n } from "../i18n/config";
 import {
   collectScopeChanges,
   formatScopeDeltaLabel,
@@ -66,7 +67,7 @@ describe("iteration-progress-chart", () => {
       { date: "2026-04-02", scopeDelta: 2, scopeTotalPoints: 10 },
       { date: "2026-04-03", scopeDelta: -1, scopeTotalPoints: 9 },
     ]);
-    expect(formatScopeDeltaLabel(3)).toBe("+3 pt 追加");
-    expect(formatScopeDeltaLabel(-2)).toBe("-2 pt 削除");
+    expect(formatScopeDeltaLabel(3, i18n.t)).toBe("+3 pt 追加");
+    expect(formatScopeDeltaLabel(-2, i18n.t)).toBe("-2 pt 削除");
   });
 });

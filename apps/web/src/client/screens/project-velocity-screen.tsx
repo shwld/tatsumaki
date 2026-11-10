@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router";
 
 import {
@@ -26,12 +28,16 @@ type SprintProgressSummary = {
   completionRate: number;
 };
 
-function formatIterationRange(iteration: Iteration): string {
-  return `${iteration.startDate} 〜 ${iteration.endDate}`;
+function formatIterationRange(iteration: Iteration, t: TFunction): string {
+  return t("projectVelocityScreen.iterationRange", {
+    start: iteration.startDate,
+    end: iteration.endDate,
+  });
 }
 
 export function ProjectVelocityScreen() {
   const { projectId } = useParams();
+  const { t } = useTranslation();
   const { notifySessionExpired } = useAuthError();
   const [iterations, setIterations] = useState<Iteration[]>([]);
   const [velocity, setVelocity] = useState(0);
@@ -43,14 +49,16 @@ export function ProjectVelocityScreen() {
     null,
   );
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<"projectNotFound" | "loadError" | null>(
+    null,
+  );
 
   useEffect(() => {
     let ignore = false;
 
     const loadVelocity = async () => {
       if (!projectId) {
-        setError("Project not found");
+        setError("projectNotFound");
         setIsLoading(false);
         return;
       }
@@ -68,7 +76,7 @@ export function ProjectVelocityScreen() {
             return;
           }
           if (!ignore) {
-            setError("ベロシティの取得に失敗しました");
+            setError("loadError");
           }
           return;
         }
@@ -142,7 +150,7 @@ export function ProjectVelocityScreen() {
         }
       } catch {
         if (!ignore) {
-          setError("ベロシティの取得に失敗しました");
+          setError("loadError");
         }
       } finally {
         if (!ignore) {
@@ -181,31 +189,33 @@ export function ProjectVelocityScreen() {
 
   return (
     <ProjectPage
-      title="ベロシティダッシュボード"
+      title={t("projectVelocityScreen.title")}
       actions={
         projectId ? (
           <Link
             className="text-sm font-medium text-blue-700"
             to={projectStoriesPath(projectId)}
           >
-            ストーリーへ戻る
+            {t("projectVelocityScreen.backToStories")}
           </Link>
         ) : null
       }
     >
       <div>
         <p className="text-sm text-gray-600">
-          完了済みイテレーションの実績ポイントから、直近3スプリントの平均ベロシティを確認します。
+          {t("projectVelocityScreen.description")}
         </p>
 
         {error ? (
           <div className="mt-6 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {error}
+            {t(`projectVelocityScreen.${error}`)}
           </div>
         ) : null}
 
         {isLoading ? (
-          <p className="mt-6 text-sm text-gray-500">読み込み中...</p>
+          <p className="mt-6 text-sm text-gray-500">
+            {t("projectVelocityScreen.loading")}
+          </p>
         ) : null}
 
         {!isLoading && !error ? (
@@ -213,7 +223,7 @@ export function ProjectVelocityScreen() {
             <section className="mt-6 grid gap-4 md:grid-cols-3">
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  直近3スプリント平均
+                  {t("projectVelocityScreen.stats.recentAverage")}
                 </p>
                 <p className="mt-2 text-3xl font-bold text-gray-900">
                   {velocity}
@@ -224,7 +234,7 @@ export function ProjectVelocityScreen() {
               </div>
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  完了スプリント数
+                  {t("projectVelocityScreen.stats.completedSprints")}
                 </p>
                 <p className="mt-2 text-3xl font-bold text-gray-900">
                   {completedIterations.length}
@@ -232,7 +242,7 @@ export function ProjectVelocityScreen() {
               </div>
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  累計完了ポイント
+                  {t("projectVelocityScreen.stats.totalCompletedPoints")}
                 </p>
                 <p className="mt-2 text-3xl font-bold text-gray-900">
                   {totalCompletedPoints}
@@ -246,26 +256,28 @@ export function ProjectVelocityScreen() {
             {currentIterationSummary ? (
               <section
                 className="mt-6 rounded-md border border-gray-200 bg-gray-50 p-3"
-                aria-label="スプリント進捗サマリー"
+                aria-label={t("projectVelocityScreen.summary.title")}
               >
                 <p className="text-sm font-semibold text-gray-900">
-                  スプリント進捗サマリー
+                  {t("projectVelocityScreen.summary.title")}
                 </p>
                 <div className="mt-2 grid grid-cols-1 gap-2 text-xs text-gray-700 sm:grid-cols-3">
                   <div className="rounded border border-gray-200 bg-white px-2 py-1.5">
-                    完了ポイント:{" "}
+                    {t("projectVelocityScreen.summary.completedPoints")}:{" "}
                     <span className="font-semibold text-gray-900">
                       {currentIterationSummary.completedPoints} pt
                     </span>
                   </div>
                   <div className="rounded border border-gray-200 bg-white px-2 py-1.5">
-                    未完了件数:{" "}
+                    {t("projectVelocityScreen.summary.incompleteCount")}:{" "}
                     <span className="font-semibold text-gray-900">
-                      {currentIterationSummary.incompleteStoryCount} 件
+                      {t("projectVelocityScreen.summary.countUnit", {
+                        count: currentIterationSummary.incompleteStoryCount,
+                      })}
                     </span>
                   </div>
                   <div className="rounded border border-gray-200 bg-white px-2 py-1.5">
-                    達成率:{" "}
+                    {t("projectVelocityScreen.summary.completionRate")}:{" "}
                     <span className="font-semibold text-gray-900">
                       {currentIterationSummary.completionRate}%
                     </span>
@@ -277,11 +289,11 @@ export function ProjectVelocityScreen() {
             {burndownPayload && currentIteration ? (
               <div className="mt-6">
                 <ProjectSection
-                  title="進捗チャート（現在イテレーション）"
+                  title={t("projectVelocityScreen.progressChartTitle")}
                   width="full"
                 >
                   <IterationProgressChart
-                    iterationLabel={formatIterationRange(currentIteration)}
+                    iterationLabel={formatIterationRange(currentIteration, t)}
                     payload={burndownPayload}
                   />
                 </ProjectSection>
@@ -289,19 +301,24 @@ export function ProjectVelocityScreen() {
             ) : null}
 
             <section className="mt-8 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-              <ProjectSection title="過去スプリント実績" width="full">
+              <ProjectSection
+                title={t("projectVelocityScreen.history.title")}
+                width="full"
+              >
                 {completedIterations.length === 0 ? (
                   <p className="mt-4 text-sm text-gray-500">
-                    まだ完了したイテレーションがありません。完了後に実績がここへ表示されます。
+                    {t("projectVelocityScreen.history.empty")}
                   </p>
                 ) : (
                   <div className="mt-4 overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200 text-sm">
                       <thead>
                         <tr className="text-left text-gray-500">
-                          <th className="px-2 py-2 font-medium">期間</th>
                           <th className="px-2 py-2 font-medium">
-                            完了ポイント
+                            {t("projectVelocityScreen.history.period")}
+                          </th>
+                          <th className="px-2 py-2 font-medium">
+                            {t("projectVelocityScreen.history.completedPoints")}
                           </th>
                         </tr>
                       </thead>
@@ -312,7 +329,7 @@ export function ProjectVelocityScreen() {
                           .map((iteration) => (
                             <tr key={iteration.id}>
                               <td className="px-2 py-2 text-gray-700">
-                                {formatIterationRange(iteration)}
+                                {formatIterationRange(iteration, t)}
                               </td>
                               <td className="px-2 py-2 font-medium text-gray-900">
                                 {iteration.totalPoints} pt
@@ -325,20 +342,23 @@ export function ProjectVelocityScreen() {
                 )}
               </ProjectSection>
 
-              <ProjectSection title="ベロシティ推移" width="full">
+              <ProjectSection
+                title={t("projectVelocityScreen.trend.title")}
+                width="full"
+              >
                 {completedIterations.length === 0 ? (
                   <p className="mt-4 text-sm text-gray-500">
-                    推移グラフは、完了したスプリントができると表示されます。
+                    {t("projectVelocityScreen.trend.empty")}
                   </p>
                 ) : (
                   <div
-                    aria-label="ベロシティ推移チャート"
+                    aria-label={t("projectVelocityScreen.trend.chartLabel")}
                     className="mt-4 space-y-3"
                   >
                     {completedIterations.map((iteration) => (
                       <div key={iteration.id}>
                         <div className="mb-1 flex items-center justify-between gap-3 text-xs text-gray-600">
-                          <span>{formatIterationRange(iteration)}</span>
+                          <span>{formatIterationRange(iteration, t)}</span>
                           <span>{iteration.totalPoints} pt</span>
                         </div>
                         <div className="h-3 rounded-full bg-gray-100">

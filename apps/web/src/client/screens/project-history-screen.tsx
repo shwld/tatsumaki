@@ -1,4 +1,5 @@
 import { useParams } from "react-router";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { ActorLabel } from "../components/actor-label";
 import { ProjectPage } from "../components/project-page";
@@ -9,8 +10,12 @@ import { projectStoryEditPath } from "../lib/story-routes";
 import type { ProjectMemberProfile } from "../types/project";
 import type { ProjectHistoryEntry } from "../types/story";
 
-function formatDate(isoString: string): string {
-  return new Date(isoString).toLocaleString("ja-JP", {
+function languageToLocale(language: string): string {
+  return language === "en" ? "en-US" : "ja-JP";
+}
+
+function formatDate(isoString: string, language: string): string {
+  return new Date(isoString).toLocaleString(languageToLocale(language), {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -19,41 +24,43 @@ function formatDate(isoString: string): string {
   });
 }
 
-function getActionLabel(
-  entry: ProjectHistoryEntry,
-  archiveLabel: string,
-  restoreLabel: string,
-): string {
+function getActionLabel(entry: ProjectHistoryEntry, t: TFunction): string {
   switch (entry.action) {
     case "created":
-      return "作成";
+      return t("projectHistoryScreen.actions.created");
     case "deleted":
-      return "削除";
+      return t("projectHistoryScreen.actions.deleted");
     case "archived":
-      return archiveLabel;
+      return t("storyAccordion.subHeader.archive");
     case "unarchived":
-      return restoreLabel;
+      return t("storyAccordion.detail.restore");
     case "field_changed": {
-      const fieldLabels: Record<string, string> = {
-        title: "タイトル",
-        description: "説明",
-        type: "タイプ",
-        status: "ステータス",
-        storyPoint: "ポイント",
-        labels: "ラベル",
-        story: "ストーリー",
-      };
-      return `${fieldLabels[entry.fieldName] ?? entry.fieldName} を変更`;
+      const knownFields = [
+        "title",
+        "description",
+        "type",
+        "status",
+        "storyPoint",
+        "labels",
+        "story",
+      ];
+      const field = knownFields.includes(entry.fieldName)
+        ? t(`projectHistoryScreen.fields.${entry.fieldName}`)
+        : entry.fieldName;
+      return t("projectHistoryScreen.actions.fieldChanged", { field });
     }
   }
 }
 
-function getChangeDescription(entry: ProjectHistoryEntry): string {
+function getChangeDescription(
+  entry: ProjectHistoryEntry,
+  t: TFunction,
+): string {
   switch (entry.action) {
     case "created":
-      return `「${entry.newValue ?? ""}」`;
+      return t("projectHistoryScreen.quoted", { value: entry.newValue ?? "" });
     case "deleted":
-      return `「${entry.oldValue ?? ""}」`;
+      return t("projectHistoryScreen.quoted", { value: entry.oldValue ?? "" });
     case "archived":
     case "unarchived":
       return "";
@@ -92,7 +99,7 @@ type HistoryEntryRowProps = {
 };
 
 function HistoryEntryRow({ entry, projectId, members }: HistoryEntryRowProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const storyTitle =
     entry.storyTitle ??
     (entry.action === "deleted" ? entry.oldValue : entry.newValue) ??
@@ -103,7 +110,7 @@ function HistoryEntryRow({ entry, projectId, members }: HistoryEntryRowProps) {
   return (
     <tr className="border-b border-gray-100 hover:bg-gray-50">
       <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">
-        {formatDate(entry.createdAt)}
+        {formatDate(entry.createdAt, i18n.language)}
       </td>
       <td className="max-w-[14rem] px-4 py-3 text-sm text-gray-700">
         <ActorLabel member={member} actorName={entry.actorName} />
@@ -112,11 +119,7 @@ function HistoryEntryRow({ entry, projectId, members }: HistoryEntryRowProps) {
         <span
           className={`inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${getActionBadgeColor(entry.action)}`}
         >
-          {getActionLabel(
-            entry,
-            t("storyAccordion.subHeader.archive"),
-            t("storyAccordion.detail.restore"),
-          )}
+          {getActionLabel(entry, t)}
         </span>
       </td>
       <td className="px-4 py-3 text-sm">
@@ -132,13 +135,14 @@ function HistoryEntryRow({ entry, projectId, members }: HistoryEntryRowProps) {
         )}
       </td>
       <td className="px-4 py-3 text-sm text-gray-600">
-        {getChangeDescription(entry)}
+        {getChangeDescription(entry, t)}
       </td>
     </tr>
   );
 }
 
 export function ProjectHistoryScreen() {
+  const { t } = useTranslation();
   const { projectId } = useParams();
   const { history, isLoading, error, hasMore, loadMore, isLoadingMore } =
     useProjectHistory(projectId ?? "");
@@ -146,7 +150,7 @@ export function ProjectHistoryScreen() {
   const members = bootstrap?.memberOptions ?? [];
 
   return (
-    <ProjectPage title="Project History">
+    <ProjectPage title={t("projectHistoryScreen.title")}>
       {error && (
         <p className="mb-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
@@ -154,20 +158,34 @@ export function ProjectHistoryScreen() {
       )}
 
       {isLoading ? (
-        <p className="text-sm text-gray-500">読み込み中...</p>
+        <p className="text-sm text-gray-500">
+          {t("projectHistoryScreen.loading")}
+        </p>
       ) : history.length === 0 ? (
-        <p className="text-sm text-gray-500">まだ操作履歴がありません。</p>
+        <p className="text-sm text-gray-500">
+          {t("projectHistoryScreen.empty")}
+        </p>
       ) : (
         <div className="space-y-3">
           <div className="overflow-x-auto rounded-lg border border-gray-200">
             <table className="w-full text-left">
               <thead className="bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500">
                 <tr>
-                  <th className="px-4 py-3">日時</th>
-                  <th className="px-4 py-3">操作者</th>
-                  <th className="px-4 py-3">操作</th>
-                  <th className="px-4 py-3">ストーリー</th>
-                  <th className="px-4 py-3">変更内容</th>
+                  <th className="px-4 py-3">
+                    {t("projectHistoryScreen.columns.date")}
+                  </th>
+                  <th className="px-4 py-3">
+                    {t("projectHistoryScreen.columns.actor")}
+                  </th>
+                  <th className="px-4 py-3">
+                    {t("projectHistoryScreen.columns.action")}
+                  </th>
+                  <th className="px-4 py-3">
+                    {t("projectHistoryScreen.columns.story")}
+                  </th>
+                  <th className="px-4 py-3">
+                    {t("projectHistoryScreen.columns.change")}
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -191,7 +209,9 @@ export function ProjectHistoryScreen() {
                 loadMore();
               }}
             >
-              {isLoadingMore ? "読み込み中..." : "さらに表示"}
+              {isLoadingMore
+                ? t("projectHistoryScreen.loading")
+                : t("projectHistoryScreen.loadMore")}
             </button>
           ) : null}
         </div>

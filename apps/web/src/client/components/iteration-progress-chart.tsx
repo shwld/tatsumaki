@@ -1,4 +1,6 @@
 import { useId, useMemo, useState, type KeyboardEvent } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import {
   CartesianGrid,
   Line,
@@ -52,11 +54,14 @@ export function collectScopeChanges(
   return changes;
 }
 
-export function formatScopeDeltaLabel(scopeDelta: number): string {
+export function formatScopeDeltaLabel(
+  scopeDelta: number,
+  t: TFunction,
+): string {
   if (scopeDelta > 0) {
-    return `+${scopeDelta} pt 追加`;
+    return t("iterationProgressChart.scopeAdded", { points: scopeDelta });
   }
-  return `${scopeDelta} pt 削除`;
+  return t("iterationProgressChart.scopeRemoved", { points: scopeDelta });
 }
 
 export function IterationProgressChart({
@@ -66,6 +71,7 @@ export function IterationProgressChart({
   iterationLabel: string;
   payload: IterationProgressChartPayload;
 }) {
+  const { t } = useTranslation();
   const [mode, setMode] = useState<ProgressMode>("burndown");
   const tablistId = useId();
   const panelId = `${tablistId}-panel`;
@@ -94,10 +100,10 @@ export function IterationProgressChart({
     return new Map(
       scopeChanges.map((change) => [
         change.date.slice(5),
-        formatScopeDeltaLabel(change.scopeDelta),
+        formatScopeDeltaLabel(change.scopeDelta, t),
       ]),
     );
-  }, [scopeChanges]);
+  }, [scopeChanges, t]);
 
   const onTabKeyDown = (
     event: KeyboardEvent<HTMLButtonElement>,
@@ -124,14 +130,19 @@ export function IterationProgressChart({
     <div className="mt-4">
       <p className="text-xs font-medium text-gray-600">{iterationLabel}</p>
       <p className="mt-1 text-xs text-gray-500">
-        スプリント開始時スコープ基準の残ポイント: {payload.burndownScopePoints}{" "}
-        pt（初回記録または現在の総見積もり）
+        {t("iterationProgressChart.baselineNote", {
+          points: payload.burndownScopePoints,
+        })}
       </p>
       <p className="text-xs text-gray-500">
-        注: 未来日の実績線は未確定のため表示されません。
+        {t("iterationProgressChart.futureNote")}
       </p>
 
-      <div className="mt-3" role="tablist" aria-label="進捗チャート切替">
+      <div
+        className="mt-3"
+        role="tablist"
+        aria-label={t("iterationProgressChart.tablistLabel")}
+      >
         <button
           id={burndownTabId}
           type="button"
@@ -142,7 +153,7 @@ export function IterationProgressChart({
           onClick={() => setMode("burndown")}
           onKeyDown={(event) => onTabKeyDown(event, "burndown")}
         >
-          バーンダウン
+          {t("iterationProgressChart.burndown")}
         </button>
         <button
           id={burnupTabId}
@@ -154,7 +165,7 @@ export function IterationProgressChart({
           onClick={() => setMode("burnup")}
           onKeyDown={(event) => onTabKeyDown(event, "burnup")}
         >
-          バーンアップ
+          {t("iterationProgressChart.burnup")}
         </button>
       </div>
 
@@ -168,8 +179,8 @@ export function IterationProgressChart({
           role="img"
           aria-label={
             mode === "burndown"
-              ? "バーンダウンチャート（理想線と実績線）"
-              : "バーンアップチャート（完了ポイントとスコープ合計）"
+              ? t("iterationProgressChart.burndownChartLabel")
+              : t("iterationProgressChart.burnupChartLabel")
           }
         >
           <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
@@ -214,7 +225,7 @@ export function IterationProgressChart({
                     strokeDasharray="6 4"
                     dot={false}
                     isAnimationActive={false}
-                    name="理想線"
+                    name={t("iterationProgressChart.idealLine")}
                   />
                   <Line
                     type="monotone"
@@ -224,7 +235,7 @@ export function IterationProgressChart({
                     dot={false}
                     connectNulls={false}
                     isAnimationActive={false}
-                    name="実績線（残ポイント）"
+                    name={t("iterationProgressChart.actualLine")}
                   />
                 </>
               ) : (
@@ -273,11 +284,11 @@ export function IterationProgressChart({
           <>
             <div className="flex items-center gap-2">
               <span className="inline-block h-0 w-12 border-t-2 border-dashed border-gray-400" />
-              理想線
+              {t("iterationProgressChart.idealLine")}
             </div>
             <div className="flex items-center gap-2">
               <span className="inline-block h-0 w-12 border-t-2 border-blue-600" />
-              実績線（残ポイント）
+              {t("iterationProgressChart.actualLine")}
             </div>
           </>
         ) : (

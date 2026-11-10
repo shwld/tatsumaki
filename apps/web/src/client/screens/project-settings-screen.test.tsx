@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { AuthErrorProvider } from "../contexts/auth-error-context";
 import { ToastProvider } from "../contexts/toast-context";
+import { i18n } from "../i18n/config";
 import { ProjectSettingsScreen } from "./project-settings-screen";
 
 const mockProject = {
@@ -360,6 +361,49 @@ describe("ProjectSettingsScreen", () => {
       expect(
         screen.getByText("プロジェクトの削除に失敗しました"),
       ).toBeInTheDocument();
+    });
+  });
+
+  it("renders English labels without Japanese text when the language is en", async () => {
+    await i18n.changeLanguage("en");
+    vi.mocked(fetch).mockImplementation(async () => {
+      return new Response(JSON.stringify({ project: mockProject }), {
+        status: 200,
+      });
+    });
+
+    const { container } = renderScreen();
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", { name: "Project settings" }),
+      ).toBeInTheDocument();
+    });
+    expect(screen.getByLabelText("Project name")).toHaveValue("Test Project");
+    expect(screen.getByLabelText("Iteration length")).toBeInTheDocument();
+    expect(screen.getByText("Delete project")).toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/[\u3040-\u30ff\u3400-\u9fff]/);
+  });
+
+  it("shows English owner guidance to non-owners when the language is en", async () => {
+    await i18n.changeLanguage("en");
+    vi.mocked(fetch).mockImplementation(async () => {
+      return new Response(
+        JSON.stringify({
+          project: { ...mockProject, currentUserRole: "member" },
+        }),
+        { status: 200 },
+      );
+    });
+
+    renderScreen();
+
+    await waitFor(() => {
+      expect(
+        screen.getAllByText(
+          "Owner permission is required to change these settings.",
+        ).length,
+      ).toBeGreaterThan(0);
     });
   });
 });
