@@ -26,3 +26,11 @@ export {
   artifactUploadSessionsTable,
   artifactUploadSessionFilesTable,
 } from "./artifacts";
+export {
+  storyMapsTable,
+  storyMapPersonasTable,
+  storyMapActivitiesTable,
+  storyMapTasksTable,
+  storyMapSlicesTable,
+  storyMapCardsTable,
+} from "./story-maps";
