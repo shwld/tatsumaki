@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { Env } from "../../index";
 import { D1ProjectRepository } from "../../infrastructure/db/repositories/d1-project-repository";
 import { D1StoryMapRepository } from "../../infrastructure/db/repositories/d1-story-map-repository";
+import { STORY_MAP_LIVE_LIMITS } from "../../shared/story-map-live-protocol";
 import { isAllowedWebSocketOrigin } from "./planning-poker";
 
 export const storyMapLiveRoute = new Hono<Env>();
@@ -83,6 +84,10 @@ storyMapLiveRoute.post(
     }
     if (!structure.value) return notFound();
 
+    const body = await readCappedBody(c.req.raw);
+    if (body === null) {
+      return c.json({ code: "invalid" }, 413);
+    }
     const headers = new Headers({
       "content-type": "application/json",
       "x-user-id": currentUser.id,
@@ -95,8 +100,36 @@ storyMapLiveRoute.post(
       new Request("https://story-map/command", {
         method: "POST",
         headers,
-        body: await c.req.text(),
+        body,
       }),
     );
   },
 );
+
+/** Reads at most the live message limit; null when the body is larger. */
+async function readCappedBody(request: Request): Promise<string | null> {
+  const max = STORY_MAP_LIVE_LIMITS.maxMessageBytes;
+  const declared = Number(request.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > max) return null;
+  if (!request.body) return "";
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > max) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(bytes);
+}

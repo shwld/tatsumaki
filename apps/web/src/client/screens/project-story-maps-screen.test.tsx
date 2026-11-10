@@ -195,6 +195,24 @@ describe("Story Map screens", () => {
     );
   });
 
+  it("names the overlong persona instead of blaming the title", async () => {
+    mockFetch(() => [200, { storyMaps: [], role: "owner" }]);
+    renderAt("/projects/p1/story-maps");
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Story Map を作成" }),
+    );
+    fireEvent.change(screen.getByLabelText("タイトル"), {
+      target: { value: "Map" },
+    });
+    fireEvent.change(screen.getByLabelText(/主要ユーザー/), {
+      target: { value: "x".repeat(201) },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "作成" }));
+    expect(
+      await screen.findByText("主要ユーザー名は 200 文字までです"),
+    ).toBeTruthy();
+  });
+
   it("asks to restore an archived map and offers no edit form", async () => {
     mockFetch(() => [
       200,

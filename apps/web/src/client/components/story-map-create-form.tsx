@@ -42,6 +42,11 @@ export function StoryMapCreateForm({ projectId, onCancel, onCreated }: Props) {
         t("storyMapCreateForm.tooMany", { max: STORY_MAP_PERSONA_MAX }),
       );
     }
+    if (personaNames.some((name) => name.length > STORY_MAP_TITLE_MAX)) {
+      return setError(
+        t("storyMapCreateForm.personaTooLong", { max: STORY_MAP_TITLE_MAX }),
+      );
+    }
     setSubmitting(true);
     setError(null);
     const result = await createStoryMap(projectId, {

@@ -175,6 +175,7 @@ describe("story map HTTP command limits", () => {
       },
     );
     expect(big.status).toBe(413);
+    expect(await big.json()).toMatchObject({ code: "invalid" });
 
     const statuses: number[] = [];
     for (let i = 0; i < 30; i += 1) {

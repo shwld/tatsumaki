@@ -78,7 +78,7 @@ export function StoryMapEditScreen() {
     mapId: string;
   }>();
   const { notifySessionExpired } = useAuthError();
-  const [detail, setDetail] = useState<StoryMapDetail | null>(null);
+  const [loaded, setLoaded] = useState<StoryMapDetail | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [title, setTitle] = useState("");
@@ -104,7 +104,7 @@ export function StoryMapEditScreen() {
         if (result.status === 401) return notifySessionExpired();
         return setLoadError(true);
       }
-      setDetail(result.value);
+      setLoaded(result.value);
       // A reload after a persona change or a failed command must not replace
       // a draft the user has not saved.
       const previous = savedMeta.current;
@@ -124,6 +124,10 @@ export function StoryMapEditScreen() {
       ignore = true;
     };
   }, [projectId, mapId, reloadKey, notifySessionExpired]);
+
+  // The previous map stays in state while the next one loads; never edit it
+  // under the new route.
+  const detail = loaded?.structure.map.id === mapId ? loaded : null;
 
   const reload = useCallback(() => setReloadKey((key) => key + 1), []);
 
