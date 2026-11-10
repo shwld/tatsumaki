@@ -154,12 +154,11 @@ describe("Story Map screens", () => {
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
     await waitFor(() => expect(posts).toHaveLength(1));
     expect(posts[0]).toMatchObject({
-      command: {
-        type: "updateMap",
-        title: "Renamed",
-        achievementGoal: "Reach the first story",
-      },
+      command: { type: "updateMap", title: "Renamed" },
     });
+    expect(
+      (posts[0] as { command: Record<string, unknown> }).command,
+    ).not.toHaveProperty("achievementGoal");
     owner.unmount();
 
     mockFetch(() => [200, { role: "viewer", structure: structure() }]);

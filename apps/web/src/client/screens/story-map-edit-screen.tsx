@@ -207,8 +207,14 @@ export function StoryMapEditScreen() {
         text: t("storyMapEditScreen.titleRequired"),
       });
     }
+    // Only what this editor changed, so a save does not restore a field
+    // someone else edited meanwhile.
     void run(
-      { type: "updateMap", title, achievementGoal: goal },
+      {
+        type: "updateMap",
+        ...(title !== map.title ? { title } : {}),
+        ...(goal !== map.achievementGoal ? { achievementGoal: goal } : {}),
+      },
       t("storyMapEditScreen.saved"),
     );
   };

@@ -148,3 +148,45 @@ describe("story map HTTP API", () => {
     ).toBe(404);
   });
 });
+
+describe("story map HTTP command limits", () => {
+  beforeEach(async () => {
+    await resetDatabase(env.DB);
+    await setupAccessBindings(env);
+    await createAuthHeaders(MEMBER);
+    const db = createDb(env.DB);
+    await db.insert(projectsTable).values({ id: P1, name: "One" });
+    await db
+      .insert(projectMembersTable)
+      .values({ projectId: P1, userId: MEMBER.sub, role: "member" });
+  });
+
+  it("refuses an oversized body and throttles a burst", async () => {
+    const created = (await (
+      await call(MEMBER, "POST", "/story-maps", { title: "Limits" })
+    ).json()) as { storyMap: { id: string } };
+    const big = await call(
+      MEMBER,
+      "POST",
+      `/story-maps/${created.storyMap.id}/commands`,
+      {
+        opId: ulid(),
+        command: { type: "updateMap", title: "x".repeat(70 * 1024) },
+      },
+    );
+    expect(big.status).toBe(413);
+
+    const statuses: number[] = [];
+    for (let i = 0; i < 30; i += 1) {
+      statuses.push(
+        (
+          await command(MEMBER, created.storyMap.id, {
+            type: "updateMap",
+            title: `T${i}`,
+          })
+        ).status,
+      );
+    }
+    expect(statuses).toContain(429);
+  });
+});

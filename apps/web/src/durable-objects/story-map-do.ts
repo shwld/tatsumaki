@@ -60,6 +60,8 @@ export class StoryMapDO {
   private queue: Promise<unknown> = Promise.resolve();
   /** Command timestamps per socket, for the rate limit. Lost on hibernation. */
   private readonly recent = new WeakMap<WebSocket, number[]>();
+  /** Same limit for HTTP commands, per user. */
+  private readonly httpRecent = new Map<string, number[]>();
 
   constructor(
     private readonly state: DurableObjectState,
@@ -207,6 +209,16 @@ export class StoryMapDO {
     await this.serialized(() => this.handleCommand(ws, attachment, message));
   }
 
+  private exceedsHttpRate(userId: string): boolean {
+    const now = Date.now();
+    const stamps = (this.httpRecent.get(userId) ?? []).filter(
+      (at) => now - at < 1000,
+    );
+    stamps.push(now);
+    this.httpRecent.set(userId, stamps);
+    return stamps.length > STORY_MAP_LIVE_LIMITS.commandsPerSecond;
+  }
+
   private exceedsRate(ws: WebSocket): boolean {
     const now = Date.now();
     const stamps = (this.recent.get(ws) ?? []).filter((at) => now - at < 1000);
@@ -223,7 +235,22 @@ export class StoryMapDO {
     request: Request,
     attachment: Attachment,
   ): Promise<Response> {
-    const body: unknown = await request.json().catch(() => null);
+    if (this.exceedsHttpRate(attachment.userId)) {
+      return Response.json({ code: "rate_limited" }, { status: 429 });
+    }
+    const raw = await request.text();
+    if (
+      new TextEncoder().encode(raw).length >
+      STORY_MAP_LIVE_LIMITS.maxMessageBytes
+    ) {
+      return Response.json({ code: "invalid" }, { status: 413 });
+    }
+    let body: unknown = null;
+    try {
+      body = JSON.parse(raw);
+    } catch {
+      // Falls through to the missing opId rejection below.
+    }
     const message =
       typeof body === "object" && body !== null
         ? (body as Record<string, unknown>)
