@@ -8,21 +8,21 @@ export function resolveStorySection(
   story: Pick<Story, "isIcebox" | "status" | "iterationId">,
   currentIterationId: string | null,
 ): StorySection {
-  if (story.isIcebox) return "Icebox";
-  if (currentIterationId !== null) {
-    if (story.iterationId === currentIterationId) return "Current";
-    if (story.status === "Accepted") return "Done";
-    return "Backlog";
+  const inCurrentIteration =
+    currentIterationId !== null && story.iterationId === currentIterationId;
+  if (story.status === "Accepted") {
+    return inCurrentIteration ? "Current" : "Done";
   }
-  if (story.status === "Accepted") return "Done";
   if (
-    story.status === "Started" ||
-    story.status === "Finished" ||
-    story.status === "Delivered"
+    !story.isIcebox &&
+    (story.status === "Started" ||
+      story.status === "Finished" ||
+      story.status === "Delivered")
   ) {
     return "Current";
   }
-  return "Backlog";
+  if (inCurrentIteration) return "Current";
+  return story.isIcebox ? "Icebox" : "Backlog";
 }
 
 export function findCurrentIterationId(
