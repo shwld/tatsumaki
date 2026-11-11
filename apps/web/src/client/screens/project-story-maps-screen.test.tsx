@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -229,5 +235,52 @@ describe("Story Map screens", () => {
     ).toBeTruthy();
     expect(screen.queryByRole("button", { name: "保存" })).toBeNull();
     expect(screen.getByRole("button", { name: "復元" })).toBeTruthy();
+  });
+
+  it("renders the live board and sends board edits through the socket", async () => {
+    const sent: string[] = [];
+    const sockets: FakeSocket[] = [];
+    class FakeSocket {
+      readyState = 1;
+      listeners: Record<string, ((event: unknown) => void)[]> = {};
+      constructor() {
+        sockets.push(this);
+      }
+      addEventListener(type: string, fn: (event: unknown) => void) {
+        (this.listeners[type] ??= []).push(fn);
+      }
+      send(data: string) {
+        sent.push(data);
+      }
+      close() {}
+      emit(type: string, event: unknown) {
+        for (const fn of this.listeners[type] ?? []) fn(event);
+      }
+    }
+    vi.stubGlobal("WebSocket", FakeSocket);
+    mockFetch(() => [200, { role: "owner", structure: structure() }]);
+    renderAt("/projects/p1/story-maps/map-1");
+    await screen.findByLabelText("タイトル");
+    await waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => {
+      sockets[0]?.emit("message", {
+        data: JSON.stringify({
+          type: "snapshot",
+          seq: 1,
+          role: "owner",
+          structure: structure(),
+        }),
+      });
+    });
+    expect(await screen.findByText("接続済み · 保存済み")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "活動を追加" }));
+    const input = screen.getByRole("textbox", { name: "活動を追加" });
+    fireEvent.change(input, { target: { value: "Sign up" } });
+    fireEvent.submit(input.closest("form") as HTMLFormElement);
+    expect(JSON.parse(sent.at(-1) ?? "{}")).toMatchObject({
+      type: "command",
+      command: { type: "addActivity", title: "Sign up", afterActivityId: null },
+    });
+    vi.unstubAllGlobals();
   });
 });

@@ -9,6 +9,8 @@ import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router";
 
 import { ProjectPage } from "../components/project-page";
+import { StoryMapBoard } from "../components/story-map-board";
+import { useStoryMapLive } from "../lib/use-story-map-live";
 import { useAuthError } from "../contexts/auth-error-context";
 import {
   fetchStoryMap,
@@ -129,7 +131,32 @@ export function StoryMapEditScreen() {
   // under the new route.
   const detail = loaded?.structure.map.id === mapId ? loaded : null;
 
+  const live = useStoryMapLive(projectId, mapId);
   const reload = useCallback(() => setReloadKey((key) => key + 1), []);
+
+  // Another editor's metadata change arrives over the socket; refetch so the
+  // form and archive control follow it while unsaved drafts are kept.
+  const liveMeta = live.state.structure
+    ? JSON.stringify([
+        live.state.structure.map.title,
+        live.state.structure.map.achievementGoal,
+        live.state.structure.map.archivedAt,
+        live.state.structure.personas,
+      ])
+    : null;
+  const loadedMeta = loaded
+    ? JSON.stringify([
+        loaded.structure.map.title,
+        loaded.structure.map.achievementGoal,
+        loaded.structure.map.archivedAt,
+        loaded.structure.personas,
+      ])
+    : null;
+  useEffect(() => {
+    if (liveMeta !== null && loadedMeta !== null && liveMeta !== loadedMeta) {
+      reload();
+    }
+  }, [liveMeta, loadedMeta, reload]);
 
   const run = async (
     command: StoryMapMetadataCommand,
@@ -351,6 +378,31 @@ export function StoryMapEditScreen() {
           )
         ) : null}
       </section>
+
+      <p role="status" className="mb-2 text-xs text-gray-600">
+        {t(`storyMapBoard.connection.${live.state.connection}`)}
+        {live.state.connection === "connected"
+          ? ` · ${t(`storyMapBoard.save_state.${live.state.save}`)}`
+          : ""}
+      </p>
+      {live.state.rejections.length > 0 ? (
+        <p role="alert" className="mb-2 text-xs text-red-700">
+          {t("storyMapBoard.rejected")}
+        </p>
+      ) : null}
+      {(live.state.structure ?? detail.structure) ? (
+        <StoryMapBoard
+          structure={live.state.structure ?? detail.structure}
+          editable={
+            live.state.structure !== null &&
+            canEdit &&
+            live.state.structure.map.archivedAt === null &&
+            live.state.role !== "viewer" &&
+            live.state.connection === "connected"
+          }
+          send={live.send}
+        />
+      ) : null}
 
       {canEdit ? (
         <button
