@@ -30,8 +30,7 @@ function epicsProgress() {
     labelColor: color,
     enabled: true,
     description: id === "growth" ? "新規登録を増やす" : "",
-    successCriteria: id === "growth" ? "月間登録数 1,000 件" : "",
-    ownerId: id === "growth" ? "github|owner" : null,
+    ownerIds: id === "growth" ? ["github|owner"] : [],
     plannedStart: start,
     plannedEnd: end,
     position: 0,
@@ -230,8 +229,7 @@ for (const theme of themeVariants) {
               labelColor: "#2563eb",
               enabled: true,
               description: "新規登録を増やす",
-              successCriteria: "月間登録数 1,000 件",
-              ownerId: "github|owner",
+              ownerIds: ["github|owner"],
               plannedStart: "2026-04-01",
               plannedEnd: "2026-06-30",
               outcomeStatus: "unevaluated",
@@ -244,7 +242,9 @@ for (const theme of themeVariants) {
 
     await page.goto("/projects/project-1/labels");
     await expect(page.getByRole("heading", { name: "Labels" })).toBeVisible();
-    await expect(page.getByLabel("目的")).toHaveValue("新規登録を増やす");
+    await expect(
+      page.getByRole("textbox", { name: "計画（目的・成功条件）" }),
+    ).toContainText("新規登録を増やす");
     await expect(page).toHaveScreenshot(
       resolveSnapshotName("project-labels.png", theme),
     );

@@ -8,6 +8,25 @@ import { AuthErrorProvider } from "../contexts/auth-error-context";
 import type { Epic } from "../types/epic";
 import { ProjectLabelsScreen } from "./project-labels-screen";
 
+vi.mock("../components/rich-text-editor", () => ({
+  RichTextEditor: ({
+    value,
+    onChange,
+    ariaLabel,
+  }: {
+    value: string;
+    onChange: (value: string) => void;
+    ariaLabel?: string;
+  }) => (
+    <textarea
+      aria-label={ariaLabel}
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+    />
+  ),
+}));
+
+const PLAN = "計画（目的・成功条件）";
 const PROJECT_ID = "project-1";
 
 const label = (id: string, name: string) => ({
@@ -28,8 +47,7 @@ const epicOf = (overrides: Partial<Epic> = {}): Epic => ({
   labelColor: "#336699",
   enabled: true,
   description: "",
-  successCriteria: "",
-  ownerId: null,
+  ownerIds: [],
   plannedStart: null,
   plannedEnd: null,
   outcomeStatus: "unevaluated",
@@ -123,7 +141,7 @@ describe("ProjectLabelsScreen", () => {
                 description: "Grow signups",
                 plannedStart: "2026-04-01",
                 plannedEnd: "2026-06-30",
-                ownerId: "user-2",
+                ownerIds: ["user-2"],
                 revision: 2,
               }),
             }),
@@ -140,12 +158,12 @@ describe("ProjectLabelsScreen", () => {
     expect(growthSwitch()).toHaveAttribute("aria-checked", "false");
     await user.click(growthSwitch());
 
-    const purpose = await screen.findByLabelText("目的");
+    const purpose = await screen.findByRole("textbox", { name: PLAN });
     expect(growthSwitch()).toHaveAttribute("aria-checked", "true");
     expect(screen.getByText(/目的・期間を入力すると/)).toBeInTheDocument();
 
     await user.type(purpose, "Grow signups");
-    await user.selectOptions(screen.getByLabelText("担当者"), "user-2");
+    await user.click(screen.getByRole("checkbox", { name: "Bob" }));
     fireEvent.change(screen.getByLabelText("開始日"), {
       target: { value: "2026-04-01" },
     });
@@ -159,8 +177,7 @@ describe("ProjectLabelsScreen", () => {
     expect(patch?.body).toEqual({
       revision: 1,
       description: "Grow signups",
-      successCriteria: "",
-      ownerId: "user-2",
+      ownerIds: ["user-2"],
       plannedStart: "2026-04-01",
       plannedEnd: "2026-06-30",
       outcomeStatus: "unevaluated",
@@ -211,16 +228,22 @@ describe("ProjectLabelsScreen", () => {
     renderScreen();
 
     await waitFor(() =>
-      expect(screen.getByLabelText("目的")).toHaveValue("Grow signups"),
+      expect(screen.getByRole("textbox", { name: PLAN })).toHaveValue(
+        "Grow signups",
+      ),
     );
     await user.click(growthSwitch());
-    await waitFor(() => expect(screen.queryByLabelText("目的")).toBeNull());
+    await waitFor(() =>
+      expect(screen.queryByRole("textbox", { name: PLAN })).toBeNull(),
+    );
     expect(
       screen.getByText(/再度 ON にすると復元されます/),
     ).toBeInTheDocument();
 
     await user.click(growthSwitch());
-    expect(await screen.findByLabelText("目的")).toHaveValue("Grow signups");
+    expect(await screen.findByRole("textbox", { name: PLAN })).toHaveValue(
+      "Grow signups",
+    );
     const enable = calls.find((call) => call.url.endsWith("/epic/enable"));
     expect(enable?.body).toEqual({ revision: 2 });
   });
@@ -255,11 +278,18 @@ describe("ProjectLabelsScreen", () => {
     const user = userEvent.setup();
     renderScreen();
 
-    await user.type(await screen.findByLabelText("目的"), " + unsaved");
+    await user.type(
+      await screen.findByRole("textbox", { name: PLAN }),
+      " + unsaved",
+    );
     await user.click(growthSwitch());
-    await waitFor(() => expect(screen.queryByLabelText("目的")).toBeNull());
+    await waitFor(() =>
+      expect(screen.queryByRole("textbox", { name: PLAN })).toBeNull(),
+    );
     await user.click(growthSwitch());
-    expect(await screen.findByLabelText("目的")).toHaveValue("Saved + unsaved");
+    expect(await screen.findByRole("textbox", { name: PLAN })).toHaveValue(
+      "Saved + unsaved",
+    );
   });
 
   it("recovers from a stale revision when toggling planning", async () => {
@@ -299,13 +329,15 @@ describe("ProjectLabelsScreen", () => {
     const user = userEvent.setup();
     renderScreen();
 
-    await screen.findByLabelText("目的");
+    await screen.findByRole("textbox", { name: PLAN });
     await user.click(growthSwitch());
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "もう一度切り替えてください",
     );
     await user.click(growthSwitch());
-    await waitFor(() => expect(screen.queryByLabelText("目的")).toBeNull());
+    await waitFor(() =>
+      expect(screen.queryByRole("textbox", { name: PLAN })).toBeNull(),
+    );
     const disables = calls.filter((call) => call.url.endsWith("/epic/disable"));
     expect(
       disables.map((c) => (c.body as { revision: number }).revision),
@@ -339,7 +371,6 @@ describe("ProjectLabelsScreen", () => {
             JSON.stringify({
               epic: epicOf({
                 description: "Theirs",
-                successCriteria: "Their criteria",
                 revision: 5,
               }),
             }),
@@ -352,21 +383,20 @@ describe("ProjectLabelsScreen", () => {
     const user = userEvent.setup();
     renderScreen();
 
-    const purpose = await screen.findByLabelText("目的");
+    const purpose = await screen.findByRole("textbox", { name: PLAN });
     await user.type(purpose, "Mine");
     await user.click(screen.getByRole("button", { name: "計画を保存" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "他の人が先にこの計画を更新しました",
     );
-    expect(screen.getByLabelText("目的")).toHaveValue("Mine");
+    expect(screen.getByRole("textbox", { name: PLAN })).toHaveValue("Mine");
 
     await user.click(screen.getByRole("button", { name: "最新の版に更新" }));
     expect(
       await screen.findByText(/最新の版に更新しました/),
     ).toBeInTheDocument();
-    expect(screen.getByLabelText("目的")).toHaveValue("Mine");
-    expect(screen.getByLabelText("成功条件")).toHaveValue("Their criteria");
+    expect(screen.getByRole("textbox", { name: PLAN })).toHaveValue("Mine");
 
     await user.click(screen.getByRole("button", { name: "計画を保存" }));
     await screen.findByText("保存しました");
@@ -387,13 +417,16 @@ describe("ProjectLabelsScreen", () => {
     const user = userEvent.setup();
     renderScreen();
 
-    await user.type(await screen.findByLabelText("目的"), "Keep me");
+    await user.type(
+      await screen.findByRole("textbox", { name: PLAN }),
+      "Keep me",
+    );
     await user.click(screen.getByRole("button", { name: "計画を保存" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "入力内容は保持されています",
     );
-    expect(screen.getByLabelText("目的")).toHaveValue("Keep me");
+    expect(screen.getByRole("textbox", { name: PLAN })).toHaveValue("Keep me");
     expect(screen.getByRole("button", { name: "計画を保存" })).toBeEnabled();
   });
 
@@ -402,7 +435,7 @@ describe("ProjectLabelsScreen", () => {
     const user = userEvent.setup();
     renderScreen();
 
-    await screen.findByLabelText("目的");
+    await screen.findByRole("textbox", { name: PLAN });
     fireEvent.change(screen.getByLabelText("開始日"), {
       target: { value: "2026-04-01" },
     });
@@ -445,7 +478,7 @@ describe("ProjectLabelsScreen", () => {
     const user = userEvent.setup();
     renderScreen();
 
-    await screen.findByLabelText("目的");
+    await screen.findByRole("textbox", { name: PLAN });
     await user.click(screen.getByRole("button", { name: /growth を削除/ }));
 
     const dialog = await screen.findByRole("dialog");

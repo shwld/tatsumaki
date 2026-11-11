@@ -8,8 +8,7 @@ export type Epic = {
   labelColor: string;
   enabled: boolean;
   description: string;
-  successCriteria: string;
-  ownerId: string | null;
+  ownerIds: string[];
   plannedStart: string | null;
   plannedEnd: string | null;
   outcomeStatus: EpicOutcomeStatus;
@@ -25,8 +24,7 @@ export type LabelDeletionImpact = {
 
 export type EpicPlanInput = {
   description: string;
-  successCriteria: string;
-  ownerId: string | null;
+  ownerIds: string[];
   plannedStart: string | null;
   plannedEnd: string | null;
   outcomeStatus: EpicOutcomeStatus;

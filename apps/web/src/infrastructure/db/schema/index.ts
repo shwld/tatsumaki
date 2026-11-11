@@ -7,7 +7,7 @@ export {
   projectInvitationsTable,
 } from "./project-members";
 export { projectLabelsTable } from "./project-labels";
-export { epicsTable } from "./epics";
+export { epicOwnersTable, epicsTable } from "./epics";
 export { storiesTable, storyPriorityHistoryTable } from "./stories";
 export { storyTimelineEntriesTable } from "./story-timeline";
 export { storyBlockersTable } from "./story-blockers";

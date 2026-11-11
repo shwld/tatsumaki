@@ -29,11 +29,9 @@ import {
   INVALID_EPIC_DESCRIPTION_ERROR,
   INVALID_EPIC_OUTCOME_STATUS_ERROR,
   INVALID_EPIC_PLANNED_PERIOD_ERROR,
-  INVALID_EPIC_SUCCESS_CRITERIA_ERROR,
   normalizeEpicDescription,
   normalizeEpicOutcomeStatus,
   normalizeEpicPlannedPeriod,
-  normalizeEpicSuccessCriteria,
 } from "./epic-input";
 
 export const EPIC_FORBIDDEN_ERROR = "EPIC_FORBIDDEN_ERROR" as const;
@@ -58,7 +56,6 @@ export type ManageEpicError =
   | typeof EPIC_REVISION_CONFLICT_ERROR
   | typeof INVALID_EPIC_OWNER_ERROR
   | typeof INVALID_EPIC_DESCRIPTION_ERROR
-  | typeof INVALID_EPIC_SUCCESS_CRITERIA_ERROR
   | typeof INVALID_EPIC_PLANNED_PERIOD_ERROR
   | typeof INVALID_EPIC_OUTCOME_STATUS_ERROR;
 
@@ -325,8 +322,7 @@ export async function disableEpicPlanning(
 export type UpdateEpicPlanInput = EpicCommand & {
   revision: number;
   description?: string;
-  successCriteria?: string;
-  ownerId?: string | null;
+  ownerIds?: string[];
   plannedPeriod?: EpicPlannedPeriod | null;
   outcomeStatus?: string;
 };
@@ -345,11 +341,6 @@ export async function updateEpicPlan(
     if (description.isErr()) return err(description.error);
     patch.description = description.value;
   }
-  if (input.successCriteria !== undefined) {
-    const successCriteria = normalizeEpicSuccessCriteria(input.successCriteria);
-    if (successCriteria.isErr()) return err(successCriteria.error);
-    patch.successCriteria = successCriteria.value;
-  }
   if (input.plannedPeriod !== undefined) {
     const period = normalizeEpicPlannedPeriod(input.plannedPeriod);
     if (period.isErr()) return err(period.error);
@@ -367,16 +358,17 @@ export async function updateEpicPlan(
     return err(label.error);
   }
 
-  if (input.ownerId !== undefined) {
-    if (input.ownerId !== null) {
+  if (input.ownerIds !== undefined) {
+    const ownerIds = [...new Set(input.ownerIds)];
+    for (const ownerId of ownerIds) {
       const member = await deps.projectRepository.findMember(
         input.projectId,
-        input.ownerId,
+        ownerId,
       );
       if (member.isErr()) return err(member.error);
       if (!member.value) return err(INVALID_EPIC_OWNER_ERROR);
     }
-    patch.ownerId = input.ownerId;
+    patch.ownerIds = ownerIds;
   }
 
   const updated = await deps.epicRepository.updatePlan(

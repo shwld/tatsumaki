@@ -32,7 +32,7 @@ describe("epic plan input", () => {
   });
 
   it("limits text length and outcome values", () => {
-    expect(normalizeEpicDescription("x".repeat(1001))._unsafeUnwrapErr()).toBe(
+    expect(normalizeEpicDescription("x".repeat(10001))._unsafeUnwrapErr()).toBe(
       INVALID_EPIC_DESCRIPTION_ERROR,
     );
     expect(normalizeEpicOutcomeStatus("missed")._unsafeUnwrap()).toBe("missed");
@@ -44,8 +44,7 @@ describe("epic plan input", () => {
   it("tells an empty plan from a saved one", () => {
     const empty = {
       description: "",
-      successCriteria: "",
-      ownerId: null,
+      ownerIds: [],
       plannedStart: null,
       plannedEnd: null,
       outcomeStatus: "unevaluated" as const,

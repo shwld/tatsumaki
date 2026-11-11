@@ -1,4 +1,4 @@
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { ok, type Result } from "neverthrow";
 import { ulid } from "ulid";
 import type { Epic } from "../../../domain/entities/epic";
@@ -18,7 +18,11 @@ import { projectLabelsTable } from "../schema/project-labels";
 type EpicRow = typeof epicsTable.$inferSelect;
 type LabelRow = Pick<typeof projectLabelsTable.$inferSelect, "name" | "color">;
 
-function toEpic(row: EpicRow & { labelId: string }, label: LabelRow): Epic {
+function toEpic(
+  row: EpicRow & { labelId: string },
+  label: LabelRow,
+  ownerIds: string[],
+): Epic {
   return {
     __typename: "Epic",
     id: row.id,
@@ -28,8 +32,7 @@ function toEpic(row: EpicRow & { labelId: string }, label: LabelRow): Epic {
     labelColor: label.color,
     enabled: row.enabled,
     description: row.description,
-    successCriteria: row.successCriteria,
-    ownerId: row.ownerId,
+    ownerIds,
     plannedStart: row.plannedStart,
     plannedEnd: row.plannedEnd,
     position: row.position,
@@ -39,6 +42,14 @@ function toEpic(row: EpicRow & { labelId: string }, label: LabelRow): Epic {
     updatedAt: row.updatedAt,
   };
 }
+
+const UPDATABLE_COLUMNS: Record<string, string> = {
+  enabled: "enabled",
+  description: "description",
+  plannedStart: "planned_start",
+  plannedEnd: "planned_end",
+  outcomeStatus: "outcome_status",
+};
 
 const UNRESOLVED_BLOCKER = `EXISTS (
   SELECT 1 FROM story_blockers b
@@ -114,17 +125,43 @@ export class D1EpicRepository implements EpicRepository {
       );
   }
 
+  private async loadOwnerIds(
+    projectId: string,
+    epicId?: string,
+  ): Promise<Map<string, string[]>> {
+    const rows = await this.d1
+      .prepare(
+        `SELECT eo.epic_id, eo.user_id
+         FROM epic_owners eo
+         JOIN epics e ON e.id = eo.epic_id
+         WHERE e.project_id = ?1 AND (?2 IS NULL OR eo.epic_id = ?2)
+         ORDER BY eo.created_at, eo.user_id`,
+      )
+      .bind(projectId, epicId ?? null)
+      .all<{ epic_id: string; user_id: string }>();
+    const byEpic = new Map<string, string[]>();
+    for (const row of rows.results) {
+      byEpic.set(row.epic_id, [
+        ...(byEpic.get(row.epic_id) ?? []),
+        row.user_id,
+      ]);
+    }
+    return byEpic;
+  }
+
   async list(projectId: string): Promise<Result<Epic[], EpicRepositoryError>> {
     const rows = await this.selectWithLabel()
       .where(eq(epicsTable.projectId, projectId))
       .orderBy(asc(epicsTable.position), asc(epicsTable.createdAt))
       .all();
+    const owners = await this.loadOwnerIds(projectId);
 
     return ok(
       rows.map((row) =>
         toEpic(
           { ...row.epic, labelId: row.labelId },
           { name: row.labelName, color: row.labelColor },
+          owners.get(row.epic.id) ?? [],
         ),
       ),
     );
@@ -146,10 +183,12 @@ export class D1EpicRepository implements EpicRepository {
     if (!row) {
       return ok(null);
     }
+    const owners = await this.loadOwnerIds(projectId, row.epic.id);
     return ok(
       toEpic(
         { ...row.epic, labelId: row.labelId },
         { name: row.labelName, color: row.labelColor },
+        owners.get(row.epic.id) ?? [],
       ),
     );
   }
@@ -199,29 +238,68 @@ export class D1EpicRepository implements EpicRepository {
     return this.updateAtRevision(projectId, labelId, expectedRevision, patch);
   }
 
+  /**
+   * Applies the owner replacement and the columns in one batch. Nothing else
+   * moves the revision inside the batch, so gating the owner statements on the
+   * expected revision lets a stale writer change nothing.
+   */
   private async updateAtRevision(
     projectId: string,
     labelId: string,
     expectedRevision: number,
     values: EpicPlanPatch & { enabled?: boolean },
   ): Promise<Result<Epic | null, EpicRepositoryError>> {
-    const updated = await this.db
-      .update(epicsTable)
-      .set({
-        ...values,
-        revision: sql`${epicsTable.revision} + 1`,
-        updatedAt: new Date().toISOString(),
-      })
-      .where(
-        and(
-          eq(epicsTable.projectId, projectId),
-          eq(epicsTable.labelId, labelId),
-          eq(epicsTable.revision, expectedRevision),
-        ),
-      )
-      .returning({ id: epicsTable.id });
+    const current = await this.findByLabelId(projectId, labelId);
+    if (current.isErr() || !current.value) {
+      return current.isErr() ? current : ok(null);
+    }
+    const epicId = current.value.id;
+    const { ownerIds, ...columns } = values;
 
-    if (updated.length === 0) {
+    const statements: D1PreparedStatement[] = [];
+    const atRevision = `EXISTS (SELECT 1 FROM epics WHERE id = ?1 AND revision = ?2)`;
+    if (ownerIds !== undefined) {
+      statements.push(
+        this.d1
+          .prepare(
+            `DELETE FROM epic_owners WHERE epic_id = ?1 AND ${atRevision}`,
+          )
+          .bind(epicId, expectedRevision),
+      );
+      const now = new Date().toISOString();
+      for (const userId of ownerIds) {
+        statements.push(
+          this.d1
+            .prepare(
+              `INSERT INTO epic_owners (epic_id, user_id, created_at)
+               SELECT ?1, ?3, ?4 WHERE ${atRevision}`,
+            )
+            .bind(epicId, expectedRevision, userId, now),
+        );
+      }
+    }
+
+    const assignments: string[] = [];
+    const bindings: unknown[] = [];
+    for (const [key, value] of Object.entries(columns)) {
+      const column = UPDATABLE_COLUMNS[key];
+      if (value === undefined || !column) continue;
+      bindings.push(typeof value === "boolean" ? Number(value) : value);
+      assignments.push(`${column} = ?${bindings.length}`);
+    }
+    bindings.push(new Date().toISOString(), epicId, expectedRevision);
+    const n = bindings.length;
+    statements.push(
+      this.d1
+        .prepare(
+          `UPDATE epics SET ${[...assignments, "revision = revision + 1", `updated_at = ?${n - 2}`].join(", ")}
+           WHERE id = ?${n - 1} AND revision = ?${n}`,
+        )
+        .bind(...bindings),
+    );
+
+    const results = await this.d1.batch(statements);
+    if (results[results.length - 1].meta.changes === 0) {
       return ok(null);
     }
     return this.findByLabelId(projectId, labelId);

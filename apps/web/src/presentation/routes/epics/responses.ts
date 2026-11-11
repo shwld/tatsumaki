@@ -2,7 +2,6 @@ import {
   INVALID_EPIC_DESCRIPTION_ERROR,
   INVALID_EPIC_OUTCOME_STATUS_ERROR,
   INVALID_EPIC_PLANNED_PERIOD_ERROR,
-  INVALID_EPIC_SUCCESS_CRITERIA_ERROR,
   EPIC_TEXT_MAX_LENGTH,
 } from "../../../application/usecases/epic-input";
 import {
@@ -69,19 +68,13 @@ export function toEpicErrorResponse(error: ManageEpicError): EpicErrorResponse {
       return {
         status: 400,
         code: "INVALID_OWNER",
-        message: "ownerId must be a member of this project",
+        message: "ownerIds must all be members of this project",
       };
     case INVALID_EPIC_DESCRIPTION_ERROR:
       return {
         status: 400,
         code: "INVALID_DESCRIPTION",
         message: `description must be at most ${EPIC_TEXT_MAX_LENGTH} characters`,
-      };
-    case INVALID_EPIC_SUCCESS_CRITERIA_ERROR:
-      return {
-        status: 400,
-        code: "INVALID_SUCCESS_CRITERIA",
-        message: `successCriteria must be at most ${EPIC_TEXT_MAX_LENGTH} characters`,
       };
     case INVALID_EPIC_PLANNED_PERIOD_ERROR:
       return {
