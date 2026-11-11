@@ -1148,7 +1148,7 @@ export function buildCliOpenApiDoc() {
     openapi: "3.1.0",
     info: {
       title: "tatsumaki CLI API",
-      version: "0.0.14",
+      version: "0.0.15",
     },
   });
 }
