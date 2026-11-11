@@ -202,6 +202,40 @@ describe("StoryMapBoard", () => {
     expect(screen.getByText("Started · 3 pt")).toBeTruthy();
   });
 
+  it("labels a linked card by its story, not its old idea title, in move choices", () => {
+    renderBoard(
+      <StoryMapBoard
+        structure={withCards([
+          {
+            ...idea,
+            id: "c1",
+            ideaTitle: "Old idea",
+            storyId: "s1",
+            storyState: "linked",
+            story: {
+              number: 7,
+              title: "Renamed",
+              status: "Started",
+              type: "feature",
+              storyPoint: null,
+              isIcebox: false,
+            },
+          },
+          { ...idea, id: "c2", ideaTitle: "Other", position: 1 },
+        ])}
+        editable
+        send={vi.fn()}
+      />,
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "カードメニュー: Other" }),
+    );
+    expect(
+      screen.getByRole("option", { name: "「#7 Renamed」の後" }),
+    ).toBeTruthy();
+    expect(screen.queryByText(/Old idea/)).toBeNull();
+  });
+
   it("explains a deleted story and offers relinking", () => {
     renderBoard(
       <StoryMapBoard

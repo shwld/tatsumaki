@@ -242,8 +242,8 @@ function CardMenu({
     (other) => other.id !== card.id,
   );
   const cardLabel = (other: StoryMapCard) =>
-    other.ideaTitle ??
     (other.story ? `#${other.story.number} ${other.story.title}` : null) ??
+    other.ideaTitle ??
     t("storyMapBoard.storyCard");
 
   const move = (event: FormEvent) => {
@@ -831,7 +831,7 @@ export function StoryMapBoard({
                                   <button
                                     type="button"
                                     className={`mt-1 ${buttonClass}`}
-                                    aria-label={`${t("storyMapBoard.cardMenu")}: ${card.ideaTitle ?? (card.story ? `#${card.story.number}` : t("storyMapBoard.storyCard"))}`}
+                                    aria-label={`${t("storyMapBoard.cardMenu")}: ${card.story ? `#${card.story.number}` : (card.ideaTitle ?? t("storyMapBoard.storyCard"))}`}
                                     onClick={() => setMenuCardId(card.id)}
                                   >
                                     {t("storyMapBoard.cardMenu")}
