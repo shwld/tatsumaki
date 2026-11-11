@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router";
 
 import { EpicCreateDialog } from "../components/epic-create-dialog";
+import { MarkdownPreview } from "../components/markdown-preview";
 import { ProjectPage } from "../components/project-page";
 import { useAuthError } from "../contexts/auth-error-context";
 import {
@@ -425,7 +426,7 @@ export function ProjectEpicDetailScreen() {
   }>();
   const { notifySessionExpired } = useAuthError();
   const [item, setItem] = useState<EpicWithProgress | null>(null);
-  const [ownerName, setOwnerName] = useState<string | null>(null);
+  const [ownerNames, setOwnerNames] = useState<string[]>([]);
   const [loadError, setLoadError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -433,7 +434,7 @@ export function ProjectEpicDetailScreen() {
     if (!projectId || !labelId) return;
     let ignore = false;
     setItem(null);
-    setOwnerName(null);
+    setOwnerNames([]);
     setLoadError(false);
     const run = async () => {
       const result = await fetchEpicProgress(projectId, labelId);
@@ -443,18 +444,23 @@ export function ProjectEpicDetailScreen() {
         return setLoadError(true);
       }
       setItem(result.value);
-      const ownerId = result.value.epic.ownerId;
-      if (!ownerId) return setOwnerName(null);
+      const ownerIds = result.value.epic.ownerIds;
+      if (ownerIds.length === 0) return setOwnerNames([]);
       try {
         const response = await fetch(`/api/projects/${projectId}/members`);
         const payload = (await response.json()) as {
           members?: Array<{ userId?: string; displayName?: string | null }>;
         };
         if (ignore) return;
-        const member = payload.members?.find((m) => m.userId === ownerId);
-        setOwnerName(member?.displayName ?? ownerId);
+        setOwnerNames(
+          ownerIds.map(
+            (ownerId) =>
+              payload.members?.find((m) => m.userId === ownerId)?.displayName ??
+              ownerId,
+          ),
+        );
       } catch {
-        if (!ignore) setOwnerName(ownerId);
+        if (!ignore) setOwnerNames(ownerIds);
       }
     };
     void run();
@@ -462,9 +468,6 @@ export function ProjectEpicDetailScreen() {
       ignore = true;
     };
   }, [projectId, labelId, reloadKey, notifySessionExpired]);
-
-  const text = (value: string) =>
-    value.trim() === "" ? t("projectEpicDetailScreen.notSet") : value;
 
   return (
     <ProjectPage title={item?.epic.labelName ?? t("projectEpicsScreen.title")}>
@@ -485,12 +488,7 @@ export function ProjectEpicDetailScreen() {
           {t("projectEpicDetailScreen.loading")}
         </p>
       ) : (
-        <EpicDetail
-          item={item}
-          ownerName={ownerName}
-          text={text}
-          projectId={projectId}
-        />
+        <EpicDetail item={item} ownerNames={ownerNames} projectId={projectId} />
       )}
     </ProjectPage>
   );
@@ -498,13 +496,11 @@ export function ProjectEpicDetailScreen() {
 
 function EpicDetail({
   item,
-  ownerName,
-  text,
+  ownerNames,
   projectId,
 }: {
   item: EpicWithProgress;
-  ownerName: string | null;
-  text: (value: string) => string;
+  ownerNames: string[];
   projectId: string;
 }) {
   const { t } = useTranslation();
@@ -602,13 +598,11 @@ function EpicDetail({
           <h2 className="font-semibold">
             {t("projectEpicDetailScreen.description")}
           </h2>
-          <p className="whitespace-pre-wrap">{text(epic.description)}</p>
-        </div>
-        <div>
-          <h2 className="font-semibold">
-            {t("projectEpicDetailScreen.successCriteria")}
-          </h2>
-          <p className="whitespace-pre-wrap">{text(epic.successCriteria)}</p>
+          {epic.description.trim() === "" ? (
+            <p>{t("projectEpicDetailScreen.notSet")}</p>
+          ) : (
+            <MarkdownPreview content={epic.description} />
+          )}
         </div>
         <div>
           <h2 className="font-semibold">
@@ -620,7 +614,11 @@ function EpicDetail({
           <h2 className="font-semibold">
             {t("projectEpicDetailScreen.owner")}
           </h2>
-          <p>{ownerName ?? t("projectEpicDetailScreen.notSet")}</p>
+          <p>
+            {ownerNames.length > 0
+              ? ownerNames.join(", ")
+              : t("projectEpicDetailScreen.notSet")}
+          </p>
         </div>
         <div>
           <h2 className="font-semibold">

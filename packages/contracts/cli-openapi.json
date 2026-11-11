@@ -805,12 +805,11 @@
           "description": {
             "type": "string"
           },
-          "successCriteria": {
-            "type": "string"
-          },
-          "ownerId": {
-            "type": "string",
-            "nullable": true
+          "ownerIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "plannedStart": {
             "type": "string",
@@ -847,8 +846,7 @@
           "labelColor",
           "enabled",
           "description",
-          "successCriteria",
-          "ownerId",
+          "ownerIds",
           "plannedStart",
           "plannedEnd",
           "position",
@@ -1067,12 +1065,11 @@
           "description": {
             "type": "string"
           },
-          "successCriteria": {
-            "type": "string"
-          },
-          "ownerId": {
-            "type": "string",
-            "nullable": true
+          "ownerIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "plannedStart": {
             "type": "string",

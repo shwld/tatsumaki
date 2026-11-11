@@ -5,8 +5,7 @@ type ParseResult<T> = { ok: true; value: T } | { ok: false; message: string };
 export type EpicPlanRequest = {
   revision: number;
   description?: string;
-  successCriteria?: string;
-  ownerId?: string | null;
+  ownerIds?: string[];
   plannedPeriod?: EpicPlannedPeriod | null;
   outcomeStatus?: string;
 };
@@ -52,8 +51,7 @@ export function parseDisableEpicBody(
 
 const PLAN_FIELDS = [
   "description",
-  "successCriteria",
-  "ownerId",
+  "ownerIds",
   "plannedStart",
   "plannedEnd",
   "outcomeStatus",
@@ -76,11 +74,7 @@ export function parseEpicPlanBody(body: unknown): ParseResult<EpicPlanRequest> {
 
   const value: EpicPlanRequest = { revision: raw.revision };
 
-  for (const field of [
-    "description",
-    "successCriteria",
-    "outcomeStatus",
-  ] as const) {
+  for (const field of ["description", "outcomeStatus"] as const) {
     if (raw[field] === undefined) continue;
     if (typeof raw[field] !== "string") {
       return { ok: false, message: `${field} must be a string` };
@@ -88,11 +82,14 @@ export function parseEpicPlanBody(body: unknown): ParseResult<EpicPlanRequest> {
     value[field] = raw[field];
   }
 
-  if (raw.ownerId !== undefined) {
-    if (raw.ownerId !== null && typeof raw.ownerId !== "string") {
-      return { ok: false, message: "ownerId must be a string or null" };
+  if (raw.ownerIds !== undefined) {
+    if (
+      !Array.isArray(raw.ownerIds) ||
+      raw.ownerIds.some((id) => typeof id !== "string")
+    ) {
+      return { ok: false, message: "ownerIds must be an array of strings" };
     }
-    value.ownerId = raw.ownerId;
+    value.ownerIds = raw.ownerIds;
   }
 
   if (raw.plannedStart !== undefined || raw.plannedEnd !== undefined) {

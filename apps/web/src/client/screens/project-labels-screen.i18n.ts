@@ -2,7 +2,7 @@ export const projectLabelsScreenJa = {
   projectLabelsScreen: {
     title: "Labels",
     description:
-      "Label ごとに戦略・計画管理を ON にすると、目的・成功条件・担当者・期間を記録できます。進捗は Label を持つ story から集計されます。",
+      "Label ごとに戦略・計画管理を ON にすると、目的・成功条件を書式付きで書き、担当者（複数可）・期間を記録できます。進捗は Label を持つ story から集計されます。",
     loading: "Label を読み込み中...",
     loadError: "Label の読み込みに失敗しました",
     retry: "再読み込み",
@@ -21,10 +21,8 @@ export const projectLabelsScreenJa = {
       setupHint: "目的・期間を入力すると、計画の見通しが立てやすくなります。",
     },
     form: {
-      description: "目的",
-      successCriteria: "成功条件",
+      description: "計画（目的・成功条件）",
       owner: "担当者",
-      ownerNone: "未設定",
       plannedStart: "開始日",
       plannedEnd: "終了日",
       outcomeStatus: "成果状態",
@@ -75,7 +73,7 @@ export const projectLabelsScreenEn = {
   projectLabelsScreen: {
     title: "Labels",
     description:
-      "Turn on strategy planning for a label to record its purpose, success criteria, owner and period. Progress is counted from the stories carrying the label.",
+      "Turn on strategy planning for a label to write its purpose and success criteria as formatted text and record its owners and period. Progress is counted from the stories carrying the label.",
     loading: "Loading labels...",
     loadError: "Failed to load labels",
     retry: "Reload",
@@ -95,10 +93,8 @@ export const projectLabelsScreenEn = {
         "Enter a purpose and a period to make the plan easier to follow.",
     },
     form: {
-      description: "Purpose",
-      successCriteria: "Success criteria",
+      description: "Plan (purpose and success criteria)",
       owner: "Owner",
-      ownerNone: "Not set",
       plannedStart: "Start date",
       plannedEnd: "End date",
       outcomeStatus: "Outcome",

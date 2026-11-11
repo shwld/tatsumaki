@@ -181,7 +181,7 @@ export function registerEpicTools(
     {
       title: "Get Label Epic",
       description:
-        "Get the strategy plan of a label: purpose, success criteria, owner, planned period, outcome status and revision.",
+        "Get the strategy plan of a label: description (Markdown), owners, planned period, outcome status and revision.",
       inputSchema: z.object({
         projectId: projectIdField,
         labelId: labelIdField,
@@ -253,13 +253,18 @@ export function registerEpicTools(
         projectId: projectIdField,
         labelId: labelIdField,
         revision: revisionField,
-        description: z.string().optional().describe("Purpose of the epic"),
-        successCriteria: z.string().optional(),
-        ownerId: z
+        description: z
           .string()
-          .nullable()
           .optional()
-          .describe("User ID of a project member, or null"),
+          .describe(
+            "Plan of the epic (purpose and success criteria) as Markdown",
+          ),
+        ownerIds: z
+          .array(z.string())
+          .optional()
+          .describe(
+            "User IDs of project members; replaces all owners, [] clears",
+          ),
         plannedStart: z.string().nullable().optional(),
         plannedEnd: z.string().nullable().optional(),
         outcomeStatus: z.enum(EPIC_OUTCOME_STATUSES).optional(),

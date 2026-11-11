@@ -1,5 +1,7 @@
 import { useId, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
+import { MarkdownPreview } from "./markdown-preview";
+import { RichTextEditor } from "./rich-text-editor";
 import {
   disableEpic,
   enableEpic,
@@ -9,7 +11,7 @@ import {
 import type { Epic, EpicOutcomeStatus, EpicPlanInput } from "../types/epic";
 import type { ProjectLabel } from "../types/project-label";
 
-export const EPIC_TEXT_MAX_LENGTH = 1000;
+export const EPIC_TEXT_MAX_LENGTH = 10000;
 const OUTCOME_STATUSES: EpicOutcomeStatus[] = [
   "unevaluated",
   "achieved",
@@ -20,8 +22,7 @@ export type MemberOption = { id: string; name: string };
 
 type Draft = {
   description: string;
-  successCriteria: string;
-  ownerId: string;
+  ownerIds: string[];
   plannedStart: string;
   plannedEnd: string;
   outcomeStatus: EpicOutcomeStatus;
@@ -30,8 +31,7 @@ type Draft = {
 function toDraft(epic: Epic | null): Draft {
   return {
     description: epic?.description ?? "",
-    successCriteria: epic?.successCriteria ?? "",
-    ownerId: epic?.ownerId ?? "",
+    ownerIds: epic?.ownerIds ?? [],
     plannedStart: epic?.plannedStart ?? "",
     plannedEnd: epic?.plannedEnd ?? "",
     outcomeStatus: epic?.outcomeStatus ?? "unevaluated",
@@ -41,8 +41,7 @@ function toDraft(epic: Epic | null): Draft {
 function toPlan(draft: Draft): EpicPlanInput {
   return {
     description: draft.description,
-    successCriteria: draft.successCriteria,
-    ownerId: draft.ownerId === "" ? null : draft.ownerId,
+    ownerIds: draft.ownerIds,
     plannedStart: draft.plannedStart === "" ? null : draft.plannedStart,
     plannedEnd: draft.plannedEnd === "" ? null : draft.plannedEnd,
     outcomeStatus: draft.outcomeStatus,
@@ -54,22 +53,19 @@ function mergeDraft(current: Draft, base: Draft, latest: Epic): Draft {
   const next = toDraft(latest);
   const merged = { ...current };
   for (const key of Object.keys(base) as (keyof Draft)[]) {
-    if (current[key] === base[key]) {
-      (merged[key] as string) = next[key];
+    if (JSON.stringify(current[key]) === JSON.stringify(base[key])) {
+      (merged[key] as Draft[typeof key]) = next[key];
     }
   }
   return merged;
 }
 
-type FieldErrorKey = "description" | "successCriteria" | "period";
+type FieldErrorKey = "description" | "period";
 
 export function validateDraft(draft: Draft): FieldErrorKey[] {
   const errors: FieldErrorKey[] = [];
   if (draft.description.length > EPIC_TEXT_MAX_LENGTH) {
     errors.push("description");
-  }
-  if (draft.successCriteria.length > EPIC_TEXT_MAX_LENGTH) {
-    errors.push("successCriteria");
   }
   const hasStart = draft.plannedStart !== "";
   const hasEnd = draft.plannedEnd !== "";
@@ -118,8 +114,10 @@ export function LabelPlanRow({
 
   const enabled = epic?.enabled === true;
   const errors = validateDraft(draft);
-  const field = (key: keyof Draft) => (value: string) =>
-    setDraft((current) => ({ ...current, [key]: value }));
+  const field =
+    <K extends keyof Draft>(key: K) =>
+    (value: Draft[K]) =>
+      setDraft((current) => ({ ...current, [key]: value }));
 
   const handleToggle = async () => {
     setIsBusy(true);
@@ -221,10 +219,9 @@ export function LabelPlanRow({
       {t("projectLabelsScreen.planning.notSet")}
     </span>
   );
-  const ownerName =
-    members.find((member) => member.id === epic?.ownerId)?.name ??
-    epic?.ownerId ??
-    null;
+  const ownerNames = (epic?.ownerIds ?? []).map(
+    (id) => members.find((member) => member.id === id)?.name ?? id,
+  );
 
   return (
     <li
@@ -294,19 +291,15 @@ export function LabelPlanRow({
             </p>
           ) : null}
           <div>
-            <label
-              className="text-sm font-medium text-gray-700"
-              htmlFor={`${baseId}-description`}
-            >
+            <span className="text-sm font-medium text-gray-700">
               {t("projectLabelsScreen.form.description")}
-            </label>
-            <textarea
-              id={`${baseId}-description`}
-              rows={2}
-              className={inputClass}
+            </span>
+            <RichTextEditor
+              ariaLabel={t("projectLabelsScreen.form.description")}
               value={draft.description}
-              onChange={(e) => field("description")(e.target.value)}
-              aria-invalid={Boolean(errorText("description"))}
+              onChange={field("description")}
+              ariaInvalid={Boolean(errorText("description"))}
+              minHeightClassName="min-h-24"
             />
             {errorText("description") ? (
               <p role="alert" className="mt-1 text-xs text-red-700">
@@ -314,51 +307,33 @@ export function LabelPlanRow({
               </p>
             ) : null}
           </div>
-          <div>
-            <label
-              className="text-sm font-medium text-gray-700"
-              htmlFor={`${baseId}-criteria`}
-            >
-              {t("projectLabelsScreen.form.successCriteria")}
-            </label>
-            <textarea
-              id={`${baseId}-criteria`}
-              rows={2}
-              className={inputClass}
-              value={draft.successCriteria}
-              onChange={(e) => field("successCriteria")(e.target.value)}
-              aria-invalid={Boolean(errorText("successCriteria"))}
-            />
-            {errorText("successCriteria") ? (
-              <p role="alert" className="mt-1 text-xs text-red-700">
-                {errorText("successCriteria")}
-              </p>
-            ) : null}
-          </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <div>
-              <label
-                className="text-sm font-medium text-gray-700"
-                htmlFor={`${baseId}-owner`}
-              >
+            <fieldset>
+              <legend className="text-sm font-medium text-gray-700">
                 {t("projectLabelsScreen.form.owner")}
-              </label>
-              <select
-                id={`${baseId}-owner`}
-                className={inputClass}
-                value={draft.ownerId}
-                onChange={(e) => field("ownerId")(e.target.value)}
-              >
-                <option value="">
-                  {t("projectLabelsScreen.form.ownerNone")}
-                </option>
+              </legend>
+              <div className="mt-1 space-y-1">
                 {members.map((member) => (
-                  <option key={member.id} value={member.id}>
+                  <label
+                    key={member.id}
+                    className="flex items-center gap-2 text-sm text-gray-900"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={draft.ownerIds.includes(member.id)}
+                      onChange={(e) =>
+                        field("ownerIds")(
+                          e.target.checked
+                            ? [...draft.ownerIds, member.id]
+                            : draft.ownerIds.filter((id) => id !== member.id),
+                        )
+                      }
+                    />
                     {member.name}
-                  </option>
+                  </label>
                 ))}
-              </select>
-            </div>
+              </div>
+            </fieldset>
             <div>
               <label
                 className="text-sm font-medium text-gray-700"
@@ -402,7 +377,9 @@ export function LabelPlanRow({
                 id={`${baseId}-outcome`}
                 className={inputClass}
                 value={draft.outcomeStatus}
-                onChange={(e) => field("outcomeStatus")(e.target.value)}
+                onChange={(e) =>
+                  field("outcomeStatus")(e.target.value as EpicOutcomeStatus)
+                }
               >
                 {OUTCOME_STATUSES.map((status) => (
                   <option key={status} value={status}>
@@ -465,23 +442,21 @@ export function LabelPlanRow({
             <dt className="text-xs text-gray-600">
               {t("projectLabelsScreen.form.description")}
             </dt>
-            <dd className="whitespace-pre-wrap text-gray-900">
-              {epic.description || notSet}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs text-gray-600">
-              {t("projectLabelsScreen.form.successCriteria")}
-            </dt>
-            <dd className="whitespace-pre-wrap text-gray-900">
-              {epic.successCriteria || notSet}
+            <dd className="text-gray-900">
+              {epic.description ? (
+                <MarkdownPreview content={epic.description} />
+              ) : (
+                notSet
+              )}
             </dd>
           </div>
           <div>
             <dt className="text-xs text-gray-600">
               {t("projectLabelsScreen.form.owner")}
             </dt>
-            <dd className="text-gray-900">{ownerName ?? notSet}</dd>
+            <dd className="text-gray-900">
+              {ownerNames.length > 0 ? ownerNames.join(", ") : notSet}
+            </dd>
           </div>
           <div>
             <dt className="text-xs text-gray-600">

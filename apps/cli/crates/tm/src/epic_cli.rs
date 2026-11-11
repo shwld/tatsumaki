@@ -94,16 +94,18 @@ pub enum EpicSubcommand {
         label_id: String,
         #[arg(long)]
         revision: i64,
-        /// Purpose of the epic
+        /// Plan of the epic (purpose and success criteria) as Markdown
         #[arg(long)]
         description: Option<String>,
-        #[arg(long)]
-        success_criteria: Option<String>,
-        /// User ID of a project member
-        #[arg(long, conflicts_with = "clear_owner")]
-        owner: Option<String>,
-        #[arg(long)]
-        clear_owner: bool,
+        /// User ID of a project member; repeatable, replaces all owners
+        #[arg(
+            long = "owner",
+            value_name = "USER_ID",
+            conflicts_with = "clear_owners"
+        )]
+        owners: Vec<String>,
+        #[arg(long, conflicts_with = "owners")]
+        clear_owners: bool,
         /// YYYY-MM-DD; requires --planned-end
         #[arg(long, requires = "planned_end", conflicts_with = "clear_period")]
         planned_start: Option<String>,
@@ -176,8 +178,7 @@ pub struct EpicInfo {
     pub label_name: String,
     pub enabled: bool,
     pub description: String,
-    pub success_criteria: String,
-    pub owner_id: Option<String>,
+    pub owner_ids: Vec<String>,
     pub planned_start: Option<String>,
     pub planned_end: Option<String>,
     pub outcome_status: String,
@@ -370,9 +371,8 @@ pub fn plan_body(command: &EpicSubcommand) -> Result<Value, String> {
     let EpicSubcommand::Update {
         revision,
         description,
-        success_criteria,
-        owner,
-        clear_owner,
+        owners,
+        clear_owners,
         planned_start,
         planned_end,
         clear_period,
@@ -386,13 +386,10 @@ pub fn plan_body(command: &EpicSubcommand) -> Result<Value, String> {
     if let Some(value) = description {
         body.insert("description".into(), Value::from(value.as_str()));
     }
-    if let Some(value) = success_criteria {
-        body.insert("successCriteria".into(), Value::from(value.as_str()));
-    }
-    if let Some(value) = owner {
-        body.insert("ownerId".into(), Value::from(value.as_str()));
-    } else if *clear_owner {
-        body.insert("ownerId".into(), Value::Null);
+    if *clear_owners {
+        body.insert("ownerIds".into(), Value::Array(Vec::new()));
+    } else if !owners.is_empty() {
+        body.insert("ownerIds".into(), Value::from(owners.clone()));
     }
     match (planned_start, planned_end) {
         (Some(start), Some(end)) => {
@@ -410,7 +407,7 @@ pub fn plan_body(command: &EpicSubcommand) -> Result<Value, String> {
     }
     if body.is_empty() {
         return Err(
-            "nothing to update: pass --description, --success-criteria, --owner/--clear-owner, --planned-start with --planned-end/--clear-period, or --outcome"
+            "nothing to update: pass --description, --owner/--clear-owners, --planned-start with --planned-end/--clear-period, or --outcome"
                 .to_string(),
         );
     }
@@ -524,8 +521,14 @@ fn print_epic(epic: &EpicInfo, json: bool) -> Result<(), FlowError> {
     println!("label: {} ({})", epic.label_name, epic.label_id);
     println!("planning: {}", if epic.enabled { "on" } else { "off" });
     println!("description: {}", epic.description);
-    println!("success criteria: {}", epic.success_criteria);
-    println!("owner: {}", epic.owner_id.as_deref().unwrap_or("-"));
+    println!(
+        "owners: {}",
+        if epic.owner_ids.is_empty() {
+            "-".to_string()
+        } else {
+            epic.owner_ids.join(", ")
+        }
+    );
     println!("period: {}", period(epic));
     println!("outcome: {}", epic.outcome_status);
     println!("revision: {}", epic.revision);
@@ -878,13 +881,32 @@ mod tests {
     }
 
     #[test]
+    fn owners_are_sent_as_a_list() {
+        let command = parse(&[
+            "update",
+            "label-1",
+            "--revision",
+            "2",
+            "--owner",
+            "u1",
+            "--owner",
+            "u2",
+        ])
+        .unwrap();
+        assert_eq!(
+            plan_body(&command).unwrap(),
+            serde_json::json!({ "revision": 2, "ownerIds": ["u1", "u2"] })
+        );
+    }
+
+    #[test]
     fn clearing_sends_nulls() {
         let command = parse(&[
             "update",
             "label-1",
             "--revision",
             "1",
-            "--clear-owner",
+            "--clear-owners",
             "--clear-period",
         ])
         .unwrap();
@@ -892,7 +914,7 @@ mod tests {
             plan_body(&command).unwrap(),
             serde_json::json!({
                 "revision": 1,
-                "ownerId": null,
+                "ownerIds": [],
                 "plannedStart": null,
                 "plannedEnd": null,
             })
@@ -920,7 +942,7 @@ mod tests {
                 "1",
                 "--owner",
                 "u",
-                "--clear-owner"
+                "--clear-owners"
             ])
             .is_err()
         );

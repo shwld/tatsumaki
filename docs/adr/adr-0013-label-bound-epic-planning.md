@@ -11,7 +11,7 @@
 
 Stories store labels as a JSON array of label names (`stories.labels`), while `project_labels` already has IDs. Epics are a separate entity with their own unique name, and a story belongs to at most one epic through `stories.epic_id` (migration 0014). Renaming a label silently detaches stories, a story cannot contribute to more than one epic, and an epic and a label with the same name are unrelated records.
 
-We want to plan strategy with epics: a purpose, success criteria, an owner and a planned period, with progress derived from the stories that contribute to it, including stories shared between epics.
+We want to plan strategy with epics: a plan written as one rich-text description (purpose and success criteria), any number of owners and a planned period, with progress derived from the stories that contribute to it, including stories shared between epics.
 
 PivotalTracker ties every epic to one label. A story belongs to an epic by carrying that label, removing the label removes it from the epic, and deleting an epic leaves its label as a normal label on the stories. An epic is done when all its stories, including those in the Icebox, are accepted.
 
@@ -31,7 +31,7 @@ tatsumaki now runs as a hosted service with open registration ([ADR-0011](adr-00
 
 ### Strategy planning on and off
 
-- The planning state lives in `Epic.enabled`; labels carry no duplicate flag. Turning planning on for a label the first time creates its epic. Turning it off sets `enabled = false` and keeps the purpose, success criteria, owner and dates. Turning it on again restores the same epic and recalculates progress from the stories that carry the label at that moment.
+- The planning state lives in `Epic.enabled`; labels carry no duplicate flag. Turning planning on for a label the first time creates its epic. Turning it off sets `enabled = false` and keeps the description, owners and dates. Turning it on again restores the same epic and recalculates progress from the stories that carry the label at that moment.
 - PivotalTracker discards an epic's description when the epic is deleted. We keep the plan instead because it is strategic information that outlives day-to-day label changes, and pausing a strategy should not lose it. Turning planning off corresponds to PivotalTracker's epic deletion: the label stays on its stories as a normal label.
 - Deleting a label deletes its StoryLabel rows and its epic with the plan; stories are never deleted. The UI shows the affected counts and suggests turning planning off instead. Deleting only the plan is not part of turning planning off.
 
@@ -86,3 +86,11 @@ This change moves production data, which [ADR-0004](adr-0004-immutable-migration
 - Deleting a label has a wider effect than before and needs a confirmation that shows it.
 - API consumers that send label names or read `epicId` break once, announced in the release notes.
 - The migration needs a reconciliation step and owner decisions for same-named labels and epics before it runs in production.
+
+## Amendment: one description and multiple owners (story #402)
+
+- An epic keeps one rich-text (Markdown) `description` that holds both purpose and success criteria; `success_criteria` is removed. The text limit rises to 10,000 characters.
+- Owners move from `epics.owner_id` to the `epic_owners` join table (`epic_id`, `user_id`). A trigger rejects an owner who is not a member of the epic's project; the API replaces the whole set with `ownerIds` and ignores duplicates. An empty set means no owner.
+- The previous description, success criteria and owner values are not carried over, and the API change is not announced separately (decided in the story).
+- Epic management UI follows [ADR-0002](adr-0002-pivotaltracker-ui-design.md). PivotalTracker has no separate success-criteria field for an epic, which supports the single description; multiple owners are a tatsumaki extension recorded by this story.
+- Creating an epic only turns planning on for a label; the description and owners are edited afterwards in the label's plan form.

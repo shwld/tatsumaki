@@ -38,8 +38,7 @@ export const projectEpicsScreenJa = {
     loading: "Epic を読み込み中...",
     loadError: "Epic を読み込めませんでした。計画管理が OFF の可能性があります",
     retry: "再読み込み",
-    description: "目的",
-    successCriteria: "成功条件",
+    description: "計画（目的・成功条件）",
     outcome: "成果状態",
     outcomes: {
       unevaluated: "未評価",
@@ -119,8 +118,7 @@ export const projectEpicsScreenEn = {
     loading: "Loading epic...",
     loadError: "Could not load this epic. Strategy planning may be off",
     retry: "Reload",
-    description: "Purpose",
-    successCriteria: "Success criteria",
+    description: "Plan (purpose and success criteria)",
     outcome: "Outcome",
     outcomes: {
       unevaluated: "Not evaluated",

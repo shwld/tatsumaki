@@ -19,8 +19,7 @@ export type Epic = {
   labelColor: string;
   enabled: boolean;
   description: string;
-  successCriteria: string;
-  ownerId: string | null;
+  ownerIds: string[];
   plannedStart: string | null;
   plannedEnd: string | null;
   position: number;
@@ -32,8 +31,7 @@ export type Epic = {
 
 export type EpicPlan = {
   description: string;
-  successCriteria: string;
-  ownerId: string | null;
+  ownerIds: string[];
   plannedStart: string | null;
   plannedEnd: string | null;
   outcomeStatus: EpicOutcomeStatus;
@@ -51,8 +49,7 @@ export function isEpicOutcomeStatus(
 export function hasEpicPlan(epic: EpicPlan): boolean {
   return (
     epic.description !== "" ||
-    epic.successCriteria !== "" ||
-    epic.ownerId !== null ||
+    epic.ownerIds.length > 0 ||
     epic.plannedStart !== null ||
     epic.outcomeStatus !== "unevaluated"
   );

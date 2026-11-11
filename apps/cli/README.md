@@ -230,7 +230,7 @@ tm --json project get <project-id>
 
 ## Labels and strategy planning (epics)
 
-An epic is the strategy plan of one label: purpose, success criteria, owner, planned period and outcome. Its name is the label's name, and its stories are the stories that carry the label. Project owners and members can change plans; viewers can only read them.
+An epic is the strategy plan of one label: a Markdown plan (purpose and success criteria), owners, planned period and outcome. Its name is the label's name, and its stories are the stories that carry the label. Project owners and members can change plans; viewers can only read them.
 
 ```bash
 tm label list --project <project-id>
@@ -242,8 +242,8 @@ tm epic progress --project <project-id>                # ON epics with progress
 tm epic progress --project <project-id> <label-id>     # one epic with its stories
 tm epic enable --project <project-id> <label-id>
 tm epic update --project <project-id> <label-id> --revision 1 \
-  --description "Make the first week easy" --success-criteria "80% finish setup" \
-  --owner <user-id> --planned-start 2026-11-01 --planned-end 2026-12-31 --outcome unevaluated
+  --description "Make the first week easy" --owner <user-id> --owner <user-id> \
+  --planned-start 2026-11-01 --planned-end 2026-12-31 --outcome unevaluated
 tm epic disable --project <project-id> <label-id> --revision 2
 tm epic enable --project <project-id> <label-id> --revision 3
 ```

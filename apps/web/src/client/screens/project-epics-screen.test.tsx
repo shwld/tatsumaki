@@ -20,8 +20,7 @@ const epicOf = (overrides: Partial<Epic>): Epic => ({
   labelColor: "#336699",
   enabled: true,
   description: "",
-  successCriteria: "",
-  ownerId: null,
+  ownerIds: [],
   plannedStart: null,
   plannedEnd: null,
   outcomeStatus: "unevaluated",
@@ -228,12 +227,16 @@ describe("ProjectEpicDetailScreen", () => {
   it("shows plan, progress, breakdown and links to the label-filtered Stories", async () => {
     mockFetch((url) =>
       url.endsWith("/members")
-        ? { members: [{ userId: "user-1", displayName: "Alice" }] }
+        ? {
+            members: [
+              { userId: "user-1", displayName: "Alice" },
+              { userId: "user-2", displayName: "Bob" },
+            ],
+          }
         : item({
             labelId: "label-growth",
-            description: "新規登録を増やす",
-            successCriteria: "月間 1,000 件",
-            ownerId: "user-1",
+            description: "# 新規登録を増やす\n\n- **月間 1,000 件**",
+            ownerIds: ["user-1", "user-2"],
             plannedStart: "2026-10-01",
             plannedEnd: "2026-12-31",
             outcomeStatus: "achieved",
@@ -241,10 +244,14 @@ describe("ProjectEpicDetailScreen", () => {
     );
     renderAt(`/projects/${PROJECT_ID}/epics/label-growth`);
 
-    expect(await screen.findByText("新規登録を増やす")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "新規登録を増やす" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("月間 1,000 件")).toBeInTheDocument();
     expect(screen.getByText("達成")).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText("Alice")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("Alice, Bob")).toBeInTheDocument(),
+    );
     expect(screen.getByText("2026-10-01 〜 2026-12-31")).toBeInTheDocument();
     expect(screen.getByText("story 完了率 50%（2/4 件）")).toBeInTheDocument();
     expect(screen.getByText("4/8 pt（50%）")).toBeInTheDocument();

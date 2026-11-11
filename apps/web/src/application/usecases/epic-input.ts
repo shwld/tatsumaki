@@ -6,37 +6,23 @@ import {
 
 export const INVALID_EPIC_DESCRIPTION_ERROR =
   "INVALID_EPIC_DESCRIPTION_ERROR" as const;
-export const INVALID_EPIC_SUCCESS_CRITERIA_ERROR =
-  "INVALID_EPIC_SUCCESS_CRITERIA_ERROR" as const;
 export const INVALID_EPIC_PLANNED_PERIOD_ERROR =
   "INVALID_EPIC_PLANNED_PERIOD_ERROR" as const;
 export const INVALID_EPIC_OUTCOME_STATUS_ERROR =
   "INVALID_EPIC_OUTCOME_STATUS_ERROR" as const;
 
-export const EPIC_TEXT_MAX_LENGTH = 1000;
+export const EPIC_TEXT_MAX_LENGTH = 10000;
 
 export type EpicPlannedPeriod = { start: string; end: string };
 
-function normalizeEpicText<E extends string>(
-  value: string,
-  error: E,
-): Result<string, E> {
-  const normalized = value.trim();
+export function normalizeEpicDescription(
+  description: string,
+): Result<string, typeof INVALID_EPIC_DESCRIPTION_ERROR> {
+  const normalized = description.trim();
   if (normalized.length > EPIC_TEXT_MAX_LENGTH) {
-    return err(error);
+    return err(INVALID_EPIC_DESCRIPTION_ERROR);
   }
   return ok(normalized);
-}
-
-export function normalizeEpicDescription(description: string) {
-  return normalizeEpicText(description, INVALID_EPIC_DESCRIPTION_ERROR);
-}
-
-export function normalizeEpicSuccessCriteria(successCriteria: string) {
-  return normalizeEpicText(
-    successCriteria,
-    INVALID_EPIC_SUCCESS_CRITERIA_ERROR,
-  );
 }
 
 function isCalendarDate(value: string): boolean {

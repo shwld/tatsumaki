@@ -12,8 +12,7 @@ type EpicPayload = {
   labelName: string;
   enabled: boolean;
   description: string;
-  successCriteria: string;
-  ownerId: string | null;
+  ownerIds: string[];
   plannedStart: string | null;
   plannedEnd: string | null;
   outcomeStatus: string;
@@ -145,18 +144,16 @@ describe("label strategy planning (epics)", () => {
 
     const saved = await updatePlan(labelId, {
       revision: 1,
-      description: "  Make the first week easy  ",
-      successCriteria: "80% finish setup",
-      ownerId: MEMBER.sub,
+      description: "  # Goal\n\n- **80%** finish setup  ",
+      ownerIds: [MEMBER.sub, OWNER.sub, MEMBER.sub],
       plannedStart: "2026-11-01",
       plannedEnd: "2026-12-31",
       outcomeStatus: "achieved",
     });
     expect(saved.status).toBe(200);
     const plan = {
-      description: "Make the first week easy",
-      successCriteria: "80% finish setup",
-      ownerId: MEMBER.sub,
+      description: "# Goal\n\n- **80%** finish setup",
+      ownerIds: [MEMBER.sub, OWNER.sub],
       plannedStart: "2026-11-01",
       plannedEnd: "2026-12-31",
       outcomeStatus: "achieved",
@@ -212,13 +209,29 @@ describe("label strategy planning (epics)", () => {
   });
 
   it("rejects writes with a stale revision", async () => {
+    await addMember(MEMBER, "member");
     const labelId = await createLabel("onboarding");
     await enable(labelId);
-    await updatePlan(labelId, { revision: 1, description: "first" });
+    const first = await updatePlan(labelId, {
+      revision: 1,
+      description: "first",
+      ownerIds: [MEMBER.sub],
+    });
+    expect(first.status).toBe(200);
 
-    const stale = await updatePlan(labelId, { revision: 1, description: "x" });
+    const stale = await updatePlan(labelId, {
+      revision: 1,
+      description: "x",
+      ownerIds: [],
+    });
     expect(stale.status).toBe(409);
     expect(await json(stale)).toMatchObject({ code: "REVISION_CONFLICT" });
+    const kept = await call("GET", api(`/labels/${labelId}/epic`));
+    expect(await epicOf(kept)).toMatchObject({
+      description: "first",
+      ownerIds: [MEMBER.sub],
+    });
+    expect(first.status).toBe(200);
 
     const staleOff = await disable(labelId, 1);
     expect(staleOff.status).toBe(409);
@@ -282,7 +295,7 @@ describe("label strategy planning (epics)", () => {
 
     const owner = await updatePlan(labelId, {
       revision: 1,
-      ownerId: OUTSIDER.sub,
+      ownerIds: [MEMBER.sub, OUTSIDER.sub],
     });
     expect(owner.status).toBe(400);
     expect(await json(owner)).toMatchObject({ code: "INVALID_OWNER" });
@@ -357,7 +370,7 @@ describe("label strategy planning (epics)", () => {
     });
 
     await enable(labelId);
-    await updatePlan(labelId, { revision: 1, successCriteria: "done" });
+    await updatePlan(labelId, { revision: 1, description: "done" });
     const withPlan = await call(
       "GET",
       api(`/labels/${labelId}/deletion-impact`),
