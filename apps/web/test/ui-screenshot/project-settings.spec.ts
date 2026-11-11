@@ -242,7 +242,9 @@ for (const theme of themeVariants) {
 
     await page.goto("/projects/project-1/labels");
     await expect(page.getByRole("heading", { name: "Labels" })).toBeVisible();
-    await expect(page.getByLabel("目的")).toHaveValue("新規登録を増やす");
+    await expect(
+      page.getByRole("textbox", { name: "計画（目的・成功条件）" }),
+    ).toContainText("新規登録を増やす");
     await expect(page).toHaveScreenshot(
       resolveSnapshotName("project-labels.png", theme),
     );
