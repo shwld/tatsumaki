@@ -1,4 +1,5 @@
 import { ulid } from "ulid";
+import type { StoryMapStoryCandidate } from "../../application/usecases/manage-story-maps";
 import type {
   StoryMap,
   StoryMapRole,
@@ -98,5 +99,19 @@ export function sendStoryMapCommand(
     `${base(projectId)}/${encodeURIComponent(mapId)}/commands`,
     jsonInit("POST", { opId: ulid(), command }),
     () => undefined,
+  );
+}
+
+export type { StoryMapStoryCandidate };
+
+export function searchStoriesForCard(
+  projectId: string,
+  mapId: string,
+  query: string,
+) {
+  return request(
+    `${base(projectId)}/${encodeURIComponent(mapId)}/story-search?q=${encodeURIComponent(query)}`,
+    undefined,
+    (body) => (body as { stories: StoryMapStoryCandidate[] }).stories,
   );
 }

@@ -33,6 +33,16 @@ export type StoryMapSlice = { id: string; title: string; position: number };
  */
 export type StoryMapCardStoryState = "idea" | "linked" | "missing";
 
+/** What a linked card shows of its story; the story stays the source of truth. */
+export type StoryMapLinkedStory = {
+  number: number;
+  title: string;
+  status: string;
+  type: string;
+  storyPoint: number | null;
+  isIcebox: boolean;
+};
+
 export type StoryMapCard = {
   id: string;
   taskId: string;
@@ -43,6 +53,8 @@ export type StoryMapCard = {
   note: string;
   storyId: string | null;
   storyState: StoryMapCardStoryState;
+  /** Set only while storyState is "linked". */
+  story: StoryMapLinkedStory | null;
 };
 
 export type StoryMapStructure = {

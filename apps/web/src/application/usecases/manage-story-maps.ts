@@ -4,6 +4,7 @@ import type {
   StoryMap,
   StoryMapActivity,
   StoryMapCard,
+  StoryMapLinkedStory,
   StoryMapPersona,
   StoryMapSlice,
   StoryMapStructure,
@@ -18,10 +19,12 @@ import type {
   StoryMapRepositoryError,
 } from "../../domain/repositories/story-map-repository";
 
+import { STORY_TYPES } from "../../domain/entities/story";
 import {
   STORY_MAP_GOAL_MAX,
   STORY_MAP_NOTE_MAX,
   STORY_MAP_PERSONA_MAX,
+  STORY_MAP_STORY_DESCRIPTION_MAX,
   STORY_MAP_TITLE_MAX,
 } from "../../shared/story-map-limits";
 
@@ -631,4 +634,82 @@ export async function deleteCard(
   if (loaded.isErr()) return err(loaded.error);
   if (!hasId(loaded.value.cards, input.cardId)) return notFound();
   return deps.storyMapRepository.deleteCard(input.mapId, input.cardId);
+}
+
+const STORY_SEARCH_LIMIT = 20;
+
+export type StoryMapStoryCandidate = StoryMapLinkedStory & {
+  id: string;
+  /** Already placed on this map, so it cannot be linked again. */
+  placed: boolean;
+};
+
+/** Candidates for linking a card. Read-only; the map and its stories are untouched. */
+export async function searchStoriesForCard(
+  deps: StoryMapDependencies,
+  input: MapTarget & { query: string },
+): Result_<StoryMapStoryCandidate[]> {
+  const loaded = await loadForEdit(deps, input);
+  if (loaded.isErr()) return err(loaded.error);
+  const found = await deps.storyMapRepository.searchStories(
+    input.projectId,
+    input.query.slice(0, STORY_MAP_TITLE_MAX),
+    STORY_SEARCH_LIMIT,
+  );
+  if (found.isErr()) return err(found.error);
+  const placed = new Set(loaded.value.cards.map((card) => card.storyId));
+  return ok(
+    found.value.map((story) => ({ ...story, placed: placed.has(story.id) })),
+  );
+}
+
+export type CreateStoryFromCardResult = {
+  storyId: string;
+  storyNumber: number;
+};
+
+/**
+ * Turns an idea card into a new Unstarted (or Icebox) story and links it. The
+ * story and the link are written in one batch; the Durable Object records the
+ * op id so a retry returns this result instead of creating a second story.
+ */
+export async function createStoryFromCard(
+  deps: StoryMapDependencies,
+  input: MapTarget & {
+    cardId: string;
+    title: string;
+    description: string;
+    type: string;
+    isIcebox: boolean;
+  },
+): Result_<CreateStoryFromCardResult> {
+  const loaded = await loadForEdit(deps, input);
+  if (loaded.isErr()) return err(loaded.error);
+  const card = loaded.value.cards.find((item) => item.id === input.cardId);
+  if (!card) return notFound();
+  if (card.storyId !== null) return err(STORY_MAP_STORY_ALREADY_PLACED_ERROR);
+  const title = text(input.title, STORY_MAP_TITLE_MAX, { required: true });
+  const description = text(input.description, STORY_MAP_STORY_DESCRIPTION_MAX, {
+    required: false,
+  });
+  if (title.isErr()) return err(title.error);
+  if (description.isErr()) return err(description.error);
+  if (!STORY_TYPES.includes(input.type as (typeof STORY_TYPES)[number])) {
+    return err(INVALID_STORY_MAP_INPUT_ERROR);
+  }
+  if (input.type === "release") return err(INVALID_STORY_MAP_INPUT_ERROR);
+  const created = await deps.storyMapRepository.createStoryForCard({
+    projectId: input.projectId,
+    mapId: input.mapId,
+    cardId: input.cardId,
+    actorUserId: input.userId,
+    title: title.value,
+    description: description.value,
+    type: input.type,
+    isIcebox: input.isIcebox,
+  });
+  if (created.isErr()) return err(created.error);
+  return created.value
+    ? ok(created.value)
+    : err(STORY_MAP_STORY_ALREADY_PLACED_ERROR);
 }

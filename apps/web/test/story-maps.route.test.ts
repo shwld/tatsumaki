@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { ulid } from "ulid";
 import { createDb } from "../src/infrastructure/db/client";
 import { projectMembersTable } from "../src/infrastructure/db/schema/project-members";
+import { storiesTable } from "../src/infrastructure/db/schema/stories";
 import { projectsTable } from "../src/infrastructure/db/schema/projects";
 import { createAuthHeaders, setupAccessBindings } from "./helpers/access-jwt";
 import { resetDatabase } from "./helpers/db";
@@ -146,6 +147,130 @@ describe("story map HTTP API", () => {
       (await command(OUTSIDER, created.storyMap.id, { type: "updateMap" }))
         .status,
     ).toBe(404);
+  });
+
+  it("creates a story from a card once per opId and searches stories", async () => {
+    const created = (await (
+      await call(MEMBER, "POST", "/story-maps", { title: "Link" })
+    ).json()) as { storyMap: { id: string } };
+    const mapId = created.storyMap.id;
+    const act = await command(MEMBER, mapId, {
+      type: "addActivity",
+      title: "A",
+      afterActivityId: null,
+    });
+    const activityId = ((await act.json()) as { result: { id: string } }).result
+      .id;
+    const taskRes = await command(MEMBER, mapId, {
+      type: "addTask",
+      activityId,
+      title: "T",
+      afterTaskId: null,
+    });
+    const taskId = ((await taskRes.json()) as { result: { id: string } }).result
+      .id;
+    const cardRes = await command(MEMBER, mapId, {
+      type: "addCard",
+      taskId,
+      sliceId: null,
+      afterCardId: null,
+      ideaTitle: "Idea",
+    });
+    const cardId = ((await cardRes.json()) as { result: { id: string } }).result
+      .id;
+
+    const sliceRes = await command(MEMBER, mapId, {
+      type: "addSlice",
+      title: "MVP",
+      afterSliceId: null,
+    });
+    const sliceId = ((await sliceRes.json()) as { result: { id: string } })
+      .result.id;
+    expect(
+      (
+        await command(MEMBER, mapId, {
+          type: "moveCard",
+          cardId,
+          taskId,
+          sliceId,
+          afterCardId: null,
+        })
+      ).status,
+    ).toBe(200);
+
+    const opId = ulid();
+    const body = {
+      opId,
+      command: {
+        type: "createStoryFromCard",
+        cardId,
+        title: "Made",
+        description: "d",
+        storyType: "feature",
+        isIcebox: false,
+      },
+    };
+    const first = await call(
+      MEMBER,
+      "POST",
+      `/story-maps/${mapId}/commands`,
+      body,
+    );
+    expect(first.status).toBe(200);
+    const firstBody = (await first.json()) as {
+      result: { storyId: string; storyNumber: number };
+      duplicate: boolean;
+    };
+    expect(firstBody.duplicate).toBe(false);
+    const retry = await call(
+      MEMBER,
+      "POST",
+      `/story-maps/${mapId}/commands`,
+      body,
+    );
+    const retryBody = (await retry.json()) as typeof firstBody;
+    expect(retryBody.duplicate).toBe(true);
+    expect(retryBody.result).toEqual(firstBody.result);
+    const stories = await createDb(env.DB).select().from(storiesTable);
+    expect(stories).toHaveLength(1);
+
+    const reloaded = (await (
+      await call(MEMBER, "GET", `/story-maps/${mapId}`)
+    ).json()) as {
+      structure: {
+        cards: {
+          sliceId: string | null;
+          storyState: string;
+          story: { number: number; title: string; status: string } | null;
+        }[];
+      };
+    };
+    expect(reloaded.structure.cards).toMatchObject([
+      {
+        sliceId,
+        storyState: "linked",
+        story: { number: 1, title: "Made", status: "Unstarted" },
+      },
+    ]);
+    expect(stories[0]).toMatchObject({
+      status: "Unstarted",
+      iterationId: null,
+      isIcebox: 0,
+    });
+
+    const search = await call(
+      MEMBER,
+      "GET",
+      `/story-maps/${mapId}/story-search?q=Made`,
+    );
+    const found = (await search.json()) as {
+      stories: { number: number; placed: boolean }[];
+    };
+    expect(found.stories).toMatchObject([{ number: 1, placed: true }]);
+    expect(
+      (await call(VIEWER, "GET", `/story-maps/${mapId}/story-search?q=`))
+        .status,
+    ).toBe(403);
   });
 });
 

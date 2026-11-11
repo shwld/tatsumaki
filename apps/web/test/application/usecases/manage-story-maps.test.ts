@@ -6,6 +6,7 @@ import {
   addCard,
   addSlice,
   addTask,
+  createStoryFromCard,
   createStoryMap,
   deleteSlice,
   getStoryMap,
@@ -15,6 +16,7 @@ import {
   moveSlice,
   moveTask,
   renamePersona,
+  searchStoriesForCard,
   setCardStory,
   STORY_MAP_ARCHIVED_ERROR,
   STORY_MAP_ELEMENT_NOT_FOUND_ERROR,
@@ -423,5 +425,185 @@ describe("manage story maps", () => {
         await addTask(deps, { ...target, activityId: activity.id, title: "x" })
       ).isOk(),
     ).toBe(true);
+  });
+  describe("linking cards to stories", () => {
+    async function ideaCard() {
+      const ctx = await setup();
+      const card = (
+        await addCard(deps, {
+          ...ctx.target,
+          taskId: ctx.task.id,
+          ideaTitle: "Idea",
+        })
+      )._unsafeUnwrap();
+      return { ...ctx, card };
+    }
+
+    it("creates an Unstarted story, links the card and writes only that story", async () => {
+      const { target, card, map } = await ideaCard();
+      await insertStory("s1", P1, 1);
+      const db = createDb(env.DB);
+      const before = await db
+        .select()
+        .from(storiesTable)
+        .where(eq(storiesTable.id, "s1"))
+        .get();
+
+      const created = (
+        await createStoryFromCard(deps, {
+          ...target,
+          cardId: card.id,
+          title: "  From idea ",
+          description: "memo",
+          type: "bug",
+          isIcebox: true,
+        })
+      )._unsafeUnwrap();
+      expect(created.storyNumber).toBe(2);
+
+      const story = await db
+        .select()
+        .from(storiesTable)
+        .where(eq(storiesTable.id, created.storyId))
+        .get();
+      expect(story).toMatchObject({
+        title: "From idea",
+        description: "memo",
+        type: "bug",
+        status: "Unstarted",
+        isIcebox: 1,
+        iterationId: null,
+      });
+      const after = await db
+        .select()
+        .from(storiesTable)
+        .where(eq(storiesTable.id, "s1"))
+        .get();
+      expect(after?.status).toBe(before?.status);
+      expect(after?.isIcebox).toBe(before?.isIcebox);
+      expect(after?.iterationId).toBe(before?.iterationId);
+
+      const linked = (
+        await getStoryMap(deps, { ...target, mapId: map.id })
+      )._unsafeUnwrap().cards[0];
+      expect(linked?.storyState).toBe("linked");
+      expect(linked?.story).toMatchObject({
+        number: 2,
+        title: "From idea",
+        status: "Unstarted",
+        isIcebox: true,
+      });
+    });
+
+    it("never creates a second story for a card that is already linked", async () => {
+      const { target, card } = await ideaCard();
+      const input = {
+        ...target,
+        cardId: card.id,
+        title: "Once",
+        description: "",
+        type: "feature",
+        isIcebox: false,
+      };
+      expect((await createStoryFromCard(deps, input)).isOk()).toBe(true);
+      expect((await createStoryFromCard(deps, input))._unsafeUnwrapErr()).toBe(
+        STORY_MAP_STORY_ALREADY_PLACED_ERROR,
+      );
+      const rows = await createDb(env.DB).select().from(storiesTable);
+      expect(rows).toHaveLength(1);
+    });
+
+    it("rejects invalid titles and types, and viewers", async () => {
+      const { target, card, map } = await ideaCard();
+      const base = {
+        cardId: card.id,
+        title: "T",
+        description: "",
+        type: "feature",
+        isIcebox: false,
+      };
+      expect(
+        (
+          await createStoryFromCard(deps, { ...target, ...base, title: " " })
+        )._unsafeUnwrapErr(),
+      ).toBe(INVALID_STORY_MAP_INPUT_ERROR);
+      expect(
+        (
+          await createStoryFromCard(deps, {
+            ...target,
+            ...base,
+            type: "release",
+          })
+        )._unsafeUnwrapErr(),
+      ).toBe(INVALID_STORY_MAP_INPUT_ERROR);
+      expect(
+        (
+          await createStoryFromCard(deps, {
+            ...as(VIEWER),
+            mapId: map.id,
+            ...base,
+          })
+        )._unsafeUnwrapErr(),
+      ).toBe(STORY_MAP_FORBIDDEN_ERROR);
+    });
+
+    it("finds stories by number or title and flags the ones already placed", async () => {
+      const { target, task } = await setup();
+      await insertStory("s1", P1, 1);
+      await insertStory("s2", P1, 2);
+      await insertStory("x1", P2, 1);
+      await addCard(deps, { ...target, taskId: task.id, storyId: "s1" });
+
+      const byNumber = (
+        await searchStoriesForCard(deps, { ...target, query: "#2" })
+      )._unsafeUnwrap();
+      expect(byNumber.map((s) => s.id)).toEqual(["s2"]);
+      const all = (
+        await searchStoriesForCard(deps, { ...target, query: "s" })
+      )._unsafeUnwrap();
+      expect(all.map((s) => [s.id, s.placed])).toEqual([
+        ["s2", false],
+        ["s1", true],
+      ]);
+      expect(
+        (
+          await searchStoriesForCard(deps, {
+            ...as(VIEWER),
+            mapId: target.mapId,
+            query: "",
+          })
+        )._unsafeUnwrapErr(),
+      ).toBe(STORY_MAP_FORBIDDEN_ERROR);
+    });
+
+    it("lets a card whose story was deleted be linked to another story", async () => {
+      const { target, task, map } = await setup();
+      await insertStory("s1", P1, 1);
+      await insertStory("s2", P1, 2);
+      const card = (
+        await addCard(deps, { ...target, taskId: task.id, storyId: "s1" })
+      )._unsafeUnwrap();
+      await createDb(env.DB)
+        .delete(storiesTable)
+        .where(eq(storiesTable.id, "s1"));
+      const missing = (
+        await getStoryMap(deps, { ...target, mapId: map.id })
+      )._unsafeUnwrap().cards[0];
+      expect(missing).toMatchObject({ storyState: "missing", story: null });
+
+      expect(
+        (
+          await setCardStory(deps, {
+            ...target,
+            cardId: card.id,
+            storyId: "s2",
+          })
+        ).isOk(),
+      ).toBe(true);
+      const relinked = (
+        await getStoryMap(deps, { ...target, mapId: map.id })
+      )._unsafeUnwrap().cards[0];
+      expect(relinked?.story?.number).toBe(2);
+    });
   });
 });

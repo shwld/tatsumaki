@@ -7,6 +7,7 @@ import {
   addPersona,
   addSlice,
   addTask,
+  createStoryFromCard,
   deleteActivity,
   deleteCard,
   deleteSlice,
@@ -133,6 +134,14 @@ export const storyMapCommandSchema = z.discriminatedUnion("type", [
     storyId: id.nullable(),
   }),
   z.strictObject({ type: z.literal("deleteCard"), cardId: id }),
+  z.strictObject({
+    type: z.literal("createStoryFromCard"),
+    cardId: id,
+    title: z.string(),
+    description: z.string(),
+    storyType: z.enum(["feature", "bug", "chore"]),
+    isIcebox: z.boolean(),
+  }),
 ]);
 
 export type StoryMapCommand = z.infer<typeof storyMapCommandSchema>;
@@ -366,6 +375,17 @@ export async function applyStoryMapCommand(
       return run(setCardStory(deps, { ...target, ...command }));
     case "deleteCard":
       return run(deleteCard(deps, { ...target, ...command }));
+    case "createStoryFromCard":
+      return run(
+        createStoryFromCard(deps, {
+          ...target,
+          cardId: command.cardId,
+          title: command.title,
+          description: command.description,
+          type: command.storyType,
+          isIcebox: command.isIcebox,
+        }),
+      );
   }
 }
 

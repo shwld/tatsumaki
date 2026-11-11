@@ -4,6 +4,7 @@ import {
   INVALID_STORY_MAP_INPUT_ERROR,
   listStoryMaps,
   type ManageStoryMapError,
+  searchStoriesForCard,
   STORY_MAP_ELEMENT_NOT_FOUND_ERROR,
   STORY_MAP_FORBIDDEN_ERROR,
   STORY_MAP_NOT_FOUND_ERROR,
@@ -119,6 +120,20 @@ export function createStoryMapRoutes() {
     });
     if (result.isErr()) return errorResponse(c, result.error);
     return c.json({ structure: result.value, role: membership.member.role });
+  });
+
+  app.get("/:projectId/story-maps/:mapId/story-search", async (c) => {
+    const projectId = c.req.param("projectId");
+    const membership = await requireProjectMembership(c, projectId);
+    if (!membership.ok) return membership.response;
+    const result = await searchStoriesForCard(dependencies(c), {
+      projectId,
+      mapId: c.req.param("mapId"),
+      userId: userId(c),
+      query: c.req.query("q") ?? "",
+    });
+    if (result.isErr()) return errorResponse(c, result.error);
+    return c.json({ stories: result.value });
   });
 
   return app;

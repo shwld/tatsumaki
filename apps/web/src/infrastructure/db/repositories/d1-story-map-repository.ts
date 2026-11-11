@@ -1,10 +1,11 @@
-import { and, asc, desc, eq, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, or, sql } from "drizzle-orm";
 import { err, ok, type Result } from "neverthrow";
 import { ulid } from "ulid";
 import type {
   StoryMap,
   StoryMapActivity,
   StoryMapCard,
+  StoryMapLinkedStory,
   StoryMapPersona,
   StoryMapSlice,
   StoryMapStructure,
@@ -175,6 +176,12 @@ export class D1StoryMapRepository implements StoryMapRepository {
           .select({
             card: storyMapCardsTable,
             existingStoryId: storiesTable.id,
+            storyNumber: storiesTable.storyNumber,
+            storyTitle: storiesTable.title,
+            storyStatus: storiesTable.status,
+            storyType: storiesTable.type,
+            storyPoint: storiesTable.storyPoint,
+            storyIsIcebox: storiesTable.isIcebox,
           })
           .from(storyMapCardsTable)
           .leftJoin(
@@ -191,7 +198,11 @@ export class D1StoryMapRepository implements StoryMapRepository {
       return {
         map: toMap(mapRow),
         personas: personas.map(
-          ({ id, name, position }): StoryMapPersona => ({ id, name, position }),
+          ({ id, name, position }): StoryMapPersona => ({
+            id,
+            name,
+            position,
+          }),
         ),
         activities: activities.map(
           ({ id, title, position }): StoryMapActivity => ({
@@ -209,10 +220,23 @@ export class D1StoryMapRepository implements StoryMapRepository {
           }),
         ),
         slices: slices.map(
-          ({ id, title, position }): StoryMapSlice => ({ id, title, position }),
+          ({ id, title, position }): StoryMapSlice => ({
+            id,
+            title,
+            position,
+          }),
         ),
         cards: cards.map(
-          ({ card, existingStoryId }): StoryMapCard => ({
+          ({
+            card,
+            existingStoryId,
+            storyNumber,
+            storyTitle,
+            storyStatus,
+            storyType,
+            storyPoint,
+            storyIsIcebox,
+          }): StoryMapCard => ({
             id: card.id,
             taskId: card.taskId,
             sliceId: card.sliceId,
@@ -226,6 +250,21 @@ export class D1StoryMapRepository implements StoryMapRepository {
                 : existingStoryId
                   ? "linked"
                   : "missing",
+            story:
+              existingStoryId &&
+              storyNumber !== null &&
+              storyTitle !== null &&
+              storyStatus !== null &&
+              storyType !== null
+                ? {
+                    number: storyNumber,
+                    title: storyTitle,
+                    status: storyStatus,
+                    type: storyType,
+                    storyPoint,
+                    isIcebox: storyIsIcebox === 1,
+                  }
+                : null,
           }),
         ),
       };
@@ -635,6 +674,7 @@ export class D1StoryMapRepository implements StoryMapRepository {
         note: input.note,
         storyId: input.storyId,
         storyState: input.storyId === null ? "idea" : "linked",
+        story: null,
       };
     });
   }
@@ -793,6 +833,112 @@ export class D1StoryMapRepository implements StoryMapRepository {
         )
         .get();
       return row !== undefined;
+    });
+  }
+  async searchStories(
+    projectId: string,
+    query: string,
+    limit: number,
+  ): Repo<(StoryMapLinkedStory & { id: string })[]> {
+    return this.guard(async () => {
+      const trimmed = query.trim().replace(/^#/, "");
+      const escaped = trimmed.replace(/[\\%_]/g, (char) => `\\${char}`);
+      const number = /^\d+$/.test(trimmed) ? Number(trimmed) : null;
+      const match = or(
+        sql`${storiesTable.title} LIKE ${`%${escaped}%`} ESCAPE '\\'`,
+        number === null ? undefined : eq(storiesTable.storyNumber, number),
+      );
+      const rows = await this.db
+        .select({
+          id: storiesTable.id,
+          number: storiesTable.storyNumber,
+          title: storiesTable.title,
+          status: storiesTable.status,
+          type: storiesTable.type,
+          storyPoint: storiesTable.storyPoint,
+          isIcebox: storiesTable.isIcebox,
+        })
+        .from(storiesTable)
+        .where(
+          and(
+            eq(storiesTable.projectId, projectId),
+            isNull(storiesTable.archivedAt),
+            trimmed === "" ? undefined : match,
+          ),
+        )
+        .orderBy(desc(storiesTable.storyNumber))
+        .limit(limit);
+      return rows.map((row) => ({ ...row, isIcebox: row.isIcebox === 1 }));
+    });
+  }
+
+  async createStoryForCard(input: {
+    projectId: string;
+    mapId: string;
+    cardId: string;
+    actorUserId: string;
+    title: string;
+    description: string;
+    type: string;
+    isIcebox: boolean;
+  }): Repo<{ storyId: string; storyNumber: number } | null> {
+    return this.guard(async () => {
+      const storyId = ulid();
+      const unlinkedCard =
+        "EXISTS (SELECT 1 FROM story_map_cards WHERE id = ? AND map_id = ? AND story_id IS NULL)";
+      const cardBinds = [input.cardId, input.mapId];
+      const now = new Date().toISOString();
+      await this.d1.batch([
+        this.d1
+          .prepare(
+            `UPDATE stories SET position = position + 1
+             WHERE project_id = ? ${input.isIcebox ? "AND is_icebox = 1" : ""} AND ${unlinkedCard}`,
+          )
+          .bind(input.projectId, ...cardBinds),
+        this.d1
+          .prepare(
+            `INSERT INTO stories (id, story_number, project_id, title, description, type, status, is_icebox, position)
+             SELECT ?, COALESCE(MAX(story_number), 0) + 1, ?, ?, ?, ?, 'Unstarted', ?, 1
+             FROM stories WHERE project_id = ? AND ${unlinkedCard}`,
+          )
+          .bind(
+            storyId,
+            input.projectId,
+            input.title,
+            input.description,
+            input.type,
+            input.isIcebox ? 1 : 0,
+            input.projectId,
+            ...cardBinds,
+          ),
+        this.d1
+          .prepare(
+            `UPDATE story_map_cards SET story_id = ?, updated_at = ?
+             WHERE id = ? AND map_id = ? AND story_id IS NULL
+               AND EXISTS (SELECT 1 FROM stories WHERE id = ?)`,
+          )
+          .bind(storyId, now, input.cardId, input.mapId, storyId),
+        this.d1
+          .prepare(
+            `INSERT INTO story_timeline_entries (id, project_id, story_id, entry_type, actor_user_id, actor_name, action, field_name, new_value)
+             SELECT ?, ?, id, 'activity', ?, COALESCE((SELECT email FROM users WHERE id = ?), ?), 'created', 'story', title
+             FROM stories WHERE id = ?`,
+          )
+          .bind(
+            ulid(),
+            input.projectId,
+            input.actorUserId,
+            input.actorUserId,
+            input.actorUserId,
+            storyId,
+          ),
+        this.touch(input.mapId),
+      ]);
+      const created = await this.d1
+        .prepare("SELECT story_number FROM stories WHERE id = ?")
+        .bind(storyId)
+        .first<{ story_number: number }>();
+      return created ? { storyId, storyNumber: created.story_number } : null;
     });
   }
 }
