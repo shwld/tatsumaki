@@ -140,6 +140,18 @@ describe("StoryMapBoard", () => {
     });
   });
 
+  it("asks again before deleting a card", () => {
+    const send = vi.fn();
+    render(<StoryMapBoard structure={structure} editable send={send} />);
+    fireEvent.click(
+      screen.getByRole("button", { name: /カードメニュー: Email form/ }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "削除" }));
+    expect(send).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "本当に削除する" }));
+    expect(send).toHaveBeenCalledWith({ type: "deleteCard", cardId: "c1" });
+  });
+
   it("is read-only for viewers", () => {
     render(
       <StoryMapBoard structure={structure} editable={false} send={vi.fn()} />,

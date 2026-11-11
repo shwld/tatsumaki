@@ -231,6 +231,7 @@ function CardMenu({
   const [taskId, setTaskId] = useState(card.taskId);
   const [sliceKey, setSliceKey] = useState(card.sliceId ?? UNPLANNED);
   const [afterId, setAfterId] = useState<string>("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const sliceId = sliceKey === UNPLANNED ? null : sliceKey;
   const siblings = cardsIn(structure, taskId, sliceId).filter(
@@ -355,11 +356,14 @@ function CardMenu({
           type="button"
           className={`${buttonClass} border-red-400 text-red-700`}
           onClick={() => {
+            if (!confirmDelete) return setConfirmDelete(true);
             send({ type: "deleteCard", cardId: card.id });
             onClose();
           }}
         >
-          {t("storyMapBoard.delete")}
+          {confirmDelete
+            ? t("storyMapBoard.deleteCardConfirm")
+            : t("storyMapBoard.delete")}
         </button>
         <button type="button" className={buttonClass} onClick={onClose}>
           {t("storyMapBoard.cancel")}

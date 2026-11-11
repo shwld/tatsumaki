@@ -370,7 +370,8 @@ export function StoryMapEditScreen() {
         <StoryMapBoard
           structure={live.state.structure}
           editable={
-            editable &&
+            canEdit &&
+            live.state.structure.map.archivedAt === null &&
             live.state.role !== "viewer" &&
             live.state.connection === "connected"
           }
