@@ -257,8 +257,10 @@ function CardMenu({
     send({
       type: "updateCard",
       cardId: card.id,
-      ...(card.storyId === null ? { ideaTitle: title } : {}),
-      note,
+      ...(card.storyId === null && title !== (card.ideaTitle ?? "")
+        ? { ideaTitle: title }
+        : {}),
+      ...(note !== card.note ? { note } : {}),
     });
     onClose();
   };

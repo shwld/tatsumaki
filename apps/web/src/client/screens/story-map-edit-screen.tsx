@@ -366,10 +366,11 @@ export function StoryMapEditScreen() {
           {t("storyMapBoard.rejected")}
         </p>
       ) : null}
-      {live.state.structure ? (
+      {(live.state.structure ?? detail.structure) ? (
         <StoryMapBoard
-          structure={live.state.structure}
+          structure={live.state.structure ?? detail.structure}
           editable={
+            live.state.structure !== null &&
             canEdit &&
             live.state.structure.map.archivedAt === null &&
             live.state.role !== "viewer" &&
