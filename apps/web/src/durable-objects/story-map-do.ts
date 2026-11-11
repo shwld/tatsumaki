@@ -23,6 +23,30 @@ type Attachment = {
   mapId: string;
 };
 
+type CommandOutcome =
+  | { kind: "rejected"; code: StoryMapCommandRejection }
+  | {
+      kind: "acked";
+      seq: number;
+      result: unknown;
+      duplicate: boolean;
+      publish?: () => Promise<void>;
+    };
+
+const REJECTION_STATUS: Record<
+  StoryMapCommandRejection,
+  400 | 403 | 404 | 409 | 500
+> = {
+  invalid: 400,
+  forbidden: 403,
+  not_found: 404,
+  target_gone: 404,
+  archived: 409,
+  story_unavailable: 409,
+  limit: 409,
+  internal: 500,
+};
+
 const ULID = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 const OP_RETENTION_MS = 24 * 60 * 60 * 1000;
 const MEMBERSHIP_RECHECK_MS = 5 * 60 * 1000;
@@ -36,6 +60,8 @@ export class StoryMapDO {
   private queue: Promise<unknown> = Promise.resolve();
   /** Command timestamps per socket, for the rate limit. Lost on hibernation. */
   private readonly recent = new WeakMap<WebSocket, number[]>();
+  /** Same limit for HTTP commands, per user. */
+  private readonly httpRecent = new Map<string, number[]>();
 
   constructor(
     private readonly state: DurableObjectState,
@@ -57,7 +83,11 @@ export class StoryMapDO {
   }
 
   async fetch(request: Request): Promise<Response> {
-    if (request.headers.get("upgrade")?.toLowerCase() !== "websocket") {
+    const isCommand = request.method === "POST";
+    if (
+      !isCommand &&
+      request.headers.get("upgrade")?.toLowerCase() !== "websocket"
+    ) {
       return new Response("Expected websocket", { status: 426 });
     }
     const userId = request.headers.get("x-user-id");
@@ -71,6 +101,14 @@ export class StoryMapDO {
       (role !== "owner" && role !== "member" && role !== "viewer")
     ) {
       return new Response("Missing auth context", { status: 400 });
+    }
+    if (isCommand) {
+      return this.handleHttpCommand(request, {
+        userId,
+        role,
+        projectId,
+        mapId,
+      });
     }
     if (
       this.state.getWebSockets().length >= STORY_MAP_LIVE_LIMITS.maxConnections
@@ -171,6 +209,16 @@ export class StoryMapDO {
     await this.serialized(() => this.handleCommand(ws, attachment, message));
   }
 
+  private exceedsHttpRate(userId: string): boolean {
+    const now = Date.now();
+    const stamps = (this.httpRecent.get(userId) ?? []).filter(
+      (at) => now - at < 1000,
+    );
+    stamps.push(now);
+    this.httpRecent.set(userId, stamps);
+    return stamps.length > STORY_MAP_LIVE_LIMITS.commandsPerSecond;
+  }
+
   private exceedsRate(ws: WebSocket): boolean {
     const now = Date.now();
     const stamps = (this.recent.get(ws) ?? []).filter((at) => now - at < 1000);
@@ -179,22 +227,99 @@ export class StoryMapDO {
     return stamps.length > STORY_MAP_LIVE_LIMITS.commandsPerSecond;
   }
 
+  /**
+   * Runs one command through the same path as a socket command, so an HTTP
+   * write is serialized with and broadcast to the live editors (ADR-0014).
+   */
+  private async handleHttpCommand(
+    request: Request,
+    attachment: Attachment,
+  ): Promise<Response> {
+    if (this.exceedsHttpRate(attachment.userId)) {
+      return Response.json({ code: "rate_limited" }, { status: 429 });
+    }
+    const raw = await request.text();
+    if (
+      new TextEncoder().encode(raw).length >
+      STORY_MAP_LIVE_LIMITS.maxMessageBytes
+    ) {
+      return Response.json({ code: "invalid" }, { status: 413 });
+    }
+    let body: unknown = null;
+    try {
+      body = JSON.parse(raw);
+    } catch {
+      // Falls through to the missing opId rejection below.
+    }
+    const message =
+      typeof body === "object" && body !== null
+        ? (body as Record<string, unknown>)
+        : {};
+    if (typeof message.opId !== "string") {
+      return Response.json({ code: "invalid" }, { status: 400 });
+    }
+    const opId = message.opId;
+    // Publishing stays inside the serialized step so a later command cannot
+    // be applied or broadcast before this one's event goes out.
+    const outcome = await this.serialized(async () => {
+      const ran = await this.runCommand(attachment, opId, message.command);
+      if (ran.kind === "acked") await ran.publish?.();
+      return ran;
+    });
+    if (outcome.kind === "rejected") {
+      return Response.json(
+        { code: outcome.code },
+        { status: REJECTION_STATUS[outcome.code] },
+      );
+    }
+    return Response.json({
+      seq: outcome.seq,
+      result: outcome.result,
+      duplicate: outcome.duplicate,
+    });
+  }
+
   private async handleCommand(
     ws: WebSocket,
     attachment: Attachment,
     message: Extract<StoryMapClientMessage, { type: "command" }>,
   ): Promise<void> {
     const { opId } = message;
-    const reject = async (code: StoryMapCommandRejection) => {
-      this.send(ws, { type: "reject", opId, code });
-      if (code === "target_gone" || code === "not_found") {
+    const outcome = await this.runCommand(attachment, opId, message.command);
+    if (outcome.kind === "rejected") {
+      this.send(ws, { type: "reject", opId, code: outcome.code });
+      if (outcome.code === "target_gone" || outcome.code === "not_found") {
         await this.sendSnapshot(ws, attachment);
       }
-    };
+      return;
+    }
+    this.send(ws, {
+      type: "ack",
+      opId,
+      seq: outcome.seq,
+      result: outcome.result,
+      duplicate: outcome.duplicate,
+    });
+    if (outcome.duplicate) {
+      await this.sendSnapshot(ws, attachment);
+      return;
+    }
+    await outcome.publish?.();
+  }
+
+  private async runCommand(
+    attachment: Attachment,
+    opId: string,
+    rawCommand: unknown,
+  ): Promise<CommandOutcome> {
+    const reject = (code: StoryMapCommandRejection): CommandOutcome => ({
+      kind: "rejected",
+      code,
+    });
     if (!ULID.test(opId)) {
       return reject("invalid");
     }
-    const command = parseStoryMapCommand(message.command);
+    const command = parseStoryMapCommand(rawCommand);
     if (command.isErr()) {
       return reject("invalid");
     }
@@ -210,15 +335,12 @@ export class StoryMapDO {
       if (recorded.value.userId !== attachment.userId) {
         return reject("invalid");
       }
-      this.send(ws, {
-        type: "ack",
-        opId,
+      return {
+        kind: "acked",
         seq: recorded.value.seq,
         result: JSON.parse(recorded.value.result),
         duplicate: true,
-      });
-      await this.sendSnapshot(ws, attachment);
-      return;
+      };
     }
 
     const structure = await deps.storyMapRepository.getStructure(
@@ -251,14 +373,20 @@ export class StoryMapDO {
     if (seq.isErr()) {
       return reject("internal");
     }
-    this.send(ws, {
-      type: "ack",
-      opId,
+    return {
+      kind: "acked",
       seq: seq.value,
       result: applied.value ?? null,
       duplicate: false,
-    });
+      publish: () => this.publish(attachment, seq.value, opId),
+    };
+  }
 
+  private async publish(
+    attachment: Attachment,
+    seq: number,
+    opId: string,
+  ): Promise<void> {
     const next = await this.load(attachment);
     if (typeof next === "string") {
       // The edit is saved but cannot be shown. Reconnecting makes every client
@@ -273,7 +401,7 @@ export class StoryMapDO {
       if (peerAttachment?.mapId !== attachment.mapId) continue;
       this.send(peer, {
         type: "applied",
-        seq: seq.value,
+        seq,
         opId,
         actorId: attachment.userId,
         structure: next,
