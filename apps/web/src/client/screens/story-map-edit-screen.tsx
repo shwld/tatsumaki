@@ -134,6 +134,30 @@ export function StoryMapEditScreen() {
   const live = useStoryMapLive(projectId, mapId);
   const reload = useCallback(() => setReloadKey((key) => key + 1), []);
 
+  // Another editor's metadata change arrives over the socket; refetch so the
+  // form and archive control follow it while unsaved drafts are kept.
+  const liveMeta = live.state.structure
+    ? JSON.stringify([
+        live.state.structure.map.title,
+        live.state.structure.map.achievementGoal,
+        live.state.structure.map.archivedAt,
+        live.state.structure.personas,
+      ])
+    : null;
+  const loadedMeta = loaded
+    ? JSON.stringify([
+        loaded.structure.map.title,
+        loaded.structure.map.achievementGoal,
+        loaded.structure.map.archivedAt,
+        loaded.structure.personas,
+      ])
+    : null;
+  useEffect(() => {
+    if (liveMeta !== null && loadedMeta !== null && liveMeta !== loadedMeta) {
+      reload();
+    }
+  }, [liveMeta, loadedMeta, reload]);
+
   const run = async (
     command: StoryMapMetadataCommand,
     successText: string | null,
