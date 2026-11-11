@@ -134,13 +134,16 @@ export interface StoryMapRepository {
   ): Repo<(StoryMapLinkedStory & { id: string })[]>;
   /**
    * Creates an Unstarted story and points the idea card at it in one batch.
-   * Nothing is written when the card is gone or already linked; the result is
-   * then null. Only the new story's own rows are written to `stories`.
+   * With `opId`, `seq` and the op record are written in the same batch, so the
+   * story can never exist without its op (ADR-0014 §2). Nothing is written
+   * when the card is gone or already linked; the result is then null. Only the
+   * new story's own rows are written to `stories`.
    */
   createStoryForCard(input: {
     projectId: string;
     mapId: string;
     cardId: string;
+    opId?: string;
     actorUserId: string;
     title: string;
     description: string;

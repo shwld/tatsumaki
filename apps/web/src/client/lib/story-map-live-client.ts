@@ -88,6 +88,16 @@ export class StoryMapLiveClient {
     return opId;
   }
 
+  /**
+   * Asks for a fresh snapshot. Story attributes shown on cards (title, state,
+   * estimate) are not broadcast, so a returning viewer re-reads them (ADR-0014).
+   */
+  resync(): void {
+    if (this.state.connection !== "connected" || !this.socket) return;
+    if (this.socket.readyState !== OPEN) return;
+    this.socket.send(JSON.stringify({ type: "resync" }));
+  }
+
   close(): void {
     this.closed = true;
     if (this.timer) clearTimeout(this.timer);

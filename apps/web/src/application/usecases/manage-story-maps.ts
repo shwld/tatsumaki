@@ -677,6 +677,8 @@ export async function createStoryFromCard(
   deps: StoryMapDependencies,
   input: MapTarget & {
     cardId: string;
+    /** Recorded with the story in the same batch when the caller is the live path. */
+    opId?: string;
     title: string;
     description: string;
     type: string;
@@ -702,6 +704,7 @@ export async function createStoryFromCard(
     projectId: input.projectId,
     mapId: input.mapId,
     cardId: input.cardId,
+    opId: input.opId,
     actorUserId: input.userId,
     title: title.value,
     description: description.value,

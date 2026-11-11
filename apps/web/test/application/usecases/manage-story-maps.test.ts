@@ -513,6 +513,27 @@ describe("manage story maps", () => {
       expect(rows).toHaveLength(1);
     });
 
+    it("records the op and advances seq in the same batch as the story", async () => {
+      const { target, card, map } = await ideaCard();
+      const opId = "01JNMVQ8Q9Y6P5KH1XZ4V7C2OP";
+      const created = (
+        await createStoryFromCard(deps, {
+          ...target,
+          opId,
+          cardId: card.id,
+          title: "Atomic",
+          description: "",
+          type: "feature",
+          isIcebox: false,
+        })
+      )._unsafeUnwrap();
+      const repository = new D1StoryMapRepository(env.DB);
+      const recorded = (await repository.findOp(map.id, opId))._unsafeUnwrap();
+      expect(recorded).toMatchObject({ userId: OWNER, seq: 1 });
+      expect(JSON.parse(recorded?.result ?? "null")).toEqual(created);
+      expect((await repository.getSeq(map.id))._unsafeUnwrap()).toBe(1);
+    });
+
     it("rejects invalid titles and types, and viewers", async () => {
       const { target, card, map } = await ideaCard();
       const base = {

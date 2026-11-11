@@ -76,6 +76,14 @@ describe("StoryMapLiveClient", () => {
     expect(state.save).toBe("saved");
   });
 
+  it("asks for a fresh snapshot on resync only while connected", () => {
+    client.resync();
+    expect(sockets[0].sent).toEqual([]);
+    sockets[0].receive(snapshot(1));
+    client.resync();
+    expect(sockets[0].sent).toEqual([{ type: "resync" }]);
+  });
+
   it("resends an unacked command with the same opId after reconnecting", () => {
     sockets[0].receive(snapshot(0));
     const opId = client.send({ type: "addPersona", name: "A" });

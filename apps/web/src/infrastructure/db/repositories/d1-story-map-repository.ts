@@ -876,6 +876,7 @@ export class D1StoryMapRepository implements StoryMapRepository {
     projectId: string;
     mapId: string;
     cardId: string;
+    opId?: string;
     actorUserId: string;
     title: string;
     description: string;
@@ -933,6 +934,24 @@ export class D1StoryMapRepository implements StoryMapRepository {
             storyId,
           ),
         this.touch(input.mapId),
+        ...(input.opId === undefined
+          ? []
+          : [
+              this.d1
+                .prepare(
+                  `UPDATE story_maps SET seq = seq + 1
+                   WHERE id = ? AND EXISTS (SELECT 1 FROM stories WHERE id = ?)`,
+                )
+                .bind(input.mapId, storyId),
+              this.d1
+                .prepare(
+                  `INSERT INTO story_map_ops (map_id, op_id, user_id, seq, result, created_at)
+                   SELECT m.id, ?, ?, m.seq,
+                     json_object('storyId', s.id, 'storyNumber', s.story_number), ?
+                   FROM story_maps m, stories s WHERE m.id = ? AND s.id = ?`,
+                )
+                .bind(input.opId, input.actorUserId, now, input.mapId, storyId),
+            ]),
       ]);
       const created = await this.d1
         .prepare("SELECT story_number FROM stories WHERE id = ?")

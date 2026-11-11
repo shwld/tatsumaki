@@ -1,3 +1,4 @@
+import { ok } from "neverthrow";
 import {
   applyStoryMapCommand,
   parseStoryMapCommand,
@@ -356,7 +357,7 @@ export class StoryMapDO {
 
     const applied = await applyStoryMapCommand(
       deps,
-      attachment,
+      { ...attachment, opId },
       structure.value,
       command.value,
     );
@@ -364,12 +365,20 @@ export class StoryMapDO {
       return reject(applied.error);
     }
 
-    const seq = await repository.recordOp({
-      mapId: attachment.mapId,
-      opId,
-      userId: attachment.userId,
-      result: JSON.stringify(applied.value ?? null),
-    });
+    // Commands that write their own op record in the same batch as their
+    // effect (story creation) are already recorded here.
+    const selfRecorded = await repository.findOp(attachment.mapId, opId);
+    if (selfRecorded.isErr()) {
+      return reject("internal");
+    }
+    const seq = selfRecorded.value
+      ? ok(selfRecorded.value.seq)
+      : await repository.recordOp({
+          mapId: attachment.mapId,
+          opId,
+          userId: attachment.userId,
+          result: JSON.stringify(applied.value ?? null),
+        });
     if (seq.isErr()) {
       return reject("internal");
     }
