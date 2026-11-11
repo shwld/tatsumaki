@@ -37,7 +37,12 @@ export function useStoryMapLive(projectId: string, mapId: string) {
     });
     clientRef.current = client;
     client.start();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") client.resync();
+    };
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
+      document.removeEventListener("visibilitychange", onVisible);
       client.close();
       if (clientRef.current === client) clientRef.current = null;
     };

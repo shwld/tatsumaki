@@ -3,6 +3,7 @@ import type {
   StoryMap,
   StoryMapActivity,
   StoryMapCard,
+  StoryMapLinkedStory,
   StoryMapPersona,
   StoryMapSlice,
   StoryMapStructure,
@@ -122,4 +123,31 @@ export interface StoryMapRepository {
 
   /** Whether the story exists in the project (archived stories count). */
   storyExistsInProject(projectId: string, storyId: string): Repo<boolean>;
+  /**
+   * Stories of the project whose title contains `query` or whose number is
+   * `query` (with an optional leading "#"). Archived stories are left out.
+   */
+  searchStories(
+    projectId: string,
+    query: string,
+    limit: number,
+  ): Repo<(StoryMapLinkedStory & { id: string })[]>;
+  /**
+   * Creates an Unstarted story and points the idea card at it in one batch.
+   * With `opId`, `seq` and the op record are written in the same batch, so the
+   * story can never exist without its op (ADR-0014 §2). Nothing is written
+   * when the card is gone or already linked; the result is then null. Only the
+   * new story's own rows are written to `stories`.
+   */
+  createStoryForCard(input: {
+    projectId: string;
+    mapId: string;
+    cardId: string;
+    opId?: string;
+    actorUserId: string;
+    title: string;
+    description: string;
+    type: string;
+    isIcebox: boolean;
+  }): Repo<{ storyId: string; storyNumber: number } | null>;
 }

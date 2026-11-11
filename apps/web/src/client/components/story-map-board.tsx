@@ -1,5 +1,6 @@
 import { useState, type FormEvent, type KeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router";
 
 import type {
   StoryMapActivity,
@@ -12,6 +13,8 @@ import {
   STORY_MAP_NOTE_MAX,
   STORY_MAP_TITLE_MAX,
 } from "../../shared/story-map-limits";
+import { projectStoryDetailPath } from "../lib/story-routes";
+import { StoryCreatePanel, StoryLinkPicker } from "./story-map-card-story";
 
 type Send = (command: unknown) => void;
 
@@ -232,13 +235,16 @@ function CardMenu({
   const [sliceKey, setSliceKey] = useState(card.sliceId ?? UNPLANNED);
   const [afterId, setAfterId] = useState<string>("");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [panel, setPanel] = useState<"link" | "create" | null>(null);
 
   const sliceId = sliceKey === UNPLANNED ? null : sliceKey;
   const siblings = cardsIn(structure, taskId, sliceId).filter(
     (other) => other.id !== card.id,
   );
   const cardLabel = (other: StoryMapCard) =>
-    other.ideaTitle ?? t("storyMapBoard.storyCard");
+    (other.story ? `#${other.story.number} ${other.story.title}` : null) ??
+    other.ideaTitle ??
+    t("storyMapBoard.storyCard");
 
   const move = (event: FormEvent) => {
     event.preventDefault();
@@ -297,6 +303,55 @@ function CardMenu({
           {t("storyMapBoard.save")}
         </button>
       </form>
+      <div className="space-y-1">
+        <div className="flex flex-wrap gap-1">
+          <button
+            type="button"
+            className={buttonClass}
+            aria-expanded={panel === "link"}
+            onClick={() => setPanel(panel === "link" ? null : "link")}
+          >
+            {card.storyId === null
+              ? t("storyMapBoard.linkStory")
+              : t("storyMapBoard.relinkStory")}
+          </button>
+          {card.storyId === null ? (
+            <button
+              type="button"
+              className={buttonClass}
+              aria-expanded={panel === "create"}
+              onClick={() => setPanel(panel === "create" ? null : "create")}
+            >
+              {t("storyMapBoard.createStory")}
+            </button>
+          ) : null}
+        </div>
+        {panel === "link" ? (
+          <StoryLinkPicker
+            projectId={structure.map.projectId}
+            mapId={structure.map.id}
+            card={card}
+            send={send}
+            onClose={onClose}
+          />
+        ) : null}
+        {panel === "create" ? (
+          <StoryCreatePanel
+            card={card}
+            context={{
+              mapTitle: structure.map.title,
+              taskTitle:
+                structure.tasks.find((task) => task.id === card.taskId)
+                  ?.title ?? "",
+              sliceTitle:
+                structure.slices.find((slice) => slice.id === card.sliceId)
+                  ?.title ?? null,
+            }}
+            send={send}
+            onClose={onClose}
+          />
+        ) : null}
+      </div>
       <form onSubmit={move} className="space-y-1">
         <label className="block">
           {t("storyMapBoard.moveTask")}
@@ -720,9 +775,37 @@ export function StoryMapBoard({
                                 className="break-words"
                               >
                                 {card.storyState === "missing" ? (
-                                  <span className="text-gray-600">
-                                    {t("storyMapBoard.storyMissing")}
-                                  </span>
+                                  <>
+                                    <span className="text-gray-600">
+                                      {t("storyMapBoard.storyMissing")}
+                                    </span>
+                                    <p className="mt-1 text-xs text-gray-600">
+                                      {t("storyMapBoard.storyMissingHelp")}
+                                    </p>
+                                  </>
+                                ) : card.story ? (
+                                  <>
+                                    <Link
+                                      className="text-blue-700 underline"
+                                      aria-label={t("storyMapBoard.openStory", {
+                                        number: card.story.number,
+                                      })}
+                                      to={projectStoryDetailPath(
+                                        structure.map.projectId,
+                                        String(card.story.number),
+                                      )}
+                                    >
+                                      #{card.story.number} {card.story.title}
+                                    </Link>
+                                    <p className="text-xs text-gray-600">
+                                      {card.story.isIcebox
+                                        ? "Icebox"
+                                        : card.story.status}
+                                      {card.story.storyPoint !== null
+                                        ? ` · ${t("storyMapBoard.storyEstimate", { point: card.story.storyPoint })}`
+                                        : ""}
+                                    </p>
+                                  </>
                                 ) : card.storyId !== null ? (
                                   <span>{t("storyMapBoard.storyCard")}</span>
                                 ) : (
@@ -748,7 +831,7 @@ export function StoryMapBoard({
                                   <button
                                     type="button"
                                     className={`mt-1 ${buttonClass}`}
-                                    aria-label={`${t("storyMapBoard.cardMenu")}: ${card.ideaTitle ?? t("storyMapBoard.storyCard")}`}
+                                    aria-label={`${t("storyMapBoard.cardMenu")}: ${card.story ? `#${card.story.number}` : (card.ideaTitle ?? t("storyMapBoard.storyCard"))}`}
                                     onClick={() => setMenuCardId(card.id)}
                                   >
                                     {t("storyMapBoard.cardMenu")}
