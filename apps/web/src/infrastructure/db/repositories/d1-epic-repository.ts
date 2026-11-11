@@ -239,9 +239,9 @@ export class D1EpicRepository implements EpicRepository {
   }
 
   /**
-   * Applies the columns and the owner replacement in one batch. The owner
-   * statements run only when this batch's update took the revision, so a stale
-   * writer changes nothing.
+   * Applies the owner replacement and the columns in one batch. Nothing else
+   * moves the revision inside the batch, so gating the owner statements on the
+   * expected revision lets a stale writer change nothing.
    */
   private async updateAtRevision(
     projectId: string,
@@ -255,50 +255,51 @@ export class D1EpicRepository implements EpicRepository {
     }
     const epicId = current.value.id;
     const { ownerIds, ...columns } = values;
-    const stamp = new Date().toISOString();
 
-    const assignments: string[] = [];
-    const bindings: unknown[] = [];
-    for (const [key, value] of Object.entries(columns)) {
-      if (value === undefined) continue;
-      const column = UPDATABLE_COLUMNS[key];
-      if (!column) continue;
-      bindings.push(typeof value === "boolean" ? Number(value) : value);
-      assignments.push(`${column} = ?${bindings.length}`);
-    }
-    bindings.push(stamp, epicId, projectId, expectedRevision);
-    const n = bindings.length;
-    const stampIndex = n - 3;
-
-    const statements = [
-      this.d1
-        .prepare(
-          `UPDATE epics SET ${[...assignments, "revision = revision + 1", `updated_at = ?${stampIndex}`].join(", ")}
-           WHERE id = ?${n - 2} AND project_id = ?${n - 1} AND revision = ?${n}`,
-        )
-        .bind(...bindings),
-    ];
+    const statements: D1PreparedStatement[] = [];
+    const atRevision = `EXISTS (SELECT 1 FROM epics WHERE id = ?1 AND revision = ?2)`;
     if (ownerIds !== undefined) {
       statements.push(
         this.d1
           .prepare(
-            `DELETE FROM epic_owners WHERE epic_id = ?1 AND EXISTS (SELECT 1 FROM epics WHERE id = ?1 AND revision = ?2 + 1 AND updated_at = ?3)`,
+            `DELETE FROM epic_owners WHERE epic_id = ?1 AND ${atRevision}`,
           )
-          .bind(epicId, expectedRevision, stamp),
+          .bind(epicId, expectedRevision),
       );
+      const now = new Date().toISOString();
       for (const userId of ownerIds) {
         statements.push(
           this.d1
             .prepare(
               `INSERT INTO epic_owners (epic_id, user_id, created_at)
-               SELECT ?1, ?4, ?3 WHERE EXISTS (SELECT 1 FROM epics WHERE id = ?1 AND revision = ?2 + 1 AND updated_at = ?3)`,
+               SELECT ?1, ?3, ?4 WHERE ${atRevision}`,
             )
-            .bind(epicId, expectedRevision, stamp, userId),
+            .bind(epicId, expectedRevision, userId, now),
         );
       }
     }
+
+    const assignments: string[] = [];
+    const bindings: unknown[] = [];
+    for (const [key, value] of Object.entries(columns)) {
+      const column = UPDATABLE_COLUMNS[key];
+      if (value === undefined || !column) continue;
+      bindings.push(typeof value === "boolean" ? Number(value) : value);
+      assignments.push(`${column} = ?${bindings.length}`);
+    }
+    bindings.push(new Date().toISOString(), epicId, expectedRevision);
+    const n = bindings.length;
+    statements.push(
+      this.d1
+        .prepare(
+          `UPDATE epics SET ${[...assignments, "revision = revision + 1", `updated_at = ?${n - 2}`].join(", ")}
+           WHERE id = ?${n - 1} AND revision = ?${n}`,
+        )
+        .bind(...bindings),
+    );
+
     const results = await this.d1.batch(statements);
-    if (results[0].meta.changes === 0) {
+    if (results[results.length - 1].meta.changes === 0) {
       return ok(null);
     }
     return this.findByLabelId(projectId, labelId);

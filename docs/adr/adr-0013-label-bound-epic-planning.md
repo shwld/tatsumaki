@@ -91,6 +91,6 @@ This change moves production data, which [ADR-0004](adr-0004-immutable-migration
 
 - An epic keeps one rich-text (Markdown) `description` that holds both purpose and success criteria; `success_criteria` is removed. The text limit rises to 10,000 characters.
 - Owners move from `epics.owner_id` to the `epic_owners` join table (`epic_id`, `user_id`). A trigger rejects an owner who is not a member of the epic's project; the API replaces the whole set with `ownerIds` and ignores duplicates. An empty set means no owner.
-- The previous description, success criteria and owner values are not carried over, and the API change is not announced separately (decided in the story).
+- The previous success criteria and single owner values are not carried over (the existing description is kept as is), and the API change is not announced separately (decided in the story).
 - Epic management UI follows [ADR-0002](adr-0002-pivotaltracker-ui-design.md). PivotalTracker has no separate success-criteria field for an epic, which supports the single description; multiple owners are a tatsumaki extension recorded by this story.
 - Creating an epic only turns planning on for a label; the description and owners are edited afterwards in the label's plan form.
