@@ -10,6 +10,7 @@ import {
   type StoryStatus,
 } from "../../domain/entities/story";
 import type {
+  StoryPlacementTarget,
   StoryRepository,
   StoryRepositoryError,
 } from "../../domain/repositories/story-repository";
@@ -184,6 +185,7 @@ export async function updateStory(
     ownerIds?: string[];
     isIcebox?: boolean;
     moveToTopOnLeavingIcebox?: boolean;
+    placement?: StoryPlacementTarget;
     requesterId?: string | null;
     allowedStoryPoints?: number[];
     actor: StoryUpdateActor;
@@ -341,6 +343,7 @@ export async function updateStory(
     ...(resolvedIsIcebox.value !== undefined
       ? { isIcebox: resolvedIsIcebox.value }
       : {}),
+    ...(input.placement ? { placement: input.placement } : {}),
     ...(input.moveToTopOnLeavingIcebox &&
     currentResult.value.isIcebox &&
     input.isIcebox === false

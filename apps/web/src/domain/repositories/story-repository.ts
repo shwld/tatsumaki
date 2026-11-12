@@ -13,6 +13,16 @@ export type StoryBlockerPair = {
   blockedStoryId: string;
 };
 
+/**
+ * Where a story lands among the non-Icebox stories. A before/after anchor is
+ * checked by the same write that places the story: if the anchor was archived
+ * or moved to the Icebox meanwhile, nothing is written.
+ */
+export type StoryPlacementTarget =
+  | { position: "top" }
+  | { position: "end" }
+  | { position: "before" | "after"; anchorId: string };
+
 export type CreateStoryInput = {
   projectId: string;
   title: string;
@@ -25,6 +35,7 @@ export type CreateStoryInput = {
   ownerIds: string[];
   requesterId: string | null;
   releaseDate?: string | null;
+  placement?: StoryPlacementTarget;
 };
 
 export type UpdateStoryInput = {
@@ -45,6 +56,8 @@ export type UpdateStoryInput = {
   isIcebox?: boolean;
   /** Put the story at the top of the position order in the same write that takes it out of the Icebox. */
   moveToTop?: boolean;
+  /** Takes precedence over `moveToTop`. Only valid for a story that stays outside the Icebox. */
+  placement?: StoryPlacementTarget;
   ownerIds?: string[];
   requesterId?: string | null;
   releaseDate?: string | null;
@@ -115,12 +128,18 @@ export const STORY_ARCHIVED_ERROR = "STORY_ARCHIVED_ERROR" as const;
 export const STORY_LABEL_NOT_IN_PROJECT_ERROR =
   "STORY_LABEL_NOT_IN_PROJECT_ERROR" as const;
 export const STORY_EPIC_NOT_FOUND_ERROR = "STORY_EPIC_NOT_FOUND_ERROR" as const;
+export const STORY_PLACEMENT_ANCHOR_NOT_FOUND_ERROR =
+  "STORY_PLACEMENT_ANCHOR_NOT_FOUND_ERROR" as const;
+export const STORY_PLACEMENT_ANCHOR_NOT_IN_BACKLOG_ERROR =
+  "STORY_PLACEMENT_ANCHOR_NOT_IN_BACKLOG_ERROR" as const;
 
 export type StoryRepositoryError =
   | typeof STORY_REPOSITORY_ERROR
   | typeof STORY_OWNER_NOT_PROJECT_MEMBER_ERROR
   | typeof STORY_REQUESTER_NOT_PROJECT_MEMBER_ERROR
   | typeof STORY_EPIC_NOT_FOUND_ERROR
+  | typeof STORY_PLACEMENT_ANCHOR_NOT_FOUND_ERROR
+  | typeof STORY_PLACEMENT_ANCHOR_NOT_IN_BACKLOG_ERROR
   | typeof STORY_STATUS_CHANGED_CONCURRENTLY_ERROR
   | typeof STORY_ARCHIVED_ERROR
   | typeof STORY_LABEL_NOT_IN_PROJECT_ERROR

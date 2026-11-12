@@ -7,9 +7,15 @@ import { D1StoryActivityRepository } from "../../../../infrastructure/db/reposit
 import { D1StoryRepository } from "../../../../infrastructure/db/repositories/d1-story-repository";
 import type { Env } from "../../../../index";
 import {
+  STORY_PLACEMENT_ANCHOR_NOT_FOUND_ERROR,
+  STORY_PLACEMENT_ANCHOR_NOT_IN_BACKLOG_ERROR,
+  type StoryPlacementTarget,
+} from "../../../../domain/repositories/story-repository";
+import {
   moveStoryToPosition,
   parseStoryPlacement,
   resolveStoryPlacementAnchor,
+  toPlacementTarget,
   type StoryPlacement,
 } from "../../../../application/usecases/move-story-to-position";
 import {
@@ -95,6 +101,7 @@ export async function handleCliStoryUpdate(
   }
 
   let placement: StoryPlacement | null = null;
+  let placementTarget: StoryPlacementTarget | null = null;
   let storyNumberOfTarget = 0;
   if (payload.placement !== undefined) {
     const parsedPlacement = parseStoryPlacement(payload.placement);
@@ -123,6 +130,7 @@ export async function handleCliStoryUpdate(
       const response = toMoveStoryErrorResponse(anchor.error);
       return c.json({ error: response.message }, response.status);
     }
+    placementTarget = toPlacementTarget(placement, anchor.value);
   }
 
   const activityRepository = new D1StoryActivityRepository(c.env.DB);
@@ -136,6 +144,7 @@ export async function handleCliStoryUpdate(
       allowedStoryPoints,
       ...parsed.value,
       moveToTopOnLeavingIcebox: true,
+      ...(placementTarget ? { placement: placementTarget } : {}),
       actor: {
         id: actorId,
         name: actorName,
@@ -149,17 +158,25 @@ export async function handleCliStoryUpdate(
     result.isErr() &&
     result.error === NO_STORY_FIELDS_TO_UPDATE_ERROR;
   if (result.isErr() && !positionOnly) {
-    const response = toUpdateStoryErrorResponse(result.error);
+    const response =
+      result.error === STORY_PLACEMENT_ANCHOR_NOT_FOUND_ERROR ||
+      result.error === STORY_PLACEMENT_ANCHOR_NOT_IN_BACKLOG_ERROR
+        ? toMoveStoryErrorResponse(result.error)
+        : toUpdateStoryErrorResponse(result.error);
     return c.json({ error: response.message }, response.status);
   }
 
   if (placement) {
-    const moved = await moveStoryToPosition(storyRepository, {
-      projectId,
-      storyNumber: storyNumberOfTarget,
-      placement,
-    });
-    if (moved.isErr()) {
+    // Fields and placement were written together above; only a placement-only
+    // request still needs the move.
+    const moved = !positionOnly
+      ? null
+      : await moveStoryToPosition(storyRepository, {
+          projectId,
+          storyNumber: storyNumberOfTarget,
+          placement,
+        });
+    if (moved?.isErr()) {
       const response = toMoveStoryErrorResponse(moved.error);
       return c.json({ error: response.message }, response.status);
     }
@@ -171,7 +188,6 @@ export async function handleCliStoryUpdate(
       return c.json({ story: positioned.value });
     }
   }
-
   if (result.isErr()) {
     return c.json({ error: "Story not found" }, 404);
   }

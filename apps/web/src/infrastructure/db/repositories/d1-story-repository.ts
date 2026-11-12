@@ -36,6 +36,7 @@ import type {
   ReassignStoriesAcrossIterationsInput,
   ReorderStoriesInput,
   StoryBlockerPair,
+  StoryPlacementTarget,
   StoryRepository,
   StoryRepositoryError,
   UpdateStoryInput,
@@ -46,6 +47,8 @@ import {
   STORY_STATUS_CHANGED_CONCURRENTLY_ERROR,
   STORY_ARCHIVED_ERROR,
   STORY_LABEL_NOT_IN_PROJECT_ERROR,
+  STORY_PLACEMENT_ANCHOR_NOT_FOUND_ERROR,
+  STORY_PLACEMENT_ANCHOR_NOT_IN_BACKLOG_ERROR,
   STORY_REQUESTER_NOT_PROJECT_MEMBER_ERROR,
 } from "../../../domain/repositories/story-repository";
 import { todayIso } from "../../../shared/date/today-iso";
@@ -176,15 +179,100 @@ function toStorySummary(
   };
 }
 
-function storyUnchangedGuard(
-  storyId: string,
-  current: { status: string; isIcebox: number; iterationId: string | null },
-): SQL {
+type StoryGuardState = {
+  status: string;
+  isIcebox: number;
+  iterationId: string | null;
+  /** Set when the write is computed from the story's position. */
+  position?: number;
+};
+
+function storyUnchangedGuard(storyId: string, current: StoryGuardState): SQL {
   return sql`exists (select 1 from ${storiesTable} as target where target.id = ${storyId} and target.status = ${current.status} and target.is_icebox = ${current.isIcebox} and ${
     current.iterationId === null
       ? sql`target.iteration_id is null`
       : sql`target.iteration_id = ${current.iterationId}`
+  } and ${
+    current.position === undefined
+      ? sql`1 = 1`
+      : sql`target.position = ${current.position}`
   } and target.archived_at is null)`;
+}
+
+/** Old position of a story that is not among the non-Icebox stories yet. */
+const NOT_IN_BACKLOG_POSITION = Number.MAX_SAFE_INTEGER;
+
+/**
+ * The position a placed story takes, evaluated inside the write itself. A
+ * before/after anchor that is archived, in the Icebox or gone yields NULL, which
+ * violates NOT NULL on `position` and rolls back the whole batch.
+ *
+ * Moving down past `oldPosition` takes the slot just before the target, since
+ * the stories in between close the gap behind it.
+ */
+function placementPositionSql(
+  projectId: string,
+  storyId: string,
+  placement: StoryPlacementTarget,
+  oldPosition: number,
+): SQL {
+  let target: SQL;
+  if (placement.position === "top") {
+    target = sql`(select coalesce(min(p.position), 1) from ${storiesTable} as p where p.project_id = ${projectId} and p.id != ${storyId} and p.is_icebox = 0 and p.archived_at is null)`;
+  } else if (placement.position === "end") {
+    target = sql`(select coalesce(max(p.position), 0) + 1 from ${storiesTable} as p where p.project_id = ${projectId} and p.id != ${storyId})`;
+  } else {
+    const offset = placement.position === "after" ? 1 : 0;
+    target = sql`(select a.position + ${offset} from ${storiesTable} as a where a.id = ${placement.anchorId} and a.project_id = ${projectId} and a.is_icebox = 0 and a.archived_at is null)`;
+  }
+  return sql`(case when ${target} > ${oldPosition} then ${target} - 1 else ${target} end)`;
+}
+
+/**
+ * Moves the non-Icebox stories whose order relative to the placed story
+ * changed by one position each, and records them in the priority history. Run
+ * after the placed story holds its new position.
+ */
+function placementShiftStatements(
+  db: DbClient,
+  projectId: string,
+  storyId: string,
+  oldPosition: number,
+  guard: SQL,
+): BatchItem<"sqlite">[] {
+  const placedPosition = sql`(select t.position from ${storiesTable} as t where t.id = ${storyId})`;
+  const windows = [
+    {
+      delta: 1,
+      range: sql`${storiesTable.position} >= ${placedPosition} and ${storiesTable.position} < ${oldPosition}`,
+    },
+    ...(oldPosition === NOT_IN_BACKLOG_POSITION
+      ? []
+      : [
+          {
+            delta: -1,
+            range: sql`${storiesTable.position} > ${oldPosition} and ${storiesTable.position} <= ${placedPosition}`,
+          },
+        ]),
+  ];
+  return windows.flatMap(({ delta, range }) => {
+    const affected = sql`${storiesTable.projectId} = ${projectId} and ${storiesTable.id} != ${storyId} and ${storiesTable.isIcebox} = 0 and ${storiesTable.archivedAt} is null and ${range}`;
+    return [
+      // Reads the positions the shift below replaces.
+      db
+        .insert(storyPriorityHistoryTable)
+        .select(
+          sql`select lower(hex(randomblob(16))), ${storiesTable.id}, ${storiesTable.position}, ${storiesTable.position} + ${delta}, CURRENT_TIMESTAMP from ${storiesTable} where ${affected} and ${guard}`,
+        ),
+      db
+        .update(storiesTable)
+        .set({
+          position: sql`${storiesTable.position} + ${delta}`,
+          updatedAt: sql`CURRENT_TIMESTAMP`,
+        })
+        .where(and(affected, guard)),
+    ];
+  });
 }
 
 function storyHasAnyLabelId(labelIds: string[]): SQL {
@@ -812,7 +900,7 @@ export class D1StoryRepository implements StoryRepository {
   private buildOwnerReplacementStatements(
     projectId: string,
     storyId: string,
-    current: { status: string; isIcebox: number; iterationId: string | null },
+    current: StoryGuardState,
     ownerIds: string[],
   ) {
     const wantedOwnerIds = sql`select value from json_each(${JSON.stringify([...new Set(ownerIds)])})`;
@@ -879,6 +967,35 @@ export class D1StoryRepository implements StoryRepository {
     return ok(undefined);
   }
 
+  /** Names why a placement batch was rolled back, or rethrows when the anchor was fine. */
+  private async placementAnchorError(
+    projectId: string,
+    placement: StoryPlacementTarget,
+    cause: unknown,
+  ): Promise<StoryRepositoryError> {
+    if (placement.position === "top" || placement.position === "end") {
+      throw cause;
+    }
+    const anchor = await this.db
+      .select({
+        archivedAt: storiesTable.archivedAt,
+        isIcebox: storiesTable.isIcebox,
+      })
+      .from(storiesTable)
+      .where(
+        and(
+          eq(storiesTable.projectId, projectId),
+          eq(storiesTable.id, placement.anchorId),
+        ),
+      )
+      .get();
+    if (!anchor) return STORY_PLACEMENT_ANCHOR_NOT_FOUND_ERROR;
+    if (anchor.archivedAt !== null) return STORY_ARCHIVED_ERROR;
+    if (anchor.isIcebox === 1)
+      return STORY_PLACEMENT_ANCHOR_NOT_IN_BACKLOG_ERROR;
+    throw cause;
+  }
+
   async create(
     input: CreateStoryInput,
   ): Promise<Result<Story, StoryRepositoryError>> {
@@ -905,7 +1022,6 @@ export class D1StoryRepository implements StoryRepository {
       return err(requesterValidation.error);
     }
 
-    let nextPosition: number;
     const maxStoryNumberRow = await this.db
       .select({
         maxStoryNumber: sql<number>`coalesce(max(${storiesTable.storyNumber}), 0)`,
@@ -914,7 +1030,18 @@ export class D1StoryRepository implements StoryRepository {
       .where(eq(storiesTable.projectId, input.projectId))
       .get();
     const nextStoryNumber = (maxStoryNumberRow?.maxStoryNumber ?? 0) + 1;
-    if (isBacklogStoryInput(input)) {
+    const storyId = ulid();
+    const placement = input.isIcebox ? undefined : input.placement;
+
+    let nextPosition: number | SQL;
+    if (placement) {
+      nextPosition = placementPositionSql(
+        input.projectId,
+        storyId,
+        placement,
+        NOT_IN_BACKLOG_POSITION,
+      );
+    } else if (isBacklogStoryInput(input)) {
       await this.db
         .update(storiesTable)
         .set({
@@ -951,29 +1078,42 @@ export class D1StoryRepository implements StoryRepository {
       nextPosition = (maxPositionRow?.maxPosition ?? 0) + 1;
     }
 
-    const [inserted] = await this.db
-      .insert(storiesTable)
-      .values({
-        id: ulid(),
-        storyNumber: nextStoryNumber,
-        projectId: input.projectId,
-        title: input.title,
-        description: input.description,
-        type: input.type,
-        status: input.status,
-        storyPoint: input.storyPoint,
-        requesterId: input.requesterId,
-        releaseDate: input.releaseDate ?? null,
-        isIcebox: input.isIcebox ? 1 : 0,
-        position: nextPosition,
-        completedAt:
-          input.status === "Accepted" ? sql`CURRENT_TIMESTAMP` : null,
-      })
-      .returning({ id: storiesTable.id });
-
-    if (!inserted) {
-      return err(STORY_REPOSITORY_ERROR);
+    const insertStory = this.db.insert(storiesTable).values({
+      id: storyId,
+      storyNumber: nextStoryNumber,
+      projectId: input.projectId,
+      title: input.title,
+      description: input.description,
+      type: input.type,
+      status: input.status,
+      storyPoint: input.storyPoint,
+      requesterId: input.requesterId,
+      releaseDate: input.releaseDate ?? null,
+      isIcebox: input.isIcebox ? 1 : 0,
+      position: nextPosition,
+      completedAt: input.status === "Accepted" ? sql`CURRENT_TIMESTAMP` : null,
+    });
+    if (placement) {
+      try {
+        await this.db.batch([
+          insertStory,
+          ...placementShiftStatements(
+            this.db,
+            input.projectId,
+            storyId,
+            NOT_IN_BACKLOG_POSITION,
+            sql`1 = 1`,
+          ),
+        ] as [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]]);
+      } catch (cause) {
+        return err(
+          await this.placementAnchorError(input.projectId, placement, cause),
+        );
+      }
+    } else {
+      await insertStory;
     }
+    const inserted = { id: storyId };
 
     const labelStatements = this.buildLabelStatements(
       input.projectId,
@@ -1180,13 +1320,22 @@ export class D1StoryRepository implements StoryRepository {
       shouldClearIterationId = !assignedCurrentIteration;
     }
 
+    const placement = nextIsIcebox ? undefined : input.placement;
+    // A placement is computed from the position read above, so a concurrent
+    // reorder of this story must fail the write instead of corrupting the order.
+    const guardState: StoryGuardState = {
+      status: current.status,
+      isIcebox: current.isIcebox,
+      iterationId: current.iterationId,
+      ...(placement ? { position: current.position } : {}),
+    };
     const ownerStatements =
       input.ownerIds === undefined
         ? []
         : this.buildOwnerReplacementStatements(
             input.projectId,
             input.id,
-            current,
+            guardState,
             input.ownerIds,
           );
     const ownerIdsAreAllCurrentOwners =
@@ -1194,7 +1343,10 @@ export class D1StoryRepository implements StoryRepository {
         ? sql`1 = 1`
         : sql`not exists (select 1 from json_each(${JSON.stringify([...new Set(input.ownerIds)])}) as wanted where wanted.value not in (select ${storyOwnersTable.userId} from ${storyOwnersTable} where ${storyOwnersTable.storyId} = ${input.id}))`;
     const shouldMoveToTop =
-      input.moveToTop === true && current.isIcebox === 1 && !nextIsIcebox;
+      placement === undefined &&
+      input.moveToTop === true &&
+      current.isIcebox === 1 &&
+      !nextIsIcebox;
     const updateQuery = this.db
       .update(storiesTable)
       .set({
@@ -1217,6 +1369,18 @@ export class D1StoryRepository implements StoryRepository {
           ? { isIcebox: resolvedIsIcebox.value ? 1 : 0 }
           : {}),
         ...(shouldMoveToTop ? { position: 1 } : {}),
+        ...(placement
+          ? {
+              position: placementPositionSql(
+                input.projectId,
+                input.id,
+                placement,
+                current.isIcebox === 1
+                  ? NOT_IN_BACKLOG_POSITION
+                  : current.position,
+              ),
+            }
+          : {}),
         ...(autoAssignedIterationId !== null
           ? { iterationId: autoAssignedIterationId }
           : {}),
@@ -1239,6 +1403,7 @@ export class D1StoryRepository implements StoryRepository {
           current.iterationId === null
             ? isNull(storiesTable.iterationId)
             : eq(storiesTable.iterationId, current.iterationId),
+          ...(placement ? [eq(storiesTable.position, current.position)] : []),
           // Owners are replaced before this statement in the same batch; the
           // story only updates when that replacement took effect.
           ownerIdsAreAllCurrentOwners,
@@ -1271,28 +1436,56 @@ export class D1StoryRepository implements StoryRepository {
       input.projectId,
       input.id,
       input,
-      sql`${storyUnchangedGuard(input.id, current)} and ${ownerIdsAreAllCurrentOwners}`,
+      sql`${storyUnchangedGuard(input.id, guardState)} and ${ownerIdsAreAllCurrentOwners}`,
     );
     const preStatements: BatchItem<"sqlite">[] = [
       ...ownerStatements,
       ...shiftStatement,
       ...labelStatements,
     ];
+    // The placed story's history row doubles as the marker that the update
+    // applied; the shifts below read the position it wrote and only run then.
+    const placementMarkerId = ulid();
+    const placementApplied = sql`exists (select 1 from ${storyPriorityHistoryTable} where ${storyPriorityHistoryTable.id} = ${placementMarkerId})`;
+    const placedPosition = sql`(select position from ${storiesTable} where id = ${input.id})`;
+    const postStatements: BatchItem<"sqlite">[] = placement
+      ? [
+          this.db
+            .insert(storyPriorityHistoryTable)
+            .select(
+              sql`select ${placementMarkerId}, ${input.id}, ${current.position}, ${placedPosition}, CURRENT_TIMESTAMP where (select changes()) > 0 and (${current.isIcebox} = 1 or ${current.position} != ${placedPosition})`,
+            ),
+          ...placementShiftStatements(
+            this.db,
+            input.projectId,
+            input.id,
+            current.isIcebox === 1 ? NOT_IN_BACKLOG_POSITION : current.position,
+            placementApplied,
+          ),
+        ]
+      : [];
     const batchStatements: BatchItem<"sqlite">[] = [
       ...preStatements,
       updateQuery,
+      ...postStatements,
     ];
-    const updatedRows =
-      preStatements.length === 0
-        ? await updateQuery
-        : ((
-            await this.db.batch(
-              batchStatements as [
-                BatchItem<"sqlite">,
-                ...BatchItem<"sqlite">[],
-              ],
-            )
-          )[preStatements.length] as { id: string }[]);
+    let updatedRows: { id: string }[];
+    if (preStatements.length === 0 && postStatements.length === 0) {
+      updatedRows = await updateQuery;
+    } else {
+      try {
+        updatedRows = (
+          await this.db.batch(
+            batchStatements as [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]],
+          )
+        )[preStatements.length] as { id: string }[];
+      } catch (cause) {
+        if (!placement) throw cause;
+        return err(
+          await this.placementAnchorError(input.projectId, placement, cause),
+        );
+      }
+    }
 
     if (updatedRows.length === 0) {
       if (input.ownerIds !== undefined) {
