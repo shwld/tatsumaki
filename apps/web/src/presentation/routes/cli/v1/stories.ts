@@ -24,7 +24,11 @@ import {
 } from "../../../../domain/entities/story-section";
 import { todayIso } from "../../../../shared/date/today-iso";
 import { STORY_ARCHIVED_ERROR } from "../../../../domain/repositories/story-repository";
-import type { StoryPlacementTarget } from "../../../../domain/repositories/story-repository";
+import {
+  STORY_PLACEMENT_ANCHOR_NOT_FOUND_ERROR,
+  STORY_PLACEMENT_ANCHOR_NOT_IN_BACKLOG_ERROR,
+  type StoryPlacementTarget,
+} from "../../../../domain/repositories/story-repository";
 import { D1IterationRepository } from "../../../../infrastructure/db/repositories/d1-iteration-repository";
 import { INVALID_STORY_STATUS_ERROR } from "../../../../application/usecases/story-input";
 import { createStory } from "../../../../application/usecases/create-story";
@@ -273,7 +277,11 @@ cliV1StoriesRoute.post("/:projectId/stories", async (c) => {
   );
 
   if (result.isErr()) {
-    const response = toCreateStoryErrorResponse(result.error);
+    const response =
+      result.error === STORY_PLACEMENT_ANCHOR_NOT_FOUND_ERROR ||
+      result.error === STORY_PLACEMENT_ANCHOR_NOT_IN_BACKLOG_ERROR
+        ? toMoveStoryErrorResponse(result.error)
+        : toCreateStoryErrorResponse(result.error);
     return c.json({ error: response.message }, response.status);
   }
 

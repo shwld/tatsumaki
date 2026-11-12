@@ -146,7 +146,16 @@ describe("D1StoryRepository placement", () => {
     expect(result.isOk()).toBe(true);
     expect(await backlogTitles()).toEqual(["C2", "A", "B"]);
     const history = await repository().listPriorityHistory(PROJECT_ID);
-    expect(history._unsafeUnwrap()).toHaveLength(1);
+    expect(
+      history._unsafeUnwrap().map((entry) => [entry.storyId, entry.toPosition]),
+    ).toEqual(
+      expect.arrayContaining([
+        ["story-C", 1],
+        ["story-A", 2],
+        ["story-B", 3],
+      ]),
+    );
+    expect(history._unsafeUnwrap()).toHaveLength(3);
   });
 
   it("leaves the story untouched when the anchor became unusable", async () => {

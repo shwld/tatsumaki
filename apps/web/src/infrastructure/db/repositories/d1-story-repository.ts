@@ -217,9 +217,21 @@ function placementShiftSql(
   storyId: string,
   placement: StoryPlacementTarget,
   guard: SQL,
+  options: { recordHistory: boolean } = { recordHistory: false },
 ): BatchItem<"sqlite">[] {
   if (placement.position === "end") return [];
+  const shifted = sql`${storiesTable.projectId} = ${projectId} and ${storiesTable.id} != ${storyId} and ${storiesTable.position} >= (select t.position from ${storiesTable} as t where t.id = ${storyId})`;
   return [
+    ...(options.recordHistory
+      ? [
+          // Runs before the shift, so it reads the positions the shift replaces.
+          db
+            .insert(storyPriorityHistoryTable)
+            .select(
+              sql`select lower(hex(randomblob(16))), ${storiesTable.id}, ${storiesTable.position}, ${storiesTable.position} + 1, CURRENT_TIMESTAMP from ${storiesTable} where ${shifted} and ${guard}`,
+            ),
+        ]
+      : []),
     db
       .update(storiesTable)
       .set({
@@ -1408,6 +1420,7 @@ export class D1StoryRepository implements StoryRepository {
             input.id,
             placement,
             updateApplied,
+            { recordHistory: true },
           ),
         ]
       : [];
