@@ -17,6 +17,7 @@ import {
   unassignStoryIterationByNumber,
 } from "../../../../application/usecases/unassign-story-iteration";
 import {
+  compareByPanelOrder,
   findCurrentIterationId,
   resolveStorySection,
 } from "../../../../domain/entities/story-section";
@@ -148,7 +149,6 @@ cliV1StoriesRoute.get("/:projectId/stories", async (c) => {
       : {}),
     ...(iceboxRaw === "true" ? { isIcebox: true } : {}),
     ...(labelIds.length > 0 ? { labelIds } : {}),
-    limit,
     detailLevel: "summary",
   });
 
@@ -173,13 +173,13 @@ cliV1StoriesRoute.get("/:projectId/stories", async (c) => {
       iteration.iterationNumber,
     ]),
   );
-  return c.json({
-    stories: result.value.map((story) => ({
-      ...story,
-      section: resolveStorySection(story, currentIterationId),
-      iterationNumber: iterationNumberById.get(story.iterationId ?? "") ?? null,
-    })),
-  });
+  const withSection = result.value.map((story) => ({
+    ...story,
+    section: resolveStorySection(story, currentIterationId),
+    iterationNumber: iterationNumberById.get(story.iterationId ?? "") ?? null,
+  }));
+  withSection.sort(compareByPanelOrder);
+  return c.json({ stories: withSection.slice(0, limit) });
 });
 
 cliV1StoriesRoute.post("/:projectId/stories", async (c) => {

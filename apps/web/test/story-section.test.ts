@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import type { Story } from "../src/domain/entities/story";
 import {
+  compareByPanelOrder,
   findCurrentIterationId,
   resolveStorySection,
 } from "../src/domain/entities/story-section";
@@ -46,5 +48,53 @@ describe("findCurrentIterationId", () => {
     ];
     expect(findCurrentIterationId(iterations, "2026-11-08")).toBe("b");
     expect(findCurrentIterationId(iterations, "2026-12-01")).toBeNull();
+  });
+});
+
+describe("compareByPanelOrder", () => {
+  const row = (
+    section: "Done" | "Current" | "Backlog" | "Icebox",
+    position: number,
+    statusChangedAt = "",
+    status: Story["status"] = "Unstarted",
+    id = `${section}-${position}`,
+  ) => ({ id, section, position, statusChangedAt, status });
+
+  it("orders sections as the UI panels and Done by newest status change", () => {
+    const sorted = [
+      row("Icebox", 1),
+      row("Backlog", 5),
+      row("Done", 9, "2026-11-01 00:00:00"),
+      row("Current", 9),
+      row("Current", 20, "2026-11-02 00:00:00", "Accepted"),
+      row("Backlog", 2),
+      row("Done", 1, "2026-11-05 00:00:00"),
+    ].sort(compareByPanelOrder);
+    expect(sorted.map((r) => [r.section, r.position])).toEqual([
+      ["Done", 1],
+      ["Done", 9],
+      ["Current", 20],
+      ["Current", 9],
+      ["Backlog", 2],
+      ["Backlog", 5],
+      ["Icebox", 1],
+    ]);
+  });
+
+  it("breaks ties like the UI: Done by descending id, Current Accepted by ascending id", () => {
+    const same = "2026-11-01 00:00:00";
+    const done = [
+      row("Done", 1, same, "Accepted", "a"),
+      row("Done", 2, same, "Accepted", "b"),
+    ];
+    expect(done.sort(compareByPanelOrder).map((r) => r.id)).toEqual(["b", "a"]);
+    const current = [
+      row("Current", 1, same, "Accepted", "b"),
+      row("Current", 1, same, "Accepted", "a"),
+    ];
+    expect(current.sort(compareByPanelOrder).map((r) => r.id)).toEqual([
+      "a",
+      "b",
+    ]);
   });
 });

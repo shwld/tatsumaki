@@ -526,7 +526,7 @@ fn story_section_rank(section: &str) -> u8 {
     }
 }
 
-/// Rows in the order of the UI panels: Done (newest status change first), Current, Backlog, Icebox (by position).
+/// Rows in the order of the UI panels, with the same tie-breakers as the server.
 fn story_list_rows(stories: &[serde_json::Value]) -> Vec<StoryListRow> {
     let mut sorted: Vec<&serde_json::Value> = stories.iter().collect();
     sorted.sort_by(|a, b| {
@@ -534,14 +534,28 @@ fn story_list_rows(stories: &[serde_json::Value]) -> Vec<StoryListRow> {
             story_section_rank(s.get("section").and_then(|v| v.as_str()).unwrap_or(""))
         };
         let position = |s: &serde_json::Value| s.get("position").and_then(|v| v.as_f64()).unwrap_or(0.0);
-        let changed_at = |s: &serde_json::Value| {
-            s.get("statusChangedAt").and_then(|v| v.as_str()).unwrap_or("").to_string()
+        let text = |s: &serde_json::Value, key: &str| s.get(key).and_then(|v| v.as_str()).unwrap_or("").to_string();
+        let accepted = |s: &serde_json::Value| text(s, "status") == "Accepted";
+        let by_position = |a: &serde_json::Value, b: &serde_json::Value| {
+            position(a)
+                .partial_cmp(&position(b))
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| text(a, "id").cmp(&text(b, "id")))
         };
         rank(a).cmp(&rank(b)).then_with(|| {
-            if rank(a) == story_section_rank("Done") {
-                changed_at(b).cmp(&changed_at(a))
+            let section = rank(a);
+            if section == story_section_rank("Done") {
+                text(b, "statusChangedAt")
+                    .cmp(&text(a, "statusChangedAt"))
+                    .then_with(|| text(b, "id").cmp(&text(a, "id")))
+            } else if section == story_section_rank("Current") && (accepted(a) || accepted(b)) {
+                accepted(b).cmp(&accepted(a)).then_with(|| {
+                    text(a, "statusChangedAt")
+                        .cmp(&text(b, "statusChangedAt"))
+                        .then_with(|| by_position(a, b))
+                })
             } else {
-                position(a).partial_cmp(&position(b)).unwrap_or(std::cmp::Ordering::Equal)
+                by_position(a, b)
             }
         })
     });
@@ -1655,6 +1669,13 @@ mod tests {
         ];
         let numbers: Vec<String> = story_list_rows(&done).into_iter().map(|r| r.number).collect();
         assert_eq!(numbers, vec!["#6", "#5"]);
+
+        let current = vec![
+            serde_json::json!({ "id": "b", "storyNumber": 7, "section": "Current", "position": 1.0, "status": "Started", "title": "x" }),
+            serde_json::json!({ "id": "c", "storyNumber": 8, "section": "Current", "position": 9.0, "status": "Accepted", "statusChangedAt": "2026-11-02 00:00:00", "title": "y" }),
+        ];
+        let numbers: Vec<String> = story_list_rows(&current).into_iter().map(|r| r.number).collect();
+        assert_eq!(numbers, vec!["#8", "#7"]);
         assert_eq!(rows[0].iteration, "4");
         assert_eq!(rows[1].iteration, "-");
         assert_eq!(rows[0].section, "Current");

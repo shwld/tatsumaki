@@ -35,3 +35,43 @@ export function findCurrentIterationId(
     )?.id ?? null
   );
 }
+
+const SECTION_RANK: Record<StorySection, number> = {
+  Done: 0,
+  Current: 1,
+  Backlog: 2,
+  Icebox: 3,
+};
+
+type PanelOrderKey = Pick<
+  Story,
+  "id" | "position" | "statusChangedAt" | "status"
+> & { section: StorySection };
+
+/** Orders stories like the UI panels, including their tie-breakers: Done (newest status change first), Current (accepted first, oldest first), Backlog, Icebox (by position). */
+export function compareByPanelOrder(
+  a: PanelOrderKey,
+  b: PanelOrderKey,
+): number {
+  const byRank = SECTION_RANK[a.section] - SECTION_RANK[b.section];
+  if (byRank !== 0) return byRank;
+  if (a.section === "Done") {
+    return (
+      b.statusChangedAt.localeCompare(a.statusChangedAt) ||
+      b.id.localeCompare(a.id)
+    );
+  }
+  if (a.section === "Current") {
+    const aAccepted = a.status === "Accepted";
+    const bAccepted = b.status === "Accepted";
+    if (aAccepted !== bAccepted) return aAccepted ? -1 : 1;
+    if (aAccepted) {
+      return (
+        a.statusChangedAt.localeCompare(b.statusChangedAt) ||
+        a.position - b.position ||
+        a.id.localeCompare(b.id)
+      );
+    }
+  }
+  return a.position - b.position || a.id.localeCompare(b.id);
+}
