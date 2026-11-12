@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  compareByPanelOrder,
   findCurrentIterationId,
   resolveStorySection,
 } from "../src/domain/entities/story-section";
@@ -46,5 +47,32 @@ describe("findCurrentIterationId", () => {
     ];
     expect(findCurrentIterationId(iterations, "2026-11-08")).toBe("b");
     expect(findCurrentIterationId(iterations, "2026-12-01")).toBeNull();
+  });
+});
+
+describe("compareByPanelOrder", () => {
+  const row = (
+    section: "Done" | "Current" | "Backlog" | "Icebox",
+    position: number,
+    statusChangedAt = "",
+  ) => ({ section, position, statusChangedAt });
+
+  it("orders sections as the UI panels and Done by newest status change", () => {
+    const sorted = [
+      row("Icebox", 1),
+      row("Backlog", 5),
+      row("Done", 9, "2026-11-01 00:00:00"),
+      row("Current", 9),
+      row("Backlog", 2),
+      row("Done", 1, "2026-11-05 00:00:00"),
+    ].sort(compareByPanelOrder);
+    expect(sorted.map((r) => [r.section, r.position])).toEqual([
+      ["Done", 1],
+      ["Done", 9],
+      ["Current", 9],
+      ["Backlog", 2],
+      ["Backlog", 5],
+      ["Icebox", 1],
+    ]);
   });
 });

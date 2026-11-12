@@ -297,6 +297,14 @@ describe("cli story positioning", () => {
     });
   });
 
+  it("applies --limit after ordering by the UI panels", async () => {
+    await seedBacklog();
+    await createStory("Iced", { isIcebox: true });
+    const response = await call("?limit=2", "GET");
+    const { stories } = (await response.json()) as { stories: Story[] };
+    expect(stories.map((s) => s.title)).toEqual(["A", "B"]);
+  });
+
   it("creates labels through the CLI API", async () => {
     const labelsUrl = `https://localhost/programmatic-api/v1/projects/${projectId}/labels`;
     const created = await SELF.fetch(labelsUrl, {
