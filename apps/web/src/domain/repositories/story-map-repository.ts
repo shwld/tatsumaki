@@ -23,7 +23,9 @@ export type StoryMapRepositoryError = typeof STORY_MAP_REPOSITORY_ERROR;
 type Repo<T> = Promise<Result<T, StoryMapRepositoryError>>;
 
 /**
- * Every method writes only story map tables. Moving or removing a card never
+ * Every method writes only story map tables. A repository bound to a live op
+ * (ADR-0014 §2) commits each write together with `seq` and the op record in one
+ * batch. Moving or removing a card never
  * touches `stories`. `index` is the 0-based place among siblings; values past
  * the end append.
  */
@@ -111,13 +113,6 @@ export interface StoryMapRepository {
   getSeq(mapId: string): Repo<number>;
   /** The recorded result of a command, or null when the op was not applied. */
   findOp(mapId: string, opId: string): Repo<StoryMapRecordedOp | null>;
-  /** Advances `seq` and records the op together; returns the new `seq`. */
-  recordOp(input: {
-    mapId: string;
-    opId: string;
-    userId: string;
-    result: string;
-  }): Repo<number>;
   /** Drops records older than `before` (ISO timestamp). */
   pruneOps(mapId: string, before: string): Repo<void>;
 
@@ -134,8 +129,8 @@ export interface StoryMapRepository {
   ): Repo<(StoryMapLinkedStory & { id: string })[]>;
   /**
    * Creates an Unstarted story and points the idea card at it in one batch.
-   * With `opId`, `seq` and the op record are written in the same batch, so the
-   * story can never exist without its op (ADR-0014 §2). Nothing is written
+   * On a repository bound to an op, `seq` and the op record are written in the
+   * same batch, so the story can never exist without its op (ADR-0014 §2). Nothing is written
    * when the card is gone or already linked; the result is then null. Only the
    * new story's own rows are written to `stories`.
    */
@@ -143,7 +138,6 @@ export interface StoryMapRepository {
     projectId: string;
     mapId: string;
     cardId: string;
-    opId?: string;
     actorUserId: string;
     title: string;
     description: string;

@@ -57,11 +57,20 @@ function toMap(row: typeof storyMapsTable.$inferSelect): StoryMap {
   };
 }
 
+export type StoryMapOpContext = { opId: string; userId: string };
+
 export class D1StoryMapRepository implements StoryMapRepository {
   private readonly db: DbClient;
   private readonly d1: D1Database;
 
-  constructor(d1: D1Database) {
+  /**
+   * With `op`, every write also advances `seq` and records the op inside its
+   * own batch, so an effect can never be committed without its op (ADR-0014 §2).
+   */
+  constructor(
+    d1: D1Database,
+    private readonly op?: StoryMapOpContext,
+  ) {
     this.d1 = d1;
     this.db = createDb(d1);
   }
@@ -75,15 +84,17 @@ export class D1StoryMapRepository implements StoryMapRepository {
   }
 
   /**
-   * Puts `id` at `index` among the rows of `scope`, renumbering the scope.
-   * `table` and `scope.where` are fixed strings from this file, never input.
+   * Statements that put `id` at `index` among the rows of `scope`, renumbering
+   * the scope. `table` and `scope.where` are fixed strings from this file,
+   * never input. The caller runs them after any statement that inserts or moves
+   * `id`, in one batch.
    */
-  private async placeAt(
+  private async planPlacement(
     table: OrderedTable,
     scope: Scope,
     id: string,
     index: number,
-  ): Promise<void> {
+  ): Promise<{ statements: D1PreparedStatement[]; position: number }> {
     const siblings = await this.d1
       .prepare(
         `SELECT id FROM ${table} WHERE ${scope.where} AND id <> ? ORDER BY position, id`,
@@ -91,14 +102,51 @@ export class D1StoryMapRepository implements StoryMapRepository {
       .bind(...scope.binds, id)
       .all<{ id: string }>();
     const ids = siblings.results.map((row) => row.id);
-    ids.splice(Math.max(0, Math.min(index, ids.length)), 0, id);
-    await this.d1.batch(
-      ids.map((rowId, position) =>
+    const position = Math.max(0, Math.min(index, ids.length));
+    ids.splice(position, 0, id);
+    return {
+      position,
+      statements: ids.map((rowId, at) =>
         this.d1
           .prepare(`UPDATE ${table} SET position = ? WHERE id = ?`)
-          .bind(position, rowId),
+          .bind(at, rowId),
       ),
-    );
+    };
+  }
+
+  private opStatements(
+    mapId: string,
+    result: string,
+    now: string,
+  ): D1PreparedStatement[] {
+    if (!this.op) return [];
+    return [
+      this.d1
+        .prepare(
+          "UPDATE story_maps SET seq = seq + 1, updated_at = ? WHERE id = ?",
+        )
+        .bind(now, mapId),
+      this.d1
+        .prepare(
+          `INSERT INTO story_map_ops (map_id, op_id, user_id, seq, result, created_at)
+           SELECT id, ?, ?, seq, ?, ? FROM story_maps WHERE id = ?`,
+        )
+        .bind(this.op.opId, this.op.userId, result, now, mapId),
+    ];
+  }
+
+  /** Runs `statements` with the map's `updated_at` bump and op record as one batch. */
+  private async commit(
+    mapId: string,
+    statements: D1PreparedStatement[],
+    result: unknown = null,
+  ): Promise<void> {
+    const now = new Date().toISOString();
+    await this.d1.batch([
+      ...statements,
+      this.touch(mapId),
+      ...this.opStatements(mapId, JSON.stringify(result ?? null), now),
+    ]);
   }
 
   private touch(mapId: string) {
@@ -328,29 +376,40 @@ export class D1StoryMapRepository implements StoryMapRepository {
         set.achievementGoal = patch.achievementGoal;
       if (patch.archived !== undefined)
         set.archivedAt = patch.archived ? now : null;
-      await this.db
+      const update = this.db
         .update(storyMapsTable)
         .set(set)
-        .where(eq(storyMapsTable.id, mapId));
+        .where(eq(storyMapsTable.id, mapId))
+        .toSQL();
+      await this.commit(mapId, [
+        this.d1.prepare(update.sql).bind(...update.params),
+      ]);
     });
   }
 
   async addPersona(mapId: string, name: string): Repo<StoryMapPersona> {
     return this.guard(async () => {
       const id = ulid();
-      await this.d1
+      const next = await this.d1
         .prepare(
-          `INSERT INTO story_map_personas (id, map_id, name, position)
-           VALUES (?1, ?2, ?3, (SELECT coalesce(max(position), -1) + 1 FROM story_map_personas WHERE map_id = ?2))`,
+          "SELECT coalesce(max(position), -1) + 1 AS position FROM story_map_personas WHERE map_id = ?",
         )
-        .bind(id, mapId, name)
-        .run();
-      const row = await this.d1
-        .prepare("SELECT position FROM story_map_personas WHERE id = ?")
-        .bind(id)
+        .bind(mapId)
         .first<{ position: number }>();
-      await this.touch(mapId).run();
-      return { id, name, position: row?.position ?? 0 };
+      const position = next?.position ?? 0;
+      const persona = { id, name, position };
+      await this.commit(
+        mapId,
+        [
+          this.d1
+            .prepare(
+              "INSERT INTO story_map_personas (id, map_id, name, position) VALUES (?, ?, ?, ?)",
+            )
+            .bind(id, mapId, name, position),
+        ],
+        persona,
+      );
+      return persona;
     });
   }
 
@@ -360,24 +419,22 @@ export class D1StoryMapRepository implements StoryMapRepository {
     name: string,
   ): Repo<void> {
     return this.guard(async () => {
-      await this.d1.batch([
+      await this.commit(mapId, [
         this.d1
           .prepare(
             "UPDATE story_map_personas SET name = ? WHERE id = ? AND map_id = ?",
           )
           .bind(name, personaId, mapId),
-        this.touch(mapId),
       ]);
     });
   }
 
   async removePersona(mapId: string, personaId: string): Repo<void> {
     return this.guard(async () => {
-      await this.d1.batch([
+      await this.commit(mapId, [
         this.d1
           .prepare("DELETE FROM story_map_personas WHERE id = ? AND map_id = ?")
           .bind(personaId, mapId),
-        this.touch(mapId),
       ]);
     });
   }
@@ -389,24 +446,26 @@ export class D1StoryMapRepository implements StoryMapRepository {
   ): Repo<StoryMapActivity> {
     return this.guard(async () => {
       const id = ulid();
-      await this.d1
-        .prepare(
-          "INSERT INTO story_map_activities (id, map_id, title, position) VALUES (?, ?, ?, 0)",
-        )
-        .bind(id, mapId, title)
-        .run();
-      await this.placeAt(
+      const placement = await this.planPlacement(
         "story_map_activities",
         { where: "map_id = ?", binds: [mapId] },
         id,
         index,
       );
-      await this.touch(mapId).run();
-      const row = await this.d1
-        .prepare("SELECT position FROM story_map_activities WHERE id = ?")
-        .bind(id)
-        .first<{ position: number }>();
-      return { id, title, position: row?.position ?? 0 };
+      const activity = { id, title, position: placement.position };
+      await this.commit(
+        mapId,
+        [
+          this.d1
+            .prepare(
+              "INSERT INTO story_map_activities (id, map_id, title, position) VALUES (?, ?, ?, 0)",
+            )
+            .bind(id, mapId, title),
+          ...placement.statements,
+        ],
+        activity,
+      );
+      return activity;
     });
   }
 
@@ -416,13 +475,12 @@ export class D1StoryMapRepository implements StoryMapRepository {
     title: string,
   ): Repo<void> {
     return this.guard(async () => {
-      await this.d1.batch([
+      await this.commit(mapId, [
         this.d1
           .prepare(
             "UPDATE story_map_activities SET title = ? WHERE id = ? AND map_id = ?",
           )
           .bind(title, activityId, mapId),
-        this.touch(mapId),
       ]);
     });
   }
@@ -433,25 +491,24 @@ export class D1StoryMapRepository implements StoryMapRepository {
     index: number,
   ): Repo<void> {
     return this.guard(async () => {
-      await this.placeAt(
+      const placement = await this.planPlacement(
         "story_map_activities",
         { where: "map_id = ?", binds: [mapId] },
         activityId,
         index,
       );
-      await this.touch(mapId).run();
+      await this.commit(mapId, placement.statements);
     });
   }
 
   async deleteActivity(mapId: string, activityId: string): Repo<void> {
     return this.guard(async () => {
-      await this.d1.batch([
+      await this.commit(mapId, [
         this.d1
           .prepare(
             "DELETE FROM story_map_activities WHERE id = ? AND map_id = ?",
           )
           .bind(activityId, mapId),
-        this.touch(mapId),
       ]);
     });
   }
@@ -464,36 +521,37 @@ export class D1StoryMapRepository implements StoryMapRepository {
   ): Repo<StoryMapTask> {
     return this.guard(async () => {
       const id = ulid();
-      await this.d1
-        .prepare(
-          "INSERT INTO story_map_tasks (id, map_id, activity_id, title, position) VALUES (?, ?, ?, ?, 0)",
-        )
-        .bind(id, mapId, activityId, title)
-        .run();
-      await this.placeAt(
+      const placement = await this.planPlacement(
         "story_map_tasks",
         { where: "activity_id = ?", binds: [activityId] },
         id,
         index,
       );
-      await this.touch(mapId).run();
-      const row = await this.d1
-        .prepare("SELECT position FROM story_map_tasks WHERE id = ?")
-        .bind(id)
-        .first<{ position: number }>();
-      return { id, activityId, title, position: row?.position ?? 0 };
+      const task = { id, activityId, title, position: placement.position };
+      await this.commit(
+        mapId,
+        [
+          this.d1
+            .prepare(
+              "INSERT INTO story_map_tasks (id, map_id, activity_id, title, position) VALUES (?, ?, ?, ?, 0)",
+            )
+            .bind(id, mapId, activityId, title),
+          ...placement.statements,
+        ],
+        task,
+      );
+      return task;
     });
   }
 
   async renameTask(mapId: string, taskId: string, title: string): Repo<void> {
     return this.guard(async () => {
-      await this.d1.batch([
+      await this.commit(mapId, [
         this.d1
           .prepare(
             "UPDATE story_map_tasks SET title = ? WHERE id = ? AND map_id = ?",
           )
           .bind(title, taskId, mapId),
-        this.touch(mapId),
       ]);
     });
   }
@@ -505,29 +563,29 @@ export class D1StoryMapRepository implements StoryMapRepository {
     index: number,
   ): Repo<void> {
     return this.guard(async () => {
-      await this.d1
-        .prepare(
-          "UPDATE story_map_tasks SET activity_id = ? WHERE id = ? AND map_id = ?",
-        )
-        .bind(activityId, taskId, mapId)
-        .run();
-      await this.placeAt(
+      const placement = await this.planPlacement(
         "story_map_tasks",
         { where: "activity_id = ?", binds: [activityId] },
         taskId,
         index,
       );
-      await this.touch(mapId).run();
+      await this.commit(mapId, [
+        this.d1
+          .prepare(
+            "UPDATE story_map_tasks SET activity_id = ? WHERE id = ? AND map_id = ?",
+          )
+          .bind(activityId, taskId, mapId),
+        ...placement.statements,
+      ]);
     });
   }
 
   async deleteTask(mapId: string, taskId: string): Repo<void> {
     return this.guard(async () => {
-      await this.d1.batch([
+      await this.commit(mapId, [
         this.d1
           .prepare("DELETE FROM story_map_tasks WHERE id = ? AND map_id = ?")
           .bind(taskId, mapId),
-        this.touch(mapId),
       ]);
     });
   }
@@ -539,49 +597,50 @@ export class D1StoryMapRepository implements StoryMapRepository {
   ): Repo<StoryMapSlice> {
     return this.guard(async () => {
       const id = ulid();
-      await this.d1
-        .prepare(
-          "INSERT INTO story_map_slices (id, map_id, title, position) VALUES (?, ?, ?, 0)",
-        )
-        .bind(id, mapId, title)
-        .run();
-      await this.placeAt(
+      const placement = await this.planPlacement(
         "story_map_slices",
         { where: "map_id = ?", binds: [mapId] },
         id,
         index,
       );
-      await this.touch(mapId).run();
-      const row = await this.d1
-        .prepare("SELECT position FROM story_map_slices WHERE id = ?")
-        .bind(id)
-        .first<{ position: number }>();
-      return { id, title, position: row?.position ?? 0 };
+      const slice = { id, title, position: placement.position };
+      await this.commit(
+        mapId,
+        [
+          this.d1
+            .prepare(
+              "INSERT INTO story_map_slices (id, map_id, title, position) VALUES (?, ?, ?, 0)",
+            )
+            .bind(id, mapId, title),
+          ...placement.statements,
+        ],
+        slice,
+      );
+      return slice;
     });
   }
 
   async renameSlice(mapId: string, sliceId: string, title: string): Repo<void> {
     return this.guard(async () => {
-      await this.d1.batch([
+      await this.commit(mapId, [
         this.d1
           .prepare(
             "UPDATE story_map_slices SET title = ? WHERE id = ? AND map_id = ?",
           )
           .bind(title, sliceId, mapId),
-        this.touch(mapId),
       ]);
     });
   }
 
   async moveSlice(mapId: string, sliceId: string, index: number): Repo<void> {
     return this.guard(async () => {
-      await this.placeAt(
+      const placement = await this.planPlacement(
         "story_map_slices",
         { where: "map_id = ?", binds: [mapId] },
         sliceId,
         index,
       );
-      await this.touch(mapId).run();
+      await this.commit(mapId, placement.statements);
     });
   }
 
@@ -618,12 +677,11 @@ export class D1StoryMapRepository implements StoryMapRepository {
           );
         });
       }
-      await this.d1.batch([
+      await this.commit(mapId, [
         ...renumber,
         this.d1
           .prepare("DELETE FROM story_map_slices WHERE id = ? AND map_id = ?")
           .bind(sliceId, mapId),
-        this.touch(mapId),
       ]);
     });
   }
@@ -639,43 +697,45 @@ export class D1StoryMapRepository implements StoryMapRepository {
   }): Repo<StoryMapCard> {
     return this.guard(async () => {
       const id = ulid();
-      await this.d1
-        .prepare(
-          `INSERT INTO story_map_cards (id, map_id, task_id, slice_id, position, idea_title, note, story_id)
-           VALUES (?, ?, ?, ?, 0, ?, ?, ?)`,
-        )
-        .bind(
-          id,
-          input.mapId,
-          input.taskId,
-          input.sliceId,
-          input.ideaTitle,
-          input.note,
-          input.storyId,
-        )
-        .run();
-      await this.placeAt(
+      const placement = await this.planPlacement(
         "story_map_cards",
         CARD_CELL_SCOPE(input.taskId, input.sliceId),
         id,
         input.index,
       );
-      await this.touch(input.mapId).run();
-      const row = await this.d1
-        .prepare("SELECT position FROM story_map_cards WHERE id = ?")
-        .bind(id)
-        .first<{ position: number }>();
-      return {
+      const card: StoryMapCard = {
         id,
         taskId: input.taskId,
         sliceId: input.sliceId,
-        position: row?.position ?? 0,
+        position: placement.position,
         ideaTitle: input.ideaTitle,
         note: input.note,
         storyId: input.storyId,
         storyState: input.storyId === null ? "idea" : "linked",
         story: null,
       };
+      await this.commit(
+        input.mapId,
+        [
+          this.d1
+            .prepare(
+              `INSERT INTO story_map_cards (id, map_id, task_id, slice_id, position, idea_title, note, story_id)
+               VALUES (?, ?, ?, ?, 0, ?, ?, ?)`,
+            )
+            .bind(
+              id,
+              input.mapId,
+              input.taskId,
+              input.sliceId,
+              input.ideaTitle,
+              input.note,
+              input.storyId,
+            ),
+          ...placement.statements,
+        ],
+        card,
+      );
+      return card;
     });
   }
 
@@ -690,7 +750,7 @@ export class D1StoryMapRepository implements StoryMapRepository {
       };
       if (patch.ideaTitle !== undefined) set.ideaTitle = patch.ideaTitle;
       if (patch.note !== undefined) set.note = patch.note;
-      await this.db
+      const update = this.db
         .update(storyMapCardsTable)
         .set(set)
         .where(
@@ -698,8 +758,11 @@ export class D1StoryMapRepository implements StoryMapRepository {
             eq(storyMapCardsTable.id, cardId),
             eq(storyMapCardsTable.mapId, mapId),
           ),
-        );
-      await this.touch(mapId).run();
+        )
+        .toSQL();
+      await this.commit(mapId, [
+        this.d1.prepare(update.sql).bind(...update.params),
+      ]);
     });
   }
 
@@ -709,19 +772,20 @@ export class D1StoryMapRepository implements StoryMapRepository {
     to: { taskId: string; sliceId: string | null; index: number },
   ): Repo<void> {
     return this.guard(async () => {
-      await this.d1
-        .prepare(
-          "UPDATE story_map_cards SET task_id = ?, slice_id = ?, updated_at = ? WHERE id = ? AND map_id = ?",
-        )
-        .bind(to.taskId, to.sliceId, new Date().toISOString(), cardId, mapId)
-        .run();
-      await this.placeAt(
+      const placement = await this.planPlacement(
         "story_map_cards",
         CARD_CELL_SCOPE(to.taskId, to.sliceId),
         cardId,
         to.index,
       );
-      await this.touch(mapId).run();
+      await this.commit(mapId, [
+        this.d1
+          .prepare(
+            "UPDATE story_map_cards SET task_id = ?, slice_id = ?, updated_at = ? WHERE id = ? AND map_id = ?",
+          )
+          .bind(to.taskId, to.sliceId, new Date().toISOString(), cardId, mapId),
+        ...placement.statements,
+      ]);
     });
   }
 
@@ -731,24 +795,22 @@ export class D1StoryMapRepository implements StoryMapRepository {
     storyId: string | null,
   ): Repo<void> {
     return this.guard(async () => {
-      await this.d1.batch([
+      await this.commit(mapId, [
         this.d1
           .prepare(
             "UPDATE story_map_cards SET story_id = ?, updated_at = ? WHERE id = ? AND map_id = ?",
           )
           .bind(storyId, new Date().toISOString(), cardId, mapId),
-        this.touch(mapId),
       ]);
     });
   }
 
   async deleteCard(mapId: string, cardId: string): Repo<void> {
     return this.guard(async () => {
-      await this.d1.batch([
+      await this.commit(mapId, [
         this.d1
           .prepare("DELETE FROM story_map_cards WHERE id = ? AND map_id = ?")
           .bind(cardId, mapId),
-        this.touch(mapId),
       ]);
     });
   }
@@ -774,35 +836,6 @@ export class D1StoryMapRepository implements StoryMapRepository {
       return row
         ? { userId: row.user_id, seq: row.seq, result: row.result }
         : null;
-    });
-  }
-
-  async recordOp(input: {
-    mapId: string;
-    opId: string;
-    userId: string;
-    result: string;
-  }): Repo<number> {
-    return this.guard(async () => {
-      const now = new Date().toISOString();
-      await this.d1.batch([
-        this.d1
-          .prepare(
-            "UPDATE story_maps SET seq = seq + 1, updated_at = ? WHERE id = ?",
-          )
-          .bind(now, input.mapId),
-        this.d1
-          .prepare(
-            `INSERT INTO story_map_ops (map_id, op_id, user_id, seq, result, created_at)
-             SELECT id, ?, ?, seq, ?, ? FROM story_maps WHERE id = ?`,
-          )
-          .bind(input.opId, input.userId, input.result, now, input.mapId),
-      ]);
-      const row = await this.d1
-        .prepare("SELECT seq FROM story_maps WHERE id = ?")
-        .bind(input.mapId)
-        .first<{ seq: number }>();
-      return row?.seq ?? 0;
     });
   }
 
@@ -876,7 +909,6 @@ export class D1StoryMapRepository implements StoryMapRepository {
     projectId: string;
     mapId: string;
     cardId: string;
-    opId?: string;
     actorUserId: string;
     title: string;
     description: string;
@@ -934,7 +966,7 @@ export class D1StoryMapRepository implements StoryMapRepository {
             storyId,
           ),
         this.touch(input.mapId),
-        ...(input.opId === undefined
+        ...(this.op === undefined
           ? []
           : [
               this.d1
@@ -950,7 +982,7 @@ export class D1StoryMapRepository implements StoryMapRepository {
                      json_object('storyId', s.id, 'storyNumber', s.story_number), ?
                    FROM story_maps m, stories s WHERE m.id = ? AND s.id = ?`,
                 )
-                .bind(input.opId, input.actorUserId, now, input.mapId, storyId),
+                .bind(this.op.opId, this.op.userId, now, input.mapId, storyId),
             ]),
       ]);
       const created = await this.d1

@@ -210,8 +210,6 @@ type Target = {
   projectId: string;
   userId: string;
   mapId: string;
-  /** The live op being applied; lets a command record itself atomically. */
-  opId?: string;
 };
 
 /**
@@ -386,7 +384,6 @@ export async function applyStoryMapCommand(
         createStoryFromCard(deps, {
           ...target,
           cardId: command.cardId,
-          opId: target.opId,
           title: command.title,
           description: command.description,
           type: command.storyType,

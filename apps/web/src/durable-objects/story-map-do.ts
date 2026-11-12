@@ -1,4 +1,3 @@
-import { ok } from "neverthrow";
 import {
   applyStoryMapCommand,
   parseStoryMapCommand,
@@ -69,9 +68,9 @@ export class StoryMapDO {
     private readonly env: Bindings,
   ) {}
 
-  private deps() {
+  private deps(op?: { opId: string; userId: string }) {
     return {
-      storyMapRepository: new D1StoryMapRepository(this.env.DB),
+      storyMapRepository: new D1StoryMapRepository(this.env.DB, op),
       projectRepository: new D1ProjectRepository(this.env.DB),
     };
   }
@@ -325,8 +324,7 @@ export class StoryMapDO {
       return reject("invalid");
     }
 
-    const deps = this.deps();
-    const repository = deps.storyMapRepository;
+    const repository = this.deps().storyMapRepository;
 
     const recorded = await repository.findOp(attachment.mapId, opId);
     if (recorded.isErr()) {
@@ -344,6 +342,9 @@ export class StoryMapDO {
       };
     }
 
+    // Every write of the command carries its seq and op record in its own
+    // batch, so a crash can never leave the effect without the op.
+    const deps = this.deps({ opId, userId: attachment.userId });
     const structure = await deps.storyMapRepository.getStructure(
       attachment.projectId,
       attachment.mapId,
@@ -357,7 +358,7 @@ export class StoryMapDO {
 
     const applied = await applyStoryMapCommand(
       deps,
-      { ...attachment, opId },
+      attachment,
       structure.value,
       command.value,
     );
@@ -365,29 +366,17 @@ export class StoryMapDO {
       return reject(applied.error);
     }
 
-    // Commands that write their own op record in the same batch as their
-    // effect (story creation) are already recorded here.
-    const selfRecorded = await repository.findOp(attachment.mapId, opId);
-    if (selfRecorded.isErr()) {
+    const recordedNow = await repository.findOp(attachment.mapId, opId);
+    if (recordedNow.isErr() || !recordedNow.value) {
       return reject("internal");
     }
-    const seq = selfRecorded.value
-      ? ok(selfRecorded.value.seq)
-      : await repository.recordOp({
-          mapId: attachment.mapId,
-          opId,
-          userId: attachment.userId,
-          result: JSON.stringify(applied.value ?? null),
-        });
-    if (seq.isErr()) {
-      return reject("internal");
-    }
+    const seq = recordedNow.value.seq;
     return {
       kind: "acked",
-      seq: seq.value,
+      seq,
       result: applied.value ?? null,
       duplicate: false,
-      publish: () => this.publish(attachment, seq.value, opId),
+      publish: () => this.publish(attachment, seq, opId),
     };
   }
 
