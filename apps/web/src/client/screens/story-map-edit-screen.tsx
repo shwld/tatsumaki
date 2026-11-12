@@ -1,26 +1,15 @@
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type FormEvent,
-} from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router";
 
 import { ProjectPage } from "../components/project-page";
 import { StoryMapBoard } from "../components/story-map-board";
-import { useStoryMapLive } from "../lib/use-story-map-live";
-import { useAuthError } from "../contexts/auth-error-context";
+import { useStoryMapDetail } from "../lib/use-story-map-detail";
 import {
-  fetchStoryMap,
-  sendStoryMapCommand,
-  type StoryMapDetail,
-  type StoryMapMetadataCommand,
-} from "../lib/story-maps-api";
-import { projectStoryMapsPath } from "../lib/story-routes";
+  projectStoryMapEditPath,
+  projectStoryMapsPath,
+} from "../lib/story-routes";
 import {
-  STORY_MAP_GOAL_MAX,
   STORY_MAP_PERSONA_MAX,
   STORY_MAP_TITLE_MAX,
 } from "../../shared/story-map-limits";
@@ -79,114 +68,9 @@ export function StoryMapEditScreen() {
     projectId: string;
     mapId: string;
   }>();
-  const { notifySessionExpired } = useAuthError();
-  const [loaded, setLoaded] = useState<StoryMapDetail | null>(null);
-  const [loadError, setLoadError] = useState(false);
-  const [reloadKey, setReloadKey] = useState(0);
-  const [title, setTitle] = useState("");
-  const [goal, setGoal] = useState("");
   const [newPersona, setNewPersona] = useState("");
-  const savedMeta = useRef<{ title: string; goal: string } | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<{
-    kind: "error" | "status";
-    text: string;
-  } | null>(null);
-
-  useEffect(() => {
-    savedMeta.current = null;
-  }, [projectId, mapId]);
-
-  useEffect(() => {
-    let ignore = false;
-    setLoadError(false);
-    void fetchStoryMap(projectId, mapId).then((result) => {
-      if (ignore) return;
-      if (!result.ok) {
-        if (result.status === 401) return notifySessionExpired();
-        return setLoadError(true);
-      }
-      setLoaded(result.value);
-      // A reload after a persona change or a failed command must not replace
-      // a draft the user has not saved.
-      const previous = savedMeta.current;
-      const next = {
-        title: result.value.structure.map.title,
-        goal: result.value.structure.map.achievementGoal,
-      };
-      savedMeta.current = next;
-      setTitle((draft) =>
-        previous === null || draft === previous.title ? next.title : draft,
-      );
-      setGoal((draft) =>
-        previous === null || draft === previous.goal ? next.goal : draft,
-      );
-    });
-    return () => {
-      ignore = true;
-    };
-  }, [projectId, mapId, reloadKey, notifySessionExpired]);
-
-  // The previous map stays in state while the next one loads; never edit it
-  // under the new route.
-  const detail = loaded?.structure.map.id === mapId ? loaded : null;
-
-  const live = useStoryMapLive(projectId, mapId);
-  const reload = useCallback(() => setReloadKey((key) => key + 1), []);
-
-  // Another editor's metadata change arrives over the socket; refetch so the
-  // form and archive control follow it while unsaved drafts are kept.
-  const liveMeta = live.state.structure
-    ? JSON.stringify([
-        live.state.structure.map.title,
-        live.state.structure.map.achievementGoal,
-        live.state.structure.map.archivedAt,
-        live.state.structure.personas,
-      ])
-    : null;
-  const loadedMeta = loaded
-    ? JSON.stringify([
-        loaded.structure.map.title,
-        loaded.structure.map.achievementGoal,
-        loaded.structure.map.archivedAt,
-        loaded.structure.personas,
-      ])
-    : null;
-  useEffect(() => {
-    if (liveMeta !== null && loadedMeta !== null && liveMeta !== loadedMeta) {
-      reload();
-    }
-  }, [liveMeta, loadedMeta, reload]);
-
-  const run = async (
-    command: StoryMapMetadataCommand,
-    successText: string | null,
-  ): Promise<boolean> => {
-    setBusy(true);
-    setMessage(null);
-    const result = await sendStoryMapCommand(projectId, mapId, command);
-    setBusy(false);
-    if (result.ok) {
-      if (successText) setMessage({ kind: "status", text: successText });
-      reload();
-      return true;
-    }
-    if (result.status === 401) {
-      notifySessionExpired();
-      return false;
-    }
-    const text =
-      result.status === 403
-        ? t("storyMapEditScreen.forbidden")
-        : result.code === "INVALID_INPUT" || result.code === "invalid"
-          ? t("storyMapEditScreen.titleRequired")
-          : result.status === 409
-            ? t("storyMapEditScreen.archivedConflict")
-            : t("storyMapEditScreen.actionFailed");
-    setMessage({ kind: "error", text });
-    reload();
-    return false;
-  };
+  const { detail, loadError, reload, live, run, busy, message } =
+    useStoryMapDetail(projectId, mapId);
 
   const back = (
     <Link
@@ -230,26 +114,6 @@ export function StoryMapEditScreen() {
   const canEdit = detail.role !== "viewer";
   const editable = canEdit && !archived;
 
-  const saveMetadata = (event: FormEvent) => {
-    event.preventDefault();
-    if (title.trim() === "") {
-      return setMessage({
-        kind: "error",
-        text: t("storyMapEditScreen.titleRequired"),
-      });
-    }
-    // Only what this editor changed, so a save does not restore a field
-    // someone else edited meanwhile.
-    void run(
-      {
-        type: "updateMap",
-        ...(title !== map.title ? { title } : {}),
-        ...(goal !== map.achievementGoal ? { achievementGoal: goal } : {}),
-      },
-      t("storyMapEditScreen.saved"),
-    );
-  };
-
   const addPersona = (event: FormEvent) => {
     event.preventDefault();
     if (newPersona.trim() === "") return;
@@ -280,44 +144,21 @@ export function StoryMapEditScreen() {
         </p>
       ) : null}
 
-      {editable ? (
-        <form onSubmit={saveMetadata} className="mb-6 max-w-xl space-y-3">
-          <label className="block text-sm text-gray-700">
-            {t("storyMapEditScreen.titleLabel")}
-            <input
-              className={`mt-1 ${inputClass}`}
-              value={title}
-              maxLength={STORY_MAP_TITLE_MAX}
-              onChange={(event) => setTitle(event.target.value)}
-            />
-          </label>
-          <label className="block text-sm text-gray-700">
-            {t("storyMapEditScreen.goalLabel")}
-            <textarea
-              className={`mt-1 ${inputClass}`}
-              rows={3}
-              value={goal}
-              maxLength={STORY_MAP_GOAL_MAX}
-              onChange={(event) => setGoal(event.target.value)}
-            />
-          </label>
-          <button
-            type="submit"
-            disabled={busy}
-            className="rounded-md border border-blue-600 bg-blue-600 px-3 py-1 text-sm text-white hover:bg-blue-700 disabled:opacity-60"
+      <div className="mb-4 flex max-w-xl items-start justify-between gap-3 text-sm text-gray-700">
+        <p
+          className={`whitespace-pre-wrap break-words ${map.achievementGoal ? "" : "text-gray-500"}`}
+        >
+          {map.achievementGoal || t("storyMapEditScreen.goalNone")}
+        </p>
+        {canEdit ? (
+          <Link
+            to={projectStoryMapEditPath(projectId, mapId)}
+            className="shrink-0 text-blue-700 underline"
           >
-            {busy
-              ? t("storyMapEditScreen.saving")
-              : t("storyMapEditScreen.save")}
-          </button>
-        </form>
-      ) : (
-        <div className="mb-6 max-w-xl text-sm text-gray-700">
-          <p className="whitespace-pre-wrap break-words">
-            {map.achievementGoal || t("storyMapEditScreen.goalNone")}
-          </p>
-        </div>
-      )}
+            {t("storyMapEditScreen.edit")}
+          </Link>
+        ) : null}
+      </div>
 
       <section className="mb-6 max-w-xl">
         <h2 className="mb-2 text-base font-semibold text-gray-900">
@@ -402,21 +243,6 @@ export function StoryMapEditScreen() {
           }
           send={live.send}
         />
-      ) : null}
-
-      {canEdit ? (
-        <button
-          type="button"
-          disabled={busy}
-          className={buttonClass}
-          onClick={() =>
-            void run({ type: "updateMap", archived: !archived }, null)
-          }
-        >
-          {archived
-            ? t("storyMapEditScreen.restore")
-            : t("storyMapEditScreen.archive")}
-        </button>
       ) : null}
     </ProjectPage>
   );

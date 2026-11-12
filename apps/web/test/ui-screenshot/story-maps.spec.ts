@@ -129,24 +129,30 @@ test("story map: create, edit, archive and restore", async ({ page }) => {
   await page.getByRole("button", { name: "作成", exact: true }).click();
 
   await expect(page).toHaveURL(/\/story-maps\/map-1$/);
-  await expect(page.getByLabel("タイトル")).toHaveValue("オンボーディング");
+  await expect(page.getByLabel("タイトル")).toHaveCount(0);
+  await expect(page.getByText("初回 story まで到達する")).toBeVisible();
   await expect(page.getByLabel("主要ユーザー名")).toHaveCount(2);
 
+  await page.getByRole("link", { name: "編集", exact: true }).click();
+  await expect(page).toHaveURL(/\/story-maps\/map-1\/edit$/);
+  await expect(page.getByLabel("タイトル")).toHaveValue("オンボーディング");
   await page.getByLabel("タイトル").fill("オンボーディング改善");
   await page.getByRole("button", { name: "保存", exact: true }).click();
-  await expect(page.getByText("保存しました")).toBeVisible();
+  await expect(page).toHaveURL(/\/story-maps\/map-1$/);
+  await expect(
+    page.getByRole("heading", { name: "オンボーディング改善" }),
+  ).toBeVisible();
   await page.getByLabel("主要ユーザーを追加").fill("閲覧者");
   await page.getByRole("button", { name: "追加", exact: true }).click();
   await expect(page.getByLabel("主要ユーザー名")).toHaveCount(3);
 
-  await page.reload();
-  await expect(page.getByLabel("タイトル")).toHaveValue("オンボーディング改善");
+  await page.getByRole("link", { name: "編集", exact: true }).click();
   await page.getByRole("button", { name: "アーカイブ", exact: true }).click();
   await expect(
     page.getByText("このマップはアーカイブ済みです。復元すると編集できます"),
   ).toBeVisible();
 
-  await page.getByRole("link", { name: "Story Map 一覧に戻る" }).click();
+  await page.goto("/projects/project-1/story-maps");
   await expect(page.getByText("Story Map がありません。")).toBeVisible();
   await page.getByLabel("アーカイブ済みも表示").check();
   await expect(page.getByText("アーカイブ済み", { exact: true })).toBeVisible();
@@ -178,6 +184,10 @@ test("story map: viewer sees no edit controls", async ({ page }) => {
 
   await page.goto("/projects/project-1/story-maps/map-1");
   await expect(page.getByText("閲覧のみできます")).toBeVisible();
-  await expect(page.getByRole("button", { name: "保存" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "編集" })).toHaveCount(0);
   await expect(page.getByLabel("主要ユーザー名")).toHaveCount(0);
+
+  await page.goto("/projects/project-1/story-maps/map-1/edit");
+  await expect(page.getByText("閲覧のみできます")).toBeVisible();
+  await expect(page.getByRole("button", { name: "保存" })).toHaveCount(0);
 });
