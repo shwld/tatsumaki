@@ -179,14 +179,23 @@ function toStorySummary(
   };
 }
 
-function storyUnchangedGuard(
-  storyId: string,
-  current: { status: string; isIcebox: number; iterationId: string | null },
-): SQL {
+type StoryGuardState = {
+  status: string;
+  isIcebox: number;
+  iterationId: string | null;
+  /** Set when the write is computed from the story's position. */
+  position?: number;
+};
+
+function storyUnchangedGuard(storyId: string, current: StoryGuardState): SQL {
   return sql`exists (select 1 from ${storiesTable} as target where target.id = ${storyId} and target.status = ${current.status} and target.is_icebox = ${current.isIcebox} and ${
     current.iterationId === null
       ? sql`target.iteration_id is null`
       : sql`target.iteration_id = ${current.iterationId}`
+  } and ${
+    current.position === undefined
+      ? sql`1 = 1`
+      : sql`target.position = ${current.position}`
   } and target.archived_at is null)`;
 }
 
@@ -891,7 +900,7 @@ export class D1StoryRepository implements StoryRepository {
   private buildOwnerReplacementStatements(
     projectId: string,
     storyId: string,
-    current: { status: string; isIcebox: number; iterationId: string | null },
+    current: StoryGuardState,
     ownerIds: string[],
   ) {
     const wantedOwnerIds = sql`select value from json_each(${JSON.stringify([...new Set(ownerIds)])})`;
@@ -1311,20 +1320,28 @@ export class D1StoryRepository implements StoryRepository {
       shouldClearIterationId = !assignedCurrentIteration;
     }
 
+    const placement = nextIsIcebox ? undefined : input.placement;
+    // A placement is computed from the position read above, so a concurrent
+    // reorder of this story must fail the write instead of corrupting the order.
+    const guardState: StoryGuardState = {
+      status: current.status,
+      isIcebox: current.isIcebox,
+      iterationId: current.iterationId,
+      ...(placement ? { position: current.position } : {}),
+    };
     const ownerStatements =
       input.ownerIds === undefined
         ? []
         : this.buildOwnerReplacementStatements(
             input.projectId,
             input.id,
-            current,
+            guardState,
             input.ownerIds,
           );
     const ownerIdsAreAllCurrentOwners =
       input.ownerIds === undefined || input.ownerIds.length === 0
         ? sql`1 = 1`
         : sql`not exists (select 1 from json_each(${JSON.stringify([...new Set(input.ownerIds)])}) as wanted where wanted.value not in (select ${storyOwnersTable.userId} from ${storyOwnersTable} where ${storyOwnersTable.storyId} = ${input.id}))`;
-    const placement = nextIsIcebox ? undefined : input.placement;
     const shouldMoveToTop =
       placement === undefined &&
       input.moveToTop === true &&
@@ -1386,6 +1403,7 @@ export class D1StoryRepository implements StoryRepository {
           current.iterationId === null
             ? isNull(storiesTable.iterationId)
             : eq(storiesTable.iterationId, current.iterationId),
+          ...(placement ? [eq(storiesTable.position, current.position)] : []),
           // Owners are replaced before this statement in the same batch; the
           // story only updates when that replacement took effect.
           ownerIdsAreAllCurrentOwners,
@@ -1418,7 +1436,7 @@ export class D1StoryRepository implements StoryRepository {
       input.projectId,
       input.id,
       input,
-      sql`${storyUnchangedGuard(input.id, current)} and ${ownerIdsAreAllCurrentOwners}`,
+      sql`${storyUnchangedGuard(input.id, guardState)} and ${ownerIdsAreAllCurrentOwners}`,
     );
     const preStatements: BatchItem<"sqlite">[] = [
       ...ownerStatements,
