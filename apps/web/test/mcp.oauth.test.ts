@@ -161,6 +161,9 @@ describe("MCP OAuth", () => {
       expect(response.status).toBe(200);
       expect(response.headers.get("x-frame-options")).toBe("DENY");
       expect(response.headers.get("referrer-policy")).toBe("same-origin");
+      expect(response.headers.get("content-security-policy")).toContain(
+        "form-action 'self' https://claude.example;",
+      );
       expect(response.headers.get("location")).toBeNull();
     });
 

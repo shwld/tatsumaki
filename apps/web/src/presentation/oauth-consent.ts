@@ -25,7 +25,7 @@ function escapeHtml(value: string) {
     .replaceAll("'", "&#39;");
 }
 
-function htmlResponse(body: string, status = 200) {
+function htmlResponse(body: string, status = 200, formAction = "'self'") {
   return new Response(body, {
     status,
     headers: {
@@ -35,17 +35,29 @@ function htmlResponse(body: string, status = 200) {
       // no-referrer makes browsers send `Origin: null` on the consent form POST,
       // which handleConsentDecision rejects.
       "referrer-policy": "same-origin",
-      "content-security-policy":
-        "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+      "content-security-policy": `default-src 'none'; style-src 'unsafe-inline'; form-action ${formAction}; frame-ancestors 'none'; base-uri 'none'`,
     },
   });
 }
 
-function page(title: string, content: string, status = 200) {
+function page(
+  title: string,
+  content: string,
+  status = 200,
+  formAction?: string,
+) {
   return htmlResponse(
     `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)}</title><style>body{font-family:system-ui,sans-serif;max-width:32rem;margin:3rem auto;padding:0 1rem;color:#222}h1{font-size:1.25rem}dl{background:#f5f5f5;padding:1rem;border-radius:6px}dt{font-weight:600;font-size:.85rem;color:#555}dd{margin:0 0 .75rem;word-break:break-all}.actions{display:flex;gap:.75rem;margin-top:1.5rem}button{font:inherit;padding:.5rem 1.25rem;border-radius:6px;border:1px solid #888;cursor:pointer}button.approve{background:#1a56db;color:#fff;border-color:#1a56db}</style></head><body>${content}</body></html>`,
     status,
+    formAction,
   );
+}
+
+// Browsers apply form-action to the redirect that follows the submission, so
+// the approval's redirect to the client's callback must be allowed here.
+function redirectSource(redirectUri: string) {
+  const { origin, protocol } = new URL(redirectUri);
+  return origin === "null" ? protocol : origin;
 }
 
 function errorPage(message: string, status = 400) {
@@ -143,6 +155,8 @@ export async function renderConsentPage(
 <button type="submit" name="decision" value="approve" class="approve">承認</button>
 </div>
 </form>`,
+    200,
+    `'self' ${redirectSource(authRequest.redirectUri)}`,
   );
 }
 
