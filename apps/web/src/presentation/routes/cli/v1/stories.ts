@@ -8,6 +8,7 @@ import {
   moveStoryToPosition,
   parseStoryPlacement,
   resolveStoryPlacementAnchor,
+  toPlacementTarget,
   type StoryPlacement,
 } from "../../../../application/usecases/move-story-to-position";
 import { reorderStories } from "../../../../application/usecases/reorder-stories";
@@ -23,6 +24,7 @@ import {
 } from "../../../../domain/entities/story-section";
 import { todayIso } from "../../../../shared/date/today-iso";
 import { STORY_ARCHIVED_ERROR } from "../../../../domain/repositories/story-repository";
+import type { StoryPlacementTarget } from "../../../../domain/repositories/story-repository";
 import { D1IterationRepository } from "../../../../infrastructure/db/repositories/d1-iteration-repository";
 import { INVALID_STORY_STATUS_ERROR } from "../../../../application/usecases/story-input";
 import { createStory } from "../../../../application/usecases/create-story";
@@ -212,6 +214,7 @@ cliV1StoriesRoute.post("/:projectId/stories", async (c) => {
     return c.json({ error: "Story point must be a number or null" }, 400);
   }
   let placement: StoryPlacement | null = null;
+  let placementTarget: StoryPlacementTarget | null = null;
   if (payload.placement !== undefined) {
     const parsedPlacement = parseStoryPlacement(payload.placement);
     if (parsedPlacement.isErr()) {
@@ -233,6 +236,7 @@ cliV1StoriesRoute.post("/:projectId/stories", async (c) => {
       const response = toMoveStoryErrorResponse(anchor.error);
       return c.json({ error: response.message }, response.status);
     }
+    placementTarget = toPlacementTarget(placement, anchor.value);
   }
   const projectRepository = new D1ProjectRepository(c.env.DB);
   const projectResult = await projectRepository.findById(projectId);
@@ -260,6 +264,7 @@ cliV1StoriesRoute.post("/:projectId/stories", async (c) => {
       isIcebox: payload.isIcebox ?? false,
       storyPoint: payload.storyPoint ?? null,
       allowedStoryPoints,
+      ...(placementTarget ? { placement: placementTarget } : {}),
       labelIds: Array.isArray(payload.labelIds) ? payload.labelIds : [],
       actorUserId: membership.member.userId,
       actorName: currentUser.email ?? currentUser.id,
@@ -273,15 +278,6 @@ cliV1StoriesRoute.post("/:projectId/stories", async (c) => {
   }
 
   if (placement) {
-    const moved = await moveStoryToPosition(repository, {
-      projectId,
-      storyNumber: result.value.storyNumber,
-      placement,
-    });
-    if (moved.isErr()) {
-      const response = toMoveStoryErrorResponse(moved.error);
-      return c.json({ error: response.message }, response.status);
-    }
     const positioned = await repository.findByStoryNumber(
       projectId,
       result.value.storyNumber,

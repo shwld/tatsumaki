@@ -2,6 +2,9 @@ import { err, ok, type Result } from "neverthrow";
 import type { Story } from "../../domain/entities/story";
 import {
   STORY_ARCHIVED_ERROR,
+  STORY_PLACEMENT_ANCHOR_NOT_FOUND_ERROR,
+  STORY_PLACEMENT_ANCHOR_NOT_IN_BACKLOG_ERROR,
+  type StoryPlacementTarget,
   type StoryRepository,
   type StoryRepositoryError,
 } from "../../domain/repositories/story-repository";
@@ -10,9 +13,9 @@ import { reorderStories } from "./reorder-stories";
 export const STORY_MOVE_TARGET_NOT_FOUND_ERROR =
   "STORY_MOVE_TARGET_NOT_FOUND_ERROR" as const;
 export const STORY_MOVE_ANCHOR_NOT_FOUND_ERROR =
-  "STORY_MOVE_ANCHOR_NOT_FOUND_ERROR" as const;
+  STORY_PLACEMENT_ANCHOR_NOT_FOUND_ERROR;
 export const STORY_MOVE_NOT_IN_BACKLOG_ERROR =
-  "STORY_MOVE_NOT_IN_BACKLOG_ERROR" as const;
+  STORY_PLACEMENT_ANCHOR_NOT_IN_BACKLOG_ERROR;
 export const STORY_MOVE_ANCHOR_IS_TARGET_ERROR =
   "STORY_MOVE_ANCHOR_IS_TARGET_ERROR" as const;
 export const INVALID_STORY_PLACEMENT_ERROR =
@@ -52,6 +55,16 @@ export function parseStoryPlacement(
     return ok({ position, relativeToStoryNumber });
   }
   return err(INVALID_STORY_PLACEMENT_ERROR);
+}
+
+export function toPlacementTarget(
+  placement: StoryPlacement,
+  anchor: Story | null,
+): StoryPlacementTarget {
+  if (placement.position === "top" || placement.position === "end") {
+    return { position: placement.position };
+  }
+  return { position: placement.position, anchorId: anchor?.id ?? "" };
 }
 
 /**

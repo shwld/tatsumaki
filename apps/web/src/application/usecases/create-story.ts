@@ -8,6 +8,7 @@ import {
 } from "../../domain/entities/story";
 import type { Story } from "../../domain/entities/story";
 import type {
+  StoryPlacementTarget,
   StoryRepository,
   StoryRepositoryError,
 } from "../../domain/repositories/story-repository";
@@ -71,6 +72,7 @@ export async function createStory(
     requesterId?: string | null;
     releaseDate?: string | null;
     allowedStoryPoints?: number[];
+    placement?: StoryPlacementTarget;
     actorUserId: string;
     actorName: string;
   },
@@ -145,6 +147,7 @@ export async function createStory(
     ownerIds: ownerIdsResult.value,
     requesterId: requesterIdResult.value,
     releaseDate: input.releaseDate ?? null,
+    ...(input.placement ? { placement: input.placement } : {}),
   });
 
   if (result.isErr()) {
