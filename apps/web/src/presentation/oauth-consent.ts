@@ -32,7 +32,9 @@ function htmlResponse(body: string, status = 200) {
       "content-type": "text/html; charset=utf-8",
       "cache-control": "no-store",
       "x-frame-options": "DENY",
-      "referrer-policy": "no-referrer",
+      // no-referrer makes browsers send `Origin: null` on the consent form POST,
+      // which handleConsentDecision rejects.
+      "referrer-policy": "same-origin",
       "content-security-policy":
         "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
     },
