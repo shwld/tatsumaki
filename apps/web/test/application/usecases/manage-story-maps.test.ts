@@ -516,10 +516,16 @@ describe("manage story maps", () => {
     it("records the op and advances seq in the same batch as the story", async () => {
       const { target, card, map } = await ideaCard();
       const opId = "01JNMVQ8Q9Y6P5KH1XZ4V7C2OP";
-      const created = (
-        await createStoryFromCard(deps, {
-          ...target,
+      const bound = {
+        ...deps,
+        storyMapRepository: new D1StoryMapRepository(env.DB, {
           opId,
+          userId: OWNER,
+        }),
+      };
+      const created = (
+        await createStoryFromCard(bound, {
+          ...target,
           cardId: card.id,
           title: "Atomic",
           description: "",
@@ -531,6 +537,78 @@ describe("manage story maps", () => {
       const recorded = (await repository.findOp(map.id, opId))._unsafeUnwrap();
       expect(recorded).toMatchObject({ userId: OWNER, seq: 1 });
       expect(JSON.parse(recorded?.result ?? "null")).toEqual(created);
+      expect((await repository.getSeq(map.id))._unsafeUnwrap()).toBe(1);
+    });
+
+    it("records every other write with its op in the same batch, so a retry finds it", async () => {
+      const { target, card, map, task } = await ideaCard();
+      const repository = new D1StoryMapRepository(env.DB);
+      const bind = (opId: string) => ({
+        ...deps,
+        storyMapRepository: new D1StoryMapRepository(env.DB, {
+          opId,
+          userId: OWNER,
+        }),
+      });
+      const addOp = "01JNMVQ8Q9Y6P5KH1XZ4V7C2A1";
+      const added = (
+        await addCard(bind(addOp), {
+          ...target,
+          taskId: task.id,
+          ideaTitle: "Second",
+          index: 0,
+        })
+      )._unsafeUnwrap();
+      const recordedAdd = (
+        await repository.findOp(map.id, addOp)
+      )._unsafeUnwrap();
+      expect(recordedAdd).toMatchObject({ userId: OWNER, seq: 1 });
+      expect(JSON.parse(recordedAdd?.result ?? "null")).toEqual(added);
+
+      const moveOp = "01JNMVQ8Q9Y6P5KH1XZ4V7C2A2";
+      await moveCard(bind(moveOp), {
+        ...target,
+        cardId: card.id,
+        taskId: task.id,
+        sliceId: null,
+        index: 0,
+      });
+      expect(
+        (await repository.findOp(map.id, moveOp))._unsafeUnwrap(),
+      ).toMatchObject({ seq: 2, result: "null" });
+      expect((await repository.getSeq(map.id))._unsafeUnwrap()).toBe(2);
+    });
+
+    it("commits neither the effect nor the op when the batch fails", async () => {
+      const { target, task, map } = await ideaCard();
+      const repository = new D1StoryMapRepository(env.DB);
+      const opId = "01JNMVQ8Q9Y6P5KH1XZ4V7C2A3";
+      const bound = new D1StoryMapRepository(env.DB, { opId, userId: OWNER });
+      await bound.addCard({
+        mapId: map.id,
+        taskId: task.id,
+        sliceId: null,
+        index: 0,
+        ideaTitle: "Once",
+        note: "",
+        storyId: null,
+      });
+      const replay = await bound.addCard({
+        mapId: map.id,
+        taskId: task.id,
+        sliceId: null,
+        index: 0,
+        ideaTitle: "Twice",
+        note: "",
+        storyId: null,
+      });
+      expect(replay.isErr()).toBe(true);
+      const structure = (
+        await repository.getStructure(target.projectId, map.id)
+      )._unsafeUnwrap();
+      expect(
+        structure?.cards.filter((card) => card.ideaTitle === "Twice"),
+      ).toHaveLength(0);
       expect((await repository.getSeq(map.id))._unsafeUnwrap()).toBe(1);
     });
 

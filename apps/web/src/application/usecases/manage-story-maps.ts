@@ -670,15 +670,13 @@ export type CreateStoryFromCardResult = {
 
 /**
  * Turns an idea card into a new Unstarted (or Icebox) story and links it. The
- * story and the link are written in one batch; the Durable Object records the
- * op id so a retry returns this result instead of creating a second story.
+ * story and the link are written in one batch; a repository bound to the live op
+ * records the op id in that batch, so a retry returns this result instead of creating a second story.
  */
 export async function createStoryFromCard(
   deps: StoryMapDependencies,
   input: MapTarget & {
     cardId: string;
-    /** Recorded with the story in the same batch when the caller is the live path. */
-    opId?: string;
     title: string;
     description: string;
     type: string;
@@ -704,7 +702,6 @@ export async function createStoryFromCard(
     projectId: input.projectId,
     mapId: input.mapId,
     cardId: input.cardId,
-    opId: input.opId,
     actorUserId: input.userId,
     title: title.value,
     description: description.value,
