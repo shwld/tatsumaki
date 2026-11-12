@@ -60,6 +60,7 @@ function MetaForm({
         <input
           className={`mt-1 ${inputClass}`}
           value={title}
+          disabled={busy}
           maxLength={STORY_MAP_TITLE_MAX}
           onChange={(event) => setTitle(event.target.value)}
         />
@@ -70,6 +71,7 @@ function MetaForm({
           className={`mt-1 ${inputClass}`}
           rows={3}
           value={goal}
+          disabled={busy}
           maxLength={STORY_MAP_GOAL_MAX}
           onChange={(event) => setGoal(event.target.value)}
         />
