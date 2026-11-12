@@ -178,4 +178,78 @@ describe("D1StoryRepository placement", () => {
     const history = await repository().listPriorityHistory(PROJECT_ID);
     expect(history._unsafeUnwrap()).toHaveLength(0);
   });
+
+  it("moves a story down and closes the gap without touching later stories", async () => {
+    await createDb(env.DB).insert(storiesTable).values({
+      id: "story-D",
+      storyNumber: 4,
+      projectId: PROJECT_ID,
+      title: "D",
+      description: "-",
+      type: "chore",
+      status: "Unstarted",
+      storyPoint: null,
+      iterationId: null,
+      position: 4,
+      isIcebox: 0,
+    });
+
+    const result = await repository().update({
+      projectId: PROJECT_ID,
+      id: "story-A",
+      title: "A2",
+      placement: { position: "after", anchorId: "story-C" },
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(await backlogTitles()).toEqual(["B", "C", "A2", "D"]);
+    const history = (
+      await repository().listPriorityHistory(PROJECT_ID)
+    )._unsafeUnwrap();
+    expect(history.map((entry) => entry.storyId).sort()).toEqual([
+      "story-A",
+      "story-B",
+      "story-C",
+    ]);
+  });
+
+  it("records the stories a positioned create shifts and leaves the Icebox alone", async () => {
+    await createDb(env.DB)
+      .update(storiesTable)
+      .set({ isIcebox: 1, position: 2 })
+      .where(eq(storiesTable.id, "story-C"));
+
+    await repository().create({
+      ...baseInput("X"),
+      placement: { position: "before", anchorId: "story-A" },
+    });
+
+    const history = (
+      await repository().listPriorityHistory(PROJECT_ID)
+    )._unsafeUnwrap();
+    expect(history.map((entry) => entry.storyId).sort()).toEqual([
+      "story-A",
+      "story-B",
+    ]);
+    const icebox = await createDb(env.DB)
+      .select({ position: storiesTable.position })
+      .from(storiesTable)
+      .where(eq(storiesTable.id, "story-C"))
+      .get();
+    expect(icebox?.position).toBe(2);
+  });
+
+  it("writes nothing extra when the story is already where it was asked to go", async () => {
+    const result = await repository().update({
+      projectId: PROJECT_ID,
+      id: "story-B",
+      title: "B2",
+      placement: { position: "after", anchorId: "story-A" },
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(await backlogTitles()).toEqual(["A", "B2", "C"]);
+    const history = await repository().listPriorityHistory(PROJECT_ID);
+    expect(history._unsafeUnwrap()).toHaveLength(0);
+  });
 });

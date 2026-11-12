@@ -190,63 +190,80 @@ function storyUnchangedGuard(
   } and target.archived_at is null)`;
 }
 
+/** Old position of a story that is not among the non-Icebox stories yet. */
+const NOT_IN_BACKLOG_POSITION = Number.MAX_SAFE_INTEGER;
+
 /**
  * The position a placed story takes, evaluated inside the write itself. A
  * before/after anchor that is archived, in the Icebox or gone yields NULL, which
  * violates NOT NULL on `position` and rolls back the whole batch.
+ *
+ * Moving down past `oldPosition` takes the slot just before the target, since
+ * the stories in between close the gap behind it.
  */
 function placementPositionSql(
   projectId: string,
   storyId: string,
   placement: StoryPlacementTarget,
+  oldPosition: number,
 ): SQL {
+  let target: SQL;
   if (placement.position === "top") {
-    return sql`(select coalesce(min(p.position), 1) from ${storiesTable} as p where p.project_id = ${projectId} and p.id != ${storyId} and p.is_icebox = 0 and p.archived_at is null)`;
+    target = sql`(select coalesce(min(p.position), 1) from ${storiesTable} as p where p.project_id = ${projectId} and p.id != ${storyId} and p.is_icebox = 0 and p.archived_at is null)`;
+  } else if (placement.position === "end") {
+    target = sql`(select coalesce(max(p.position), 0) + 1 from ${storiesTable} as p where p.project_id = ${projectId} and p.id != ${storyId})`;
+  } else {
+    const offset = placement.position === "after" ? 1 : 0;
+    target = sql`(select a.position + ${offset} from ${storiesTable} as a where a.id = ${placement.anchorId} and a.project_id = ${projectId} and a.is_icebox = 0 and a.archived_at is null)`;
   }
-  if (placement.position === "end") {
-    return sql`(select coalesce(max(p.position), 0) + 1 from ${storiesTable} as p where p.project_id = ${projectId} and p.id != ${storyId})`;
-  }
-  const offset = placement.position === "after" ? 1 : 0;
-  return sql`(select a.position + ${offset} from ${storiesTable} as a where a.id = ${placement.anchorId} and a.project_id = ${projectId} and a.is_icebox = 0 and a.archived_at is null)`;
+  return sql`(case when ${target} > ${oldPosition} then ${target} - 1 else ${target} end)`;
 }
 
-/** Makes room at the placed story's position; run after the placed story holds it. */
-function placementShiftSql(
+/**
+ * Moves the non-Icebox stories whose order relative to the placed story
+ * changed by one position each, and records them in the priority history. Run
+ * after the placed story holds its new position.
+ */
+function placementShiftStatements(
   db: DbClient,
   projectId: string,
   storyId: string,
-  placement: StoryPlacementTarget,
+  oldPosition: number,
   guard: SQL,
-  options: { recordHistory: boolean } = { recordHistory: false },
 ): BatchItem<"sqlite">[] {
-  if (placement.position === "end") return [];
-  const shifted = sql`${storiesTable.projectId} = ${projectId} and ${storiesTable.id} != ${storyId} and ${storiesTable.position} >= (select t.position from ${storiesTable} as t where t.id = ${storyId})`;
-  return [
-    ...(options.recordHistory
-      ? [
-          // Runs before the shift, so it reads the positions the shift replaces.
-          db
-            .insert(storyPriorityHistoryTable)
-            .select(
-              sql`select lower(hex(randomblob(16))), ${storiesTable.id}, ${storiesTable.position}, ${storiesTable.position} + 1, CURRENT_TIMESTAMP from ${storiesTable} where ${shifted} and ${guard}`,
-            ),
-        ]
-      : []),
-    db
-      .update(storiesTable)
-      .set({
-        position: sql`${storiesTable.position} + 1`,
-        updatedAt: sql`CURRENT_TIMESTAMP`,
-      })
-      .where(
-        and(
-          eq(storiesTable.projectId, projectId),
-          ne(storiesTable.id, storyId),
-          sql`${storiesTable.position} >= (select t.position from ${storiesTable} as t where t.id = ${storyId})`,
-          guard,
-        ),
-      ),
+  const placedPosition = sql`(select t.position from ${storiesTable} as t where t.id = ${storyId})`;
+  const windows = [
+    {
+      delta: 1,
+      range: sql`${storiesTable.position} >= ${placedPosition} and ${storiesTable.position} < ${oldPosition}`,
+    },
+    ...(oldPosition === NOT_IN_BACKLOG_POSITION
+      ? []
+      : [
+          {
+            delta: -1,
+            range: sql`${storiesTable.position} > ${oldPosition} and ${storiesTable.position} <= ${placedPosition}`,
+          },
+        ]),
   ];
+  return windows.flatMap(({ delta, range }) => {
+    const affected = sql`${storiesTable.projectId} = ${projectId} and ${storiesTable.id} != ${storyId} and ${storiesTable.isIcebox} = 0 and ${storiesTable.archivedAt} is null and ${range}`;
+    return [
+      // Reads the positions the shift below replaces.
+      db
+        .insert(storyPriorityHistoryTable)
+        .select(
+          sql`select lower(hex(randomblob(16))), ${storiesTable.id}, ${storiesTable.position}, ${storiesTable.position} + ${delta}, CURRENT_TIMESTAMP from ${storiesTable} where ${affected} and ${guard}`,
+        ),
+      db
+        .update(storiesTable)
+        .set({
+          position: sql`${storiesTable.position} + ${delta}`,
+          updatedAt: sql`CURRENT_TIMESTAMP`,
+        })
+        .where(and(affected, guard)),
+    ];
+  });
 }
 
 function storyHasAnyLabelId(labelIds: string[]): SQL {
@@ -1009,7 +1026,12 @@ export class D1StoryRepository implements StoryRepository {
 
     let nextPosition: number | SQL;
     if (placement) {
-      nextPosition = placementPositionSql(input.projectId, storyId, placement);
+      nextPosition = placementPositionSql(
+        input.projectId,
+        storyId,
+        placement,
+        NOT_IN_BACKLOG_POSITION,
+      );
     } else if (isBacklogStoryInput(input)) {
       await this.db
         .update(storiesTable)
@@ -1066,11 +1088,11 @@ export class D1StoryRepository implements StoryRepository {
       try {
         await this.db.batch([
           insertStory,
-          ...placementShiftSql(
+          ...placementShiftStatements(
             this.db,
             input.projectId,
             storyId,
-            placement,
+            NOT_IN_BACKLOG_POSITION,
             sql`1 = 1`,
           ),
         ] as [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]]);
@@ -1336,6 +1358,9 @@ export class D1StoryRepository implements StoryRepository {
                 input.projectId,
                 input.id,
                 placement,
+                current.isIcebox === 1
+                  ? NOT_IN_BACKLOG_POSITION
+                  : current.position,
               ),
             }
           : {}),
@@ -1400,27 +1425,24 @@ export class D1StoryRepository implements StoryRepository {
       ...shiftStatement,
       ...labelStatements,
     ];
-    // These read the position the update just wrote, so they follow it and only
-    // apply when it changed a row.
-    const updateApplied = sql`(select changes()) > 0`;
+    // The placed story's history row doubles as the marker that the update
+    // applied; the shifts below read the position it wrote and only run then.
+    const placementMarkerId = ulid();
+    const placementApplied = sql`exists (select 1 from ${storyPriorityHistoryTable} where ${storyPriorityHistoryTable.id} = ${placementMarkerId})`;
+    const placedPosition = sql`(select position from ${storiesTable} where id = ${input.id})`;
     const postStatements: BatchItem<"sqlite">[] = placement
       ? [
-          ...(current.isIcebox === 0
-            ? [
-                this.db
-                  .insert(storyPriorityHistoryTable)
-                  .select(
-                    sql`select ${ulid()}, ${input.id}, ${current.position}, (select position from ${storiesTable} where id = ${input.id}), CURRENT_TIMESTAMP where ${updateApplied}`,
-                  ),
-              ]
-            : []),
-          ...placementShiftSql(
+          this.db
+            .insert(storyPriorityHistoryTable)
+            .select(
+              sql`select ${placementMarkerId}, ${input.id}, ${current.position}, ${placedPosition}, CURRENT_TIMESTAMP where (select changes()) > 0 and (${current.isIcebox} = 1 or ${current.position} != ${placedPosition})`,
+            ),
+          ...placementShiftStatements(
             this.db,
             input.projectId,
             input.id,
-            placement,
-            updateApplied,
-            { recordHistory: true },
+            current.isIcebox === 1 ? NOT_IN_BACKLOG_POSITION : current.position,
+            placementApplied,
           ),
         ]
       : [];
