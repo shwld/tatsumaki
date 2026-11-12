@@ -57,7 +57,8 @@ describe("compareByPanelOrder", () => {
     position: number,
     statusChangedAt = "",
     status: Story["status"] = "Unstarted",
-  ) => ({ section, position, statusChangedAt, status });
+    id = `${section}-${position}`,
+  ) => ({ id, section, position, statusChangedAt, status });
 
   it("orders sections as the UI panels and Done by newest status change", () => {
     const sorted = [
@@ -77,6 +78,23 @@ describe("compareByPanelOrder", () => {
       ["Backlog", 2],
       ["Backlog", 5],
       ["Icebox", 1],
+    ]);
+  });
+
+  it("breaks ties like the UI: Done by descending id, Current Accepted by ascending id", () => {
+    const same = "2026-11-01 00:00:00";
+    const done = [
+      row("Done", 1, same, "Accepted", "a"),
+      row("Done", 2, same, "Accepted", "b"),
+    ];
+    expect(done.sort(compareByPanelOrder).map((r) => r.id)).toEqual(["b", "a"]);
+    const current = [
+      row("Current", 1, same, "Accepted", "b"),
+      row("Current", 1, same, "Accepted", "a"),
+    ];
+    expect(current.sort(compareByPanelOrder).map((r) => r.id)).toEqual([
+      "a",
+      "b",
     ]);
   });
 });

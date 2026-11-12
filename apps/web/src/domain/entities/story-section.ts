@@ -43,25 +43,35 @@ const SECTION_RANK: Record<StorySection, number> = {
   Icebox: 3,
 };
 
-/** Orders stories like the UI panels: Done (newest status change first), Current (accepted first, oldest first), Backlog, Icebox (by position). */
+type PanelOrderKey = Pick<
+  Story,
+  "id" | "position" | "statusChangedAt" | "status"
+> & { section: StorySection };
+
+/** Orders stories like the UI panels, including their tie-breakers: Done (newest status change first), Current (accepted first, oldest first), Backlog, Icebox (by position). */
 export function compareByPanelOrder(
-  a: Pick<Story, "position" | "statusChangedAt" | "status"> & {
-    section: StorySection;
-  },
-  b: Pick<Story, "position" | "statusChangedAt" | "status"> & {
-    section: StorySection;
-  },
+  a: PanelOrderKey,
+  b: PanelOrderKey,
 ): number {
   const byRank = SECTION_RANK[a.section] - SECTION_RANK[b.section];
   if (byRank !== 0) return byRank;
   if (a.section === "Done") {
-    return b.statusChangedAt.localeCompare(a.statusChangedAt);
+    return (
+      b.statusChangedAt.localeCompare(a.statusChangedAt) ||
+      b.id.localeCompare(a.id)
+    );
   }
   if (a.section === "Current") {
     const aAccepted = a.status === "Accepted";
     const bAccepted = b.status === "Accepted";
     if (aAccepted !== bAccepted) return aAccepted ? -1 : 1;
-    if (aAccepted) return a.statusChangedAt.localeCompare(b.statusChangedAt);
+    if (aAccepted) {
+      return (
+        a.statusChangedAt.localeCompare(b.statusChangedAt) ||
+        a.position - b.position ||
+        a.id.localeCompare(b.id)
+      );
+    }
   }
-  return a.position - b.position;
+  return a.position - b.position || a.id.localeCompare(b.id);
 }
