@@ -279,7 +279,8 @@ cliV1StoriesRoute.post("/:projectId/stories", async (c) => {
   if (result.isErr()) {
     const response =
       result.error === STORY_PLACEMENT_ANCHOR_NOT_FOUND_ERROR ||
-      result.error === STORY_PLACEMENT_ANCHOR_NOT_IN_BACKLOG_ERROR
+      result.error === STORY_PLACEMENT_ANCHOR_NOT_IN_BACKLOG_ERROR ||
+      (placement !== null && result.error === STORY_ARCHIVED_ERROR)
         ? toMoveStoryErrorResponse(result.error)
         : toCreateStoryErrorResponse(result.error);
     return c.json({ error: response.message }, response.status);
