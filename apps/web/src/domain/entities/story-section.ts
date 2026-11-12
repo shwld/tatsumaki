@@ -43,15 +43,25 @@ const SECTION_RANK: Record<StorySection, number> = {
   Icebox: 3,
 };
 
-/** Orders stories like the UI panels: Done (newest status change first), Current, Backlog, Icebox (by position). */
+/** Orders stories like the UI panels: Done (newest status change first), Current (accepted first, oldest first), Backlog, Icebox (by position). */
 export function compareByPanelOrder(
-  a: Pick<Story, "position" | "statusChangedAt"> & { section: StorySection },
-  b: Pick<Story, "position" | "statusChangedAt"> & { section: StorySection },
+  a: Pick<Story, "position" | "statusChangedAt" | "status"> & {
+    section: StorySection;
+  },
+  b: Pick<Story, "position" | "statusChangedAt" | "status"> & {
+    section: StorySection;
+  },
 ): number {
   const byRank = SECTION_RANK[a.section] - SECTION_RANK[b.section];
   if (byRank !== 0) return byRank;
   if (a.section === "Done") {
     return b.statusChangedAt.localeCompare(a.statusChangedAt);
+  }
+  if (a.section === "Current") {
+    const aAccepted = a.status === "Accepted";
+    const bAccepted = b.status === "Accepted";
+    if (aAccepted !== bAccepted) return aAccepted ? -1 : 1;
+    if (aAccepted) return a.statusChangedAt.localeCompare(b.statusChangedAt);
   }
   return a.position - b.position;
 }

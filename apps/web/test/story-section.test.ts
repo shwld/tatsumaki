@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { Story } from "../src/domain/entities/story";
 import {
   compareByPanelOrder,
   findCurrentIterationId,
@@ -55,7 +56,8 @@ describe("compareByPanelOrder", () => {
     section: "Done" | "Current" | "Backlog" | "Icebox",
     position: number,
     statusChangedAt = "",
-  ) => ({ section, position, statusChangedAt });
+    status: Story["status"] = "Unstarted",
+  ) => ({ section, position, statusChangedAt, status });
 
   it("orders sections as the UI panels and Done by newest status change", () => {
     const sorted = [
@@ -63,12 +65,14 @@ describe("compareByPanelOrder", () => {
       row("Backlog", 5),
       row("Done", 9, "2026-11-01 00:00:00"),
       row("Current", 9),
+      row("Current", 20, "2026-11-02 00:00:00", "Accepted"),
       row("Backlog", 2),
       row("Done", 1, "2026-11-05 00:00:00"),
     ].sort(compareByPanelOrder);
     expect(sorted.map((r) => [r.section, r.position])).toEqual([
       ["Done", 1],
       ["Done", 9],
+      ["Current", 20],
       ["Current", 9],
       ["Backlog", 2],
       ["Backlog", 5],
