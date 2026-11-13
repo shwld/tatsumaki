@@ -4,6 +4,7 @@ import type { ArtifactErrorCode } from "../../application/usecases/artifacts/err
 import { STATUS_BY_CODE } from "../routes/artifacts/responses";
 import { getCliVersionCompatibility } from "../../application/usecases/get-cli-version-compatibility";
 import { registerEpicOpenApi } from "./epic-openapi";
+import { registerStoryMapOpenApi } from "./story-map-openapi";
 
 const StoryStatusEnumSchema = z
   .enum(STORY_STATUSES)
@@ -1141,6 +1142,7 @@ export function buildCliOpenApiDoc() {
   );
 
   registerEpicOpenApi(app);
+  registerStoryMapOpenApi(app);
 
   app.openAPIRegistry.register("ArtifactError", ArtifactErrorSchema);
 

@@ -5,6 +5,7 @@ mod artifact_cli;
 mod desktop_ipc_client;
 mod desktop_ipc_command;
 mod epic_cli;
+mod story_map_cli;
 mod infrastructure;
 mod update;
 
@@ -85,6 +86,8 @@ enum Commands {
     Artifact(artifact_cli::ArtifactCommand),
     Label(epic_cli::LabelCommand),
     Epic(epic_cli::EpicCommand),
+    /// Read and edit story maps
+    StoryMap(story_map_cli::StoryMapCommand),
     Project(ProjectCommand),
     Desktop(DesktopCommand),
     Update(UpdateCommand),
@@ -633,7 +636,10 @@ pub fn exit_code_for_error(error: &CliError) -> i32 {
 /// message text is never inspected (it can contain words like "required").
 pub fn exit_code_for_api_error(status: u16, code: &str) -> i32 {
     match code {
-        "UNAUTHORIZED" | "FORBIDDEN" => EXIT_AUTH,
+        "UNAUTHORIZED" | "FORBIDDEN" | "forbidden" => EXIT_AUTH,
+        "archived" | "story_unavailable" | "limit" => EXIT_CONFLICT,
+        "invalid" | "INVALID_INPUT" => EXIT_INVALID_ARGUMENT,
+        "STORY_MAP_NOT_FOUND" | "not_found" | "target_gone" => EXIT_NOT_FOUND,
         "BASE_VERSION_CONFLICT"
         | "PUBLISH_CONFLICT"
         | "REVISION_CONFLICT"
@@ -775,6 +781,18 @@ async fn run() -> Result<(), (CliError, i32)> {
                 eprintln!("{warning}");
             }
             epic_cli::run_epic(epic_cmd, &base_url, &service, cli.json).await
+        }
+        Commands::StoryMap(mut story_map_cmd) => {
+            story_map_cmd.project = Some(require_project(story_map_cmd.project.take())?);
+            let base_url = resolve_base_url(&config_store, cli.base_url.clone())?;
+            let service = build_service(base_url.clone());
+            if let Some(warning) = service
+                .check_version_compatibility(&base_url, env!("CARGO_PKG_VERSION"))
+                .await
+            {
+                eprintln!("{warning}");
+            }
+            story_map_cli::run_story_map(story_map_cmd, &base_url, &service, cli.json).await
         }
         Commands::Story(mut story_cmd) => {
             let slot = story_cmd.command.project_slot();

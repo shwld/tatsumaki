@@ -68,6 +68,21 @@ impl HttpArtifactGateway {
 
 /// Builds the error for a non-success answer. The body is the server's
 /// `{ error, code }`; anything else falls back to the status text.
+/// Story map commands answer a rejection with only a `code`.
+fn story_map_rejection_message(code: &str) -> Option<&'static str> {
+    Some(match code {
+        "invalid" => "Invalid story map command or input",
+        "forbidden" => "You cannot edit this story map (viewers are read-only)",
+        "not_found" => "Story map not found",
+        "target_gone" => "An element the command refers to no longer exists; fetch the map again",
+        "archived" => "The story map is archived; restore it before editing",
+        "story_unavailable" => "The story does not exist or is already placed on this map",
+        "limit" => "The story map reached its card limit (2,000)",
+        "rate_limited" => "Too many commands; retry shortly",
+        _ => return None,
+    })
+}
+
 pub fn parse_api_error(status: u16, body: &str, retry_after_secs: Option<u64>) -> CliError {
     #[derive(serde::Deserialize)]
     struct ErrorBody {
@@ -89,6 +104,7 @@ pub fn parse_api_error(status: u16, body: &str, retry_after_secs: Option<u64>) -
         .unwrap_or_else(|| format!("HTTP_{status}"));
     let message = parsed
         .and_then(|b| b.error)
+        .or_else(|| story_map_rejection_message(&code).map(str::to_string))
         .unwrap_or_else(|| format!("Request failed with status {status}"));
     CliError::Api {
         status,
