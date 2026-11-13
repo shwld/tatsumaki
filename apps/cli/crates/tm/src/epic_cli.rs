@@ -415,15 +415,15 @@ pub fn plan_body(command: &EpicSubcommand) -> Result<Value, String> {
     Ok(Value::Object(body))
 }
 
-struct EpicClient<'a, T: TokenProvider> {
-    base_url: &'a str,
-    project: String,
-    tokens: &'a T,
-    client: reqwest::Client,
+pub(crate) struct EpicClient<'a, T: TokenProvider> {
+    pub(crate) base_url: &'a str,
+    pub(crate) project: String,
+    pub(crate) tokens: &'a T,
+    pub(crate) client: reqwest::Client,
 }
 
 impl<T: TokenProvider + Sync> EpicClient<'_, T> {
-    fn url(&self, path: &str) -> String {
+    pub(crate) fn url(&self, path: &str) -> String {
         format!(
             "{}/programmatic-api/v1/projects/{}{}",
             self.base_url.trim_end_matches('/'),
@@ -463,7 +463,7 @@ impl<T: TokenProvider + Sync> EpicClient<'_, T> {
         }
     }
 
-    async fn send<R: serde::de::DeserializeOwned>(
+    pub(crate) async fn send<R: serde::de::DeserializeOwned>(
         &self,
         method: reqwest::Method,
         url: String,
@@ -488,7 +488,7 @@ impl<T: TokenProvider + Sync> EpicClient<'_, T> {
     }
 }
 
-fn print_json<T: Serialize>(value: &T) -> Result<(), FlowError> {
+pub(crate) fn print_json<T: Serialize>(value: &T) -> Result<(), FlowError> {
     println!(
         "{}",
         serde_json::to_string_pretty(value).map_err(|e| (CliError::Json(e), EXIT_GENERAL))?

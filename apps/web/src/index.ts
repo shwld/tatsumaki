@@ -18,7 +18,10 @@ import { iterationsRoute } from "./presentation/routes/iterations";
 import { mcpRoute } from "./presentation/routes/mcp";
 import { cliRoute } from "./presentation/routes/cli";
 import { planningPokerRoute } from "./presentation/routes/planning-poker";
-import { storyMapLiveRoute } from "./presentation/routes/story-map-live";
+import {
+  storyMapCommandsRoute,
+  storyMapLiveRoute,
+} from "./presentation/routes/story-map-live";
 import { createStoryMapRoutes } from "./presentation/routes/story-maps";
 import { projectHistoryRoute } from "./presentation/routes/project-history";
 import { savedFiltersRoute } from "./presentation/routes/saved-filters";
@@ -131,6 +134,7 @@ protectedApi.route("/", iterationsRoute);
 protectedApi.route("/", planningPokerRoute);
 protectedApi.route("/", storyMapLiveRoute);
 protectedApi.route("/projects", createStoryMapRoutes());
+protectedApi.route("/projects", storyMapCommandsRoute);
 protectedApi.route("/", projectHistoryRoute);
 protectedApi.route("/", savedFiltersRoute);
 protectedApi.route("/", myWorkRoute);

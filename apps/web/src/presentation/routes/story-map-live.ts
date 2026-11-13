@@ -58,9 +58,12 @@ storyMapLiveRoute.get(
 /**
  * HTTP write path: the command goes to the same Durable Object as the socket
  * commands, so it is serialized with live edits and shown to live editors.
+ * Shared by the Web API and the programmatic API; mounted under ".../projects".
  */
-storyMapLiveRoute.post(
-  "/projects/:projectId/story-maps/:mapId/commands",
+export const storyMapCommandsRoute = new Hono<Env>();
+
+storyMapCommandsRoute.post(
+  "/:projectId/story-maps/:mapId/commands",
   async (c) => {
     const projectId = c.req.param("projectId");
     const mapId = c.req.param("mapId");

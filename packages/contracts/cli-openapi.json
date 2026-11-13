@@ -1116,6 +1116,703 @@
           }
         },
         "required": ["labelId", "labelName", "storyCount", "epic"]
+      },
+      "StoryMapListResponse": {
+        "type": "object",
+        "properties": {
+          "storyMaps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StoryMap"
+            }
+          },
+          "role": {
+            "type": "string",
+            "example": "member"
+          }
+        },
+        "required": ["storyMaps", "role"]
+      },
+      "StoryMap": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "achievementGoal": {
+            "type": "string"
+          },
+          "archivedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "projectId",
+          "title",
+          "achievementGoal",
+          "archivedAt",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "StoryMapResponse": {
+        "type": "object",
+        "properties": {
+          "storyMap": {
+            "$ref": "#/components/schemas/StoryMap"
+          }
+        },
+        "required": ["storyMap"]
+      },
+      "CreateStoryMapBody": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "achievementGoal": {
+            "type": "string"
+          }
+        },
+        "required": ["title"]
+      },
+      "StoryMapStructureResponse": {
+        "type": "object",
+        "properties": {
+          "structure": {
+            "$ref": "#/components/schemas/StoryMapStructure"
+          },
+          "role": {
+            "type": "string",
+            "example": "member"
+          }
+        },
+        "required": ["structure", "role"]
+      },
+      "StoryMapStructure": {
+        "type": "object",
+        "properties": {
+          "map": {
+            "$ref": "#/components/schemas/StoryMap"
+          },
+          "activities": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "position": {
+                  "type": "number"
+                }
+              },
+              "required": ["id", "title", "position"]
+            }
+          },
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "activityId": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "position": {
+                  "type": "number"
+                }
+              },
+              "required": ["id", "activityId", "title", "position"]
+            }
+          },
+          "slices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "position": {
+                  "type": "number"
+                }
+              },
+              "required": ["id", "title", "position"]
+            }
+          },
+          "cards": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "taskId": {
+                  "type": "string"
+                },
+                "sliceId": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "position": {
+                  "type": "number"
+                },
+                "ideaTitle": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "note": {
+                  "type": "string"
+                },
+                "storyId": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "storyState": {
+                  "type": "string",
+                  "enum": ["idea", "linked", "missing"]
+                },
+                "story": {
+                  "type": "object",
+                  "properties": {
+                    "number": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "storyPoint": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "isIcebox": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "number",
+                    "title",
+                    "status",
+                    "type",
+                    "storyPoint",
+                    "isIcebox"
+                  ],
+                  "nullable": true
+                }
+              },
+              "required": [
+                "id",
+                "taskId",
+                "sliceId",
+                "position",
+                "ideaTitle",
+                "note",
+                "storyId",
+                "storyState",
+                "story"
+              ]
+            }
+          }
+        },
+        "required": ["map", "activities", "tasks", "slices", "cards"]
+      },
+      "StoryMapCommandResponse": {
+        "type": "object",
+        "properties": {
+          "seq": {
+            "type": "integer"
+          },
+          "result": {},
+          "duplicate": {
+            "type": "boolean"
+          }
+        },
+        "required": ["seq", "duplicate"]
+      },
+      "StoryMapCommandBody": {
+        "type": "object",
+        "properties": {
+          "opId": {
+            "type": "string",
+            "description": "ULID chosen by the caller. Sending the same opId again returns the first result with duplicate: true"
+          },
+          "command": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": ["updateMap"]
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "achievementGoal": {
+                    "type": "string"
+                  },
+                  "archived": {
+                    "type": "boolean"
+                  }
+                },
+                "required": ["type"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": ["addActivity"]
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "afterActivityId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "nullable": true
+                  }
+                },
+                "required": ["type", "title", "afterActivityId"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": ["renameActivity"]
+                  },
+                  "activityId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "title": {
+                    "type": "string"
+                  }
+                },
+                "required": ["type", "activityId", "title"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": ["moveActivity"]
+                  },
+                  "activityId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "afterActivityId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "nullable": true
+                  }
+                },
+                "required": ["type", "activityId", "afterActivityId"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": ["deleteActivity"]
+                  },
+                  "activityId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  }
+                },
+                "required": ["type", "activityId"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": ["addTask"]
+                  },
+                  "activityId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "afterTaskId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "nullable": true
+                  }
+                },
+                "required": ["type", "activityId", "title", "afterTaskId"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": ["renameTask"]
+                  },
+                  "taskId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "title": {
+                    "type": "string"
+                  }
+                },
+                "required": ["type", "taskId", "title"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": ["moveTask"]
+                  },
+                  "taskId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "activityId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "afterTaskId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "nullable": true
+                  }
+                },
+                "required": ["type", "taskId", "activityId", "afterTaskId"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": ["deleteTask"]
+                  },
+                  "taskId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  }
+                },
+                "required": ["type", "taskId"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": ["addSlice"]
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "afterSliceId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "nullable": true
+                  }
+                },
+                "required": ["type", "title", "afterSliceId"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": ["renameSlice"]
+                  },
+                  "sliceId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "title": {
+                    "type": "string"
+                  }
+                },
+                "required": ["type", "sliceId", "title"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": ["moveSlice"]
+                  },
+                  "sliceId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "afterSliceId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "nullable": true
+                  }
+                },
+                "required": ["type", "sliceId", "afterSliceId"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": ["deleteSlice"]
+                  },
+                  "sliceId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  }
+                },
+                "required": ["type", "sliceId"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": ["addCard"]
+                  },
+                  "taskId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "sliceId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "nullable": true
+                  },
+                  "afterCardId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "nullable": true
+                  },
+                  "ideaTitle": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "note": {
+                    "type": "string"
+                  },
+                  "storyId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "nullable": true
+                  }
+                },
+                "required": ["type", "taskId", "sliceId", "afterCardId"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": ["updateCard"]
+                  },
+                  "cardId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "ideaTitle": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                },
+                "required": ["type", "cardId"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": ["moveCard"]
+                  },
+                  "cardId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "taskId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "sliceId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "nullable": true
+                  },
+                  "afterCardId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "type",
+                  "cardId",
+                  "taskId",
+                  "sliceId",
+                  "afterCardId"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": ["setCardStory"]
+                  },
+                  "cardId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "storyId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "nullable": true
+                  }
+                },
+                "required": ["type", "cardId", "storyId"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": ["deleteCard"]
+                  },
+                  "cardId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  }
+                },
+                "required": ["type", "cardId"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": ["createStoryFromCard"]
+                  },
+                  "cardId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "storyType": {
+                    "type": "string",
+                    "enum": ["feature", "bug", "chore"]
+                  },
+                  "isIcebox": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "type",
+                  "cardId",
+                  "title",
+                  "description",
+                  "storyType",
+                  "isIcebox"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "required": ["opId", "command"]
       }
     },
     "parameters": {}
@@ -3020,6 +3717,206 @@
           },
           "404": {
             "description": "Label not found. Body: { error, code }"
+          }
+        }
+      }
+    },
+    "/programmatic-api/v1/projects/{projectId}/story-maps": {
+      "get": {
+        "operationId": "listStoryMaps",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "example": "project-123"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": ["true"]
+            },
+            "required": false,
+            "name": "includeArchived",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Story maps of the project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoryMapListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createStoryMap",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "example": "project-123"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateStoryMapBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created story map",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoryMapResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input. Body: { error, code }"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Viewers cannot create maps"
+          }
+        }
+      }
+    },
+    "/programmatic-api/v1/projects/{projectId}/story-maps/{mapId}": {
+      "get": {
+        "operationId": "getStoryMap",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "example": "project-123"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "example": "map-123"
+            },
+            "required": true,
+            "name": "mapId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Whole structure of the map. Every element carries the ID later commands refer to",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoryMapStructureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Story map not found. Body: { error, code }"
+          }
+        }
+      }
+    },
+    "/programmatic-api/v1/projects/{projectId}/story-maps/{mapId}/commands": {
+      "post": {
+        "operationId": "applyStoryMapCommand",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "example": "project-123"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "example": "map-123"
+            },
+            "required": true,
+            "name": "mapId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StoryMapCommandBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Applied through the map's Durable Object, serialized with live edits",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoryMapCommandResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid command. Body: { code: invalid }"
+          },
+          "403": {
+            "description": "Viewers cannot edit. Body: { code: forbidden }"
+          },
+          "404": {
+            "description": "Map or target element not found. Body: { code: not_found | target_gone }"
+          },
+          "409": {
+            "description": "Body: { code: archived | story_unavailable | limit }. Archived maps reject edits; limit is the 2,000 card cap"
+          },
+          "413": {
+            "description": "Body too large"
+          },
+          "429": {
+            "description": "Body: { code: rate_limited }"
           }
         }
       }

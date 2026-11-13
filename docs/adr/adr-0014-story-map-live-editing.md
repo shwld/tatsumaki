@@ -79,6 +79,17 @@ CRDT は採用しない。DO が唯一の適用順序を決めるので、マー
 - 配信メッセージは `{ seq, op }` でなく **操作後の構造全体**(`applied` に `structure`)を運ぶ。クライアントが位置計算を複製せず、DO と必ず一致する。上限(カード 2,000)内で 1 メッセージに収まる。実測で大きすぎる場合は差分配信に変える。
 - 操作の効果と `seq` 更新・`opId` 記録は、現状では 2 回の D1 呼び出しになる(効果 → `seq`+`opId` の batch)。repository の各操作が複数文の batch で、効果の statement を外へ出せないため。効果の適用後、記録の前に落ちた場合、再送された `opId` は未記録なので再適用される。重複が副作用を持つのは add 系だけである。1 回の batch へ統合するのは story #406 で扱う。
 
+## Amendment (story #409)
+
+AI が Story Map を使えるよう、CLI(`tm story-map`)からの編集を採用する。Consequences の「API key / CLI からの編集は含めない」はこの Amendment で置き換える。
+
+- CLI は programmatic API の `/programmatic-api/v1/projects/{projectId}/story-maps`(一覧・作成・構造取得)と `.../{mapId}/commands`(書き込み)を使う。書き込みは Web と同じ HTTP の `commands` で、必ず DO を通る。ライブ編集中の画面にも反映され、直列化・権限(viewer は不可)・archive 済みの拒否・カード上限 2,000 は Web と同じ usecase が守る。
+- `commands` は `storyMapCommandSchema` の全 type をそのまま受ける。CLI は各 type を 1 コマンドに対応させる(`updateMap` は update / archive / restore)。persona は #408 で廃止済みなので対象外。
+- `opId`(ULID)は CLI が毎回生成する。同じ `opId` の再送は最初の結果を `duplicate: true` で返す。
+- 拒否は HTTP ステータスと `code` で返り、CLI は `code` を終了コードに対応させる(`archived` / `story_unavailable` / `limit` は 7、`forbidden` は 3、`not_found` / `target_gone` は 4、`invalid` は 2)。
+- WebSocket(ライブ購読)は CLI の対象外のまま。CLI は取得 → 編集 → 再取得で使う。
+- MCP への追加は見送る。CLI の JSON 出力で AI の運用は足り、MCP のツール面を増やす理由が今はない。
+
 ## Consequences
 
 - 同時編集が最初から成立し、衝突は到着順で決まる。同じ項目を同時に編集すると後の入力が残り、先の入力は上書きされる。
@@ -86,5 +97,5 @@ CRDT は採用しない。DO が唯一の適用順序を決めるので、マー
 - Story Map の導入で `wrangler.toml` に DO binding と migration(新しい tag)が増える。self-hosting の `wrangler.*.toml` と setup script、テスト設定も追従する。
 - D1 の書き込みがマップ内の操作ごとに発生する。1 マップ 50 接続・毎秒 20 コマンドの上限内で収まる想定で、#397 の実測(500 / 2,000 カード)で確認する。
 - story の属性変更がライブで反映されないことを画面で許容する。必要になったら別 story で DO への通知経路を追加する。
-- 履歴・undo・presence・オフライン編集・API key / CLI からの編集は含めない。要望が出た時点で別 story にする。
+- 履歴・undo・presence・オフライン編集は含めない。API key / CLI からの編集は #409 で採用した(Amendment 参照)。要望が出た時点で別 story にする。
 - 後続: #394(domain・永続化・権限)、#395(DO 基盤)、#396(一覧画面)、#397(編集画面)、#398(story 連携)がこの決定に従う。

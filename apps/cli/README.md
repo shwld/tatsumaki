@@ -68,7 +68,7 @@ tm config show
 
 ## Project resolution
 
-`tm story`, `tm label`, `tm epic`, `tm artifact`, `tm project get` and `tm desktop refetch` resolve the project in this order:
+`tm story`, `tm label`, `tm epic`, `tm story-map`, `tm artifact`, `tm project get` and `tm desktop refetch` resolve the project in this order:
 
 1. `--project` (for `tm project get`, the positional project ID)
 2. `TATSUMAKI_PROJECT_ID`
@@ -252,6 +252,37 @@ tm epic enable --project <project-id> <label-id> --revision 3
 - Writes take the `revision` you last read. If someone changed the plan in between, the command fails with exit code 7 and nothing changes; read it again and retry.
 - The planned period is two calendar days (`YYYY-MM-DD`) given together, start on or before end; `--clear-period` removes it. `--outcome` (`unevaluated`, `achieved`, `missed`) is entered by a person and never inferred from story completion.
 - Deleting a label also deletes its epic with the plan. `tm label deletion-impact` shows what would go.
+
+## Story maps
+
+`tm story-map` reads and edits story maps. Every write goes through the map's Durable Object, so it is serialized with live edits and shown to people editing the map in the Web. Viewers can only read; archived maps reject edits until restored.
+
+```bash
+tm story-map list --project <project-id> [--include-archived]
+tm story-map create --project <project-id> --title "Onboarding" --goal "..."
+tm --json story-map get --project <project-id> <map-id>     # every element with its ID
+tm story-map update --project <project-id> <map-id> --title "..." --goal "..."
+tm story-map archive --project <project-id> <map-id>
+tm story-map restore --project <project-id> <map-id>
+
+tm story-map activity add <map-id> --title "Sign up" [--after <activity-id>]
+tm story-map activity rename|move|delete <map-id> <activity-id> ...
+tm story-map task add <map-id> --activity <activity-id> --title "Enter email" [--after <task-id>]
+tm story-map task rename|move|delete <map-id> <task-id> ...
+tm story-map slice add <map-id> --title "Release 1" [--after <slice-id>]
+tm story-map slice rename|move|delete <map-id> <slice-id> ...
+tm story-map card add <map-id> --task <task-id> [--slice <slice-id>] [--after <card-id>] \
+  [--idea-title "..."] [--note "..."] [--story <story-id>]
+tm story-map card update <map-id> <card-id> [--idea-title "..." | --clear-idea-title] [--note "..."]
+tm story-map card move <map-id> <card-id> --task <task-id> [--slice <slice-id>] [--after <card-id>]
+tm story-map card set-story <map-id> <card-id> --story <story-id>   # or --clear
+tm story-map card create-story <map-id> <card-id> --title "..." [--type feature|bug|chore] [--icebox]
+tm story-map card delete <map-id> <card-id>
+```
+
+- A position is the element to place after (`--after <id>`); leave it out to place at the start. A card without `--slice` is in the unplanned row.
+- Story links take the story ID (`tm --json story get` shows it), not the story number.
+- Exit codes: 7 when the map is archived, the story is unavailable (missing or already on the map) or the 2,000-card limit is reached; 3 for no permission; 4 for a missing map or element; 2 for invalid input. Rerun `get` after exit 4, since someone may have changed the map.
 
 ### Labels on stories
 
