@@ -110,9 +110,6 @@ describe("manage story maps", () => {
 
   it("keeps a free-text goal on the map", async () => {
     const { map } = await setup();
-    const structure = (
-      await getStoryMap(deps, { ...as(VIEWER), mapId: map.id })
-    )._unsafeUnwrap();
     const updated = await updateStoryMap(deps, {
       ...as(MEMBER),
       mapId: map.id,
