@@ -101,13 +101,14 @@ export function StoryMapMetaEditScreen() {
   }>();
   const { detail, loadError, reload, run, busy, message, setMessage } =
     useStoryMapDetail(projectId, mapId);
-  const active = useRef(true);
+  const routeKey = `${projectId}/${mapId}`;
+  const currentRoute = useRef(routeKey);
   useEffect(() => {
-    active.current = true;
+    currentRoute.current = routeKey;
     return () => {
-      active.current = false;
+      currentRoute.current = "";
     };
-  }, []);
+  }, [routeKey]);
 
   const detailPath = projectStoryMapPath(projectId, mapId);
   const back = (
@@ -178,7 +179,7 @@ export function StoryMapMetaEditScreen() {
 
   const saveMetadata = (patch: { title?: string; achievementGoal?: string }) =>
     void run({ type: "updateMap", ...patch }, null).then((ok) => {
-      if (ok && active.current) void navigate(detailPath);
+      if (ok && currentRoute.current === routeKey) void navigate(detailPath);
     });
 
   return (
