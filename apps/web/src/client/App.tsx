@@ -15,6 +15,7 @@ import {
 } from "./screens/project-epics-screen";
 import { ProjectStoryMapsScreen } from "./screens/project-story-maps-screen";
 import { StoryMapEditScreen } from "./screens/story-map-edit-screen";
+import { StoryMapMetaEditScreen } from "./screens/story-map-meta-edit-screen";
 import { ProjectLabelsScreen } from "./screens/project-labels-screen";
 import { ProjectInvitationsScreen } from "./screens/project-invitations-screen";
 import { ProjectMembersScreen } from "./screens/project-members-screen";
@@ -102,6 +103,10 @@ export function App() {
                     <Route
                       path="/projects/:projectId/story-maps/:mapId"
                       element={<StoryMapEditScreen />}
+                    />
+                    <Route
+                      path="/projects/:projectId/story-maps/:mapId/edit"
+                      element={<StoryMapMetaEditScreen />}
                     />
                     <Route
                       path="/projects/:projectId/invitations/:invitationId/accept"

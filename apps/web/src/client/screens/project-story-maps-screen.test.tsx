@@ -12,6 +12,7 @@ import { AuthErrorProvider } from "../contexts/auth-error-context";
 import { i18n } from "../i18n/config";
 import { ProjectStoryMapsScreen } from "./project-story-maps-screen";
 import { StoryMapEditScreen } from "./story-map-edit-screen";
+import { StoryMapMetaEditScreen } from "./story-map-meta-edit-screen";
 
 const storyMap = (overrides: Record<string, unknown> = {}) => ({
   __typename: "StoryMap",
@@ -55,6 +56,10 @@ function renderAt(path: string) {
           <Route
             path="/projects/:projectId/story-maps/:mapId"
             element={<StoryMapEditScreen />}
+          />
+          <Route
+            path="/projects/:projectId/story-maps/:mapId/edit"
+            element={<StoryMapMetaEditScreen />}
           />
         </Routes>
       </AuthErrorProvider>
@@ -142,7 +147,18 @@ describe("Story Map screens", () => {
     );
   });
 
-  it("edits the title through a command and keeps viewers read-only", async () => {
+  it("shows only the goal on the detail screen and links to the edit screen", async () => {
+    mockFetch(() => [200, { role: "owner", structure: structure() }]);
+    renderAt("/projects/p1/story-maps/map-1");
+    expect(await screen.findByText("Reach the first story")).toBeTruthy();
+    expect(screen.queryByLabelText("タイトル")).toBeNull();
+    expect(screen.queryByRole("button", { name: "アーカイブ" })).toBeNull();
+    expect(
+      screen.getByRole("link", { name: "編集" }).getAttribute("href"),
+    ).toBe("/projects/p1/story-maps/map-1/edit");
+  });
+
+  it("edits the title through a command and returns to the detail screen", async () => {
     const posts: unknown[] = [];
     mockFetch((_url, init) => {
       if (init?.method === "POST") {
@@ -151,7 +167,7 @@ describe("Story Map screens", () => {
       }
       return [200, { role: "owner", structure: structure() }];
     });
-    const owner = renderAt("/projects/p1/story-maps/map-1");
+    renderAt("/projects/p1/story-maps/map-1/edit");
     const title = (await screen.findByLabelText(
       "タイトル",
     )) as HTMLInputElement;
@@ -165,16 +181,24 @@ describe("Story Map screens", () => {
     expect(
       (posts[0] as { command: Record<string, unknown> }).command,
     ).not.toHaveProperty("achievementGoal");
-    owner.unmount();
-
-    mockFetch(() => [200, { role: "viewer", structure: structure() }]);
-    renderAt("/projects/p1/story-maps/map-1");
-    expect(await screen.findByText("閲覧のみできます")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "保存" })).toBeNull();
-    expect(screen.queryByLabelText("主要ユーザー名")).toBeNull();
+    expect(await screen.findByRole("link", { name: "編集" })).toBeTruthy();
   });
 
-  it("keeps an unsaved title when a persona change reloads the map", async () => {
+  it("keeps viewers read-only and hides their edit link", async () => {
+    mockFetch(() => [200, { role: "viewer", structure: structure() }]);
+    const detail = renderAt("/projects/p1/story-maps/map-1");
+    expect(await screen.findByText("閲覧のみできます")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "編集" })).toBeNull();
+    expect(screen.queryByLabelText("主要ユーザー名")).toBeNull();
+    detail.unmount();
+
+    renderAt("/projects/p1/story-maps/map-1/edit");
+    expect(await screen.findByText("閲覧のみできます")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "保存" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "アーカイブ" })).toBeNull();
+  });
+
+  it("archives from the edit screen", async () => {
     const posts: unknown[] = [];
     mockFetch((_url, init) => {
       if (init?.method === "POST") {
@@ -183,18 +207,33 @@ describe("Story Map screens", () => {
       }
       return [200, { role: "owner", structure: structure() }];
     });
-    renderAt("/projects/p1/story-maps/map-1");
+    renderAt("/projects/p1/story-maps/map-1/edit");
+    fireEvent.click(await screen.findByRole("button", { name: "アーカイブ" }));
+    await waitFor(() => expect(posts).toHaveLength(1));
+    expect(posts[0]).toMatchObject({
+      command: { type: "updateMap", archived: true },
+    });
+  });
+
+  it("keeps an unsaved title when a failed save reloads the map", async () => {
+    let posts = 0;
+    mockFetch((_url, init) => {
+      if (init?.method === "POST") {
+        posts += 1;
+        return [500, { error: "boom" }];
+      }
+      return [200, { role: "owner", structure: structure() }];
+    });
+    renderAt("/projects/p1/story-maps/map-1/edit");
     const title = (await screen.findByLabelText(
       "タイトル",
     )) as HTMLInputElement;
     fireEvent.change(title, { target: { value: "Draft title" } });
-    fireEvent.change(screen.getByLabelText("主要ユーザーを追加"), {
-      target: { value: "Member" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "追加" }));
-    await waitFor(() => expect(posts).toHaveLength(1));
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(posts).toBe(1));
+    expect(await screen.findByRole("alert")).toBeTruthy();
     await waitFor(() =>
-      expect(vi.mocked(fetch).mock.calls.length).toBeGreaterThan(2),
+      expect(vi.mocked(fetch).mock.calls.length).toBeGreaterThanOrEqual(3),
     );
     expect((screen.getByLabelText("タイトル") as HTMLInputElement).value).toBe(
       "Draft title",
@@ -227,7 +266,7 @@ describe("Story Map screens", () => {
         structure: structure(storyMap({ archivedAt: "2026-01-02 00:00:00" })),
       },
     ]);
-    renderAt("/projects/p1/story-maps/map-1");
+    renderAt("/projects/p1/story-maps/map-1/edit");
     expect(
       await screen.findByText(
         "このマップはアーカイブ済みです。復元すると編集できます",
@@ -260,7 +299,7 @@ describe("Story Map screens", () => {
     vi.stubGlobal("WebSocket", FakeSocket);
     mockFetch(() => [200, { role: "owner", structure: structure() }]);
     renderAt("/projects/p1/story-maps/map-1");
-    await screen.findByLabelText("タイトル");
+    await screen.findByText("Reach the first story");
     await waitFor(() => expect(sockets).toHaveLength(1));
     act(() => {
       sockets[0]?.emit("message", {

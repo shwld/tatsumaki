@@ -14,6 +14,13 @@ export function projectStoryMapPath(projectId: string, mapId: string): string {
   return `${projectStoryMapsPath(projectId)}/${encodeURIComponent(mapId)}`;
 }
 
+export function projectStoryMapEditPath(
+  projectId: string,
+  mapId: string,
+): string {
+  return `${projectStoryMapPath(projectId, mapId)}/edit`;
+}
+
 export function projectEpicPath(projectId: string, labelId: string): string {
   return `${projectEpicsPath(projectId)}/${encodeURIComponent(labelId)}`;
 }
