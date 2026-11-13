@@ -67,7 +67,6 @@ export function fetchStoryMap(projectId: string, mapId: string) {
 export type CreateStoryMapInput = {
   title: string;
   achievementGoal: string;
-  personaNames: string[];
 };
 
 export function createStoryMap(projectId: string, input: CreateStoryMapInput) {
@@ -78,16 +77,12 @@ export function createStoryMap(projectId: string, input: CreateStoryMapInput) {
   );
 }
 
-export type StoryMapMetadataCommand =
-  | {
-      type: "updateMap";
-      title?: string;
-      achievementGoal?: string;
-      archived?: boolean;
-    }
-  | { type: "addPersona"; name: string }
-  | { type: "renamePersona"; personaId: string; name: string }
-  | { type: "removePersona"; personaId: string };
+export type StoryMapMetadataCommand = {
+  type: "updateMap";
+  title?: string;
+  achievementGoal?: string;
+  archived?: boolean;
+};
 
 /** Writes go through the map's Durable Object so live editors see them (ADR-0014). */
 export function sendStoryMapCommand(

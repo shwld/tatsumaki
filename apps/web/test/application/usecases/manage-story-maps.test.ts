@@ -15,7 +15,6 @@ import {
   moveCard,
   moveSlice,
   moveTask,
-  renamePersona,
   searchStoriesForCard,
   setCardStory,
   STORY_MAP_ARCHIVED_ERROR,
@@ -67,7 +66,6 @@ async function setup() {
     await createStoryMap(deps, {
       ...as(OWNER),
       title: "Map",
-      personaNames: ["Parent", "Child"],
     })
   )._unsafeUnwrap();
   const target = { ...as(OWNER), mapId: map.id };
@@ -110,12 +108,11 @@ describe("manage story maps", () => {
     };
   });
 
-  it("keeps several personas and a free-text goal on the map", async () => {
+  it("keeps a free-text goal on the map", async () => {
     const { map } = await setup();
     const structure = (
       await getStoryMap(deps, { ...as(VIEWER), mapId: map.id })
     )._unsafeUnwrap();
-    expect(structure.personas.map((p) => p.name)).toEqual(["Parent", "Child"]);
     const updated = await updateStoryMap(deps, {
       ...as(MEMBER),
       mapId: map.id,
@@ -200,15 +197,6 @@ describe("manage story maps", () => {
           taskId: a.task.id,
           sliceId: "nope",
           ideaTitle: "x",
-        })
-      )._unsafeUnwrapErr(),
-    ).toBe(STORY_MAP_ELEMENT_NOT_FOUND_ERROR);
-    expect(
-      (
-        await renamePersona(deps, {
-          ...a.target,
-          personaId: "nope",
-          name: "x",
         })
       )._unsafeUnwrapErr(),
     ).toBe(STORY_MAP_ELEMENT_NOT_FOUND_ERROR);

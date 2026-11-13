@@ -6,7 +6,6 @@ import type {
   StoryMapActivity,
   StoryMapCard,
   StoryMapLinkedStory,
-  StoryMapPersona,
   StoryMapSlice,
   StoryMapStructure,
   StoryMapTask,
@@ -22,7 +21,6 @@ import { storiesTable } from "../schema/stories";
 import {
   storyMapActivitiesTable,
   storyMapCardsTable,
-  storyMapPersonasTable,
   storyMapSlicesTable,
   storyMapsTable,
   storyMapTasksTable,
@@ -31,7 +29,6 @@ import {
 type Repo<T> = Promise<Result<T, StoryMapRepositoryError>>;
 
 type OrderedTable =
-  | "story_map_personas"
   | "story_map_activities"
   | "story_map_tasks"
   | "story_map_slices"
@@ -195,13 +192,7 @@ export class D1StoryMapRepository implements StoryMapRepository {
       if (!mapRow) {
         return null;
       }
-      const [personas, activities, tasks, slices, cards] = await Promise.all([
-        this.db
-          .select()
-          .from(storyMapPersonasTable)
-          .where(eq(storyMapPersonasTable.mapId, mapId))
-          .orderBy(asc(storyMapPersonasTable.position))
-          .all(),
+      const [activities, tasks, slices, cards] = await Promise.all([
         this.db
           .select()
           .from(storyMapActivitiesTable)
@@ -245,13 +236,6 @@ export class D1StoryMapRepository implements StoryMapRepository {
       ]);
       return {
         map: toMap(mapRow),
-        personas: personas.map(
-          ({ id, name, position }): StoryMapPersona => ({
-            id,
-            name,
-            position,
-          }),
-        ),
         activities: activities.map(
           ({ id, title, position }): StoryMapActivity => ({
             id,
@@ -323,7 +307,6 @@ export class D1StoryMapRepository implements StoryMapRepository {
     projectId: string;
     title: string;
     achievementGoal: string;
-    personaNames: string[];
   }): Repo<StoryMap> {
     return this.guard(async () => {
       const id = ulid();
@@ -341,13 +324,6 @@ export class D1StoryMapRepository implements StoryMapRepository {
             now,
             now,
           ),
-        ...input.personaNames.map((name, position) =>
-          this.d1
-            .prepare(
-              "INSERT INTO story_map_personas (id, map_id, name, position) VALUES (?, ?, ?, ?)",
-            )
-            .bind(ulid(), id, name, position),
-        ),
       ]);
       return {
         __typename: "StoryMap" as const,
@@ -383,58 +359,6 @@ export class D1StoryMapRepository implements StoryMapRepository {
         .toSQL();
       await this.commit(mapId, [
         this.d1.prepare(update.sql).bind(...update.params),
-      ]);
-    });
-  }
-
-  async addPersona(mapId: string, name: string): Repo<StoryMapPersona> {
-    return this.guard(async () => {
-      const id = ulid();
-      const next = await this.d1
-        .prepare(
-          "SELECT coalesce(max(position), -1) + 1 AS position FROM story_map_personas WHERE map_id = ?",
-        )
-        .bind(mapId)
-        .first<{ position: number }>();
-      const position = next?.position ?? 0;
-      const persona = { id, name, position };
-      await this.commit(
-        mapId,
-        [
-          this.d1
-            .prepare(
-              "INSERT INTO story_map_personas (id, map_id, name, position) VALUES (?, ?, ?, ?)",
-            )
-            .bind(id, mapId, name, position),
-        ],
-        persona,
-      );
-      return persona;
-    });
-  }
-
-  async renamePersona(
-    mapId: string,
-    personaId: string,
-    name: string,
-  ): Repo<void> {
-    return this.guard(async () => {
-      await this.commit(mapId, [
-        this.d1
-          .prepare(
-            "UPDATE story_map_personas SET name = ? WHERE id = ? AND map_id = ?",
-          )
-          .bind(name, personaId, mapId),
-      ]);
-    });
-  }
-
-  async removePersona(mapId: string, personaId: string): Repo<void> {
-    return this.guard(async () => {
-      await this.commit(mapId, [
-        this.d1
-          .prepare("DELETE FROM story_map_personas WHERE id = ? AND map_id = ?")
-          .bind(personaId, mapId),
       ]);
     });
   }

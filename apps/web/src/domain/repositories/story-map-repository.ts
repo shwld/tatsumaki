@@ -4,7 +4,6 @@ import type {
   StoryMapActivity,
   StoryMapCard,
   StoryMapLinkedStory,
-  StoryMapPersona,
   StoryMapSlice,
   StoryMapStructure,
   StoryMapTask,
@@ -40,16 +39,11 @@ export interface StoryMapRepository {
     projectId: string;
     title: string;
     achievementGoal: string;
-    personaNames: string[];
   }): Repo<StoryMap>;
   updateMap(
     mapId: string,
     patch: { title?: string; achievementGoal?: string; archived?: boolean },
   ): Repo<void>;
-
-  addPersona(mapId: string, name: string): Repo<StoryMapPersona>;
-  renamePersona(mapId: string, personaId: string, name: string): Repo<void>;
-  removePersona(mapId: string, personaId: string): Repo<void>;
 
   addActivity(
     mapId: string,

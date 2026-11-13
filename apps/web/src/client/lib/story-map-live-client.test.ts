@@ -69,7 +69,7 @@ describe("StoryMapLiveClient", () => {
     sockets[0].receive(snapshot(4));
     expect(state).toMatchObject({ connection: "connected", seq: 4 });
 
-    const opId = client.send({ type: "addPersona", name: "A" });
+    const opId = client.send({ type: "addActivity", title: "A" });
     expect(state.save).toBe("saving");
     expect(sockets[0].sent[0]).toMatchObject({ type: "command", opId });
     sockets[0].receive({ type: "ack", opId, seq: 5, result: null });
@@ -86,7 +86,7 @@ describe("StoryMapLiveClient", () => {
 
   it("resends an unacked command with the same opId after reconnecting", () => {
     sockets[0].receive(snapshot(0));
-    const opId = client.send({ type: "addPersona", name: "A" });
+    const opId = client.send({ type: "addActivity", title: "A" });
     sockets[0].emit("close");
     expect(state.connection).toBe("reconnecting");
     expect(state.save).toBe("saving");
@@ -97,13 +97,13 @@ describe("StoryMapLiveClient", () => {
     sockets[1].receive(snapshot(0));
     expect(state.connection).toBe("connected");
     expect(sockets[1].sent).toEqual([
-      { type: "command", opId, command: { type: "addPersona", name: "A" } },
+      { type: "command", opId, command: { type: "addActivity", title: "A" } },
     ]);
   });
 
   it("does not resend pending commands when a snapshot arrives on a live connection", () => {
     sockets[0].receive(snapshot(0));
-    client.send({ type: "addPersona", name: "A" });
+    client.send({ type: "addActivity", title: "A" });
     expect(sockets[0].sent).toHaveLength(1);
     sockets[0].receive(snapshot(0));
     expect(sockets[0].sent).toHaveLength(1);
@@ -111,7 +111,7 @@ describe("StoryMapLiveClient", () => {
 
   it("sends a rate-limited command again instead of dropping it", () => {
     sockets[0].receive(snapshot(0));
-    const opId = client.send({ type: "addPersona", name: "A" });
+    const opId = client.send({ type: "addActivity", title: "A" });
     sockets[0].receive({ type: "reject", opId, code: "rate_limited" });
     expect(state.save).toBe("saving");
     expect(state.rejections).toEqual([]);
@@ -122,15 +122,15 @@ describe("StoryMapLiveClient", () => {
   it("keeps later commands behind a rate-limited one", () => {
     sockets[0].receive(snapshot(0));
     const first = client.send({
-      type: "renamePersona",
-      personaId: "p",
-      name: "1",
+      type: "renameActivity",
+      activityId: "a",
+      title: "1",
     });
     sockets[0].receive({ type: "reject", opId: first, code: "rate_limited" });
     const second = client.send({
-      type: "renamePersona",
-      personaId: "p",
-      name: "2",
+      type: "renameActivity",
+      activityId: "a",
+      title: "2",
     });
     expect(sockets[0].sent.map((m) => m.opId)).toEqual([first]);
     vi.advanceTimersByTime(1000);

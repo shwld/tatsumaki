@@ -32,21 +32,6 @@ export const storyMapsTable = sqliteTable(
   ],
 );
 
-export const storyMapPersonasTable = sqliteTable(
-  "story_map_personas",
-  {
-    id: text("id").primaryKey(),
-    mapId: text("map_id")
-      .notNull()
-      .references(() => storyMapsTable.id, { onDelete: "cascade" }),
-    name: text("name").notNull(),
-    position: integer("position").notNull(),
-  },
-  (table) => [
-    index("idx_story_map_personas_map").on(table.mapId, table.position),
-  ],
-);
-
 export const storyMapActivitiesTable = sqliteTable(
   "story_map_activities",
   {

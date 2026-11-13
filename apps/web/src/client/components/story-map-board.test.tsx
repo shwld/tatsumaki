@@ -18,7 +18,6 @@ const structure: StoryMapStructure = {
     createdAt: "",
     updatedAt: "",
   },
-  personas: [],
   activities: [
     { id: "a1", title: "Sign up", position: 0 },
     { id: "a2", title: "Plan", position: 1 },

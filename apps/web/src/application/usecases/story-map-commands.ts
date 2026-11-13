@@ -4,7 +4,6 @@ import type { StoryMapStructure } from "../../domain/entities/story-map";
 import {
   addActivity,
   addCard,
-  addPersona,
   addSlice,
   addTask,
   createStoryFromCard,
@@ -18,9 +17,7 @@ import {
   moveCard,
   moveSlice,
   moveTask,
-  removePersona,
   renameActivity,
-  renamePersona,
   renameSlice,
   renameTask,
   STORY_MAP_ARCHIVED_ERROR,
@@ -49,13 +46,6 @@ export const storyMapCommandSchema = z.discriminatedUnion("type", [
     achievementGoal: z.string().optional(),
     archived: z.boolean().optional(),
   }),
-  z.strictObject({ type: z.literal("addPersona"), name: z.string() }),
-  z.strictObject({
-    type: z.literal("renamePersona"),
-    personaId: id,
-    name: z.string(),
-  }),
-  z.strictObject({ type: z.literal("removePersona"), personaId: id }),
   z.strictObject({
     type: z.literal("addActivity"),
     title: z.string(),
@@ -236,12 +226,6 @@ export async function applyStoryMapCommand(
   switch (command.type) {
     case "updateMap":
       return run(updateStoryMap(deps, { ...target, ...command }));
-    case "addPersona":
-      return run(addPersona(deps, { ...target, name: command.name }));
-    case "renamePersona":
-      return run(renamePersona(deps, { ...target, ...command }));
-    case "removePersona":
-      return run(removePersona(deps, { ...target, ...command }));
     case "addActivity": {
       const at = indexAfter(
         structure.activities,

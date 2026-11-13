@@ -17,7 +17,6 @@ const metaKey = (structure: StoryMapDetail["structure"]) =>
     structure.map.title,
     structure.map.achievementGoal,
     structure.map.archivedAt,
-    structure.personas,
   ]);
 
 export function useStoryMapDetail(projectId: string, mapId: string) {

@@ -4,7 +4,6 @@ import { useAuthError } from "../contexts/auth-error-context";
 import { createStoryMap } from "../lib/story-maps-api";
 import {
   STORY_MAP_GOAL_MAX,
-  STORY_MAP_PERSONA_MAX,
   STORY_MAP_TITLE_MAX,
 } from "../../shared/story-map-limits";
 import type { StoryMap } from "../types/story-map";
@@ -23,36 +22,20 @@ export function StoryMapCreateForm({ projectId, onCancel, onCreated }: Props) {
   const { notifySessionExpired } = useAuthError();
   const [title, setTitle] = useState("");
   const [goal, setGoal] = useState("");
-  const [personas, setPersonas] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (submitting) return;
-    const personaNames = personas
-      .split("\n")
-      .map((line) => line.trim())
-      .filter((line) => line !== "");
     if (title.trim() === "") {
       return setError(t("storyMapCreateForm.titleRequired"));
-    }
-    if (personaNames.length > STORY_MAP_PERSONA_MAX) {
-      return setError(
-        t("storyMapCreateForm.tooMany", { max: STORY_MAP_PERSONA_MAX }),
-      );
-    }
-    if (personaNames.some((name) => name.length > STORY_MAP_TITLE_MAX)) {
-      return setError(
-        t("storyMapCreateForm.personaTooLong", { max: STORY_MAP_TITLE_MAX }),
-      );
     }
     setSubmitting(true);
     setError(null);
     const result = await createStoryMap(projectId, {
       title,
       achievementGoal: goal,
-      personaNames,
     });
     setSubmitting(false);
     if (result.ok) return onCreated(result.value);
@@ -95,18 +78,6 @@ export function StoryMapCreateForm({ projectId, onCancel, onCreated }: Props) {
         />
         <span className="text-xs text-gray-500">
           {t("storyMapCreateForm.goalHint")}
-        </span>
-      </label>
-      <label className="block text-sm text-gray-700">
-        {t("storyMapCreateForm.personasLabel")}
-        <textarea
-          className={`mt-1 ${inputClass}`}
-          rows={3}
-          value={personas}
-          onChange={(event) => setPersonas(event.target.value)}
-        />
-        <span className="text-xs text-gray-500">
-          {t("storyMapCreateForm.personasHint", { max: STORY_MAP_PERSONA_MAX })}
         </span>
       </label>
       {error ? (
