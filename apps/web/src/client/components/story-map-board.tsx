@@ -31,6 +31,8 @@ const ghostAddClass =
 /** Controls stay in the tab order but only show on hover/focus where a pointer exists. */
 const revealClass =
   "[@media(hover:hover)]:opacity-0 group-hover/header:opacity-100 group-focus-within/header:opacity-100 focus-within:opacity-100";
+const cardRevealClass =
+  "[@media(hover:hover)]:opacity-0 group-hover/card:opacity-100 group-focus-within/card:opacity-100 focus-within:opacity-100";
 
 /** Left accent per card state: idea, missing, then the linked story's status. */
 const STATUS_TONE: Record<string, string> = {
@@ -858,7 +860,7 @@ export function StoryMapBoard({
                                   <span>{card.ideaTitle}</span>
                                 )}
                                 {card.note ? (
-                                  <p className="mt-1 line-clamp-3 whitespace-pre-wrap text-xs text-gray-600">
+                                  <p className="mt-1 whitespace-pre-wrap text-xs text-gray-600">
                                     {card.note}
                                   </p>
                                 ) : null}
@@ -876,7 +878,7 @@ export function StoryMapBoard({
                                 ) : (
                                   <button
                                     type="button"
-                                    className={`mt-1 ${buttonClass} ${revealClass}`}
+                                    className={`mt-1 ${buttonClass} ${cardRevealClass}`}
                                     aria-label={`${t("storyMapBoard.cardMenu")}: ${card.story ? `#${card.story.number}` : (card.ideaTitle ?? t("storyMapBoard.storyCard"))}`}
                                     onClick={() => setMenuCardId(card.id)}
                                   >
