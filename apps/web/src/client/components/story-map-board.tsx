@@ -22,9 +22,37 @@ const byPosition = <T extends { position: number; id: string }>(a: T, b: T) =>
   a.position - b.position || a.id.localeCompare(b.id);
 
 const buttonClass =
-  "rounded border border-gray-300 px-1.5 py-0.5 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50";
+  "rounded border border-gray-300 px-1.5 py-0.5 text-xs text-gray-700 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 disabled:opacity-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800";
 const inputClass =
-  "w-full rounded border border-gray-300 px-2 py-1 text-sm text-gray-900";
+  "w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100";
+const dangerButtonClass = `${buttonClass} border-red-400 text-red-700 dark:border-red-500 dark:text-red-300`;
+const ghostAddClass =
+  "rounded border border-dashed border-gray-300 px-1.5 py-0.5 text-xs text-gray-600 hover:border-gray-400 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800";
+/** Controls stay in the tab order but only show on hover/focus where a pointer exists. */
+const revealClass =
+  "[@media(hover:hover)]:opacity-0 group-hover/header:opacity-100 group-focus-within/header:opacity-100 focus-within:opacity-100";
+
+/** Left accent per card state: idea, missing, then the linked story's status. */
+const STATUS_TONE: Record<string, string> = {
+  Unstarted: "border-l-gray-400 dark:border-l-slate-400",
+  Started: "border-l-sky-500",
+  Finished: "border-l-amber-500",
+  Delivered: "border-l-purple-500",
+  Accepted: "border-l-emerald-500",
+  Rejected: "border-l-red-500",
+};
+const ICEBOX_TONE = "border-l-cyan-400";
+const IDEA_TONE = "border-l-gray-300 border-dashed dark:border-l-slate-500";
+const MISSING_TONE = "border-l-red-400 border-dashed";
+
+function cardTone(card: StoryMapCard): string {
+  if (card.storyState === "missing") return MISSING_TONE;
+  if (card.story) {
+    if (card.story.isIcebox) return ICEBOX_TONE;
+    return STATUS_TONE[card.story.status] ?? STATUS_TONE.Unstarted;
+  }
+  return card.storyId !== null ? STATUS_TONE.Unstarted : IDEA_TONE;
+}
 
 /** The unplanned row has no slice. It is shown first and cannot be edited. */
 const UNPLANNED = "";
@@ -55,9 +83,10 @@ function InlineAdd({
     return (
       <button
         type="button"
-        className={buttonClass}
+        className={ghostAddClass}
         onClick={() => setOpen(true)}
       >
+        <span aria-hidden="true">+ </span>
         {label}
       </button>
     );
@@ -144,14 +173,14 @@ function HeaderControls({
         role="alertdialog"
         aria-label={`${t("storyMapBoard.delete")}: ${title}`}
       >
-        <p className="mb-1 text-xs text-gray-800">
+        <p className="mb-1 text-xs text-gray-800 dark:text-slate-100">
           {t("storyMapBoard.deleteConfirm", { kind, title })}
           {deleteImpact ? ` ${deleteImpact}` : ""}
         </p>
         <div className="flex gap-1">
           <button
             type="button"
-            className={`${buttonClass} border-red-400 text-red-700`}
+            className={dangerButtonClass}
             onClick={() => {
               onDelete();
               setMode("idle");
@@ -171,7 +200,7 @@ function HeaderControls({
     );
   }
   return (
-    <div className="mt-1 flex flex-wrap gap-1">
+    <div className={`mt-1 flex flex-wrap gap-1 ${revealClass}`}>
       <button
         type="button"
         className={buttonClass}
@@ -275,7 +304,7 @@ function CardMenu({
     <div
       role="group"
       aria-label={t("storyMapBoard.cardMenu")}
-      className="mt-1 space-y-2 rounded border border-gray-300 bg-white p-2 text-xs"
+      className="mt-1 space-y-2 rounded border border-gray-300 bg-white p-2 text-xs shadow-md dark:border-slate-600"
     >
       <form onSubmit={save} className="space-y-1">
         {card.storyId === null ? (
@@ -411,7 +440,7 @@ function CardMenu({
       <div className="flex gap-1">
         <button
           type="button"
-          className={`${buttonClass} border-red-400 text-red-700`}
+          className={dangerButtonClass}
           onClick={() => {
             if (!confirmDelete) return setConfirmDelete(true);
             send({ type: "deleteCard", cardId: card.id });
@@ -515,16 +544,16 @@ export function StoryMapBoard({
 
   return (
     <section aria-label={t("storyMapBoard.title")} className="mb-6">
-      <h2 className="mb-2 text-base font-semibold text-gray-900">
+      <h2 className="mb-2 text-base font-semibold text-gray-900 dark:text-slate-100">
         {t("storyMapBoard.title")}
       </h2>
-      <div className="max-h-[70vh] overflow-auto rounded border border-gray-300">
-        <table className="border-separate border-spacing-0 text-sm">
+      <div className="max-h-[75vh] overflow-auto rounded-lg border border-gray-300 shadow-sm dark:border-slate-700">
+        <table className="border-separate border-spacing-0 text-sm text-gray-900 dark:text-slate-100">
           <thead className="sticky top-0 z-20">
             <tr>
               <th
                 scope="col"
-                className="sticky left-0 z-30 min-w-40 border-b border-r border-gray-300 bg-gray-100 p-2 text-left"
+                className="sticky left-0 z-30 min-w-40 border-b border-r border-gray-300 bg-gray-100 p-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:border-slate-700 dark:text-slate-300"
               >
                 {t("storyMapBoard.activities")}
               </th>
@@ -535,9 +564,11 @@ export function StoryMapBoard({
                     key={activity.id}
                     scope="colgroup"
                     colSpan={Math.max(tasks.length, 1)}
-                    className="min-w-48 border-b border-r border-gray-300 bg-gray-100 p-2 text-left align-top"
+                    className="group/header min-w-48 border-b border-r border-t-4 border-gray-300 border-t-blue-500 bg-gray-100 p-2 text-left align-top dark:border-slate-700 dark:border-t-blue-400"
                   >
-                    <div className="font-semibold">{activity.title}</div>
+                    <div className="text-sm font-semibold">
+                      {activity.title}
+                    </div>
                     {editable ? (
                       <HeaderControls
                         title={activity.title}
@@ -576,7 +607,7 @@ export function StoryMapBoard({
                 );
               })}
               {editable ? (
-                <th className="min-w-48 border-b border-gray-300 bg-gray-100 p-2 text-left align-top">
+                <th className="min-w-48 border-b border-gray-300 bg-gray-100 p-2 text-left align-top dark:border-slate-700">
                   <InlineAdd
                     label={t("storyMapBoard.addActivity")}
                     onAdd={(title) =>
@@ -593,7 +624,7 @@ export function StoryMapBoard({
             <tr>
               <th
                 scope="col"
-                className="sticky left-0 z-30 border-b border-r border-gray-300 bg-gray-100 p-2 text-left"
+                className="sticky left-0 z-30 border-b border-r border-gray-300 bg-gray-100 p-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:border-slate-700 dark:text-slate-300"
               >
                 {t("storyMapBoard.tasks")}
               </th>
@@ -617,7 +648,7 @@ export function StoryMapBoard({
                     <th
                       key={`${activity.id}-empty`}
                       scope="col"
-                      className="border-b border-r border-gray-300 bg-gray-50 p-2 text-left align-top"
+                      className="border-b border-r border-gray-300 bg-gray-50 p-2 text-left align-top dark:border-slate-700"
                     >
                       {addTask}
                     </th>,
@@ -627,7 +658,7 @@ export function StoryMapBoard({
                   <th
                     key={task.id}
                     scope="col"
-                    className="border-b border-r border-gray-300 bg-gray-50 p-2 text-left align-top"
+                    className="group/header min-w-48 border-b border-r border-t-2 border-gray-300 border-t-indigo-400 bg-gray-50 p-2 text-left align-top dark:border-slate-700 dark:border-t-indigo-300"
                   >
                     <div className="font-medium">{task.title}</div>
                     {editable ? (
@@ -669,7 +700,7 @@ export function StoryMapBoard({
                 ));
               })}
               {editable ? (
-                <th className="border-b border-gray-300 bg-gray-50" />
+                <th className="border-b border-gray-300 bg-gray-50 dark:border-slate-700" />
               ) : null}
             </tr>
           </thead>
@@ -678,9 +709,15 @@ export function StoryMapBoard({
               <tr key={row.key}>
                 <th
                   scope="row"
-                  className="sticky left-0 z-10 border-b border-r border-gray-300 bg-gray-50 p-2 text-left align-top"
+                  className={`group/header sticky left-0 z-10 border-b border-r border-l-4 border-gray-300 p-2 text-left align-top dark:border-slate-700 ${row.slice ? "border-l-emerald-500 bg-gray-50" : "border-l-gray-300 bg-gray-100 dark:border-l-slate-500"}`}
                 >
-                  <div className="font-medium">
+                  <div
+                    className={
+                      row.slice
+                        ? "font-medium"
+                        : "font-medium italic text-gray-600 dark:text-slate-300"
+                    }
+                  >
                     {row.slice?.title ?? t("storyMapBoard.unplanned")}
                   </div>
                   {row.slice && editable ? (
@@ -724,7 +761,7 @@ export function StoryMapBoard({
                     return [
                       <td
                         key={`${activity.id}-empty`}
-                        className="border-b border-r border-gray-200 bg-gray-50/50"
+                        className="border-b border-r border-gray-200 bg-gray-50/50 dark:border-slate-700"
                       />,
                     ];
                   }
@@ -734,7 +771,7 @@ export function StoryMapBoard({
                       <td
                         key={task.id}
                         data-testid={`cell-${task.id}-${row.key || "unplanned"}`}
-                        className="border-b border-r border-gray-200 p-2 align-top"
+                        className={`group/cell border-b border-r border-gray-200 p-1.5 align-top dark:border-slate-700 ${row.slice ? "" : "bg-gray-50/70 dark:bg-slate-900/40"}`}
                         onDragOver={(event) => {
                           if (editable && dragId) event.preventDefault();
                         }}
@@ -762,7 +799,7 @@ export function StoryMapBoard({
                                 event.stopPropagation();
                                 onDrop(task.id, row.sliceId, card.id);
                               }}
-                              className="rounded border border-gray-300 bg-white p-2 shadow-sm"
+                              className={`group/card rounded border border-l-4 border-gray-300 bg-white p-2 shadow-sm dark:border-slate-600 ${cardTone(card)}`}
                             >
                               <div
                                 tabIndex={editable ? 0 : undefined}
@@ -772,11 +809,11 @@ export function StoryMapBoard({
                                     : undefined
                                 }
                                 onKeyDown={(event) => onCardKey(event, card)}
-                                className="break-words"
+                                className="break-words rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
                               >
                                 {card.storyState === "missing" ? (
                                   <>
-                                    <span className="text-gray-600">
+                                    <span className="text-red-700 dark:text-red-300">
                                       {t("storyMapBoard.storyMissing")}
                                     </span>
                                     <p className="mt-1 text-xs text-gray-600">
@@ -786,7 +823,7 @@ export function StoryMapBoard({
                                 ) : card.story ? (
                                   <>
                                     <Link
-                                      className="text-blue-700 underline"
+                                      className="font-medium text-blue-700 underline dark:text-blue-300"
                                       aria-label={t("storyMapBoard.openStory", {
                                         number: card.story.number,
                                       })}
@@ -797,13 +834,22 @@ export function StoryMapBoard({
                                     >
                                       #{card.story.number} {card.story.title}
                                     </Link>
-                                    <p className="text-xs text-gray-600">
-                                      {card.story.isIcebox
-                                        ? "Icebox"
-                                        : card.story.status}
-                                      {card.story.storyPoint !== null
-                                        ? ` · ${t("storyMapBoard.storyEstimate", { point: card.story.storyPoint })}`
-                                        : ""}
+                                    <p className="mt-0.5 flex flex-wrap items-center gap-1 text-xs text-gray-600">
+                                      <span className="rounded bg-gray-100 px-1 py-px font-medium dark:bg-slate-800">
+                                        {card.story.isIcebox
+                                          ? "Icebox"
+                                          : card.story.status}
+                                      </span>
+                                      <span className="rounded bg-gray-100 px-1 py-px dark:bg-slate-800">
+                                        {card.story.type}
+                                      </span>
+                                      {card.story.storyPoint !== null ? (
+                                        <span>
+                                          {t("storyMapBoard.storyEstimate", {
+                                            point: card.story.storyPoint,
+                                          })}
+                                        </span>
+                                      ) : null}
                                     </p>
                                   </>
                                 ) : card.storyId !== null ? (
@@ -812,7 +858,7 @@ export function StoryMapBoard({
                                   <span>{card.ideaTitle}</span>
                                 )}
                                 {card.note ? (
-                                  <p className="mt-1 whitespace-pre-wrap text-xs text-gray-600">
+                                  <p className="mt-1 line-clamp-3 whitespace-pre-wrap text-xs text-gray-600">
                                     {card.note}
                                   </p>
                                 ) : null}
@@ -830,7 +876,7 @@ export function StoryMapBoard({
                                 ) : (
                                   <button
                                     type="button"
-                                    className={`mt-1 ${buttonClass}`}
+                                    className={`mt-1 ${buttonClass} ${revealClass}`}
                                     aria-label={`${t("storyMapBoard.cardMenu")}: ${card.story ? `#${card.story.number}` : (card.ideaTitle ?? t("storyMapBoard.storyCard"))}`}
                                     onClick={() => setMenuCardId(card.id)}
                                   >
@@ -842,7 +888,7 @@ export function StoryMapBoard({
                           ))}
                         </ul>
                         {editable ? (
-                          <div className="mt-1">
+                          <div className="mt-1.5">
                             <InlineAdd
                               label={`${t("storyMapBoard.addCard")}`}
                               onAdd={(title) =>
@@ -861,14 +907,16 @@ export function StoryMapBoard({
                     );
                   });
                 })}
-                {editable ? <td className="border-b border-gray-200" /> : null}
+                {editable ? (
+                  <td className="border-b border-gray-200 dark:border-slate-700" />
+                ) : null}
               </tr>
             ))}
             {editable ? (
               <tr>
                 <th
                   scope="row"
-                  className="sticky left-0 z-10 border-r border-gray-300 bg-gray-50 p-2 text-left"
+                  className="sticky left-0 z-10 border-r border-gray-300 bg-gray-50 p-2 text-left dark:border-slate-700"
                 >
                   <InlineAdd
                     label={t("storyMapBoard.addSlice")}
@@ -891,7 +939,7 @@ export function StoryMapBoard({
           </tbody>
         </table>
       </div>
-      <p className="mt-2 text-xs text-gray-600">
+      <p className="mt-2 text-xs text-gray-600 dark:text-slate-300">
         {t("storyMapBoard.keyboardHint")}
       </p>
     </section>
