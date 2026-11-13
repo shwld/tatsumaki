@@ -59,7 +59,6 @@ describe("story map HTTP API", () => {
     const created = await call(MEMBER, "POST", "/story-maps", {
       title: "Onboarding",
       achievementGoal: "Reach first story",
-      personaNames: ["Owner", "Member"],
     });
     expect(created.status).toBe(201);
     const { storyMap } = (await created.json()) as {
@@ -71,14 +70,9 @@ describe("story map HTTP API", () => {
     ).json()) as {
       structure: {
         map: { title: string; achievementGoal: string };
-        personas: { name: string }[];
       };
     };
     expect(detail.structure.map.achievementGoal).toBe("Reach first story");
-    expect(detail.structure.personas.map((p) => p.name)).toEqual([
-      "Owner",
-      "Member",
-    ]);
 
     const edit = await command(MEMBER, storyMap.id, {
       type: "updateMap",

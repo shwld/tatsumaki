@@ -28,7 +28,6 @@ const storyMap = (overrides: Record<string, unknown> = {}) => ({
 
 const structure = (map = storyMap()) => ({
   map,
-  personas: [{ id: "persona-1", name: "Owner", position: 0 }],
   activities: [],
   tasks: [],
   slices: [],
@@ -189,7 +188,6 @@ describe("Story Map screens", () => {
     const detail = renderAt("/projects/p1/story-maps/map-1");
     expect(await screen.findByText("閲覧のみできます")).toBeTruthy();
     expect(screen.queryByRole("link", { name: "編集" })).toBeNull();
-    expect(screen.queryByLabelText("主要ユーザー名")).toBeNull();
     detail.unmount();
 
     renderAt("/projects/p1/story-maps/map-1/edit");
@@ -238,24 +236,6 @@ describe("Story Map screens", () => {
     expect((screen.getByLabelText("タイトル") as HTMLInputElement).value).toBe(
       "Draft title",
     );
-  });
-
-  it("names the overlong persona instead of blaming the title", async () => {
-    mockFetch(() => [200, { storyMaps: [], role: "owner" }]);
-    renderAt("/projects/p1/story-maps");
-    fireEvent.click(
-      await screen.findByRole("button", { name: "Story Map を作成" }),
-    );
-    fireEvent.change(screen.getByLabelText("タイトル"), {
-      target: { value: "Map" },
-    });
-    fireEvent.change(screen.getByLabelText(/主要ユーザー/), {
-      target: { value: "x".repeat(201) },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "作成" }));
-    expect(
-      await screen.findByText("主要ユーザー名は 200 文字までです"),
-    ).toBeTruthy();
   });
 
   it("asks to restore an archived map and offers no edit form", async () => {

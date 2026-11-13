@@ -28,7 +28,6 @@ export {
 } from "./artifacts";
 export {
   storyMapsTable,
-  storyMapPersonasTable,
   storyMapActivitiesTable,
   storyMapTasksTable,
   storyMapSlicesTable,

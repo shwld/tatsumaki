@@ -1,9 +1,3 @@
-export type StoryMapPersona = {
-  id: string;
-  name: string;
-  position: number;
-};
-
 export type StoryMap = {
   __typename: "StoryMap";
   id: string;
@@ -59,7 +53,6 @@ export type StoryMapCard = {
 
 export type StoryMapStructure = {
   map: StoryMap;
-  personas: StoryMapPersona[];
   activities: StoryMapActivity[];
   tasks: StoryMapTask[];
   slices: StoryMapSlice[];

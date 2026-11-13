@@ -6,7 +6,6 @@ type MapState = {
   title: string;
   achievementGoal: string;
   archivedAt: string | null;
-  personas: { id: string; name: string; position: number }[];
 };
 
 // A tiny in-memory stand-in for the story map API, so the flow below checks
@@ -44,18 +43,12 @@ async function mockStoryMapApi(page: Page, role: "owner" | "viewer") {
       const body = request.postDataJSON() as {
         title: string;
         achievementGoal: string;
-        personaNames: string[];
       };
       const map: MapState = {
         id: `map-${maps.length + 1}`,
         title: body.title,
         achievementGoal: body.achievementGoal,
         archivedAt: null,
-        personas: body.personaNames.map((name, index) => ({
-          id: `persona-${maps.length + 1}-${index}`,
-          name,
-          position: index,
-        })),
       };
       maps.push(map);
       return route.fulfill(json({ storyMap: toMap(map) }, 201));
@@ -69,7 +62,6 @@ async function mockStoryMapApi(page: Page, role: "owner" | "viewer") {
           role,
           structure: {
             map: toMap(map),
-            personas: map.personas,
             activities: [],
             tasks: [],
             slices: [],
@@ -85,8 +77,6 @@ async function mockStoryMapApi(page: Page, role: "owner" | "viewer") {
           title?: string;
           achievementGoal?: string;
           archived?: boolean;
-          name?: string;
-          personaId?: string;
         };
       };
       if (command.type === "updateMap") {
@@ -97,14 +87,6 @@ async function mockStoryMapApi(page: Page, role: "owner" | "viewer") {
         if (command.archived !== undefined) {
           map.archivedAt = command.archived ? "2026-01-02 00:00:00" : null;
         }
-      } else if (command.type === "addPersona" && command.name) {
-        map.personas.push({
-          id: `persona-${map.id}-${map.personas.length}`,
-          name: command.name,
-          position: map.personas.length,
-        });
-      } else if (command.type === "removePersona") {
-        map.personas = map.personas.filter((p) => p.id !== command.personaId);
       }
       return route.fulfill(json({ seq: 1, result: null, duplicate: false }));
     }
@@ -125,13 +107,11 @@ test("story map: create, edit, archive and restore", async ({ page }) => {
   await page.getByRole("button", { name: "Story Map を作成" }).click();
   await page.getByLabel("タイトル").fill("オンボーディング");
   await page.getByLabel("達成目的").fill("初回 story まで到達する");
-  await page.getByLabel("主要ユーザー").fill("オーナー\nメンバー");
   await page.getByRole("button", { name: "作成", exact: true }).click();
 
   await expect(page).toHaveURL(/\/story-maps\/map-1$/);
   await expect(page.getByLabel("タイトル")).toHaveCount(0);
   await expect(page.getByText("初回 story まで到達する")).toBeVisible();
-  await expect(page.getByLabel("主要ユーザー名")).toHaveCount(2);
 
   await page.getByRole("link", { name: "編集", exact: true }).click();
   await expect(page).toHaveURL(/\/story-maps\/map-1\/edit$/);
@@ -142,9 +122,6 @@ test("story map: create, edit, archive and restore", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "オンボーディング改善" }),
   ).toBeVisible();
-  await page.getByLabel("主要ユーザーを追加").fill("閲覧者");
-  await page.getByRole("button", { name: "追加", exact: true }).click();
-  await expect(page.getByLabel("主要ユーザー名")).toHaveCount(3);
 
   await page.getByRole("link", { name: "編集", exact: true }).click();
   await page.getByRole("button", { name: "アーカイブ", exact: true }).click();
@@ -172,7 +149,6 @@ test("story map: viewer sees no edit controls", async ({ page }) => {
     title: "共有マップ",
     achievementGoal: "共有する",
     archivedAt: null,
-    personas: [{ id: "persona-1", name: "オーナー", position: 0 }],
   });
 
   await page.goto("/projects/project-1/story-maps");
@@ -185,7 +161,6 @@ test("story map: viewer sees no edit controls", async ({ page }) => {
   await page.goto("/projects/project-1/story-maps/map-1");
   await expect(page.getByText("閲覧のみできます")).toBeVisible();
   await expect(page.getByRole("link", { name: "編集" })).toHaveCount(0);
-  await expect(page.getByLabel("主要ユーザー名")).toHaveCount(0);
 
   await page.goto("/projects/project-1/story-maps/map-1/edit");
   await expect(page.getByText("閲覧のみできます")).toBeVisible();

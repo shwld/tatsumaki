@@ -89,13 +89,7 @@ export function createStoryMapRoutes() {
     const body = await readObject(c);
     if (!body || typeof body.title !== "string") return invalidBody(c);
     const goal = optionalString(body, "achievementGoal");
-    const names = body.personaNames;
-    if (
-      !goal.ok ||
-      (names !== undefined &&
-        (!Array.isArray(names) ||
-          names.some((name) => typeof name !== "string")))
-    ) {
+    if (!goal.ok) {
       return invalidBody(c);
     }
     const result = await createStoryMap(dependencies(c), {
@@ -103,7 +97,6 @@ export function createStoryMapRoutes() {
       userId: userId(c),
       title: body.title,
       achievementGoal: goal.value,
-      personaNames: names as string[] | undefined,
     });
     if (result.isErr()) return errorResponse(c, result.error);
     return c.json({ storyMap: result.value }, 201);

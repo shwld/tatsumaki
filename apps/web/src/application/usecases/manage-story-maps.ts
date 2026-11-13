@@ -5,7 +5,6 @@ import type {
   StoryMapActivity,
   StoryMapCard,
   StoryMapLinkedStory,
-  StoryMapPersona,
   StoryMapSlice,
   StoryMapStructure,
   StoryMapTask,
@@ -23,7 +22,6 @@ import { STORY_TYPES } from "../../domain/entities/story";
 import {
   STORY_MAP_GOAL_MAX,
   STORY_MAP_NOTE_MAX,
-  STORY_MAP_PERSONA_MAX,
   STORY_MAP_STORY_DESCRIPTION_MAX,
   STORY_MAP_TITLE_MAX,
 } from "../../shared/story-map-limits";
@@ -58,12 +56,7 @@ export type StoryMapDependencies = {
 
 type Result_<T> = Promise<Result<T, ManageStoryMapError>>;
 
-export {
-  STORY_MAP_GOAL_MAX,
-  STORY_MAP_NOTE_MAX,
-  STORY_MAP_PERSONA_MAX,
-  STORY_MAP_TITLE_MAX,
-};
+export { STORY_MAP_GOAL_MAX, STORY_MAP_NOTE_MAX, STORY_MAP_TITLE_MAX };
 
 type Actor = { projectId: string; userId: string };
 type MapTarget = Actor & { mapId: string };
@@ -181,7 +174,6 @@ export async function createStoryMap(
   input: Actor & {
     title: string;
     achievementGoal?: string;
-    personaNames?: string[];
   },
 ): Result_<StoryMap> {
   const role = await requireRole(deps, input);
@@ -195,27 +187,13 @@ export async function createStoryMap(
   const goal = text(input.achievementGoal ?? "", STORY_MAP_GOAL_MAX, {
     required: false,
   });
-  const names = (input.personaNames ?? []).map((name) =>
-    text(name, STORY_MAP_TITLE_MAX, { required: true }),
-  );
   if (title.isErr() || goal.isErr()) {
-    return err(INVALID_STORY_MAP_INPUT_ERROR);
-  }
-  const personaNames: string[] = [];
-  for (const name of names) {
-    if (name.isErr()) {
-      return err(name.error);
-    }
-    personaNames.push(name.value);
-  }
-  if (personaNames.length > STORY_MAP_PERSONA_MAX) {
     return err(INVALID_STORY_MAP_INPUT_ERROR);
   }
   return deps.storyMapRepository.createMap({
     projectId: input.projectId,
     title: title.value,
     achievementGoal: goal.value,
-    personaNames,
   });
 }
 
@@ -254,46 +232,6 @@ export async function updateStoryMap(
     patch.archived = input.archived;
   }
   return deps.storyMapRepository.updateMap(input.mapId, patch);
-}
-
-export async function addPersona(
-  deps: StoryMapDependencies,
-  input: MapTarget & { name: string },
-): Result_<StoryMapPersona> {
-  const loaded = await loadForEdit(deps, input);
-  if (loaded.isErr()) return err(loaded.error);
-  const name = text(input.name, STORY_MAP_TITLE_MAX, { required: true });
-  if (name.isErr()) return err(name.error);
-  if (loaded.value.personas.length >= STORY_MAP_PERSONA_MAX) {
-    return err(INVALID_STORY_MAP_INPUT_ERROR);
-  }
-  return deps.storyMapRepository.addPersona(input.mapId, name.value);
-}
-
-export async function renamePersona(
-  deps: StoryMapDependencies,
-  input: MapTarget & { personaId: string; name: string },
-): Result_<void> {
-  const loaded = await loadForEdit(deps, input);
-  if (loaded.isErr()) return err(loaded.error);
-  const name = text(input.name, STORY_MAP_TITLE_MAX, { required: true });
-  if (name.isErr()) return err(name.error);
-  if (!hasId(loaded.value.personas, input.personaId)) return notFound();
-  return deps.storyMapRepository.renamePersona(
-    input.mapId,
-    input.personaId,
-    name.value,
-  );
-}
-
-export async function removePersona(
-  deps: StoryMapDependencies,
-  input: MapTarget & { personaId: string },
-): Result_<void> {
-  const loaded = await loadForEdit(deps, input);
-  if (loaded.isErr()) return err(loaded.error);
-  if (!hasId(loaded.value.personas, input.personaId)) return notFound();
-  return deps.storyMapRepository.removePersona(input.mapId, input.personaId);
 }
 
 export async function addActivity(
