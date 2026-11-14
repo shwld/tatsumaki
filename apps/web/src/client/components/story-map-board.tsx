@@ -1,4 +1,9 @@
-import { useState, type FormEvent, type KeyboardEvent } from "react";
+import {
+  useState,
+  type DragEvent,
+  type FormEvent,
+  type KeyboardEvent,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 
@@ -13,6 +18,15 @@ import {
   STORY_MAP_NOTE_MAX,
   STORY_MAP_TITLE_MAX,
 } from "../../shared/story-map-limits";
+import {
+  afterIdFor,
+  dropKey,
+  indicatorClass,
+  sideOf,
+  type DragItem,
+  type DropIndicator,
+  type DropSide,
+} from "../lib/story-map-dnd";
 import { projectStoryDetailPath } from "../lib/story-routes";
 import { StoryCreatePanel, StoryLinkPicker } from "./story-map-card-story";
 
@@ -474,7 +488,8 @@ export function StoryMapBoard({
 }: StoryMapBoardProps) {
   const { t } = useTranslation();
   const [menuCardId, setMenuCardId] = useState<string | null>(null);
-  const [dragId, setDragId] = useState<string | null>(null);
+  const [drag, setDrag] = useState<DragItem | null>(null);
+  const [indicator, setIndicator] = useState<DropIndicator | null>(null);
 
   const activities = [...structure.activities].sort(byPosition);
   const slices = [...structure.slices].sort(byPosition);
@@ -528,17 +543,208 @@ export function StoryMapBoard({
     placeAt(card.id, task.id, row.sliceId, target.at(-1)?.id ?? null);
   };
 
-  const onDrop = (
-    taskId: string,
-    sliceId: string | null,
-    afterCardId: string | null,
-  ) => {
-    if (dragId === null) return;
-    const dragged = structure.cards.find((card) => card.id === dragId);
-    setDragId(null);
-    if (!dragged || dragged.id === afterCardId) return;
-    placeAt(dragged.id, taskId, sliceId, afterCardId);
+  const endDrag = () => {
+    setDrag(null);
+    setIndicator(null);
   };
+
+  /** Only the title block drags, so rename inputs and buttons keep working. */
+  const dragSource = (item: DragItem) =>
+    editable
+      ? {
+          draggable: true,
+          onDragStart: (event: DragEvent) => {
+            event.stopPropagation();
+            event.dataTransfer?.setData("text/plain", item.id);
+            setDrag(item);
+          },
+          onDragEnd: endDrag,
+        }
+      : {};
+
+  type Drop = {
+    side: DropSide | "end";
+    command: Record<string, unknown> | null;
+  };
+  /** Dropping on oneself is consumed so an outer cell does not move it to its end. */
+  const SELF: Drop = { side: "end", command: null };
+
+  /**
+   * A drop target resolves the current drag to a command, or to nothing when
+   * it cannot take it (wrong kind, or dropped on itself).
+   */
+  const dropTarget = (
+    key: string,
+    axis: "x" | "y",
+    resolve: (dragged: DragItem, side: DropSide) => Drop | null,
+  ) => ({
+    onDragOver: (event: DragEvent<HTMLElement>) => {
+      if (!editable || !drag) return;
+      const drop = resolve(
+        drag,
+        sideOf(event, event.currentTarget.getBoundingClientRect(), axis),
+      );
+      if (!drop) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (drop.command === null) return setIndicator(null);
+      setIndicator((current) =>
+        current?.key === key && current.side === drop.side
+          ? current
+          : { key, side: drop.side },
+      );
+    },
+    onDrop: (event: DragEvent<HTMLElement>) => {
+      if (!editable || !drag) return;
+      const drop = resolve(
+        drag,
+        sideOf(event, event.currentTarget.getBoundingClientRect(), axis),
+      );
+      if (!drop) return;
+      event.preventDefault();
+      event.stopPropagation();
+      endDrag();
+      if (drop.command) send(drop.command);
+    },
+  });
+
+  const dropOnActivity = (activity: StoryMapActivity) =>
+    dropTarget(dropKey("activity", activity.id), "x", (dragged, side) => {
+      if (dragged.kind === "activity") {
+        if (dragged.id === activity.id) return SELF;
+        return {
+          side,
+          command: {
+            type: "moveActivity",
+            activityId: dragged.id,
+            afterActivityId: afterIdFor(
+              activities.map((a) => a.id),
+              dragged.id,
+              activity.id,
+              side,
+            ),
+          },
+        };
+      }
+      if (dragged.kind === "task") {
+        return {
+          side: "end",
+          command: {
+            type: "moveTask",
+            taskId: dragged.id,
+            activityId: activity.id,
+            afterTaskId:
+              tasksOf(activity.id)
+                .filter((task) => task.id !== dragged.id)
+                .at(-1)?.id ?? null,
+          },
+        };
+      }
+      return null;
+    });
+
+  const dropOnTask = (task: StoryMapTask) =>
+    dropTarget(dropKey("task", task.id), "x", (dragged, side) => {
+      if (dragged.kind !== "task") return null;
+      if (dragged.id === task.id) return SELF;
+      return {
+        side,
+        command: {
+          type: "moveTask",
+          taskId: dragged.id,
+          activityId: task.activityId,
+          afterTaskId: afterIdFor(
+            tasksOf(task.activityId).map((t) => t.id),
+            dragged.id,
+            task.id,
+            side,
+          ),
+        },
+      };
+    });
+
+  const dropOnEmptyActivity = (activity: StoryMapActivity) =>
+    dropTarget(dropKey("activity", `${activity.id}-empty`), "x", (dragged) =>
+      dragged.kind === "task"
+        ? {
+            side: "end",
+            command: {
+              type: "moveTask",
+              taskId: dragged.id,
+              activityId: activity.id,
+              afterTaskId: null,
+            },
+          }
+        : null,
+    );
+
+  const dropOnSlice = (slice: StoryMapSlice | null) =>
+    dropTarget(
+      dropKey("slice", slice?.id ?? UNPLANNED),
+      "y",
+      (dragged, side) => {
+        if (dragged.kind !== "slice") return null;
+        if (dragged.id === slice?.id) return SELF;
+        return {
+          side: slice ? side : "after",
+          command: {
+            type: "moveSlice",
+            sliceId: dragged.id,
+            afterSliceId: slice
+              ? afterIdFor(
+                  slices.map((s) => s.id),
+                  dragged.id,
+                  slice.id,
+                  side,
+                )
+              : null,
+          },
+        };
+      },
+    );
+
+  const dropOnCard = (card: StoryMapCard) =>
+    dropTarget(dropKey("card", card.id), "y", (dragged, side) => {
+      if (dragged.kind !== "card") return null;
+      if (dragged.id === card.id) return SELF;
+      return {
+        side,
+        command: {
+          type: "moveCard",
+          cardId: dragged.id,
+          taskId: card.taskId,
+          sliceId: card.sliceId,
+          afterCardId: afterIdFor(
+            cardsIn(structure, card.taskId, card.sliceId).map((c) => c.id),
+            dragged.id,
+            card.id,
+            side,
+          ),
+        },
+      };
+    });
+
+  const dropOnCell = (taskId: string, sliceId: string | null) =>
+    dropTarget(
+      dropKey("cell", `${taskId}-${sliceId ?? UNPLANNED}`),
+      "y",
+      (dragged) =>
+        dragged.kind === "card"
+          ? {
+              side: "end",
+              command: {
+                type: "moveCard",
+                cardId: dragged.id,
+                taskId,
+                sliceId,
+                afterCardId:
+                  cardsIn(structure, taskId, sliceId)
+                    .filter((card) => card.id !== dragged.id)
+                    .at(-1)?.id ?? null,
+              },
+            }
+          : null,
+    );
 
   if (activities.length === 0 && !editable) {
     return <p className="text-sm text-gray-600">{t("storyMapBoard.empty")}</p>;
@@ -566,9 +772,14 @@ export function StoryMapBoard({
                     key={activity.id}
                     scope="colgroup"
                     colSpan={Math.max(tasks.length, 1)}
-                    className="group/header min-w-48 border-b border-r border-t-4 border-gray-300 border-t-blue-500 bg-gray-100 p-2 text-left align-top dark:border-slate-700 dark:border-t-blue-400"
+                    className={`group/header min-w-48 border-b border-r border-t-4 border-gray-300 border-t-blue-500 bg-gray-100 p-2 text-left align-top dark:border-slate-700 dark:border-t-blue-400 ${indicatorClass(indicator, dropKey("activity", activity.id), "x")}`}
+                    {...dropOnActivity(activity)}
                   >
-                    <div className="text-sm font-semibold">
+                    <div
+                      className={`text-sm font-semibold ${editable ? "cursor-grab" : ""}`}
+                      {...dragSource({ kind: "activity", id: activity.id })}
+                    >
+                      {editable ? <span aria-hidden="true">⠿ </span> : null}
                       {activity.title}
                     </div>
                     {editable ? (
@@ -630,7 +841,7 @@ export function StoryMapBoard({
               >
                 {t("storyMapBoard.tasks")}
               </th>
-              {activities.flatMap((activity) => {
+              {activities.flatMap((activity, activityIndex) => {
                 const tasks = tasksOf(activity.id);
                 const addTask = editable ? (
                   <InlineAdd
@@ -650,7 +861,8 @@ export function StoryMapBoard({
                     <th
                       key={`${activity.id}-empty`}
                       scope="col"
-                      className="border-b border-r border-gray-300 bg-gray-50 p-2 text-left align-top dark:border-slate-700"
+                      className={`border-b border-r border-gray-300 bg-gray-50 p-2 text-left align-top dark:border-slate-700 ${indicatorClass(indicator, dropKey("activity", `${activity.id}-empty`), "x")}`}
+                      {...dropOnEmptyActivity(activity)}
                     >
                       {addTask}
                     </th>,
@@ -660,16 +872,26 @@ export function StoryMapBoard({
                   <th
                     key={task.id}
                     scope="col"
-                    className="group/header min-w-48 border-b border-r border-t-2 border-gray-300 border-t-indigo-400 bg-gray-50 p-2 text-left align-top dark:border-slate-700 dark:border-t-indigo-300"
+                    className={`group/header min-w-48 border-b border-r border-t-2 border-gray-300 border-t-indigo-400 bg-gray-50 p-2 text-left align-top dark:border-slate-700 dark:border-t-indigo-300 ${indicatorClass(indicator, dropKey("task", task.id), "x")}`}
+                    {...dropOnTask(task)}
                   >
-                    <div className="font-medium">{task.title}</div>
+                    <div
+                      className={`font-medium ${editable ? "cursor-grab" : ""}`}
+                      {...dragSource({ kind: "task", id: task.id })}
+                    >
+                      {editable ? <span aria-hidden="true">⠿ </span> : null}
+                      {task.title}
+                    </div>
                     {editable ? (
                       <>
                         <HeaderControls
                           title={task.title}
                           kind={t("storyMapBoard.kindTask")}
-                          canMovePrev={index > 0}
-                          canMoveNext={index < tasks.length - 1}
+                          canMovePrev={index > 0 || activityIndex > 0}
+                          canMoveNext={
+                            index < tasks.length - 1 ||
+                            activityIndex < activities.length - 1
+                          }
                           deleteImpact={t("storyMapBoard.impactTask", {
                             cards: cardCountOfTask(task.id),
                           })}
@@ -678,7 +900,21 @@ export function StoryMapBoard({
                           }
                           onMove={(direction) => {
                             const target = tasks[index + direction];
-                            if (!target) return;
+                            if (!target) {
+                              const neighbor =
+                                activities[activityIndex + direction];
+                              if (!neighbor) return;
+                              send({
+                                type: "moveTask",
+                                taskId: task.id,
+                                activityId: neighbor.id,
+                                afterTaskId:
+                                  direction === -1
+                                    ? (tasksOf(neighbor.id).at(-1)?.id ?? null)
+                                    : null,
+                              });
+                              return;
+                            }
                             send({
                               type: "moveTask",
                               taskId: task.id,
@@ -711,15 +947,22 @@ export function StoryMapBoard({
               <tr key={row.key}>
                 <th
                   scope="row"
-                  className={`group/header sticky left-0 z-10 border-b border-r border-l-4 border-gray-300 p-2 text-left align-top dark:border-slate-700 ${row.slice ? "border-l-emerald-500 bg-gray-50" : "border-l-gray-300 bg-gray-100 dark:border-l-slate-500"}`}
+                  className={`group/header sticky left-0 z-10 border-b border-r border-l-4 border-gray-300 p-2 text-left align-top dark:border-slate-700 ${row.slice ? "border-l-emerald-500 bg-gray-50" : "border-l-gray-300 bg-gray-100 dark:border-l-slate-500"} ${indicatorClass(indicator, dropKey("slice", row.slice?.id ?? UNPLANNED), "y")}`}
+                  {...dropOnSlice(row.slice)}
                 >
                   <div
                     className={
                       row.slice
-                        ? "font-medium"
+                        ? `font-medium ${editable ? "cursor-grab" : ""}`
                         : "font-medium italic text-gray-600 dark:text-slate-300"
                     }
+                    {...(row.slice
+                      ? dragSource({ kind: "slice", id: row.slice.id })
+                      : {})}
                   >
+                    {row.slice && editable ? (
+                      <span aria-hidden="true">⠿ </span>
+                    ) : null}
                     {row.slice?.title ?? t("storyMapBoard.unplanned")}
                   </div>
                   {row.slice && editable ? (
@@ -773,35 +1016,16 @@ export function StoryMapBoard({
                       <td
                         key={task.id}
                         data-testid={`cell-${task.id}-${row.key || "unplanned"}`}
-                        className={`group/cell border-b border-r border-gray-200 p-1.5 align-top dark:border-slate-700 ${row.slice ? "" : "bg-gray-50/70 dark:bg-slate-900/40"}`}
-                        onDragOver={(event) => {
-                          if (editable && dragId) event.preventDefault();
-                        }}
-                        onDrop={(event) => {
-                          event.preventDefault();
-                          onDrop(
-                            task.id,
-                            row.sliceId,
-                            cards.at(-1)?.id ?? null,
-                          );
-                        }}
+                        className={`group/cell border-b border-r border-gray-200 p-1.5 align-top dark:border-slate-700 ${row.slice ? "" : "bg-gray-50/70 dark:bg-slate-900/40"} ${indicatorClass(indicator, dropKey("cell", `${task.id}-${row.key}`), "y")}`}
+                        {...dropOnCell(task.id, row.sliceId)}
                       >
                         <ul className="space-y-1">
                           {cards.map((card) => (
                             <li
                               key={card.id}
-                              draggable={editable}
-                              onDragStart={() => setDragId(card.id)}
-                              onDragEnd={() => setDragId(null)}
-                              onDragOver={(event) => {
-                                if (editable && dragId) event.preventDefault();
-                              }}
-                              onDrop={(event) => {
-                                event.preventDefault();
-                                event.stopPropagation();
-                                onDrop(task.id, row.sliceId, card.id);
-                              }}
-                              className={`group/card rounded border border-l-4 border-gray-300 bg-white p-2 shadow-sm dark:border-slate-600 ${cardTone(card)}`}
+                              {...dragSource({ kind: "card", id: card.id })}
+                              {...dropOnCard(card)}
+                              className={`group/card rounded border border-l-4 border-gray-300 bg-white p-2 shadow-sm dark:border-slate-600 ${cardTone(card)} ${indicatorClass(indicator, dropKey("card", card.id), "y")}`}
                             >
                               <div
                                 tabIndex={editable ? 0 : undefined}

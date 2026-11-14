@@ -110,7 +110,10 @@ export function StoryMapEditScreen() {
       </p>
       {live.state.rejections.length > 0 ? (
         <p role="alert" className="mb-2 text-xs text-red-700">
-          {t("storyMapBoard.rejected")}
+          {t("storyMapBoard.rejected")}{" "}
+          {t(
+            `storyMapBoard.rejectedBy.${live.state.rejections[live.state.rejections.length - 1]}`,
+          )}
         </p>
       ) : null}
       {(live.state.structure ?? detail.structure) ? (
