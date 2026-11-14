@@ -763,7 +763,7 @@ export function StoryMapBoard({
                     return [
                       <td
                         key={`${activity.id}-empty`}
-                        className="border-b border-r border-gray-200 bg-gray-50/50 dark:border-slate-700"
+                        className="border-b border-r border-gray-200 bg-gray-50/50 dark:border-slate-700 dark:bg-slate-900/40"
                       />,
                     ];
                   }
