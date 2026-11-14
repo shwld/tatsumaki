@@ -34,11 +34,7 @@ tm config show
 tm --json whoami
 ```
 
-If `tm` is missing, tell the user that tatsumaki's release installer is the supported install path and ask before running it:
-
-```bash
-curl -fsSL https://github.com/shwld/tatsumaki/releases/latest/download/install-tm.sh | bash
-```
+If `tm` is missing, tell the user that the supported install path is downloading the tarball and `sha256sums.txt` from the latest `cli-v*` GitHub Release, verifying the checksum, and extracting `tm`. Follow [apps/cli/README.md](https://github.com/shwld/tatsumaki/blob/main/apps/cli/README.md#download-github-releases) and ask before running it.
 
 ## Authentication
 

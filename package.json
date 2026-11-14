@@ -26,7 +26,6 @@
     "test:components": "bun run --cwd apps/web test:components",
     "test:ui": "bun run --cwd apps/web test:ui",
     "test:ui:update": "bun run --cwd apps/web test:ui:update",
-    "cli:release:upload": "bash scripts/cli-release-upload.sh",
     "typecheck": "bun run --cwd apps/web typecheck"
   },
   "devDependencies": {
