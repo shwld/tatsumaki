@@ -198,7 +198,9 @@ describe("StoryMapBoard", () => {
     const link = screen.getByRole("link", { name: "story #12 を開く" });
     expect(link.getAttribute("href")).toBe("/projects/p1/stories/12");
     expect(link.textContent).toBe("#12 Sign in");
-    expect(screen.getByText("Started · 3 pt")).toBeTruthy();
+    expect(screen.getByText("Started")).toBeTruthy();
+    expect(screen.getByText("feature")).toBeTruthy();
+    expect(screen.getByText("3 pt")).toBeTruthy();
   });
 
   it("labels a linked card by its story, not its old idea title, in move choices", () => {
