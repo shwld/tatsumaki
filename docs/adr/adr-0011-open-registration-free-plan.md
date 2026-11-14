@@ -66,3 +66,17 @@ The goal is to open registration to anyone on the official hosted service, keep 
 - 公開面の確認結果と運用手順は [hosted-access-rollout.md](../hosted-access-rollout.md) に記録した。bypass は `/artifact-content/*`(content host)、`/api-key/*`、`/programmatic-api`、`/.well-known/oauth-*`、`/oauth/token`、`/oauth/register` で、いずれも Access ではなく各経路の認証(capability token、project API key、OAuth Bearer)に任せる。`/oauth/authorize` と `/oauth/consent` は Access の背後に残す。
 - ユーザー・project 単位の容量・件数上限は、公開の条件にしない。free ユーザーは project を作れず、artifact を置けるのは招待された project に限られ、1 version あたりの上限(50 MB、1 ファイル 25 MB、1000 ファイル)は有効なため。代わりに R2・D1 の使用量を運用で定期確認し、異常があれば `access_status = 'blocked'` で停止する。使用量が増えた時点で、project 単位の上限を別 story で検討する。
 - ロールバックは、Turnstile secret の削除(登録のみ停止)、Access ポリシーの無効化、`blocked` の順に行う。
+
+## Amendment 2026-11-14 (story #414)
+
+公式ホスト版の課金をプロジェクト単位にした([ADR-0015](adr-0015-project-scoped-billing.md))。本 ADR のうち次の記述を置き換える。登録、`access_status`、Abuse surface は変わらない。
+
+- **Plans and limits**
+  - participate-only: 意味は維持する。契約していないユーザーはプロジェクトを所有できず、参加は無制限。ただし所有上限の変数(`FREE_MAX_OWNED_PROJECTS`)による判定はなくなる。置き換えは作成フローの story で行う。
+  - `maxOwnedProjects` の箇条(現在の所有数で数えること、削除や譲渡で枠が空くこと、作成時だけ比べること)は全体を廃止する。Pro に所有上限はなく、プロジェクトごとに購読する。
+  - 「`grace` と `restricted` でも既存データは読めて編集できる」は廃止する。状態はプロジェクトごとの `active` / `grace` / `suspended` になる。`suspended` では書き込みとエクスポートをすべて拒否し、読み取りだけを許す。データを削除・非表示にしない点は維持する。役割を変えない点も維持する。
+- **Billing identity**
+  - `billingAccountId` は `users.id` ではなく、プロジェクトになる。Stripe の customer は購入したユーザー単位のまま。
+  - Access の `sub` が変わったときのリスクは形が変わる。課金はプロジェクトに付くので、課金アカウントは二重にならない。ただし新しいユーザーは元のプロジェクトのオーナーではなくなり、再開や支払い方法の更新ができなくなる。アカウントの紐づけを範囲外とする扱いは変わらない。
+- **Consequences**
+  - 「Control Plane が使えないとき、作成は `ENTITLEMENT_UNAVAILABLE_ERROR` で失敗し、参加と通常の利用は続く」は廃止する。状態が分からないときは、作成・書き込み・エクスポートを 503 で拒否し、読み取りは続ける(ADR-0015)。停止状態を強制する story が出るまでは、元の挙動のままになる。
