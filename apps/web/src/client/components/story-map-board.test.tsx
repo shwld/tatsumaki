@@ -132,6 +132,139 @@ describe("StoryMapBoard", () => {
     });
   });
 
+  describe("drag and drop", () => {
+    const rich: StoryMapStructure = {
+      ...structure,
+      activities: [
+        { id: "a1", title: "Sign up", position: 0 },
+        { id: "a2", title: "Plan", position: 1 },
+        { id: "a3", title: "Empty", position: 2 },
+      ],
+      tasks: [
+        { id: "t1", activityId: "a1", title: "Register", position: 0 },
+        { id: "t2", activityId: "a1", title: "Verify", position: 1 },
+        { id: "t3", activityId: "a2", title: "Create story", position: 0 },
+      ],
+      slices: [
+        { id: "s1", title: "MVP", position: 0 },
+        { id: "s2", title: "Later", position: 1 },
+      ],
+      cards: [
+        { ...structure.cards[0], id: "c1", taskId: "t1", position: 0 },
+        {
+          ...structure.cards[0],
+          id: "c2",
+          taskId: "t1",
+          position: 1,
+          ideaTitle: "Second",
+        },
+      ],
+    };
+    const dnd = (source: HTMLElement, target: HTMLElement) => {
+      fireEvent.dragStart(source);
+      fireEvent.dragOver(target);
+      fireEvent.drop(target);
+    };
+
+    it("moves an activity after another", () => {
+      const send = vi.fn();
+      renderBoard(<StoryMapBoard structure={rich} editable send={send} />);
+      dnd(screen.getByText("Sign up"), screen.getByText("Plan").closest("th")!);
+      expect(send).toHaveBeenCalledWith({
+        type: "moveActivity",
+        activityId: "a1",
+        afterActivityId: "a2",
+      });
+    });
+
+    it("moves a task into another activity and into an empty one", () => {
+      const send = vi.fn();
+      renderBoard(<StoryMapBoard structure={rich} editable send={send} />);
+      dnd(
+        screen.getByText("Register"),
+        screen.getByText("Plan").closest("th")!,
+      );
+      expect(send).toHaveBeenLastCalledWith({
+        type: "moveTask",
+        taskId: "t1",
+        activityId: "a2",
+        afterTaskId: "t3",
+      });
+      dnd(screen.getByText("Verify"), screen.getByText("Empty").closest("th")!);
+      expect(send).toHaveBeenLastCalledWith({
+        type: "moveTask",
+        taskId: "t2",
+        activityId: "a3",
+        afterTaskId: null,
+      });
+    });
+
+    it("reorders slices", () => {
+      const send = vi.fn();
+      renderBoard(<StoryMapBoard structure={rich} editable send={send} />);
+      dnd(screen.getByText("MVP"), screen.getByText("Later").closest("th")!);
+      expect(send).toHaveBeenCalledWith({
+        type: "moveSlice",
+        sliceId: "s1",
+        afterSliceId: "s2",
+      });
+    });
+
+    it("reorders cards within a cell and ignores a drop on itself", () => {
+      const send = vi.fn();
+      renderBoard(<StoryMapBoard structure={rich} editable send={send} />);
+      dnd(
+        screen.getByText("Second").closest("li")!,
+        screen.getByText("Email form").closest("li")!,
+      );
+      expect(send).toHaveBeenCalledWith({
+        type: "moveCard",
+        cardId: "c2",
+        taskId: "t1",
+        sliceId: null,
+        afterCardId: "c1",
+      });
+      send.mockClear();
+      const self = screen.getByText("Second").closest("li")!;
+      dnd(self, self);
+      expect(send).not.toHaveBeenCalled();
+    });
+
+    it("does not accept a task dropped on a slice", () => {
+      const send = vi.fn();
+      renderBoard(<StoryMapBoard structure={rich} editable send={send} />);
+      dnd(screen.getByText("Register"), screen.getByText("MVP").closest("th")!);
+      expect(send).not.toHaveBeenCalled();
+    });
+
+    it("is not draggable when not editable", () => {
+      const send = vi.fn();
+      renderBoard(
+        <StoryMapBoard structure={rich} editable={false} send={send} />,
+      );
+      expect(screen.getByText("Sign up").closest("[draggable]")).toBeNull();
+      dnd(
+        screen.getByText("Email form").closest("li")!,
+        screen.getByTestId("cell-t3-s1"),
+      );
+      expect(send).not.toHaveBeenCalled();
+    });
+
+    it("moves a task into the adjacent activity with the heading buttons", () => {
+      const send = vi.fn();
+      renderBoard(<StoryMapBoard structure={rich} editable send={send} />);
+      fireEvent.click(
+        screen.getByRole("button", { name: "後ろへ移動: Verify" }),
+      );
+      expect(send).toHaveBeenCalledWith({
+        type: "moveTask",
+        taskId: "t2",
+        activityId: "a2",
+        afterTaskId: null,
+      });
+    });
+  });
+
   it("confirms deletion with the number of affected cards", () => {
     const send = vi.fn();
     renderBoard(<StoryMapBoard structure={structure} editable send={send} />);

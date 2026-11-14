@@ -118,7 +118,7 @@ export const projectStoryMapsScreenJa = {
     positionAfter: "「{{title}}」の後",
     move: "移動",
     keyboardHint:
-      "カードにフォーカスして Alt + 矢印キーで、タスク間（左右）とスライス間（上下）を移動できます。ドラッグやカードメニューからも移動できます。",
+      "活動・タスク・スライス・カードはドラッグで移動できます。キーボードでは、見出しの「前へ移動」「後ろへ移動」ボタン（タスクは隣の活動へも移れます）と、カードにフォーカスした Alt + 矢印キー（左右でタスク間、上下でスライス間）やカードメニューを使います。タッチ操作ではドラッグできないため、これらのボタンを使ってください。",
     connection: {
       connecting: "接続中...",
       connected: "接続済み",
@@ -127,6 +127,18 @@ export const projectStoryMapsScreenJa = {
     },
     save_state: { saving: "保存中...", saved: "保存済み" },
     rejected: "一部の操作を反映できませんでした。最新の状態を確認してください",
+    rejectedBy: {
+      invalid: "操作の内容が正しくありません。",
+      forbidden: "この操作を行う権限がありません。",
+      not_found: "対象が見つかりません。",
+      archived: "アーカイブ済みのため編集できません。",
+      target_gone:
+        "移動先または対象が他のユーザーに削除されたため、元の位置のままです。",
+      story_unavailable: "story を利用できません。",
+      limit: "上限に達しているため操作できません。",
+      rate_limited: "操作が多すぎます。少し待ってください。",
+      internal: "サーバーで問題が起きました。",
+    },
   },
 } as const;
 
@@ -250,7 +262,7 @@ export const projectStoryMapsScreenEn = {
     positionAfter: "After “{{title}}”",
     move: "Move",
     keyboardHint:
-      "Focus a card and press Alt + arrow keys to move it between tasks (left/right) and slices (up/down). You can also drag it or use the card menu.",
+      "Drag activities, tasks, slices and cards to move them. From the keyboard, use the Move earlier / Move later buttons on each heading (tasks can also cross into the adjacent activity), Alt + arrow keys on a focused card (left/right between tasks, up/down between slices), or the card menu. Touch screens cannot drag, so use those buttons.",
     connection: {
       connecting: "Connecting...",
       connected: "Connected",
@@ -259,5 +271,17 @@ export const projectStoryMapsScreenEn = {
     },
     save_state: { saving: "Saving...", saved: "Saved" },
     rejected: "Some changes could not be applied. Check the latest state",
+    rejectedBy: {
+      invalid: "The change was not valid.",
+      forbidden: "You do not have permission to do this.",
+      not_found: "The target was not found.",
+      archived: "This map is archived and cannot be edited.",
+      target_gone:
+        "The target or destination was deleted by someone else, so it stays where it was.",
+      story_unavailable: "The story is not available.",
+      limit: "A limit was reached, so the change was not applied.",
+      rate_limited: "Too many changes. Wait a moment.",
+      internal: "Something went wrong on the server.",
+    },
   },
 } as const;
