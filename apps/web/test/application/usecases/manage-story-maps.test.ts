@@ -1,6 +1,7 @@
 import { env } from "cloudflare:test";
 import { eq } from "drizzle-orm";
-import { beforeEach, describe, expect, it } from "vitest";
+import { ok } from "neverthrow";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   addActivity,
   addCard,
@@ -655,6 +656,33 @@ describe("manage story maps", () => {
           STORY_MAP_ELEMENT_NOT_FOUND_ERROR,
         );
         expect(await db.select().from(storiesTable)).toHaveLength(2);
+      });
+
+      it("reports a vanished anchor instead of an internal error when it changes after the check", async () => {
+        const { target, card } = await ideaCard();
+        const db = createDb(env.DB);
+        await insertStory("s1", P1, 1);
+        await db
+          .update(storiesTable)
+          .set({ archivedAt: "2026-01-01 00:00:00" })
+          .where(eq(storiesTable.id, "s1"));
+        const repository = new D1StoryMapRepository(env.DB);
+        vi.spyOn(repository, "findPlacementAnchor").mockResolvedValueOnce(
+          ok({ id: "s1", isIcebox: false, archived: false }),
+        );
+        const result = await createStoryFromCard(
+          { ...deps, storyMapRepository: repository },
+          {
+            ...target,
+            ...base,
+            cardId: card.id,
+            placement: { position: "before", relativeToStoryNumber: 1 },
+          },
+        );
+        expect(result._unsafeUnwrapErr()).toBe(
+          STORY_MAP_ELEMENT_NOT_FOUND_ERROR,
+        );
+        expect(await db.select().from(storiesTable)).toHaveLength(1);
       });
 
       it("rejects a placement together with the Icebox", async () => {

@@ -676,7 +676,15 @@ export async function createStoryFromCard(
     isIcebox: input.isIcebox,
     ...(placement.value ? { placement: placement.value } : {}),
   });
-  if (created.isErr()) return err(created.error);
+  if (created.isErr()) {
+    // A before/after anchor archived or moved to the Icebox after the check
+    // makes the batch roll back; report that instead of an internal error.
+    if (placement.value) {
+      const recheck = await resolvePlacement(deps, input);
+      if (recheck.isErr()) return err(recheck.error);
+    }
+    return err(created.error);
+  }
   return created.value
     ? ok(created.value)
     : err(STORY_MAP_STORY_ALREADY_PLACED_ERROR);
