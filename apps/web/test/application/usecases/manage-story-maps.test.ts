@@ -31,7 +31,11 @@ import { D1ProjectRepository } from "../../../src/infrastructure/db/repositories
 import { D1StoryMapRepository } from "../../../src/infrastructure/db/repositories/d1-story-map-repository";
 import { projectMembersTable } from "../../../src/infrastructure/db/schema/project-members";
 import { projectsTable } from "../../../src/infrastructure/db/schema/projects";
-import { storiesTable } from "../../../src/infrastructure/db/schema/stories";
+import {
+  storiesTable,
+  storyPriorityHistoryTable,
+} from "../../../src/infrastructure/db/schema/stories";
+import type { StoryPlacement } from "../../../src/application/usecases/move-story-to-position";
 import { usersTable } from "../../../src/infrastructure/db/schema/users";
 import { resetDatabase } from "../../helpers/db";
 
@@ -496,6 +500,231 @@ describe("manage story maps", () => {
       );
       const rows = await createDb(env.DB).select().from(storiesTable);
       expect(rows).toHaveLength(1);
+    });
+
+    describe("placement", () => {
+      const base = {
+        title: "Placed",
+        description: "",
+        type: "feature",
+        isIcebox: false,
+      } as const;
+
+      async function backlogOrder() {
+        const rows = await createDb(env.DB)
+          .select()
+          .from(storiesTable)
+          .where(eq(storiesTable.isIcebox, 0));
+        return rows
+          .sort((a, b) => a.position - b.position)
+          .map((row) => row.id);
+      }
+
+      async function placed(placement: StoryPlacement | undefined) {
+        const { target, card } = await ideaCard();
+        for (const [id, n] of [
+          ["s1", 1],
+          ["s2", 2],
+          ["s3", 3],
+        ] as const) {
+          await insertStory(id, P1, n);
+        }
+        const result = await createStoryFromCard(deps, {
+          ...target,
+          ...base,
+          cardId: card.id,
+          ...(placement ? { placement } : {}),
+        });
+        return { result, target, card };
+      }
+
+      it("puts the story first when no placement is given", async () => {
+        const { result } = await placed(undefined);
+        const created = result._unsafeUnwrap();
+        expect(await backlogOrder()).toEqual([
+          created.storyId,
+          "s1",
+          "s2",
+          "s3",
+        ]);
+      });
+
+      it("puts the story first for top", async () => {
+        const { result } = await placed({ position: "top" });
+        expect(await backlogOrder()).toEqual([
+          result._unsafeUnwrap().storyId,
+          "s1",
+          "s2",
+          "s3",
+        ]);
+      });
+
+      it("puts the story last for end and leaves the others alone", async () => {
+        const { result } = await placed({ position: "end" });
+        expect(await backlogOrder()).toEqual([
+          "s1",
+          "s2",
+          "s3",
+          result._unsafeUnwrap().storyId,
+        ]);
+      });
+
+      it("puts the story right before the anchor", async () => {
+        const { result } = await placed({
+          position: "before",
+          relativeToStoryNumber: 2,
+        });
+        expect(await backlogOrder()).toEqual([
+          "s1",
+          result._unsafeUnwrap().storyId,
+          "s2",
+          "s3",
+        ]);
+      });
+
+      it("puts the story right after the anchor", async () => {
+        const { result } = await placed({
+          position: "after",
+          relativeToStoryNumber: 2,
+        });
+        expect(await backlogOrder()).toEqual([
+          "s1",
+          "s2",
+          result._unsafeUnwrap().storyId,
+          "s3",
+        ]);
+      });
+
+      it("records the stories it pushed down in the priority history", async () => {
+        await placed({ position: "before", relativeToStoryNumber: 2 });
+        const history = await createDb(env.DB)
+          .select()
+          .from(storyPriorityHistoryTable);
+        expect(
+          history.map((row) => [row.storyId, row.fromPosition, row.toPosition]),
+        ).toEqual(
+          expect.arrayContaining([
+            ["s2", 2, 3],
+            ["s3", 3, 4],
+          ]),
+        );
+        expect(history).toHaveLength(2);
+      });
+
+      it("rejects a story number that does not exist and writes nothing", async () => {
+        const { result, target, card } = await placed({
+          position: "after",
+          relativeToStoryNumber: 99,
+        });
+        expect(result._unsafeUnwrapErr()).toBe(
+          STORY_MAP_ELEMENT_NOT_FOUND_ERROR,
+        );
+        expect(await backlogOrder()).toEqual(["s1", "s2", "s3"]);
+        const map = (
+          await getStoryMap(deps, { ...target, mapId: target.mapId })
+        )._unsafeUnwrap();
+        expect(map.cards.find((c) => c.id === card.id)?.storyState).not.toBe(
+          "linked",
+        );
+      });
+
+      it("rejects an anchor in the Icebox and an archived anchor", async () => {
+        const { target, card } = await ideaCard();
+        const db = createDb(env.DB);
+        await insertStory("s1", P1, 1);
+        await insertStory("s2", P1, 2);
+        await db
+          .update(storiesTable)
+          .set({ isIcebox: 1 })
+          .where(eq(storiesTable.id, "s1"));
+        await db
+          .update(storiesTable)
+          .set({ archivedAt: "2026-01-01 00:00:00" })
+          .where(eq(storiesTable.id, "s2"));
+        const run = (n: number) =>
+          createStoryFromCard(deps, {
+            ...target,
+            ...base,
+            cardId: card.id,
+            placement: { position: "before", relativeToStoryNumber: n },
+          });
+        expect((await run(1))._unsafeUnwrapErr()).toBe(
+          INVALID_STORY_MAP_INPUT_ERROR,
+        );
+        expect((await run(2))._unsafeUnwrapErr()).toBe(
+          STORY_MAP_ELEMENT_NOT_FOUND_ERROR,
+        );
+        expect(await db.select().from(storiesTable)).toHaveLength(2);
+      });
+
+      it("rejects a placement together with the Icebox", async () => {
+        const { target, card } = await ideaCard();
+        const result = await createStoryFromCard(deps, {
+          ...target,
+          ...base,
+          isIcebox: true,
+          cardId: card.id,
+          placement: { position: "end" },
+        });
+        expect(result._unsafeUnwrapErr()).toBe(INVALID_STORY_MAP_INPUT_ERROR);
+        expect(await createDb(env.DB).select().from(storiesTable)).toHaveLength(
+          0,
+        );
+      });
+
+      it("still puts an Icebox story first within the Icebox", async () => {
+        const { target, card } = await ideaCard();
+        await insertStory("s1", P1, 1);
+        await createDb(env.DB)
+          .update(storiesTable)
+          .set({ isIcebox: 1 })
+          .where(eq(storiesTable.id, "s1"));
+        const created = (
+          await createStoryFromCard(deps, {
+            ...target,
+            ...base,
+            isIcebox: true,
+            cardId: card.id,
+          })
+        )._unsafeUnwrap();
+        const row = await createDb(env.DB)
+          .select()
+          .from(storiesTable)
+          .where(eq(storiesTable.id, created.storyId))
+          .get();
+        expect(row?.position).toBe(1);
+      });
+
+      it("does not create a second story when the same operation is retried", async () => {
+        const { target, card } = await ideaCard();
+        for (const [id, n] of [
+          ["s1", 1],
+          ["s2", 2],
+        ] as const) {
+          await insertStory(id, P1, n);
+        }
+        const bound = {
+          ...deps,
+          storyMapRepository: new D1StoryMapRepository(env.DB, {
+            opId: "01JNMVQ8Q9Y6P5KH1XZ4V7C2OQ",
+            userId: OWNER,
+          }),
+        };
+        const input = {
+          ...target,
+          ...base,
+          cardId: card.id,
+          placement: {
+            position: "after",
+            relativeToStoryNumber: 1,
+          } satisfies StoryPlacement,
+        };
+        expect((await createStoryFromCard(bound, input)).isOk()).toBe(true);
+        expect((await createStoryFromCard(bound, input)).isErr()).toBe(true);
+        expect(await createDb(env.DB).select().from(storiesTable)).toHaveLength(
+          3,
+        );
+      });
     });
 
     it("records the op and advances seq in the same batch as the story", async () => {

@@ -101,6 +101,12 @@ AI が Story Map を使えるよう、CLI(`tm story-map`)からの編集を採�
 - キーボードの代替は、各見出しの「前へ移動」「後ろへ移動」ボタン(タスクは端で隣の活動へ移る)、カードの Alt + 矢印とカードメニュー。
 - 標準 DnD はタッチでドラッグできない。タッチでは上記のボタンとカードメニューを使う。タッチ DnD は要望が出た時点で別 story にする。
 
+## Amendment (story #416)
+
+`createStoryFromCard` に任意の `placement` を追加する。形は `tm story create` と同じ(`top` / `end` / `before` / `after` + `relativeToStoryNumber`)で、Icebox の外の story だけに指定できる。省略時と `top` は従来どおり先頭に置く。Icebox の story との併用、Icebox の story を基準にした `before` / `after` は `invalid`、存在しない・アーカイブ済みの story 番号は `target_gone` で拒否し、story もカードのリンクも作らない。
+
+Web の story 化 UI は位置の選択を増やさず、既定の先頭のままにする。複数カードを map の順に story 化する運用は CLI(AI)が中心で、画面は 1 枚ずつ作る流れのため、選択肢を足すと小さなチームの流れが重くなる。要望が出た時点で別 story にする。
+
 ## Consequences
 
 - 同時編集が最初から成立し、衝突は到着順で決まる。同じ項目を同時に編集すると後の入力が残り、先の入力は上書きされる。

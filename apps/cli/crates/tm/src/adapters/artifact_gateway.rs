@@ -74,7 +74,7 @@ fn story_map_rejection_message(code: &str) -> Option<&'static str> {
         "invalid" => "Invalid story map command or input",
         "forbidden" => "You cannot edit this story map (viewers are read-only)",
         "not_found" => "Story map not found",
-        "target_gone" => "An element the command refers to no longer exists; fetch the map again",
+        "target_gone" => "An element or story the command refers to no longer exists; fetch the map again",
         "archived" => "The story map is archived; restore it before editing",
         "story_unavailable" => "The story does not exist or is already placed on this map",
         "limit" => "The story map reached its card limit (2,000)",

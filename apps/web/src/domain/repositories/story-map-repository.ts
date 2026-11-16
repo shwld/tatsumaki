@@ -8,6 +8,7 @@ import type {
   StoryMapStructure,
   StoryMapTask,
 } from "../entities/story-map";
+import type { StoryPlacementTarget } from "./story-repository";
 
 export type StoryMapRecordedOp = {
   userId: string;
@@ -137,5 +138,12 @@ export interface StoryMapRepository {
     description: string;
     type: string;
     isIcebox: boolean;
+    /** Only for stories outside the Icebox; absent places the story first. */
+    placement?: StoryPlacementTarget;
   }): Repo<{ storyId: string; storyNumber: number } | null>;
+  /** The story a new story is placed before or after, found by its number. */
+  findPlacementAnchor(
+    projectId: string,
+    storyNumber: number,
+  ): Repo<{ id: string; isIcebox: boolean; archived: boolean } | null>;
 }

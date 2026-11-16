@@ -230,8 +230,11 @@ pub enum CardCommand {
         description: String,
         #[arg(long = "type", value_enum, default_value = "feature")]
         story_type: StoryTypeArg,
-        #[arg(long)]
+        #[arg(long, conflicts_with_all = ["to_top", "to_end", "after", "before"])]
         icebox: bool,
+        /// Where the story goes among the stories outside the Icebox; the default is first
+        #[command(flatten)]
+        placement: crate::StoryPlacementArgs,
     },
     Delete {
         map_id: String,
@@ -440,17 +443,21 @@ pub fn command_for(command: &StoryMapSubcommand) -> Result<Option<(&str, Value)>
                 description,
                 story_type,
                 icebox,
-            } => (
-                map_id,
-                json!({
+                placement,
+            } => {
+                let mut command = json!({
                     "type": "createStoryFromCard",
                     "cardId": card_id,
                     "title": title,
                     "description": description,
                     "storyType": story_type.as_str(),
                     "isIcebox": icebox,
-                }),
-            ),
+                });
+                if let Some(placement) = placement.into_placement() {
+                    command["placement"] = placement.to_json();
+                }
+                (map_id, command)
+            }
             CardCommand::Delete { map_id, card_id } => {
                 (map_id, json!({ "type": "deleteCard", "cardId": card_id }))
             }
@@ -821,6 +828,44 @@ mod tests {
                 "isIcebox": false,
             })
         );
+    }
+
+    #[test]
+    fn create_story_from_card_sends_the_position_only_when_given() {
+        let place = |flags: &[&str]| {
+            let mut args = vec!["card", "create-story", "m1", "c1", "--title", "T"];
+            args.extend_from_slice(flags);
+            body(&args).1
+        };
+        assert_eq!(place(&["--to-end"])["placement"], json!({ "position": "end" }));
+        assert_eq!(place(&["--to-top"])["placement"], json!({ "position": "top" }));
+        assert_eq!(
+            place(&["--after", "12"])["placement"],
+            json!({ "position": "after", "relativeToStoryNumber": 12 })
+        );
+        assert_eq!(
+            place(&["--before", "7"])["placement"],
+            json!({ "position": "before", "relativeToStoryNumber": 7 })
+        );
+        assert!(place(&[]).get("placement").is_none());
+    }
+
+    #[test]
+    fn create_story_from_card_rejects_conflicting_positions() {
+        let base = ["card", "create-story", "m1", "c1", "--title", "T"];
+        for flags in [
+            vec!["--to-top", "--to-end"],
+            vec!["--after", "1", "--before", "2"],
+            vec!["--icebox", "--to-end"],
+            vec!["--icebox", "--after", "3"],
+        ] {
+            let mut args = base.to_vec();
+            args.extend(flags);
+            assert!(parse(&args).is_err(), "{args:?}");
+        }
+        let mut args = base.to_vec();
+        args.push("--icebox");
+        assert!(parse(&args).is_ok());
     }
 
     #[test]

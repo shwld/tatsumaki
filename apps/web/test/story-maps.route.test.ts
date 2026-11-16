@@ -202,6 +202,7 @@ describe("story map HTTP API", () => {
         description: "d",
         storyType: "feature",
         isIcebox: false,
+        placement: { position: "end" },
       },
     };
     const first = await call(
