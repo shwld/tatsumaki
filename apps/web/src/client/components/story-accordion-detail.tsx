@@ -12,6 +12,7 @@ import {
   useDeferredValue,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { useTranslation } from "react-i18next";
@@ -207,18 +208,23 @@ function StoryAccordionDetailComponent({
     [timeline, locale],
   );
 
+  const appliedDetailLabelIdsKey = useRef<string | undefined>(undefined);
   useEffect(() => {
+    appliedDetailLabelIdsKey.current = undefined;
     setSelectedLabelIds(resolvedStory.labelIds);
     setTitleDraft(resolvedStory.title);
     setMetadataFieldErrors({});
   }, [resolvedStory.id]);
 
-  // 一覧の summary は labelIds を持たないため、詳細取得後に届いた値を選択状態へ反映する
+  // 一覧の summary は labelIds を持たないため、詳細取得後に届いた値を選択状態へ反映する。
+  // 保存中に届いた値は、保存の完了後に反映する。
   const detailedLabelIdsKey = detailedStory?.labelIds.join(",");
   useEffect(() => {
     if (!detailedStory || isSaving) return;
+    if (appliedDetailLabelIdsKey.current === detailedLabelIdsKey) return;
+    appliedDetailLabelIdsKey.current = detailedLabelIdsKey;
     setSelectedLabelIds(detailedStory.labelIds);
-  }, [detailedLabelIdsKey]);
+  }, [detailedLabelIdsKey, isSaving]);
 
   const attachmentsQuery = useQuery({
     queryKey: storyQueryKeys.storyAttachments(story.projectId, story.id),
