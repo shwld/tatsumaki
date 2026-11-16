@@ -213,6 +213,13 @@ function StoryAccordionDetailComponent({
     setMetadataFieldErrors({});
   }, [resolvedStory.id]);
 
+  // 一覧の summary は labelIds を持たないため、詳細取得後に届いた値を選択状態へ反映する
+  const detailedLabelIdsKey = detailedStory?.labelIds.join(",");
+  useEffect(() => {
+    if (!detailedStory || isSaving) return;
+    setSelectedLabelIds(detailedStory.labelIds);
+  }, [detailedLabelIdsKey]);
+
   const attachmentsQuery = useQuery({
     queryKey: storyQueryKeys.storyAttachments(story.projectId, story.id),
     queryFn: async (): Promise<StoryAttachment[]> => {

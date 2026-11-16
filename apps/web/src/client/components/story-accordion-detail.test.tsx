@@ -35,9 +35,11 @@ vi.mock("../hooks/use-current-user", () => ({
   }),
 }));
 
+const mockStoryDetail = vi.hoisted(() => ({ story: null as Story | null }));
+
 vi.mock("../hooks/use-story-detail", () => ({
   useStoryDetail: () => ({
-    story: null,
+    story: mockStoryDetail.story,
     isLoading: false,
     error: null,
   }),
@@ -138,7 +140,7 @@ function renderDetail(
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
-  render(
+  const tree = () => (
     <QueryClientProvider client={queryClient}>
       <AuthErrorProvider>
         <ToastProvider>
@@ -149,8 +151,10 @@ function renderDetail(
           />
         </ToastProvider>
       </AuthErrorProvider>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
+  const view = render(tree());
+  return { rerender: () => view.rerender(tree()) };
 }
 
 function createStory(): Story {
@@ -189,6 +193,7 @@ describe("StoryAccordionDetail", () => {
     mockViewer.displayName = "Author";
     mockViewer.email = "author@example.com";
     mockProjectBootstrapData.projectLabels = [];
+    mockStoryDetail.story = null;
   });
 
   it("shows archived stories read-only and restores them", async () => {
@@ -595,6 +600,33 @@ describe("StoryAccordionDetail", () => {
         }),
       );
     });
+  });
+
+  it("shows labels that arrive with the story detail after opening from a summary without labels", () => {
+    mockProjectBootstrapData.projectLabels = [
+      {
+        __typename: "ProjectLabel",
+        id: "label-1",
+        projectId: "project-1",
+        name: "urgent",
+        color: "#ef4444",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      },
+    ];
+
+    const { rerender } = renderDetail();
+    expect(screen.getByText("ラベルを選択")).toBeTruthy();
+
+    mockStoryDetail.story = {
+      ...createStory(),
+      labels: ["urgent"],
+      labelIds: ["label-1"],
+    };
+    rerender();
+
+    expect(screen.queryByText("ラベルを選択")).toBeNull();
+    expect(screen.getByText("urgent")).toBeTruthy();
   });
 
   it("patches story status when status select changes", async () => {
