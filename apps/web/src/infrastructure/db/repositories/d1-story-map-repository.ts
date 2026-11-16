@@ -16,6 +16,7 @@ import {
   type StoryMapRepository,
   type StoryMapRepositoryError,
 } from "../../../domain/repositories/story-map-repository";
+import type { StoryPlacementTarget } from "../../../domain/repositories/story-repository";
 import { createDb, type DbClient } from "../client";
 import { storiesTable } from "../schema/stories";
 import {
@@ -52,6 +53,30 @@ function toMap(row: typeof storyMapsTable.$inferSelect): StoryMap {
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
+}
+
+/**
+ * The position a placed story takes, as a scalar subquery. A before/after anchor
+ * that was archived or moved to the Icebox meanwhile yields NULL, which violates
+ * NOT NULL on `position` and rolls back the whole batch.
+ */
+type PlacedStory = Exclude<StoryPlacementTarget, { position: "top" }>;
+
+function placementPosition(placement: PlacedStory): string {
+  if (placement.position === "end") {
+    return "(SELECT COALESCE(MAX(p.position), 0) + 1 FROM stories p WHERE p.project_id = ?)";
+  }
+  const offset = placement.position === "after" ? 1 : 0;
+  return `(SELECT a.position + ${offset} FROM stories a WHERE a.id = ? AND a.project_id = ? AND a.is_icebox = 0 AND a.archived_at IS NULL)`;
+}
+
+function placementPositionBinds(
+  placement: PlacedStory,
+  projectId: string,
+): string[] {
+  return placement.position === "end"
+    ? [projectId]
+    : [placement.anchorId, projectId];
 }
 
 export type StoryMapOpContext = { opId: string; userId: string };
@@ -792,6 +817,35 @@ export class D1StoryMapRepository implements StoryMapRepository {
       return row !== undefined;
     });
   }
+  async findPlacementAnchor(
+    projectId: string,
+    storyNumber: number,
+  ): Repo<{ id: string; isIcebox: boolean; archived: boolean } | null> {
+    return this.guard(async () => {
+      const row = await this.db
+        .select({
+          id: storiesTable.id,
+          isIcebox: storiesTable.isIcebox,
+          archivedAt: storiesTable.archivedAt,
+        })
+        .from(storiesTable)
+        .where(
+          and(
+            eq(storiesTable.projectId, projectId),
+            eq(storiesTable.storyNumber, storyNumber),
+          ),
+        )
+        .get();
+      return row
+        ? {
+            id: row.id,
+            isIcebox: row.isIcebox === 1,
+            archived: row.archivedAt !== null,
+          }
+        : null;
+    });
+  }
+
   async searchStories(
     projectId: string,
     query: string,
@@ -829,6 +883,34 @@ export class D1StoryMapRepository implements StoryMapRepository {
     });
   }
 
+  /**
+   * Moves the stories outside the Icebox at or after the placed story down by
+   * one and records them in the priority history. Runs after the placed story is
+   * inserted, so it changes nothing when that insert did not happen.
+   */
+  private shiftForPlacement(
+    storyId: string,
+    projectId: string,
+  ): D1PreparedStatement[] {
+    const affected =
+      "project_id = ? AND id != ? AND is_icebox = 0 AND archived_at IS NULL AND position >= (SELECT position FROM stories WHERE id = ?)";
+    const binds = [projectId, storyId, storyId];
+    return [
+      this.d1
+        .prepare(
+          `INSERT INTO story_priority_history (id, story_id, from_position, to_position, changed_at)
+           SELECT lower(hex(randomblob(16))), id, position, position + 1, CURRENT_TIMESTAMP
+           FROM stories WHERE ${affected}`,
+        )
+        .bind(...binds),
+      this.d1
+        .prepare(
+          `UPDATE stories SET position = position + 1, updated_at = CURRENT_TIMESTAMP WHERE ${affected}`,
+        )
+        .bind(...binds),
+    ];
+  }
+
   async createStoryForCard(input: {
     projectId: string;
     mapId: string;
@@ -838,6 +920,7 @@ export class D1StoryMapRepository implements StoryMapRepository {
     description: string;
     type: string;
     isIcebox: boolean;
+    placement?: StoryPlacementTarget;
   }): Repo<{ storyId: string; storyNumber: number } | null> {
     return this.guard(async () => {
       const storyId = ulid();
@@ -845,17 +928,25 @@ export class D1StoryMapRepository implements StoryMapRepository {
         "EXISTS (SELECT 1 FROM story_map_cards WHERE id = ? AND map_id = ? AND story_id IS NULL)";
       const cardBinds = [input.cardId, input.mapId];
       const now = new Date().toISOString();
+      const placement =
+        input.isIcebox || input.placement?.position === "top"
+          ? undefined
+          : input.placement;
       await this.d1.batch([
-        this.d1
-          .prepare(
-            `UPDATE stories SET position = position + 1
-             WHERE project_id = ? ${input.isIcebox ? "AND is_icebox = 1" : ""} AND ${unlinkedCard}`,
-          )
-          .bind(input.projectId, ...cardBinds),
+        ...(placement
+          ? []
+          : [
+              this.d1
+                .prepare(
+                  `UPDATE stories SET position = position + 1
+                   WHERE project_id = ? ${input.isIcebox ? "AND is_icebox = 1" : ""} AND ${unlinkedCard}`,
+                )
+                .bind(input.projectId, ...cardBinds),
+            ]),
         this.d1
           .prepare(
             `INSERT INTO stories (id, story_number, project_id, title, description, type, status, is_icebox, position)
-             SELECT ?, COALESCE(MAX(story_number), 0) + 1, ?, ?, ?, ?, 'Unstarted', ?, 1
+             SELECT ?, COALESCE(MAX(story_number), 0) + 1, ?, ?, ?, ?, 'Unstarted', ?, ${placement ? placementPosition(placement) : "1"}
              FROM stories WHERE project_id = ? AND ${unlinkedCard}`,
           )
           .bind(
@@ -865,9 +956,13 @@ export class D1StoryMapRepository implements StoryMapRepository {
             input.description,
             input.type,
             input.isIcebox ? 1 : 0,
+            ...(placement
+              ? placementPositionBinds(placement, input.projectId)
+              : []),
             input.projectId,
             ...cardBinds,
           ),
+        ...(placement ? this.shiftForPlacement(storyId, input.projectId) : []),
         this.d1
           .prepare(
             `UPDATE story_map_cards SET story_id = ?, updated_at = ?

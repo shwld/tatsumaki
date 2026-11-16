@@ -39,6 +39,16 @@ const id = z.string().min(1).max(64);
 /** The sibling to place after; null places at the start. */
 const after = id.nullable();
 
+/** Same shape as `tm story create`; applies to stories outside the Icebox. */
+const storyPlacement = z.discriminatedUnion("position", [
+  z.strictObject({ position: z.literal("top") }),
+  z.strictObject({ position: z.literal("end") }),
+  z.strictObject({
+    position: z.enum(["before", "after"]),
+    relativeToStoryNumber: z.number().int().min(1),
+  }),
+]);
+
 export const storyMapCommandSchema = z.discriminatedUnion("type", [
   z.strictObject({
     type: z.literal("updateMap"),
@@ -131,6 +141,7 @@ export const storyMapCommandSchema = z.discriminatedUnion("type", [
     description: z.string(),
     storyType: z.enum(["feature", "bug", "chore"]),
     isIcebox: z.boolean(),
+    placement: storyPlacement.optional(),
   }),
 ]);
 
@@ -372,6 +383,7 @@ export async function applyStoryMapCommand(
           description: command.description,
           type: command.storyType,
           isIcebox: command.isIcebox,
+          ...(command.placement ? { placement: command.placement } : {}),
         }),
       );
   }

@@ -19,6 +19,8 @@ import type {
 } from "../../domain/repositories/story-map-repository";
 
 import { STORY_TYPES } from "../../domain/entities/story";
+import type { StoryPlacementTarget } from "../../domain/repositories/story-repository";
+import type { StoryPlacement } from "./move-story-to-position";
 import {
   STORY_MAP_GOAL_MAX,
   STORY_MAP_NOTE_MAX,
@@ -607,6 +609,30 @@ export type CreateStoryFromCardResult = {
 };
 
 /**
+ * "top" is the default for a new story, so it needs no placement. A story is
+ * only positioned among the stories outside the Icebox, and a before/after
+ * anchor that is gone, archived or in the Icebox is rejected before anything is written.
+ */
+async function resolvePlacement(
+  deps: StoryMapDependencies,
+  input: { projectId: string; isIcebox: boolean; placement?: StoryPlacement },
+): Result_<StoryPlacementTarget | null> {
+  const { placement } = input;
+  if (!placement) return ok(null);
+  if (input.isIcebox) return err(INVALID_STORY_MAP_INPUT_ERROR);
+  if (placement.position === "top") return ok(null);
+  if (placement.position === "end") return ok({ position: "end" });
+  const anchor = await deps.storyMapRepository.findPlacementAnchor(
+    input.projectId,
+    placement.relativeToStoryNumber,
+  );
+  if (anchor.isErr()) return err(anchor.error);
+  if (!anchor.value || anchor.value.archived) return notFound();
+  if (anchor.value.isIcebox) return err(INVALID_STORY_MAP_INPUT_ERROR);
+  return ok({ position: placement.position, anchorId: anchor.value.id });
+}
+
+/**
  * Turns an idea card into a new Unstarted (or Icebox) story and links it. The
  * story and the link are written in one batch; a repository bound to the live op
  * records the op id in that batch, so a retry returns this result instead of creating a second story.
@@ -619,6 +645,7 @@ export async function createStoryFromCard(
     description: string;
     type: string;
     isIcebox: boolean;
+    placement?: StoryPlacement;
   },
 ): Result_<CreateStoryFromCardResult> {
   const loaded = await loadForEdit(deps, input);
@@ -636,6 +663,8 @@ export async function createStoryFromCard(
     return err(INVALID_STORY_MAP_INPUT_ERROR);
   }
   if (input.type === "release") return err(INVALID_STORY_MAP_INPUT_ERROR);
+  const placement = await resolvePlacement(deps, input);
+  if (placement.isErr()) return err(placement.error);
   const created = await deps.storyMapRepository.createStoryForCard({
     projectId: input.projectId,
     mapId: input.mapId,
@@ -645,8 +674,17 @@ export async function createStoryFromCard(
     description: description.value,
     type: input.type,
     isIcebox: input.isIcebox,
+    ...(placement.value ? { placement: placement.value } : {}),
   });
-  if (created.isErr()) return err(created.error);
+  if (created.isErr()) {
+    // A before/after anchor archived or moved to the Icebox after the check
+    // makes the batch roll back; report that instead of an internal error.
+    if (placement.value) {
+      const recheck = await resolvePlacement(deps, input);
+      if (recheck.isErr()) return err(recheck.error);
+    }
+    return err(created.error);
+  }
   return created.value
     ? ok(created.value)
     : err(STORY_MAP_STORY_ALREADY_PLACED_ERROR);

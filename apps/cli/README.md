@@ -276,11 +276,12 @@ tm story-map card add <map-id> --task <task-id> [--slice <slice-id>] [--after <c
 tm story-map card update <map-id> <card-id> [--idea-title "..." | --clear-idea-title] [--note "..."]
 tm story-map card move <map-id> <card-id> --task <task-id> [--slice <slice-id>] [--after <card-id>]
 tm story-map card set-story <map-id> <card-id> --story <story-id>   # or --clear
-tm story-map card create-story <map-id> <card-id> --title "..." [--type feature|bug|chore] [--icebox]
+tm story-map card create-story <map-id> <card-id> --title "..." [--type feature|bug|chore] [--icebox | --to-top | --to-end | --after <story-number> | --before <story-number>]
 tm story-map card delete <map-id> <card-id>
 ```
 
 - A position is the element to place after (`--after <id>`); leave it out to place at the start. A card without `--slice` is in the unplanned row.
+- `create-story` puts the new story first by default. `--to-end`, `--after` and `--before` place it among the stories outside the Icebox, as in `tm story create`; they cannot be combined with `--icebox`. A story number that does not exist or is archived exits 4 and creates nothing; one in the Icebox exits 2.
 - Story links take the story ID (`tm --json story get` shows it), not the story number.
 - Exit codes: 7 when the map is archived, the story is unavailable (missing or already on the map) or the 2,000-card limit is reached; 3 for no permission; 4 for a missing map or element; 2 for invalid input. Rerun `get` after exit 4, since someone may have changed the map.
 

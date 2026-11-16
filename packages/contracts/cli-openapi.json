@@ -1797,6 +1797,47 @@
                   },
                   "isIcebox": {
                     "type": "boolean"
+                  },
+                  "placement": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "position": {
+                            "type": "string",
+                            "enum": ["top"]
+                          }
+                        },
+                        "required": ["position"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "position": {
+                            "type": "string",
+                            "enum": ["end"]
+                          }
+                        },
+                        "required": ["position"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "position": {
+                            "type": "string",
+                            "enum": ["before", "after"]
+                          },
+                          "relativeToStoryNumber": {
+                            "type": "integer",
+                            "minimum": 1
+                          }
+                        },
+                        "required": ["position", "relativeToStoryNumber"],
+                        "additionalProperties": false
+                      }
+                    ]
                   }
                 },
                 "required": [
