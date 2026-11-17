@@ -3,6 +3,12 @@ import type { ProjectEntitlement } from "../../domain/entities/entitlement";
 
 type Entry = { entitlement: ProjectEntitlement; fetchedAtMs: number };
 
+export type ProjectAccessState =
+  | { kind: "active" }
+  | { kind: "grace"; validUntil: string | null }
+  | { kind: "suspended" }
+  | { kind: "unknown" };
+
 export type ProjectWriteDecision =
   | { kind: "allow" }
   | { kind: "suspended" }
@@ -38,6 +44,17 @@ export class ProjectEntitlementCache {
     return this.isWritable(entitlement)
       ? { kind: "allow" }
       : { kind: "suspended" };
+  }
+
+  /** Display state; a grace past its deadline reads as suspended, like writes. */
+  async accessState(projectId: string): Promise<ProjectAccessState> {
+    const entitlement = await this.resolve(projectId);
+    if (!entitlement) return { kind: "unknown" };
+    if (!this.isWritable(entitlement)) return { kind: "suspended" };
+    if (entitlement.state === "grace") {
+      return { kind: "grace", validUntil: entitlement.validUntil };
+    }
+    return { kind: "active" };
   }
 
   private isWritable(entitlement: ProjectEntitlement): boolean {

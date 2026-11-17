@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useProjectReadOnly } from "../contexts/project-billing-context";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router";
 
@@ -93,6 +94,7 @@ function MetaForm({
 }
 
 export function StoryMapMetaEditScreen() {
+  const readOnly = useProjectReadOnly();
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { projectId = "", mapId = "" } = useParams<{
@@ -155,7 +157,7 @@ export function StoryMapMetaEditScreen() {
 
   const { map } = detail.structure;
   const archived = map.archivedAt !== null;
-  const canEdit = detail.role !== "viewer";
+  const canEdit = detail.role !== "viewer" && !readOnly;
 
   const messageEl = message ? (
     <p

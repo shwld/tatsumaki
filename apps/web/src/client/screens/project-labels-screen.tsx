@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useProjectReadOnly } from "../contexts/project-billing-context";
 import { useTranslation } from "react-i18next";
 import { useParams } from "react-router";
 
@@ -40,6 +41,7 @@ type DeleteTarget = {
 };
 
 export function ProjectLabelsScreen() {
+  const readOnly = useProjectReadOnly();
   const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
   const { notifySessionExpired } = useAuthError();
@@ -184,7 +186,8 @@ export function ProjectLabelsScreen() {
     setDeleting(null);
   };
 
-  const canEdit = data?.role === "owner" || data?.role === "member";
+  const canEdit =
+    (data?.role === "owner" || data?.role === "member") && !readOnly;
 
   return (
     <ProjectPage title={t("projectLabelsScreen.title")}>

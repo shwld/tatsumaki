@@ -56,6 +56,7 @@ import { RichTextEditor } from "./rich-text-editor";
 import { StoryAccordionAttachmentsSection } from "./story-accordion-attachments-section";
 import { StoryAccordionBlockersSection } from "./story-accordion-blockers-section";
 import type { ProjectMemberProfile } from "../types/project";
+import { useProjectReadOnly } from "../contexts/project-billing-context";
 import { ActorLabel } from "./actor-label";
 
 function sameStringArray(a: string[], b: string[]) {
@@ -168,7 +169,8 @@ function StoryAccordionDetailComponent({
   const [deletingCommentId, setDeletingCommentId] = useState<string | null>(
     null,
   );
-  const isSaving = isPatchSaving;
+  const readOnly = useProjectReadOnly();
+  const isSaving = isPatchSaving || readOnly;
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
   const [titleDraft, setTitleDraft] = useState(story.title);
 

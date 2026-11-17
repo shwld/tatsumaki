@@ -36,6 +36,10 @@ import {
   projectListItemEn,
   projectListItemJa,
 } from "../components/project-list-item.i18n";
+import {
+  projectBillingBannerEn,
+  projectBillingBannerJa,
+} from "../components/project-billing-banner.i18n";
 import { projectNavEn, projectNavJa } from "../components/project-nav.i18n";
 import {
   artifactScreensEn,
@@ -122,6 +126,7 @@ i18n.use(initReactI18next).init({
       common: {
         ...layoutJa,
         ...billingStatusSectionJa,
+        ...projectBillingBannerJa,
         ...permissionDeniedJa,
         ...errorRetryJa,
         ...actorLabelJa,
@@ -156,6 +161,7 @@ i18n.use(initReactI18next).init({
       common: {
         ...layoutEn,
         ...billingStatusSectionEn,
+        ...projectBillingBannerEn,
         ...permissionDeniedEn,
         ...errorRetryEn,
         ...actorLabelEn,

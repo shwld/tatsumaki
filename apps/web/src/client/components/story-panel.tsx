@@ -35,6 +35,7 @@ import {
   calculateTotalPoints,
   groupStoriesByIteration,
 } from "../lib/story-panel-grouping";
+import { useProjectReadOnly } from "../contexts/project-billing-context";
 import { useToast } from "../contexts/toast-context";
 import { useStoryDragState } from "../contexts/story-drag-context";
 import { useStoryPatch } from "../hooks/use-story-patch";
@@ -645,7 +646,8 @@ const StoryCardWithInlineEdit = memo(function StoryCardWithInlineEdit({
     setTitlePopoverOpen(false);
   }, [titleDraft, story.title, patchStory]);
 
-  const busy = isSaving;
+  const readOnly = useProjectReadOnly();
+  const busy = isSaving || readOnly;
 
   return (
     <div
@@ -850,7 +852,7 @@ const StoryCardWithInlineEdit = memo(function StoryCardWithInlineEdit({
                 titleDraft={titleDraft}
                 onTitleDraftChange={setTitleDraft}
                 originalTitle={story.title}
-                isSaving={isSaving}
+                isSaving={busy}
                 inputRef={titleInputRef}
                 onSave={() => void handleTitleSave()}
                 onCancel={() => setTitlePopoverOpen(false)}
@@ -930,6 +932,7 @@ const SortableStoryItem = memo(function SortableStoryItem({
   story,
   ...cardProps
 }: SortableStoryItemProps) {
+  const readOnlyDrag = useProjectReadOnly();
   const {
     attributes,
     listeners,
@@ -939,7 +942,10 @@ const SortableStoryItem = memo(function SortableStoryItem({
     isDragging,
     index,
     activeIndex,
-  } = useSortable({ id: story.id, disabled: Boolean(story.archivedAt) });
+  } = useSortable({
+    id: story.id,
+    disabled: Boolean(story.archivedAt) || readOnlyDrag,
+  });
   const { t } = useTranslation();
   const drag = useStoryDragState();
   const showInsertLine =

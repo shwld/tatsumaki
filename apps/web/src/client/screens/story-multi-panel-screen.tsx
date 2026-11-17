@@ -19,6 +19,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams, useSearchParams } from "react-router";
+import { useProjectReadOnly } from "../contexts/project-billing-context";
 
 import { ErrorRetry } from "../components/error-retry";
 import {
@@ -196,6 +197,7 @@ function toCreatePayloadPanel(
 export function StoryMultiPanelScreen() {
   const { t } = useTranslation();
   const { projectId } = useParams();
+  const readOnly = useProjectReadOnly();
   const { notifySessionExpired } = useAuthError();
   const { showToast } = useToast();
   const { user, isLoading: isUserLoading } = useCurrentUser();
@@ -1796,7 +1798,8 @@ export function StoryMultiPanelScreen() {
           <div className="relative">
             <button
               type="button"
-              className="text-xs font-medium text-blue-700"
+              className="text-xs font-medium text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={readOnly}
               onClick={() => openCreateForm(targetPanel)}
             >
               {t("storyMultiPanelScreen.create.button")}
@@ -2495,6 +2498,7 @@ export function StoryMultiPanelScreen() {
               onDragMove={handleDndDragMove}
               onDragEnd={(event) => {
                 resetDndBodyCursor();
+                if (readOnly) return;
                 void handleDragEnd(event);
               }}
               onDragCancel={resetDndBodyCursor}
