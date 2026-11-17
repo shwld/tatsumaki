@@ -324,6 +324,41 @@ describe("project creation requests", () => {
       expect(await countProjects()).toBe(0);
     });
 
+    it("reports the current membership instead of assuming ownership", async () => {
+      const ctx = setup();
+      const projectId = await open(ctx);
+      ctx.fake.state = "active";
+      await ctx.post(
+        "user-1",
+        `/project-creation-requests/${projectId}/complete`,
+        {},
+      );
+
+      await env.DB.prepare(
+        "UPDATE project_members SET role = 'member' WHERE project_id = ?",
+      )
+        .bind(projectId)
+        .run();
+      const demoted = await ctx.post(
+        "user-1",
+        `/project-creation-requests/${projectId}/complete`,
+        {},
+      );
+      expect(await demoted.json()).toMatchObject({
+        project: { currentUserRole: "member" },
+      });
+
+      await env.DB.prepare("DELETE FROM project_members WHERE project_id = ?")
+        .bind(projectId)
+        .run();
+      const removed = await ctx.post(
+        "user-1",
+        `/project-creation-requests/${projectId}/complete`,
+        {},
+      );
+      expect(removed.status).toBe(404);
+    });
+
     it("hides another user's request and an unknown project id", async () => {
       const ctx = setup();
       const projectId = await open(ctx);
@@ -399,6 +434,18 @@ describe("project creation requests", () => {
       expect(response.status).toBe(409);
       expect(await countProjects()).toBe(0);
     });
+  });
+
+  it("rejects direct creation under an unsupported entitlement mode", async () => {
+    const { post } = setup();
+    const response = await post(
+      "user-1",
+      "/projects",
+      { name: "Sneaky" },
+      { ENTITLEMENT_MODE: "control-plan" },
+    );
+    expect(response.status).toBe(503);
+    expect(await countProjects()).toBe(0);
   });
 
   it("refuses direct project creation in control-plane mode", async () => {

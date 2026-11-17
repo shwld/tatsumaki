@@ -110,7 +110,7 @@ export type CompleteProjectCreationResult =
 export async function completeProjectCreation(
   deps: {
     requests: ProjectCreationRequestRepository;
-    projects: Pick<ProjectRepository, "findById">;
+    projects: Pick<ProjectRepository, "findById" | "findMember">;
     entitlements: EntitlementProvider;
   },
   input: { userId: string; projectId: string },
@@ -127,16 +127,19 @@ export async function completeProjectCreation(
   }
 
   if (request.status === "created") {
-    const existing = await deps.projects.findById(request.projectId);
-    if (existing.isErr()) {
+    const [existing, member] = await Promise.all([
+      deps.projects.findById(request.projectId),
+      deps.projects.findMember(request.projectId, input.userId),
+    ]);
+    if (existing.isErr() || member.isErr()) {
       return err(PROJECT_CREATION_FAILED_ERROR);
     }
-    if (!existing.value) {
+    if (!existing.value || !member.value) {
       return err(PROJECT_CREATION_REQUEST_NOT_FOUND_ERROR);
     }
     return ok({
       status: "created",
-      project: { ...existing.value, currentUserRole: "owner" },
+      project: { ...existing.value, currentUserRole: member.value.role },
     });
   }
 

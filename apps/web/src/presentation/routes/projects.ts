@@ -38,6 +38,7 @@ import {
   hashInvitationLinkToken,
 } from "../../application/usecases/invitation-link-crypto";
 import type { Env } from "../../index";
+import { createEntitlementProvider } from "./billing";
 import { requireProjectMembership } from "./project-membership";
 import { computeGravatarHash } from "../lib/gravatar";
 
@@ -139,6 +140,12 @@ projectsRoute.post("/projects", async (c) => {
       },
       409,
     );
+  }
+
+  try {
+    createEntitlementProvider(c.env);
+  } catch {
+    return c.json({ error: "Entitlement is temporarily unavailable" }, 503);
   }
 
   const currentUser = c.get("currentUser");
