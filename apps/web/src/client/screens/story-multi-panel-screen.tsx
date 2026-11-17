@@ -1968,6 +1968,7 @@ export function StoryMultiPanelScreen() {
       currentIterationEndDate={currentIteration?.endDate ?? null}
       currentIterationNumber={currentIteration?.iterationNumber ?? null}
       currentIterationId={currentIteration?.id ?? null}
+      currentStoryIds={currentStoryIdSet}
       utilizationOverrideByIterationNumber={
         utilizationOverrideByIterationNumber
       }
