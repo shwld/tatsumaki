@@ -573,6 +573,73 @@ describe("project routes", () => {
     });
   });
 
+  it("hides the invitation list from non-owner members", async () => {
+    const createResponse = await SELF.fetch("https://localhost/api/projects", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        ...(await createAuthHeaders()),
+      },
+      body: JSON.stringify({ name: "Alpha Project" }),
+    });
+    const { project } = (await createResponse.json()) as {
+      project: { id: string };
+    };
+
+    await SELF.fetch(
+      `https://localhost/api/projects/${project.id}/invitations`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...(await createAuthHeaders()),
+        },
+        body: JSON.stringify({ email: "pending@example.com", role: "member" }),
+      },
+    );
+    const inviteResponse = await SELF.fetch(
+      `https://localhost/api/projects/${project.id}/invitations`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...(await createAuthHeaders()),
+        },
+        body: JSON.stringify({ userId: "github|viewer-user", role: "viewer" }),
+      },
+    );
+    const { invitation } = (await inviteResponse.json()) as {
+      invitation: { id: string };
+    };
+    const viewerHeaders = await createAuthHeaders({
+      sub: "github|viewer-user",
+      email: "viewer@example.com",
+    });
+    await SELF.fetch(
+      `https://localhost/api/projects/${project.id}/invitations/${invitation.id}/accept`,
+      { method: "POST", headers: viewerHeaders },
+    );
+
+    const ownerMembers = (await (
+      await SELF.fetch(`https://localhost/api/projects/${project.id}/members`, {
+        headers: await createAuthHeaders(),
+      })
+    ).json()) as { invitations: { targetEmail: string | null }[] };
+    expect(
+      ownerMembers.invitations.some(
+        (item) => item.targetEmail === "pending@example.com",
+      ),
+    ).toBe(true);
+
+    const viewerMembers = (await (
+      await SELF.fetch(`https://localhost/api/projects/${project.id}/members`, {
+        headers: viewerHeaders,
+      })
+    ).json()) as { currentMemberRole: string; invitations: unknown[] };
+    expect(viewerMembers.currentMemberRole).toBe("viewer");
+    expect(viewerMembers.invitations).toEqual([]);
+  });
+
   it("lists invitation notifications for invited user without project membership", async () => {
     const createResponse = await SELF.fetch("https://localhost/api/projects", {
       method: "POST",

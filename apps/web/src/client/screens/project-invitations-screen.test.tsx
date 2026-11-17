@@ -107,6 +107,37 @@ describe("ProjectInvitationsScreen", () => {
     );
   });
 
+  it("shows a permission notice instead of the invite form for non-owners", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      buildJsonResponse({
+        currentMemberRole: "member",
+        members: [],
+        invitations: [],
+      }),
+    );
+
+    render(
+      <MemoryRouter
+        initialEntries={["/projects/project-1/members/invitations"]}
+      >
+        <AuthErrorProvider>
+          <Routes>
+            <Route
+              path="/projects/:projectId/members/invitations"
+              element={<ProjectInvitationsScreen />}
+            />
+          </Routes>
+        </AuthErrorProvider>
+      </MemoryRouter>,
+    );
+
+    expect(
+      await screen.findByText(/招待はプロジェクトのオーナーのみ/),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText("メールアドレス")).toBeNull();
+    expect(screen.queryByRole("button", { name: "招待を送信" })).toBeNull();
+  });
+
   it("requires an email address", async () => {
     vi.mocked(fetch).mockResolvedValue(
       buildJsonResponse({

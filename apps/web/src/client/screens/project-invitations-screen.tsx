@@ -162,6 +162,16 @@ export function ProjectInvitationsScreen() {
     return <PermissionDenied message={forbidden} />;
   }
 
+  if (!isLoading && !canManageRoles) {
+    return (
+      <PermissionDenied
+        message={t("projectInvitationsScreen.ownerOnly")}
+        backTo={projectId ? projectMembersPath(projectId) : undefined}
+        backLabel={t("projectInvitationsScreen.backToMembers")}
+      />
+    );
+  }
+
   return (
     <ProjectPage
       title={t("projectInvitationsScreen.title")}
@@ -261,7 +271,7 @@ export function ProjectInvitationsScreen() {
                 <button
                   type="button"
                   className="mt-3 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 disabled:opacity-50"
-                  disabled={isCreatingLink || !canManageRoles}
+                  disabled={isCreatingLink}
                   onClick={handleCreateLink}
                 >
                   {isCreatingLink
@@ -330,8 +340,7 @@ export function ProjectInvitationsScreen() {
                           })}
                         </p>
                         {invitation.invitationType === "single_use" &&
-                        invitation.status === "pending" &&
-                        canManageRoles ? (
+                        invitation.status === "pending" ? (
                           <button
                             type="button"
                             className="mt-2 text-xs font-semibold text-red-700 hover:underline"
