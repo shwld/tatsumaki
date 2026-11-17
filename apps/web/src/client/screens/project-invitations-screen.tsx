@@ -20,6 +20,7 @@ export function ProjectInvitationsScreen() {
     setInvitations,
     forbidden,
     canManageRoles,
+    currentMemberRole,
     requestError,
     setRequestError,
     isLoading,
@@ -162,7 +163,7 @@ export function ProjectInvitationsScreen() {
     return <PermissionDenied message={forbidden} />;
   }
 
-  if (!isLoading && !canManageRoles) {
+  if (!isLoading && currentMemberRole !== null && !canManageRoles) {
     return (
       <PermissionDenied
         message={t("projectInvitationsScreen.ownerOnly")}
