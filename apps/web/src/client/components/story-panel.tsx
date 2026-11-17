@@ -637,7 +637,11 @@ const StoryCardWithInlineEdit = memo(function StoryCardWithInlineEdit({
     [patchStory, story.type],
   );
 
+  const readOnly = useProjectReadOnly();
+  const busy = isSaving || readOnly;
+
   const handleTitleSave = useCallback(async () => {
+    if (readOnly) return;
     const trimmed = titleDraft.trim();
     if (!trimmed || trimmed === story.title) {
       setTitlePopoverOpen(false);
@@ -645,10 +649,7 @@ const StoryCardWithInlineEdit = memo(function StoryCardWithInlineEdit({
     }
     await patchStory({ title: trimmed });
     setTitlePopoverOpen(false);
-  }, [titleDraft, story.title, patchStory]);
-
-  const readOnly = useProjectReadOnly();
-  const busy = isSaving || readOnly;
+  }, [readOnly, titleDraft, story.title, patchStory]);
 
   return (
     <div

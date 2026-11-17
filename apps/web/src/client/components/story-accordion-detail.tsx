@@ -1248,6 +1248,7 @@ const CommentItem = memo(function CommentItem({
           mentionCandidates={mentionCandidates}
           uploadPastedImage={uploadPastedImage}
           placeholder={t("storyAccordion.timeline.commentPlaceholder")}
+          disabled={!canMutateComment}
         />
       ) : (
         <MarkdownPreview
