@@ -7,6 +7,7 @@ import { AuthErrorProvider } from "./contexts/auth-error-context";
 import { ToastProvider } from "./contexts/toast-context";
 import { popReturnTo } from "./lib/api-error";
 import { LoginScreen } from "./screens/login-screen";
+import { ProjectCreateCompleteScreen } from "./screens/project-create-complete-screen";
 import { ProjectCreateScreen } from "./screens/project-create-screen";
 import { ProjectListScreen } from "./screens/project-list-screen";
 import {
@@ -74,6 +75,10 @@ export function App() {
                     <Route
                       path="/projects/new"
                       element={<ProjectCreateScreen />}
+                    />
+                    <Route
+                      path="/projects/new/complete"
+                      element={<ProjectCreateCompleteScreen />}
                     />
                     <Route path="/projects" element={<ProjectListScreen />} />
                     <Route

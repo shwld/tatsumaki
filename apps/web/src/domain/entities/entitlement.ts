@@ -1,14 +1,8 @@
-export type EntitlementPlan = "unlimited" | "free" | "pro";
+export type ProjectEntitlementState = "active" | "grace" | "suspended";
 
-export type EntitlementState = "active" | "grace" | "restricted";
-
-export type Entitlement = {
-  billingAccountId: string;
-  plan: EntitlementPlan;
-  state: EntitlementState;
-  limits: {
-    maxOwnedProjects: number | null;
-  };
+export type ProjectEntitlement = {
+  projectId: string;
+  state: ProjectEntitlementState;
   validUntil: string | null;
   revision: number;
   cache: {

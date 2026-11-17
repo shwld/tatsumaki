@@ -24,7 +24,7 @@ describe("ProjectListScreen", () => {
     vi.mocked(fetch).mockImplementation(async (input) =>
       String(input) === "/api/billing/entitlement"
         ? buildJsonResponse({
-            entitlement: { limits: { maxOwnedProjects: null } },
+            projectCreation: "direct",
           })
         : buildJsonResponse({ projects: [] }),
     );
@@ -94,7 +94,7 @@ describe("ProjectListScreen", () => {
       .mockResolvedValueOnce(buildJsonResponse({ projects: [] }))
       .mockResolvedValueOnce(
         buildJsonResponse({
-          entitlement: { limits: { maxOwnedProjects: null } },
+          projectCreation: "direct",
         }),
       );
 
@@ -151,7 +151,7 @@ describe("ProjectListScreen", () => {
       )
       .mockResolvedValueOnce(
         buildJsonResponse({
-          entitlement: { limits: { maxOwnedProjects: null } },
+          projectCreation: "direct",
         }),
       );
 
@@ -191,7 +191,7 @@ describe("ProjectListScreen", () => {
       )
       .mockResolvedValueOnce(
         buildJsonResponse({
-          entitlement: { limits: { maxOwnedProjects: null } },
+          projectCreation: "direct",
         }),
       );
 

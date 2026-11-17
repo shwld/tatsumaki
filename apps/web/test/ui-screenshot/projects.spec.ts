@@ -104,4 +104,28 @@ for (const theme of themeVariants) {
       resolveSnapshotName("projects-list.png", theme),
     );
   });
+
+  test(`project create completion waits for payment (${theme})`, async ({
+    page,
+  }) => {
+    await setThemeMode(page, theme);
+    await mockAuthMe(page);
+    await page.route("**/api/project-creation-requests/*/complete", (route) =>
+      route.fulfill({
+        status: 202,
+        contentType: "application/json",
+        body: JSON.stringify({ status: "pending", state: "suspended" }),
+      }),
+    );
+
+    await page.goto(
+      "/projects/new/complete?request=01HQZV0M8DG1S2Q3R4T5U6V7WA",
+    );
+    await expect(
+      page.getByRole("heading", { name: "プロジェクトを作成しています" }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("お支払いの反映を確認しています..."),
+    ).toBeVisible();
+  });
 }

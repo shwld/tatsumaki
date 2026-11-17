@@ -29,6 +29,7 @@ import { projectApiKeysRoute } from "./presentation/routes/project-api-keys";
 import { apiKeyRoute } from "./presentation/routes/api-key";
 import { onboardingRoute } from "./presentation/routes/onboarding";
 import { billingRoute } from "./presentation/routes/billing";
+import { projectCreationRequestsRoute } from "./presentation/routes/project-creation-requests";
 import { invitationLinksRoute } from "./presentation/routes/invitation-links";
 import { artifactContentRoute } from "./presentation/routes/artifact-content/routes";
 import {
@@ -140,6 +141,7 @@ protectedApi.route("/", savedFiltersRoute);
 protectedApi.route("/", myWorkRoute);
 protectedApi.route("/", projectApiKeysRoute);
 protectedApi.route("/", billingRoute);
+protectedApi.route("/", projectCreationRequestsRoute);
 protectedApi.route("/", artifactPreviewTokenRoute);
 // The Web shows artifacts but never creates, edits or downloads them
 // (ADR-0010 §7); those stay on the CLI / API key routes. Only personal pins and

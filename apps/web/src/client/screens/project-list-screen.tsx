@@ -78,13 +78,11 @@ export function ProjectListScreen() {
       .then(async (response) => {
         if (!response.ok) return;
         const data = (await response.json()) as {
-          entitlement?: { limits?: { maxOwnedProjects?: number | null } };
+          projectCreation?: "direct" | "checkout" | "disabled";
         };
         if (!ignore) {
           setCreation(
-            data.entitlement?.limits?.maxOwnedProjects === 0
-              ? "denied"
-              : "allowed",
+            data.projectCreation === "disabled" ? "denied" : "allowed",
           );
         }
       })

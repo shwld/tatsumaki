@@ -1,11 +1,12 @@
 import { z } from "zod";
 import type { EntitlementProvider } from "../../application/ports/entitlement-provider";
-import type { Entitlement } from "../../domain/entities/entitlement";
+import type { ProjectEntitlement } from "../../domain/entities/entitlement";
 
 export interface ControlPlaneRpc {
-  getEntitlement(input: { billingAccountId: string }): Promise<unknown>;
+  getProjectEntitlement(input: { projectId: string }): Promise<unknown>;
   createCheckoutSession(input: {
     billingAccountId: string;
+    projectId: string;
     requestId: string;
     successUrl: string;
     cancelUrl: string;
@@ -32,12 +33,8 @@ export const parseSessionResponse = (response: unknown): { url: string } =>
   sessionSchema.parse(response);
 
 const entitlementSchema = z.object({
-  billingAccountId: z.string().min(1),
-  plan: z.enum(["free", "pro"]),
-  state: z.enum(["active", "grace", "restricted"]),
-  limits: z.object({
-    maxOwnedProjects: z.number().int().nonnegative().nullable(),
-  }),
+  projectId: z.string().min(1),
+  state: z.enum(["active", "grace", "suspended"]),
   validUntil: z.iso.datetime().nullable(),
   revision: z.number().int().positive(),
   cache: z.object({
@@ -48,16 +45,19 @@ const entitlementSchema = z.object({
 
 export class ControlPlaneEntitlementProvider implements EntitlementProvider {
   constructor(
-    private readonly controlPlane: Pick<ControlPlaneRpc, "getEntitlement">,
+    private readonly controlPlane: Pick<
+      ControlPlaneRpc,
+      "getProjectEntitlement"
+    >,
   ) {}
 
-  async getEntitlement(billingAccountId: string): Promise<Entitlement> {
-    const response = await this.controlPlane.getEntitlement({
-      billingAccountId,
+  async getProjectEntitlement(projectId: string): Promise<ProjectEntitlement> {
+    const response = await this.controlPlane.getProjectEntitlement({
+      projectId,
     });
     const entitlement = entitlementSchema.parse(response);
-    if (entitlement.billingAccountId !== billingAccountId) {
-      throw new Error("Control Plane returned a different billing account");
+    if (entitlement.projectId !== projectId) {
+      throw new Error("Control Plane returned a different project");
     }
     return entitlement;
   }
