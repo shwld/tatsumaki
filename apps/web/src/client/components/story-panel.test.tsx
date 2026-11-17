@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { DndContext } from "@dnd-kit/core";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { StoryPanel } from "./story-panel";
@@ -83,6 +89,19 @@ const STORY_INLINE_EDIT_CONTEXT: StoryInlineEditContext = {
 };
 
 describe("StoryPanel", () => {
+  it("shows story labels only when showLabels is on", () => {
+    const stories = [
+      makeStory({ labels: [{ id: "l1", name: "backend" }] }),
+      makeStory({ id: "s2", storyNumber: 2, labels: [] }),
+    ];
+    renderPanel({ stories });
+    expect(screen.queryByText("backend")).toBeNull();
+
+    cleanup();
+    renderPanel({ stories, showLabels: true });
+    expect(screen.getAllByText("backend")).toHaveLength(1);
+  });
+
   it("renders panel header with label and count", () => {
     renderPanel();
 

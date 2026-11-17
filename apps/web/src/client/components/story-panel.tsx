@@ -144,6 +144,7 @@ type StoryCardProps = {
   subHeaderContent?: ReactNode;
   storyInlineEdit?: StoryInlineEditContext | null;
   projectLabels?: ProjectLabel[];
+  showLabels?: boolean;
   /** Tailwind `top-*` when not using `--story-sticky-offset` (Icebox uses `top-0`). */
   stickyHeaderTopClassName?: string;
   /** When true, sticky header uses `style={{ top: "var(--story-sticky-offset)" }}` from the parent iteration `<section>`. */
@@ -394,6 +395,7 @@ const StoryCardStaticMeta = memo(function StoryCardStaticMeta({
   expandedContent,
   subHeaderContent,
   projectLabels,
+  showLabels = false,
   stickyHeaderTopClassName = "top-0",
   stickyHeaderTopUsesIterationCssVar = false,
 }: Omit<StoryCardProps, "storyInlineEdit">) {
@@ -517,10 +519,12 @@ const StoryCardStaticMeta = memo(function StoryCardStaticMeta({
             </button>
             <span>{story.title}</span>
           </div>
-          <StoryLabelChips
-            labels={story.labels}
-            projectLabels={projectLabels}
-          />
+          {showLabels ? (
+            <StoryLabelChips
+              labels={story.labels}
+              projectLabels={projectLabels}
+            />
+          ) : null}
         </div>
         {isExpanded && subHeaderContent ? (
           <div className="border-t border-gray-100">{subHeaderContent}</div>
@@ -556,6 +560,7 @@ const StoryCardWithInlineEdit = memo(function StoryCardWithInlineEdit({
   expandedContent,
   subHeaderContent,
   projectLabels,
+  showLabels = false,
   stickyHeaderTopClassName = "top-0",
   stickyHeaderTopUsesIterationCssVar = false,
 }: Omit<StoryCardProps, "storyInlineEdit"> & {
@@ -844,10 +849,12 @@ const StoryCardWithInlineEdit = memo(function StoryCardWithInlineEdit({
               />
             </PopoverContent>
           </Popover>
-          <StoryLabelChips
-            labels={story.labels}
-            projectLabels={projectLabels}
-          />
+          {showLabels ? (
+            <StoryLabelChips
+              labels={story.labels}
+              projectLabels={projectLabels}
+            />
+          ) : null}
         </div>
         {isExpanded && subHeaderContent ? (
           <div className="border-t border-gray-100">{subHeaderContent}</div>
@@ -1148,6 +1155,7 @@ export type StoryPanelProps = {
   /** When set, non-release story cards show title/type/point inline Popovers (single useStoryPatch). */
   storyInlineEdit?: StoryInlineEditContext | null;
   projectLabels?: ProjectLabel[];
+  showLabels?: boolean;
 };
 
 function StoryPanelComponent({
@@ -1200,6 +1208,7 @@ function StoryPanelComponent({
   utilizationOverrideByIterationNumber = {},
   storyInlineEdit = null,
   projectLabels,
+  showLabels = false,
 }: StoryPanelProps) {
   const { t } = useTranslation();
   const panelIdForTest = panelTestIdOverride ?? panelType;
@@ -1351,6 +1360,7 @@ function StoryPanelComponent({
     onSelect,
     storyInlineEdit,
     projectLabels,
+    showLabels,
     stickyHeaderTopClassName: storyStickyHeaderTopClassName,
     stickyHeaderTopUsesIterationCssVar: panelType !== "Icebox",
     expandedContent:
