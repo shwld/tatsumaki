@@ -33,3 +33,4 @@ export {
   storyMapSlicesTable,
   storyMapCardsTable,
 } from "./story-maps";
+export { projectCreationRequestsTable } from "./project-creation-requests";

@@ -63,6 +63,10 @@ import {
   onboardingScreenJa,
 } from "../screens/onboarding-screen.i18n";
 import {
+  projectCreateCompleteScreenEn,
+  projectCreateCompleteScreenJa,
+} from "../screens/project-create-complete-screen.i18n";
+import {
   projectCreateScreenEn,
   projectCreateScreenJa,
 } from "../screens/project-create-screen.i18n";
@@ -128,6 +132,7 @@ i18n.use(initReactI18next).init({
         ...projectListContentJa,
         ...projectListItemJa,
         ...projectCreateScreenJa,
+        ...projectCreateCompleteScreenJa,
         ...projectCreateFormJa,
         ...projectLabelsScreenJa,
         ...projectEpicsScreenJa,
@@ -161,6 +166,7 @@ i18n.use(initReactI18next).init({
         ...projectListContentEn,
         ...projectListItemEn,
         ...projectCreateScreenEn,
+        ...projectCreateCompleteScreenEn,
         ...projectCreateFormEn,
         ...projectLabelsScreenEn,
         ...projectEpicsScreenEn,

@@ -10,32 +10,16 @@ const json = (body: unknown, status = 200): Response =>
     headers: { "content-type": "application/json" },
   });
 
-const entitlement = (
-  overrides: Partial<{
-    plan: string;
-    state: string;
-    maxOwnedProjects: number | null;
-  }> = {},
-) => ({
-  billingAccountId: "user-1",
-  plan: overrides.plan ?? "free",
-  state: overrides.state ?? "active",
-  limits: { maxOwnedProjects: overrides.maxOwnedProjects ?? 0 },
-  validUntil: null,
-  revision: 1,
-  cache: { maxAgeSeconds: 60, staleIfErrorSeconds: 300 },
-});
-
-const renderSection = (path = "/account") =>
+const renderSection = () =>
   render(
-    <MemoryRouter initialEntries={[path]}>
+    <MemoryRouter initialEntries={["/account"]}>
       <AuthErrorProvider>
         <BillingStatusSection />
       </AuthErrorProvider>
     </MemoryRouter>,
   );
 
-describe("BillingStatusSection actions", () => {
+describe("BillingStatusSection", () => {
   const assign = vi.fn();
 
   beforeEach(() => {
@@ -45,160 +29,65 @@ describe("BillingStatusSection actions", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
-    vi.useRealTimers();
     assign.mockReset();
   });
 
-  it("redirects a free user to Stripe Checkout", async () => {
-    vi.mocked(fetch)
-      .mockResolvedValueOnce(
-        json({ entitlement: entitlement(), checkoutEnabled: true }),
-      )
-      .mockResolvedValueOnce(json({ url: "https://checkout.stripe.com/x" }));
-    renderSection();
-
-    fireEvent.click(
-      await screen.findByRole("button", { name: "Pro にアップグレード" }),
-    );
-
-    await waitFor(() => {
-      expect(assign).toHaveBeenCalledWith("https://checkout.stripe.com/x");
-    });
-    expect(vi.mocked(fetch).mock.calls[1]).toEqual([
-      "/api/billing/checkout",
-      { method: "POST" },
-    ]);
-  });
-
-  it("hides the upgrade button while checkout is disabled", async () => {
+  it("shows no limits for a self-hosted deployment and no payment button", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(
-      json({ entitlement: entitlement(), checkoutEnabled: false }),
+      json({ mode: "self-hosted", checkoutEnabled: false }),
     );
     renderSection();
 
-    expect(await screen.findByText("Pro プランは準備中です。")).toBeVisible();
     expect(
-      screen.queryByRole("button", { name: "Pro にアップグレード" }),
-    ).toBeNull();
+      await screen.findByText("このサービスには利用上限がありません。"),
+    ).toBeTruthy();
+    expect(screen.queryByRole("button")).toBeNull();
   });
 
-  it("redirects a Pro user to the billing portal", async () => {
+  it("opens the billing portal for a hosted deployment", async () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(
-        json({
-          entitlement: entitlement({ plan: "pro", maxOwnedProjects: null }),
-          checkoutEnabled: false,
-        }),
+        json({ mode: "control-plane", checkoutEnabled: true }),
       )
-      .mockResolvedValueOnce(json({ url: "https://billing.stripe.com/p" }));
+      .mockResolvedValueOnce(json({ url: "https://billing.stripe.com/p/x" }));
     renderSection();
 
     fireEvent.click(
       await screen.findByRole("button", { name: "支払いを管理" }),
     );
 
-    await waitFor(() => {
-      expect(assign).toHaveBeenCalledWith("https://billing.stripe.com/p");
+    await waitFor(() =>
+      expect(assign).toHaveBeenCalledWith("https://billing.stripe.com/p/x"),
+    );
+    expect(fetch).toHaveBeenLastCalledWith("/api/billing/portal", {
+      method: "POST",
     });
   });
 
-  it("offers a resume path to restricted users", async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(
-      json({
-        entitlement: entitlement({ plan: "pro", state: "restricted" }),
-        checkoutEnabled: true,
-      }),
-    );
-    renderSection();
-
-    expect(
-      await screen.findByRole("button", { name: "支払いを再開" }),
-    ).toBeVisible();
-    expect(
-      screen.queryByRole("button", { name: "Pro にアップグレード" }),
-    ).toBeNull();
-  });
-
-  it("shows an error when the session cannot be created", async () => {
+  it("shows an error when the portal cannot be opened", async () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(
-        json({ entitlement: entitlement(), checkoutEnabled: true }),
+        json({ mode: "control-plane", checkoutEnabled: true }),
       )
-      .mockResolvedValueOnce(json({ error: "x" }, 503));
+      .mockResolvedValueOnce(json({ error: "down" }, 503));
     renderSection();
 
     fireEvent.click(
-      await screen.findByRole("button", { name: "Pro にアップグレード" }),
+      await screen.findByRole("button", { name: "支払いを管理" }),
     );
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
+    expect((await screen.findByRole("alert")).textContent).toContain(
       "処理を開始できませんでした",
     );
     expect(assign).not.toHaveBeenCalled();
   });
 
-  it("polls the entitlement after checkout until Pro is reflected", async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    vi.mocked(fetch)
-      .mockResolvedValueOnce(
-        json({ entitlement: entitlement(), checkoutEnabled: true }),
-      )
-      .mockResolvedValueOnce(
-        json({
-          entitlement: entitlement({ plan: "pro", maxOwnedProjects: null }),
-          checkoutEnabled: true,
-        }),
-      );
-    renderSection("/account?checkout=success");
+  it("shows an unavailable notice when the status cannot be loaded", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(json({ error: "down" }, 503));
+    renderSection();
 
-    expect(
-      await screen.findByText("お支払いの反映を確認しています..."),
-    ).toBeVisible();
-    await vi.advanceTimersByTimeAsync(2000);
-
-    expect(
-      await screen.findByText("Pro プランへのアップグレードが完了しました。"),
-    ).toBeVisible();
-    expect(fetch).toHaveBeenCalledTimes(2);
-  });
-
-  it("keeps polling after a transient entitlement failure", async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    vi.mocked(fetch)
-      .mockResolvedValueOnce(
-        json({ entitlement: entitlement(), checkoutEnabled: true }),
-      )
-      .mockResolvedValueOnce(json({ error: "x" }, 503))
-      .mockResolvedValueOnce(
-        json({
-          entitlement: entitlement({ plan: "pro", maxOwnedProjects: null }),
-          checkoutEnabled: true,
-        }),
-      );
-    renderSection("/account?checkout=success");
-
-    await screen.findByText("お支払いの反映を確認しています...");
-    await vi.advanceTimersByTimeAsync(2000);
-    await vi.advanceTimersByTimeAsync(2000);
-
-    expect(
-      await screen.findByText("Pro プランへのアップグレードが完了しました。"),
-    ).toBeVisible();
-  });
-
-  it("keeps the last entitlement when the final poll fails", async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    vi.mocked(fetch)
-      .mockResolvedValueOnce(
-        json({ entitlement: entitlement(), checkoutEnabled: true }),
-      )
-      .mockResolvedValue(json({ error: "x" }, 503));
-    renderSection("/account?checkout=success");
-
-    await screen.findByText("お支払いの反映を確認しています...");
-    await vi.advanceTimersByTimeAsync(2000 * 15);
-
-    expect(await screen.findByText(/反映に時間がかかっています/)).toBeVisible();
-    expect(screen.getByText("Free")).toBeVisible();
+    expect((await screen.findByRole("status")).textContent).toContain(
+      "一時的に取得できません",
+    );
   });
 });

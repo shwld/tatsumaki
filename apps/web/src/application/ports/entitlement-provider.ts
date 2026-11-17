@@ -1,5 +1,5 @@
-import type { Entitlement } from "../../domain/entities/entitlement";
+import type { ProjectEntitlement } from "../../domain/entities/entitlement";
 
 export interface EntitlementProvider {
-  getEntitlement(billingAccountId: string): Promise<Entitlement>;
+  getProjectEntitlement(projectId: string): Promise<ProjectEntitlement>;
 }

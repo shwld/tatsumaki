@@ -10,60 +10,69 @@ const bindings = {
   STORY_MAP_DO: {} as DurableObjectNamespace,
 };
 
+const projectEntitlement = (overrides: Record<string, unknown> = {}) => ({
+  projectId: "project-1",
+  state: "active",
+  validUntil: null,
+  revision: 1,
+  cache: { maxAgeSeconds: 60, staleIfErrorSeconds: 300 },
+  ...overrides,
+});
+
 describe("ControlPlaneEntitlementProvider", () => {
-  it("calls the Service Binding RPC with the opaque billing account id", async () => {
-    const getEntitlement = vi.fn(async () => ({
-      billingAccountId: "user-123",
-      plan: "free",
-      state: "active",
-      limits: { maxOwnedProjects: 3 },
-      validUntil: null,
-      revision: 1,
-      cache: { maxAgeSeconds: 60, staleIfErrorSeconds: 300 },
-    }));
-    const provider = new ControlPlaneEntitlementProvider({ getEntitlement });
-
-    await expect(provider.getEntitlement("user-123")).resolves.toEqual({
-      billingAccountId: "user-123",
-      plan: "free",
-      state: "active",
-      limits: { maxOwnedProjects: 3 },
-      validUntil: null,
-      revision: 1,
-      cache: { maxAgeSeconds: 60, staleIfErrorSeconds: 300 },
-    });
-    expect(getEntitlement).toHaveBeenCalledWith({
-      billingAccountId: "user-123",
-    });
-  });
-
-  it("rejects an invalid RPC response at the adapter boundary", async () => {
+  it("asks the Control Plane about the project, not the user", async () => {
+    const getProjectEntitlement = vi.fn(async () => projectEntitlement());
     const provider = new ControlPlaneEntitlementProvider({
-      getEntitlement: vi.fn(async () => ({
-        billingAccountId: "user-123",
-        plan: "enterprise",
-      })),
+      getProjectEntitlement,
     });
 
-    await expect(provider.getEntitlement("user-123")).rejects.toThrow();
-  });
-
-  it("rejects an entitlement for a different billing account", async () => {
-    const provider = new ControlPlaneEntitlementProvider({
-      getEntitlement: vi.fn(async () => ({
-        billingAccountId: "other-user",
-        plan: "free",
-        state: "active",
-        limits: { maxOwnedProjects: 3 },
-        validUntil: null,
-        revision: 1,
-        cache: { maxAgeSeconds: 60, staleIfErrorSeconds: 300 },
-      })),
-    });
-
-    await expect(provider.getEntitlement("user-123")).rejects.toThrow(
-      "different billing account",
+    await expect(provider.getProjectEntitlement("project-1")).resolves.toEqual(
+      projectEntitlement(),
     );
+    expect(getProjectEntitlement).toHaveBeenCalledWith({
+      projectId: "project-1",
+    });
+  });
+
+  it.each([
+    "active",
+    "grace",
+    "suspended",
+  ])("accepts the %s state", async (state) => {
+    const provider = new ControlPlaneEntitlementProvider({
+      getProjectEntitlement: vi.fn(async () => projectEntitlement({ state })),
+    });
+    await expect(
+      provider.getProjectEntitlement("project-1"),
+    ).resolves.toMatchObject({ state });
+  });
+
+  it("rejects an invalid state at the adapter boundary", async () => {
+    const provider = new ControlPlaneEntitlementProvider({
+      getProjectEntitlement: vi.fn(async () =>
+        projectEntitlement({ state: "restricted" }),
+      ),
+    });
+    await expect(provider.getProjectEntitlement("project-1")).rejects.toThrow();
+  });
+
+  it("rejects an entitlement for a different project", async () => {
+    const provider = new ControlPlaneEntitlementProvider({
+      getProjectEntitlement: vi.fn(async () =>
+        projectEntitlement({ projectId: "other-project" }),
+      ),
+    });
+    await expect(provider.getProjectEntitlement("project-1")).rejects.toThrow(
+      "different project",
+    );
+  });
+});
+
+describe("UnlimitedEntitlementProvider", () => {
+  it("keeps every project active for self-hosting", async () => {
+    await expect(
+      new UnlimitedEntitlementProvider().getProjectEntitlement("project-1"),
+    ).resolves.toMatchObject({ projectId: "project-1", state: "active" });
   });
 });
 
@@ -80,7 +89,7 @@ describe("createEntitlementProvider", () => {
         ...bindings,
         ENTITLEMENT_MODE: "control-plane",
         CONTROL_PLANE: {
-          getEntitlement: vi.fn(),
+          getProjectEntitlement: vi.fn(),
           createCheckoutSession: vi.fn(),
           createPortalSession: vi.fn(),
         },

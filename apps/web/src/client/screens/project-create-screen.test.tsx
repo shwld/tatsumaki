@@ -227,4 +227,85 @@ describe("ProjectCreateScreen", () => {
     const input = screen.getByLabelText("プロジェクト名");
     expect(input.className).toContain("border-red-500");
   });
+
+  describe("hosted checkout", () => {
+    const assign = vi.fn();
+    const json = (body: unknown, status = 200) =>
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { "content-type": "application/json" },
+      });
+
+    beforeEach(() => {
+      vi.stubGlobal("location", { ...window.location, assign });
+    });
+
+    afterEach(() => {
+      assign.mockReset();
+    });
+
+    const submitName = (value: string) => {
+      fireEvent.change(screen.getByLabelText("プロジェクト名"), {
+        target: { value },
+      });
+      fireEvent.submit(
+        screen.getByLabelText("プロジェクト名").closest("form")!,
+      );
+    };
+
+    it("redirects to Checkout when direct creation requires payment", async () => {
+      vi.mocked(fetch)
+        .mockResolvedValueOnce(
+          json({ error: "pay first", code: "checkout_required" }, 409),
+        )
+        .mockResolvedValueOnce(
+          json(
+            {
+              kind: "checkout",
+              projectId: "p1",
+              url: "https://checkout.stripe.com/c/pay/x",
+            },
+            201,
+          ),
+        );
+
+      renderScreen();
+      submitName("Alpha");
+
+      await waitFor(() =>
+        expect(assign).toHaveBeenCalledWith(
+          "https://checkout.stripe.com/c/pay/x",
+        ),
+      );
+      const [, init] = vi.mocked(fetch).mock.calls[1];
+      expect(vi.mocked(fetch).mock.calls[1][0]).toBe(
+        "/api/project-creation-requests",
+      );
+      expect(JSON.parse(String(init?.body))).toEqual({
+        name: "Alpha",
+        idempotencyKey: expect.any(String),
+      });
+    });
+
+    it("reuses the idempotency key for a retry with the same name", async () => {
+      vi.mocked(fetch)
+        .mockResolvedValueOnce(json({ code: "checkout_required" }, 409))
+        .mockResolvedValueOnce(json({ error: "down" }, 503))
+        .mockResolvedValueOnce(json({ code: "checkout_required" }, 409))
+        .mockResolvedValueOnce(json({ error: "down" }, 503));
+
+      renderScreen();
+      submitName("Alpha");
+      await screen.findByText("down");
+      fireEvent.submit(
+        screen.getByLabelText("プロジェクト名").closest("form")!,
+      );
+      await waitFor(() => expect(fetch).toHaveBeenCalledTimes(4));
+
+      const keyOf = (index: number) =>
+        JSON.parse(String(vi.mocked(fetch).mock.calls[index][1]?.body))
+          .idempotencyKey;
+      expect(keyOf(3)).toBe(keyOf(1));
+    });
+  });
 });

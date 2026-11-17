@@ -1,13 +1,11 @@
 import type { EntitlementProvider } from "../../application/ports/entitlement-provider";
-import type { Entitlement } from "../../domain/entities/entitlement";
+import type { ProjectEntitlement } from "../../domain/entities/entitlement";
 
 export class UnlimitedEntitlementProvider implements EntitlementProvider {
-  async getEntitlement(billingAccountId: string): Promise<Entitlement> {
+  async getProjectEntitlement(projectId: string): Promise<ProjectEntitlement> {
     return {
-      billingAccountId,
-      plan: "unlimited",
+      projectId,
       state: "active",
-      limits: { maxOwnedProjects: null },
       validUntil: null,
       revision: 1,
       cache: {

@@ -1,6 +1,6 @@
 import { FormEvent, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useNavigate } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
 
 import { PermissionDenied } from "../components/permission-denied";
 import { ProjectCreateForm } from "../components/project-create-form";
@@ -20,6 +20,54 @@ export function ProjectCreateScreen() {
   const [forbidden, setForbidden] = useState<string | null>(null);
   const retryRequestRef = useRef<null | (() => Promise<void>)>(null);
   const submitLockRef = useRef(false);
+  const idempotencyKeyRef = useRef(crypto.randomUUID());
+  const [searchParams] = useSearchParams();
+  const checkoutCancelled = searchParams.get("checkout") === "cancel";
+
+  const handleNameChange = (value: string) => {
+    idempotencyKeyRef.current = crypto.randomUUID();
+    setName(value);
+  };
+
+  const startCheckout = async (): Promise<void> => {
+    const response = await fetch("/api/project-creation-requests", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name,
+        idempotencyKey: idempotencyKeyRef.current,
+      }),
+    });
+    if (!response.ok) {
+      if (isAuthError(response.status)) {
+        notifySessionExpired();
+        return;
+      }
+      const errorMessage = await parseErrorMessage(response);
+      if (response.status === 400) {
+        setFieldErrors({ name: errorMessage });
+        return;
+      }
+      setRequestError(errorMessage);
+      return;
+    }
+    const data = (await response.json()) as {
+      kind?: "checkout" | "ready";
+      projectId?: string;
+      url?: string;
+    };
+    if (data.kind === "checkout" && data.url) {
+      window.location.assign(data.url);
+      return;
+    }
+    if (data.kind === "ready" && data.projectId) {
+      navigate(
+        `/projects/new/complete?request=${encodeURIComponent(data.projectId)}`,
+      );
+      return;
+    }
+    setRequestError(t("projectCreateScreen.requestError"));
+  };
 
   const submitProject = async () => {
     retryRequestRef.current = submitProject;
@@ -55,6 +103,16 @@ export function ProjectCreateScreen() {
         if (isForbiddenError(response.status)) {
           setForbidden(await parseErrorMessage(response));
           return;
+        }
+        if (response.status === 409) {
+          const body = (await response
+            .clone()
+            .json()
+            .catch(() => null)) as { code?: string } | null;
+          if (body?.code === "checkout_required") {
+            await startCheckout();
+            return;
+          }
         }
         const errorMessage = await parseErrorMessage(response);
         if (response.status === 400) {
@@ -110,12 +168,17 @@ export function ProjectCreateScreen() {
         <p className="mt-1 text-sm text-gray-600">
           {t("projectCreateScreen.description")}
         </p>
+        {checkoutCancelled ? (
+          <p className="mt-4 text-sm text-gray-700" role="status">
+            {t("projectCreateScreen.checkoutCancelled")}
+          </p>
+        ) : null}
         <ProjectCreateForm
           name={name}
           fieldErrors={fieldErrors}
           requestError={requestError}
           isSubmitting={isSubmitting}
-          onNameChange={setName}
+          onNameChange={handleNameChange}
           onSubmit={handleSubmit}
         />
       </div>

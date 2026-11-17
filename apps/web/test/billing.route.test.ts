@@ -15,7 +15,7 @@ describe("billing entitlement route", () => {
     expect(response.status).toBe(401);
   });
 
-  it("returns unlimited entitlement when no Control Plane is bound", async () => {
+  it("reports self-hosted direct creation when no Control Plane is bound", async () => {
     const response = await SELF.fetch(
       "https://localhost/api/billing/entitlement",
       {
@@ -25,26 +25,20 @@ describe("billing entitlement route", () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
+      mode: "self-hosted",
       checkoutEnabled: false,
-      entitlement: {
-        billingAccountId: "github|self-hosted-user",
-        plan: "unlimited",
-        state: "active",
-        limits: { maxOwnedProjects: null },
-        validUntil: null,
-        revision: 1,
-        cache: { maxAgeSeconds: 3600, staleIfErrorSeconds: 86400 },
-      },
+      projectCreation: "direct",
     });
   });
 
-  it("rejects checkout and portal requests when no Control Plane is bound", async () => {
+  it("rejects portal and checkout-based creation when no Control Plane is bound", async () => {
     const headers = await createAuthHeaders({ sub: "github|self-hosted-user" });
-    for (const path of ["checkout", "portal"]) {
-      const response = await SELF.fetch(
-        `https://localhost/api/billing/${path}`,
-        { method: "POST", headers },
-      );
+    for (const path of ["billing/portal", "project-creation-requests"]) {
+      const response = await SELF.fetch(`https://localhost/api/${path}`, {
+        method: "POST",
+        headers: { ...headers, "content-type": "application/json" },
+        body: JSON.stringify({ name: "A", idempotencyKey: "key-12345678" }),
+      });
       expect(response.status).toBe(409);
     }
   });

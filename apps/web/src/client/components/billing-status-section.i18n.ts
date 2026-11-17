@@ -1,103 +1,35 @@
 export const billingStatusSectionJa = {
   billingStatusSection: {
-    title: "プランと利用状況",
-    loading: "プラン情報を読み込み中...",
+    title: "お支払い",
+    loading: "お支払い情報を読み込み中...",
     unavailable:
-      "プラン情報を一時的に取得できません。時間をおいて再読み込みしてください。",
-    plan: {
-      label: "プラン",
-      free: "Free",
-      pro: "Pro",
-      unlimited: "Unlimited",
-    },
-    state: {
-      label: "状態",
-      active: "有効",
-      grace: "支払い猶予中",
-      restricted: "制限中",
-    },
-    maxOwnedProjects: {
-      label: "作成できるプロジェクト数",
-      unlimited: "上限なし",
-      count: "{{count}} 件",
-    },
+      "お支払い情報を一時的に取得できません。時間をおいて再読み込みしてください。",
     actions: {
-      upgrade: "Pro にアップグレード",
       manage: "支払いを管理",
-      resume: "支払いを再開",
-      upgradeComingSoon: "Pro プランは準備中です。",
       error: "処理を開始できませんでした。時間をおいてもう一度お試しください。",
     },
-    checkout: {
-      waiting: "お支払いの反映を確認しています...",
-      delayed:
-        "お支払いの反映に時間がかかっています。しばらくしてからこのページを再読み込みしてください。",
-      completed: "Pro プランへのアップグレードが完了しました。",
-    },
-    validUntil: "期限",
     guidance: {
-      freeActive:
-        "Free プランではプロジェクトへの参加のみ可能です。プロジェクトを作成するには Pro が必要です。",
-      proActive: "Pro プランをご利用中です。",
-      unlimitedActive: "このサービスには利用上限がありません。",
-      grace:
-        "支払いを確認できていません。{{validUntil}} までに解消されない場合、プロジェクトの作成が制限されます。オーナーとしての権限と既存データの編集は引き続き可能です。",
-      graceNoDate:
-        "支払いを確認できていません。解消されない場合、プロジェクトの作成が制限されます。オーナーとしての権限と既存データの編集は引き続き可能です。",
-      restricted:
-        "現在プロジェクトを新規作成できません。支払いを再開すると作成できるようになります。オーナーとしての権限と既存データの編集は引き続き可能です。",
+      selfHosted: "このサービスには利用上限がありません。",
+      perProject:
+        "プロジェクトごとに月額の購読で利用します。購読中のプロジェクトの支払い方法や解約は、支払い管理から行えます。",
     },
   },
 } as const;
 
 export const billingStatusSectionEn = {
   billingStatusSection: {
-    title: "Plan and usage",
-    loading: "Loading plan...",
+    title: "Billing",
+    loading: "Loading billing...",
     unavailable:
-      "Plan information is temporarily unavailable. Please reload in a moment.",
-    plan: {
-      label: "Plan",
-      free: "Free",
-      pro: "Pro",
-      unlimited: "Unlimited",
-    },
-    state: {
-      label: "Status",
-      active: "Active",
-      grace: "Payment grace period",
-      restricted: "Restricted",
-    },
-    maxOwnedProjects: {
-      label: "Projects you can own",
-      unlimited: "Unlimited",
-      count: "{{count}}",
-    },
+      "Billing information is temporarily unavailable. Please reload in a moment.",
     actions: {
-      upgrade: "Upgrade to Pro",
       manage: "Manage payment",
-      resume: "Resume payment",
-      upgradeComingSoon: "The Pro plan is coming soon.",
       error: "Could not start the request. Please try again in a moment.",
     },
-    checkout: {
-      waiting: "Confirming your payment...",
-      delayed:
-        "Your payment is taking longer than expected to apply. Please reload this page in a moment.",
-      completed: "Your upgrade to Pro is complete.",
-    },
-    validUntil: "Valid until",
     guidance: {
-      freeActive:
-        "The Free plan can only join projects. Creating projects requires Pro.",
-      proActive: "You are on the Pro plan.",
-      unlimitedActive: "This service has no usage limits.",
-      grace:
-        "We could not confirm your payment. Creating projects will be restricted unless it is resolved by {{validUntil}}. You remain an owner and can keep editing existing data.",
-      graceNoDate:
-        "We could not confirm your payment. Creating projects will be restricted unless it is resolved. You remain an owner and can keep editing existing data.",
-      restricted:
-        "You cannot create new projects right now. Resume payment to create projects again. You remain an owner and can keep editing existing data.",
+      selfHosted: "This service has no usage limits.",
+      perProject:
+        "Each project runs on its own monthly subscription. Manage payment methods and cancellations for your subscribed projects from payment management.",
     },
   },
 } as const;
