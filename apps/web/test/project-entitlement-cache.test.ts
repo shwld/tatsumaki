@@ -129,3 +129,16 @@ describe("ProjectEntitlementCache", () => {
     expect(await cache.decideWrite("p1")).toEqual({ kind: "unavailable" });
   });
 });
+
+describe("ProjectEntitlementCache revision watermark", () => {
+  it("does not reopen a suspended project through an older revision after expiry", async () => {
+    const { cache, advance } = setup([
+      entitlement({ state: "suspended", revision: 5 }),
+      entitlement({ state: "active", revision: 4 }),
+    ]);
+    expect(await cache.decideWrite("p1")).toEqual({ kind: "suspended" });
+    advance(60 + 300);
+    expect(await cache.decideWrite("p1")).toEqual({ kind: "unavailable" });
+    expect(await cache.decideWrite("p1")).toEqual({ kind: "unavailable" });
+  });
+});

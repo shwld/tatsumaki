@@ -145,4 +145,32 @@ describe("requireProjectWritable", () => {
     const env = bindings(async () => entitlement("suspended"));
     expect((await call("POST", "/api/projects", env)).status).toBe(200);
   });
+
+  it("keeps artifact preview token issuance open on a suspended project", async () => {
+    const env = bindings(async () => entitlement("suspended"));
+    const response = await call(
+      "POST",
+      "/api/projects/p1/artifacts/a1/versions/3/preview-token",
+      env,
+    );
+    expect(response.status).toBe(200);
+  });
+
+  it("leaves other projects to the route when an api key is bound elsewhere", async () => {
+    const env = bindings(async () => entitlement("suspended"));
+    const app = new Hono<any>();
+    app.use("*", async (c, next) => {
+      c.set("currentUser", { id: userId });
+      c.set("apiKeyProjectId", "another-project");
+      await next();
+    });
+    app.use("*", requireProjectWritable());
+    app.all("*", (c) => c.json({ reached: true }));
+    const response = await app.request(
+      `/api-key/v1/projects/${projectId}/stories`,
+      { method: "POST" },
+      env,
+    );
+    expect(response.status).toBe(200);
+  });
 });

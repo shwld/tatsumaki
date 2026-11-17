@@ -16,6 +16,7 @@ export type ProjectWriteDecision =
  */
 export class ProjectEntitlementCache {
   private readonly entries = new Map<string, Entry>();
+  private readonly highestRevision = new Map<string, number>();
   private readonly inflight = new Map<string, Promise<Entry | null>>();
 
   constructor(
@@ -52,7 +53,7 @@ export class ProjectEntitlementCache {
     if (cached && this.now() < expiresAt(cached, 0)) {
       return cached.entitlement;
     }
-    const fetched = await this.fetchShared(projectId, cached);
+    const fetched = await this.fetchShared(projectId);
     if (fetched) return fetched.entitlement;
     if (
       cached &&
@@ -65,29 +66,24 @@ export class ProjectEntitlementCache {
     return null;
   }
 
-  private fetchShared(
-    projectId: string,
-    previous: Entry | undefined,
-  ): Promise<Entry | null> {
+  private fetchShared(projectId: string): Promise<Entry | null> {
     const running = this.inflight.get(projectId);
     if (running) return running;
-    const started = this.fetch(projectId, previous).finally(() => {
+    const started = this.fetch(projectId).finally(() => {
       this.inflight.delete(projectId);
     });
     this.inflight.set(projectId, started);
     return started;
   }
 
-  private async fetch(
-    projectId: string,
-    previous: Entry | undefined,
-  ): Promise<Entry | null> {
+  private async fetch(projectId: string): Promise<Entry | null> {
     try {
       const entitlement = await this.provider.getProjectEntitlement(projectId);
       if (entitlement.projectId !== projectId) return null;
-      if (previous && entitlement.revision < previous.entitlement.revision) {
+      if (entitlement.revision < (this.highestRevision.get(projectId) ?? 0)) {
         return null;
       }
+      this.highestRevision.set(projectId, entitlement.revision);
       const entry = { entitlement, fetchedAtMs: this.now() };
       this.entries.set(projectId, entry);
       return entry;

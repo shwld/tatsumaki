@@ -8,6 +8,8 @@ import {
 } from "../../infrastructure/entitlements/project-write-guard";
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+const PREVIEW_TOKEN_PATH =
+  /^\/artifacts\/[^/]+\/versions\/[^/]+\/preview-token$/;
 const PROJECT_PATH = /(?:^|\/)projects\/([^/]+)(\/.*)?$/;
 
 /**
@@ -25,6 +27,11 @@ export const requireProjectWritable = (): MiddlewareHandler<Env> => {
     if (!match) return next();
     const projectId = decodeURIComponent(match[1]);
     if (c.req.method === "DELETE" && match[2] === undefined) return next();
+    // Signs a read-only viewing token; viewing stays open (ADR-0015).
+    if (match[2] && PREVIEW_TOKEN_PATH.test(match[2])) return next();
+    // A key is bound to one project; other projects get the route's own answer.
+    const keyProjectId = c.get("apiKeyProjectId");
+    if (keyProjectId !== undefined && keyProjectId !== projectId) return next();
 
     const member = await new D1ProjectRepository(c.env.DB).findMember(
       projectId,
