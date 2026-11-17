@@ -31,6 +31,8 @@ export const projectStoryMapsScreenJa = {
   },
   storyMapEditScreen: {
     back: "Story Map 一覧に戻る",
+    showDetails: "詳細を表示",
+    hideDetails: "詳細を隠す",
     loading: "Story Map を読み込み中...",
     loadError:
       "Story Map を読み込めませんでした。削除されたか、権限がない可能性があります",
@@ -175,6 +177,8 @@ export const projectStoryMapsScreenEn = {
   },
   storyMapEditScreen: {
     back: "Back to story maps",
+    showDetails: "Show details",
+    hideDetails: "Hide details",
     loading: "Loading story map...",
     loadError:
       "Could not load the story map. It may have been removed, or you may not have access",

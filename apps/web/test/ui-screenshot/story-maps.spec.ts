@@ -111,6 +111,7 @@ test("story map: create, edit, archive and restore", async ({ page }) => {
 
   await expect(page).toHaveURL(/\/story-maps\/map-1$/);
   await expect(page.getByLabel("タイトル")).toHaveCount(0);
+  await page.getByRole("button", { name: "詳細を表示" }).click();
   await expect(page.getByText("初回 story まで到達する")).toBeVisible();
 
   await page.getByRole("link", { name: "編集", exact: true }).click();

@@ -1,3 +1,5 @@
+import { Info } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router";
 
@@ -18,6 +20,7 @@ export function StoryMapEditScreen() {
     projectId: string;
     mapId: string;
   }>();
+  const [expanded, setExpanded] = useState(false);
   const { detail, loadError, reload, live, message } = useStoryMapDetail(
     projectId,
     mapId,
@@ -65,51 +68,75 @@ export function StoryMapEditScreen() {
   const canEdit = detail.role !== "viewer";
 
   return (
-    <ProjectPage title={map.title}>
-      {back}
+    <main className="flex min-h-0 flex-1 flex-col px-4 py-2">
+      <div className="flex items-center gap-2">
+        <h1 className="min-w-0 truncate text-base font-semibold text-gray-900">
+          {map.title}
+        </h1>
+        <p role="status" className="shrink-0 text-xs text-gray-600">
+          {t(`storyMapBoard.connection.${live.state.connection}`)}
+          {live.state.connection === "connected"
+            ? ` · ${t(`storyMapBoard.save_state.${live.state.save}`)}`
+            : ""}
+        </p>
+        {canEdit ? (
+          <Link
+            to={projectStoryMapEditPath(projectId, mapId)}
+            className="shrink-0 rounded border border-gray-300 px-2 py-0.5 text-xs text-gray-900"
+          >
+            {t("storyMapEditScreen.edit")}
+          </Link>
+        ) : null}
+        <button
+          type="button"
+          className="inline-flex size-7 shrink-0 items-center justify-center rounded text-gray-600 hover:bg-gray-100"
+          aria-expanded={expanded}
+          aria-controls="story-map-details"
+          aria-label={
+            expanded
+              ? t("storyMapEditScreen.hideDetails")
+              : t("storyMapEditScreen.showDetails")
+          }
+          onClick={() => setExpanded((value) => !value)}
+        >
+          <Info className="size-4" aria-hidden="true" />
+        </button>
+      </div>
+
+      {expanded ? (
+        <div
+          id="story-map-details"
+          className="mt-2 flex flex-col gap-2 text-sm text-gray-700"
+        >
+          <p
+            className={`max-w-xl whitespace-pre-wrap break-words ${map.achievementGoal ? "" : "text-gray-500"}`}
+          >
+            {map.achievementGoal || t("storyMapEditScreen.goalNone")}
+          </p>
+          {back}
+        </div>
+      ) : null}
+
       {archived ? (
-        <p className="mb-3 text-sm text-gray-700">
+        <p className="mt-1 text-sm text-gray-700">
           {t("storyMapEditScreen.archivedNotice")}
         </p>
       ) : null}
       {!canEdit ? (
-        <p className="mb-3 text-sm text-gray-700">
+        <p className="mt-1 text-sm text-gray-700">
           {t("storyMapEditScreen.viewerNotice")}
         </p>
       ) : null}
       {message ? (
         <p
           role={message.kind === "error" ? "alert" : "status"}
-          className={`mb-3 text-sm ${message.kind === "error" ? "text-red-700" : "text-gray-700"}`}
+          className={`mt-1 text-sm ${message.kind === "error" ? "text-red-700" : "text-gray-700"}`}
         >
           {message.text}
         </p>
       ) : null}
-
-      <div className="mb-4 flex max-w-xl items-start justify-between gap-3 text-sm text-gray-700">
-        <p
-          className={`whitespace-pre-wrap break-words ${map.achievementGoal ? "" : "text-gray-500"}`}
-        >
-          {map.achievementGoal || t("storyMapEditScreen.goalNone")}
-        </p>
-        {canEdit ? (
-          <Link
-            to={projectStoryMapEditPath(projectId, mapId)}
-            className="shrink-0 text-blue-700 underline"
-          >
-            {t("storyMapEditScreen.edit")}
-          </Link>
-        ) : null}
-      </div>
-
-      <p role="status" className="mb-2 text-xs text-gray-600">
-        {t(`storyMapBoard.connection.${live.state.connection}`)}
-        {live.state.connection === "connected"
-          ? ` · ${t(`storyMapBoard.save_state.${live.state.save}`)}`
-          : ""}
-      </p>
       {live.state.rejections.length > 0 ? (
-        <p role="alert" className="mb-2 text-xs text-red-700">
+        <p role="alert" className="mt-1 text-xs text-red-700">
           {t("storyMapBoard.rejected")}{" "}
           {t(
             `storyMapBoard.rejectedBy.${live.state.rejections[live.state.rejections.length - 1]}`,
@@ -129,6 +156,6 @@ export function StoryMapEditScreen() {
           send={live.send}
         />
       ) : null}
-    </ProjectPage>
+    </main>
   );
 }
