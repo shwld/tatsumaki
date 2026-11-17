@@ -262,6 +262,8 @@ const StoryCardAccepted = memo(function StoryCardAccepted({
   onToggleExpand,
   expandedContent,
   subHeaderContent,
+  projectLabels,
+  showLabels = false,
   stickyHeaderTopClassName = "top-0",
   stickyHeaderTopUsesIterationCssVar = false,
 }: Omit<
@@ -361,6 +363,12 @@ const StoryCardAccepted = memo(function StoryCardAccepted({
               <StoryBlockStateBadges story={story} />
             </span>
           </div>
+          {showLabels ? (
+            <StoryLabelChips
+              labels={story.labels}
+              projectLabels={projectLabels}
+            />
+          ) : null}
         </div>
         {isExpanded && subHeaderContent ? (
           <div className="border-t border-gray-100">{subHeaderContent}</div>

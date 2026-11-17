@@ -100,6 +100,18 @@ describe("StoryPanel", () => {
     cleanup();
     renderPanel({ stories, showLabels: true });
     expect(screen.getAllByText("backend")).toHaveLength(1);
+
+    cleanup();
+    renderPanel({
+      stories: [
+        makeStory({
+          status: "Accepted",
+          labels: [{ id: "l1", name: "backend" }],
+        }),
+      ],
+      showLabels: true,
+    });
+    expect(screen.getAllByText("backend")).toHaveLength(1);
   });
 
   it("renders panel header with label and count", () => {
