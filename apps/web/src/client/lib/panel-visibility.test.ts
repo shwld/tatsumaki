@@ -55,3 +55,25 @@ describe("usePanelVisibility persistence", () => {
     expect(result.current.visiblePanels).toEqual(["Current", "Backlog"]);
   });
 });
+
+describe("useShowStoryLabels persistence", () => {
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  it("defaults to off, toggles, and persists", async () => {
+    const { renderHook, act } = await import("@testing-library/react");
+    const { useShowStoryLabels } = await import("./panel-visibility");
+
+    const first = renderHook(() => useShowStoryLabels());
+    expect(first.result.current.showLabels).toBe(false);
+
+    act(() => {
+      first.result.current.toggleShowLabels();
+    });
+    expect(first.result.current.showLabels).toBe(true);
+
+    const second = renderHook(() => useShowStoryLabels());
+    expect(second.result.current.showLabels).toBe(true);
+  });
+});

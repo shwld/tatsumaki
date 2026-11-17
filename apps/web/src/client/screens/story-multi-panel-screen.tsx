@@ -74,6 +74,7 @@ import {
   PANEL_LABELS,
   PANEL_TYPES,
   usePanelVisibility,
+  useShowStoryLabels,
   type PanelType,
 } from "../lib/panel-visibility";
 import { storyPanelCollisionDetection } from "../lib/story-panel-dnd-collision";
@@ -199,6 +200,7 @@ export function StoryMultiPanelScreen() {
   const { showToast } = useToast();
   const { user, isLoading: isUserLoading } = useCurrentUser();
   const { visibility, togglePanel, visiblePanels } = usePanelVisibility();
+  const { showLabels, toggleShowLabels } = useShowStoryLabels();
   const { mode: currentBacklogViewMode, toggleMode: toggleCurrentBacklogMode } =
     useCurrentBacklogViewMode(user?.id);
   const breakpoint = useBreakpoint();
@@ -1748,6 +1750,7 @@ export function StoryMultiPanelScreen() {
     onToggleExpand: handleToggleExpand,
     selectedStoryIds,
     projectLabels,
+    showLabels,
     onStatusChange: (story: Story, status: StoryStatus) => {
       void handleStatusChange(story, status);
     },
@@ -2156,6 +2159,15 @@ export function StoryMultiPanelScreen() {
                           {PANEL_LABELS[panel]}
                         </DropdownMenuCheckboxItem>
                       ))}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuCheckboxItem
+                        checked={showLabels}
+                        className="text-xs"
+                        onCheckedChange={() => toggleShowLabels()}
+                        data-testid="panel-toggle-labels"
+                      >
+                        {t("storyMultiPanelScreen.panelMenu.showLabels")}
+                      </DropdownMenuCheckboxItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
                         className="text-xs"
@@ -2568,6 +2580,18 @@ export function StoryMultiPanelScreen() {
                                 {PANEL_LABELS[panel]}
                               </DropdownMenuCheckboxItem>
                             ))}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuCheckboxItem
+                              checked={showLabels}
+                              className="text-xs"
+                              onCheckedChange={() => {
+                                toggleShowLabels();
+                                setMobileMenuOpen(false);
+                              }}
+                              data-testid="panel-toggle-labels"
+                            >
+                              {t("storyMultiPanelScreen.panelMenu.showLabels")}
+                            </DropdownMenuCheckboxItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               className="text-xs"

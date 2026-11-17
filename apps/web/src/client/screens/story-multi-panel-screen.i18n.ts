@@ -47,6 +47,7 @@ export const storyMultiPanelScreenJa = {
     panelMenu: {
       settingsLabel: "パネル表示・結合設定",
       panels: "Panels",
+      showLabels: "ラベルを表示",
       combineCurrentBacklog: "Combine current & backlog",
       splitCurrentBacklog: "Split current & backlog",
       advancedSearch: "高度な検索",
@@ -207,6 +208,7 @@ export const storyMultiPanelScreenEn = {
     panelMenu: {
       settingsLabel: "Panel display and combine settings",
       panels: "Panels",
+      showLabels: "Show labels",
       combineCurrentBacklog: "Combine current & backlog",
       splitCurrentBacklog: "Split current & backlog",
       advancedSearch: "Advanced search",

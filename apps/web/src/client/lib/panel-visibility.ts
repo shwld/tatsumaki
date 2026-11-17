@@ -57,6 +57,34 @@ function saveVisibility(visibility: Record<PanelType, boolean>): void {
   }
 }
 
+const SHOW_LABELS_STORAGE_KEY = "tatsumaki:show-story-labels";
+
+function loadShowLabels(): boolean {
+  try {
+    return localStorage.getItem(SHOW_LABELS_STORAGE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+export function useShowStoryLabels() {
+  const [showLabels, setShowLabels] = useState<boolean>(loadShowLabels);
+
+  const toggleShowLabels = useCallback(() => {
+    setShowLabels((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(SHOW_LABELS_STORAGE_KEY, String(next));
+      } catch {
+        // ignore storage errors
+      }
+      return next;
+    });
+  }, []);
+
+  return { showLabels, toggleShowLabels };
+}
+
 export function usePanelVisibility() {
   const [visibility, setVisibility] =
     useState<Record<PanelType, boolean>>(loadVisibility);
