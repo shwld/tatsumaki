@@ -280,7 +280,7 @@ export function groupStoriesByIteration(
     const firstBucketCapacity =
       opts.panelType === "Backlog" &&
       typeof opts.currentTotalPoints === "number" &&
-      currentIterationCapacity > 0
+      (currentIteration !== null || currentIterationCapacity > 0)
         ? Math.max(currentIterationCapacity - opts.currentTotalPoints, 0)
         : velocity;
 

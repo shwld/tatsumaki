@@ -392,6 +392,29 @@ describe("groupStoriesByIteration", () => {
     expect(result[1]?.label).toBe("2026-01-22");
   });
 
+  it("does not merge Backlog into a current iteration with zero capacity", () => {
+    const current = {
+      ...makeIteration("iter-cur", "2026-01-14", "2026-01-21"),
+      effectiveSprintUtilizationPercent: 0,
+    };
+    const result = groupStoriesByIteration(
+      [makeStory({ id: "b-2", iterationId: null, storyPoint: 2, position: 1 })],
+      [current],
+      {
+        panelType: "Backlog",
+        velocity: 8,
+        currentTotalPoints: 0,
+        sprintDurationDays: 7,
+        currentIterationEndDate: "2026-01-21",
+        currentIterationId: "iter-cur",
+        todayIso: "2026-01-15",
+      },
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.groupType).toBe("future-iteration");
+  });
+
   it("allocates zero-point release stories to the next sprint when the first bucket is full", () => {
     const result = groupStoriesByIteration(
       [
