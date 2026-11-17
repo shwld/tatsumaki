@@ -751,11 +751,14 @@ export function StoryMapBoard({
   }
 
   return (
-    <section aria-label={t("storyMapBoard.title")} className="mb-6">
-      <h2 className="mb-2 text-base font-semibold text-gray-900 dark:text-slate-100">
+    <section
+      aria-label={t("storyMapBoard.title")}
+      className="mt-2 flex min-h-0 flex-1 flex-col"
+    >
+      <h2 className="sr-only text-base font-semibold text-gray-900 dark:text-slate-100">
         {t("storyMapBoard.title")}
       </h2>
-      <div className="max-h-[75vh] overflow-auto rounded-lg border border-gray-300 shadow-sm dark:border-slate-700">
+      <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-gray-300 shadow-sm dark:border-slate-700">
         <table className="border-separate border-spacing-0 text-sm text-gray-900 dark:text-slate-100">
           <thead className="sticky top-0 z-20">
             <tr>

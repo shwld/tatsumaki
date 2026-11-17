@@ -149,6 +149,7 @@ describe("Story Map screens", () => {
   it("shows only the goal on the detail screen and links to the edit screen", async () => {
     mockFetch(() => [200, { role: "owner", structure: structure() }]);
     renderAt("/projects/p1/story-maps/map-1");
+    fireEvent.click(await screen.findByRole("button", { name: "詳細を表示" }));
     expect(await screen.findByText("Reach the first story")).toBeTruthy();
     expect(screen.queryByLabelText("タイトル")).toBeNull();
     expect(screen.queryByRole("button", { name: "アーカイブ" })).toBeNull();
@@ -279,7 +280,7 @@ describe("Story Map screens", () => {
     vi.stubGlobal("WebSocket", FakeSocket);
     mockFetch(() => [200, { role: "owner", structure: structure() }]);
     renderAt("/projects/p1/story-maps/map-1");
-    await screen.findByText("Reach the first story");
+    await screen.findByRole("button", { name: "詳細を表示" });
     await waitFor(() => expect(sockets).toHaveLength(1));
     act(() => {
       sockets[0]?.emit("message", {
