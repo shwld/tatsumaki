@@ -209,9 +209,10 @@ export function StoryMapMetaEditScreen() {
       )}
       <button
         type="button"
-        disabled={busy}
+        disabled={busy || readOnly}
         className={buttonClass}
         onClick={() =>
+          !readOnly &&
           void run({ type: "updateMap", archived: !archived }, null)
         }
       >

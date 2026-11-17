@@ -919,6 +919,7 @@ export function StoryMultiPanelScreen() {
   // --- Status change ---
 
   const handleStatusChange = async (story: Story, nextStatus: StoryStatus) => {
+    if (readOnly) return;
     retryRequestRef.current = () => handleStatusChange(story, nextStatus);
     setError(null);
 
