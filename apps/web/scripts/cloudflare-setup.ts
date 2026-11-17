@@ -532,10 +532,14 @@ export function renderWranglerConfig(
 ): string {
   const runWorkerFirst = splitContentHost ? "true" : '["/", "/index.html"]';
   const toml = (value: string) => JSON.stringify(value);
+  const controlPlaneVars = [
+    'ENTITLEMENT_MODE = "control-plane"',
+    ...(plan.environment === "staging" ? ['CHECKOUT_ENABLED = "true"'] : []),
+  ].join("\n");
   const controlPlaneBinding = controlPlaneService
     ? `
 [vars]
-ENTITLEMENT_MODE = "control-plane"${plan.environment === "staging" ? '\nCHECKOUT_ENABLED = "true"' : ""}
+${controlPlaneVars}
 
 [[services]]
 binding = "CONTROL_PLANE"
