@@ -239,7 +239,10 @@ export function registerStoryMapOpenApi(app: OpenAPIHono) {
           },
         },
         400: { description: "Invalid command. Body: { code: invalid }" },
-        403: { description: "Viewers cannot edit. Body: { code: forbidden }" },
+        403: {
+          description:
+            "Body: { code: forbidden | suspended }. Viewers cannot edit; suspended projects are read-only",
+        },
         404: {
           description:
             "Map or target element not found. Body: { code: not_found | target_gone }",
@@ -250,6 +253,10 @@ export function registerStoryMapOpenApi(app: OpenAPIHono) {
         },
         413: { description: "Body too large" },
         429: { description: "Body: { code: rate_limited }" },
+        503: {
+          description:
+            "Body: { code: entitlement_unavailable }. Billing state could not be checked",
+        },
       },
     }),
     (c) => c.json({ seq: 1, result: null, duplicate: false }),

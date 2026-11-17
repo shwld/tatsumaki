@@ -29,6 +29,7 @@ import {
   toEpicResponse,
 } from "../epics/responses";
 import { requireProjectAccess } from "./project-access";
+import type { ProjectWriteGuardBindings } from "../../../infrastructure/entitlements/project-write-guard";
 
 type ToolResult = {
   content: Array<{ type: "text"; text: string }>;
@@ -68,7 +69,15 @@ function epicResult(result: Result<Epic, ManageEpicError>): ToolResult {
 /** Strategy planning of labels (ADR-0013). */
 export function registerEpicTools(
   server: McpServer,
-  { db, currentUser }: { db: D1Database; currentUser: CurrentUser },
+  {
+    db,
+    env,
+    currentUser,
+  }: {
+    db: D1Database;
+    env: ProjectWriteGuardBindings;
+    currentUser: CurrentUser;
+  },
 ) {
   const projectRepository = new D1ProjectRepository(db);
   const deps: EpicDependencies = {
@@ -80,15 +89,22 @@ export function registerEpicTools(
   async function withMember(
     projectId: string,
     run: (member: ProjectMember) => Promise<ToolResult>,
+    { write = false }: { write?: boolean } = {},
   ): Promise<ToolResult> {
     const access = await requireProjectAccess(
       projectRepository,
       projectId,
       currentUser.id,
+      write ? env : undefined,
     );
     if (!access.ok) return access.response;
     return run(access.member);
   }
+
+  const withWriteMember = (
+    projectId: string,
+    run: (member: ProjectMember) => Promise<ToolResult>,
+  ) => withMember(projectId, run, { write: true });
 
   server.registerTool(
     "list_labels",
@@ -206,7 +222,7 @@ export function registerEpicTools(
       }),
     },
     ({ projectId, labelId, revision }) =>
-      withMember(projectId, async (member) =>
+      withWriteMember(projectId, async (member) =>
         epicResult(
           await enableEpicPlanning(deps, {
             projectId,
@@ -231,7 +247,7 @@ export function registerEpicTools(
       }),
     },
     ({ projectId, labelId, revision }) =>
-      withMember(projectId, async (member) =>
+      withWriteMember(projectId, async (member) =>
         epicResult(
           await disableEpicPlanning(deps, {
             projectId,
@@ -271,7 +287,7 @@ export function registerEpicTools(
       }),
     },
     ({ projectId, labelId, ...body }) =>
-      withMember(projectId, async (member) => {
+      withWriteMember(projectId, async (member) => {
         const parsed = parseEpicPlanBody(body);
         if (!parsed.ok) return failure(parsed.message);
         return epicResult(

@@ -112,3 +112,14 @@
 - 解約や未払いは、そのプロジェクトのメンバー全員の編集を止める。オーナー以外にも影響するので、停止の理由と再開の方法を画面で示す。
 - 所有上限の変数と `maxOwnedProjects` の判定は不要になる。置き換えは作成フローの story で行う。
 - Control Plane では、購読と権利がプロジェクトに紐づく。Checkout は、プロジェクトの作成・再開・譲渡のための購入に作り替わる。Portal は customer 単位のままなので、そのユーザーの全プロジェクトの購読をまとめて扱う。
+
+## Amendment 2026-11-18 (story #433)
+
+停止状態の強制を実装した。経路の一覧は [billing-write-gate.md](../billing-write-gate.md)。
+
+- **強制のスイッチ**: `ENTITLEMENT_MODE=control-plane` かつ `PROJECT_WRITE_ENFORCEMENT=true` のときだけ書き込みを判定する。未設定なら従来どおり何も拒否しない。公開準備(既存プロジェクトの扱いと法務表示)が済むまで本番では設定せず、staging で先に有効にして確認する。セルフホストは設定しても影響を受けない。
+- **キャッシュ**: プロジェクトごとに、Control Plane の応答の `maxAgeSeconds` の間だけ使う。取得に失敗したときだけ `staleIfErrorSeconds` の間、古い値を使う。期限の起点は応答を受け取った時刻。本体側に独立した TTL は持たない。現行の Control Plane の値(`ENTITLEMENT_CACHE_TTL_SECONDS=60`、`ENTITLEMENT_STALE_IF_ERROR_SECONDS=300`)では、停止が書き込みに反映されるまでの最大遅延は、Control Plane が正常なら 60 秒、障害中は 360 秒(60 + 300)。ただし、キャッシュは Worker の isolate ごとなので、状態の変化に気づく時刻は isolate ごとに最大 60 秒ずれる。
+- **grace**: `validUntil` を過ぎた `grace` は、キャッシュの期限内でも `suspended` として扱う。
+- **応答**: `suspended` は HTTP 403 と `code: PROJECT_SUSPENDED`、状態が分からないときは HTTP 503 と `code: ENTITLEMENT_UNAVAILABLE`。MCP は同じ code を含むエラー文、story map のライブ編集は `suspended` / `entitlement_unavailable` の reject code で返す。
+- **応答の古い値**: キャッシュは revision が戻る応答を採用しない。
+- **脱退**: 現在のコードにメンバー本人が脱退する経路はない。追加するときは書き込みから除外する(経路一覧の例外に記載)。
