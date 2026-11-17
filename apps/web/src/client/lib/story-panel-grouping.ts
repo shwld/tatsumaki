@@ -108,6 +108,7 @@ type GroupStoriesByIterationOptions = {
   iterationStartDay?: number | null;
   currentIterationEndDate?: string | null;
   currentIterationNumber?: number | null;
+  currentIterationId?: string | null;
   utilizationOverrideByIterationNumber?: Record<number, number>;
   todayIso?: string;
   formatStartLabel?: (date: string) => string;
@@ -244,10 +245,16 @@ export function groupStoriesByIteration(
         : 0;
     const todayIso = opts.todayIso ?? new Date().toISOString().slice(0, 10);
     const currentIteration =
+      (opts.currentIterationId
+        ? iterations.find(
+            (iteration) => iteration.id === opts.currentIterationId,
+          )
+        : undefined) ??
       iterations.find(
         (iteration) =>
           iteration.startDate <= todayIso && iteration.endDate > todayIso,
-      ) ?? null;
+      ) ??
+      null;
     const currentIterationNumber =
       opts.currentIterationNumber ?? currentIteration?.iterationNumber ?? null;
     const overrideByNumber = opts.utilizationOverrideByIterationNumber ?? {};
@@ -277,6 +284,13 @@ export function groupStoriesByIteration(
         ? Math.max(currentIterationCapacity - opts.currentTotalPoints, 0)
         : velocity;
 
+    const mergesIntoCurrentIteration =
+      opts.panelType === "Backlog" &&
+      currentIteration !== null &&
+      velocity > 0 &&
+      typeof opts.currentTotalPoints === "number";
+    const bucketOffset = mergesIntoCurrentIteration ? 0 : 1;
+
     const capacities: number[] =
       velocity > 0 ? [firstBucketCapacity] : [Number.POSITIVE_INFINITY];
     const consumed: number[] = [0];
@@ -301,7 +315,7 @@ export function groupStoriesByIteration(
         consumed.push(0);
         const iterationNumber =
           currentIterationNumber !== null
-            ? currentIterationNumber + targetIdx + 1
+            ? currentIterationNumber + targetIdx + bucketOffset
             : null;
         const nextCapacity =
           iterationNumber !== null
@@ -320,11 +334,43 @@ export function groupStoriesByIteration(
 
     groupedStories.forEach((bucketStories, idx) => {
       if (bucketStories.length === 0) return;
-      const startDate = addDays(futureStartDate, sprintDurationDays * idx);
+      if (mergesIntoCurrentIteration && idx === 0 && currentIteration) {
+        const key = `iteration-${currentIteration.id}`;
+        const existing = groups.get(key);
+        const added = bucketStories.reduce(
+          (sum, item) => sum + (item.storyPoint ?? 0),
+          0,
+        );
+        if (existing) {
+          existing.stories.push(...bucketStories);
+          existing.totalPoints += added;
+          return;
+        }
+        groups.set(key, {
+          key,
+          iterationId: currentIteration.id,
+          iterationNumber: currentIteration.iterationNumber ?? null,
+          startDate: currentIteration.startDate,
+          endDate: currentIteration.endDate,
+          label:
+            opts.formatStartLabel?.(currentIteration.startDate) ??
+            currentIteration.startDate,
+          groupType: "iteration",
+          stories: bucketStories,
+          totalPoints: added,
+          effectiveSprintUtilizationPercent:
+            currentIteration.effectiveSprintUtilizationPercent ?? 100,
+        });
+        return;
+      }
+      const startDate = addDays(
+        futureStartDate,
+        sprintDurationDays * (idx - (mergesIntoCurrentIteration ? 1 : 0)),
+      );
       const endDate = addDays(startDate, sprintDurationDays);
       const iterationNumber =
         currentIterationNumber !== null
-          ? currentIterationNumber + idx + 1
+          ? currentIterationNumber + idx + bucketOffset
           : null;
       const overridePercent =
         iterationNumber !== null
