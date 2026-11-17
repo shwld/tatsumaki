@@ -91,6 +91,11 @@ export function ProjectCreateCompleteScreen() {
         >
           {t(`projectCreateCompleteScreen.${phase}`)}
         </p>
+        {phase === "waiting" || phase === "delayed" ? (
+          <p className="text-sm text-gray-600">
+            {t("projectCreateCompleteScreen.closeNotice")}
+          </p>
+        ) : null}
         {phase === "delayed" || phase === "grace" || phase === "error" ? (
           <button
             type="button"

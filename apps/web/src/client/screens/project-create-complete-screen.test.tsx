@@ -83,13 +83,12 @@ describe("ProjectCreateCompleteScreen", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("does not promise creation continues after closing the page", async () => {
-    vi.mocked(fetch).mockResolvedValue(
-      json({ status: "pending", state: "suspended" }, 202),
-    );
+  it("tells the user creation continues even if the page is closed", async () => {
+    vi.mocked(fetch).mockResolvedValue(json({ status: "pending" }, 202));
     renderScreen();
-    await screen.findByRole("status");
 
-    expect(screen.queryByText(/閉じても/)).toBeNull();
+    expect(
+      await screen.findByText("このページを閉じても作成は続きます。"),
+    ).toBeTruthy();
   });
 });

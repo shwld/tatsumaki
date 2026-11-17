@@ -2,6 +2,7 @@ export const projectCreateCompleteScreenJa = {
   projectCreateCompleteScreen: {
     title: "プロジェクトを作成しています",
     waiting: "お支払いの反映を確認しています...",
+    closeNotice: "このページを閉じても作成は続きます。",
     delayed:
       "お支払いの反映に時間がかかっています。しばらくしてから「もう一度確認」を押してください。",
     grace:
@@ -19,6 +20,7 @@ export const projectCreateCompleteScreenEn = {
   projectCreateCompleteScreen: {
     title: "Creating your project",
     waiting: "Confirming your payment...",
+    closeNotice: "Creation continues even if you close this page.",
     delayed:
       "Your payment is taking longer than expected to apply. Please try again in a moment.",
     grace:

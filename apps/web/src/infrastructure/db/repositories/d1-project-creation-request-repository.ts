@@ -1,15 +1,17 @@
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq, isNull, lte, or } from "drizzle-orm";
 import { err, ok, type Result } from "neverthrow";
 import type { Project } from "../../../domain/entities/project";
 import type {
   ProjectCreationRequest,
   ProjectCreationRequestStatus,
+  ProjectCreationStalledReason,
 } from "../../../domain/entities/project-creation-request";
 import {
   PROJECT_CREATION_REQUEST_REPOSITORY_ERROR,
   type OpenProjectCreationRequestInput,
   type ProjectCreationRequestRepository,
   type ProjectCreationRequestRepositoryError,
+  type RecordCreationAttemptInput,
 } from "../../../domain/repositories/project-creation-request-repository";
 import { createDb, type DbClient } from "../client";
 import { projectCreationRequestsTable } from "../schema";
@@ -27,6 +29,11 @@ const toRequest = (row: Row): ProjectCreationRequest => ({
   idempotencyKey: row.idempotencyKey,
   checkoutRequestId: row.checkoutRequestId,
   status: row.status as ProjectCreationRequestStatus,
+  attemptCount: row.attemptCount,
+  materializeFailureCount: row.materializeFailureCount,
+  paymentEvidence: row.paymentEvidence === 1,
+  stalledReason: row.stalledReason as ProjectCreationStalledReason | null,
+  createdAt: row.createdAt,
 });
 
 export class D1ProjectCreationRequestRepository
@@ -125,6 +132,62 @@ export class D1ProjectCreationRequestRepository
         return err(PROJECT_CREATION_REQUEST_REPOSITORY_ERROR);
       }
       return ok({ ...project.value, currentUserRole: "owner" });
+    } catch {
+      return err(PROJECT_CREATION_REQUEST_REPOSITORY_ERROR);
+    }
+  }
+
+  async listRecoverable(
+    now: string,
+    limit: number,
+  ): Promise<
+    Result<ProjectCreationRequest[], ProjectCreationRequestRepositoryError>
+  > {
+    try {
+      const rows = await this.db
+        .select()
+        .from(projectCreationRequestsTable)
+        .where(
+          and(
+            eq(projectCreationRequestsTable.status, "pending"),
+            isNull(projectCreationRequestsTable.stalledReason),
+            or(
+              isNull(projectCreationRequestsTable.nextAttemptAt),
+              lte(projectCreationRequestsTable.nextAttemptAt, now),
+            ),
+          ),
+        )
+        .orderBy(asc(projectCreationRequestsTable.createdAt))
+        .limit(limit)
+        .all();
+      return ok(rows.map(toRequest));
+    } catch {
+      return err(PROJECT_CREATION_REQUEST_REPOSITORY_ERROR);
+    }
+  }
+
+  async recordAttempt(
+    input: RecordCreationAttemptInput,
+  ): Promise<Result<void, ProjectCreationRequestRepositoryError>> {
+    try {
+      await this.db
+        .update(projectCreationRequestsTable)
+        .set({
+          attemptCount: input.attemptCount,
+          materializeFailureCount: input.materializeFailureCount,
+          paymentEvidence: input.paymentEvidence ? 1 : 0,
+          nextAttemptAt: input.nextAttemptAt,
+          lastError: input.lastError,
+          stalledReason: input.stalledReason,
+          updatedAt: new Date().toISOString(),
+        })
+        .where(
+          and(
+            eq(projectCreationRequestsTable.projectId, input.projectId),
+            eq(projectCreationRequestsTable.status, "pending"),
+          ),
+        );
+      return ok(undefined);
     } catch {
       return err(PROJECT_CREATION_REQUEST_REPOSITORY_ERROR);
     }
