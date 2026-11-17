@@ -107,6 +107,61 @@ describe("ProjectInvitationsScreen", () => {
     );
   });
 
+  it("shows a permission notice instead of the invite form for non-owners", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      buildJsonResponse({
+        currentMemberRole: "member",
+        members: [],
+        invitations: [],
+      }),
+    );
+
+    render(
+      <MemoryRouter
+        initialEntries={["/projects/project-1/members/invitations"]}
+      >
+        <AuthErrorProvider>
+          <Routes>
+            <Route
+              path="/projects/:projectId/members/invitations"
+              element={<ProjectInvitationsScreen />}
+            />
+          </Routes>
+        </AuthErrorProvider>
+      </MemoryRouter>,
+    );
+
+    expect(
+      await screen.findByText(/招待はプロジェクトのオーナーのみ/),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText("メールアドレス")).toBeNull();
+    expect(screen.queryByRole("button", { name: "招待を送信" })).toBeNull();
+  });
+
+  it("keeps the load error visible instead of the permission notice when the role is unknown", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify({ error: "boom" }), { status: 500 }),
+    );
+
+    render(
+      <MemoryRouter
+        initialEntries={["/projects/project-1/members/invitations"]}
+      >
+        <AuthErrorProvider>
+          <Routes>
+            <Route
+              path="/projects/:projectId/members/invitations"
+              element={<ProjectInvitationsScreen />}
+            />
+          </Routes>
+        </AuthErrorProvider>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(screen.queryByText(/招待はプロジェクトのオーナーのみ/)).toBeNull();
+  });
+
   it("requires an email address", async () => {
     vi.mocked(fetch).mockResolvedValue(
       buildJsonResponse({

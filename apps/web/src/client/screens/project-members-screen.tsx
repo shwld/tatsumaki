@@ -78,7 +78,7 @@ export function ProjectMembersScreen() {
     <ProjectPage
       title={t("projectMembersScreen.title")}
       actions={
-        projectId ? (
+        projectId && canManageRoles ? (
           <Link
             to={projectInvitationsPath(projectId)}
             className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white"

@@ -1,3 +1,4 @@
+import { ok } from "neverthrow";
 import { Hono } from "hono";
 import {
   createProject,
@@ -189,9 +190,12 @@ projectsRoute.get("/projects/:projectId/members", async (c) => {
     return membership.response;
   }
 
+  const isOwner = membership.member.role === "owner";
   const [membersResult, invitationsResult] = await Promise.all([
     membership.repository.listMembers(projectId),
-    membership.repository.listInvitations(projectId),
+    isOwner
+      ? membership.repository.listInvitations(projectId)
+      : Promise.resolve(ok([])),
   ]);
 
   if (membersResult.isErr() || invitationsResult.isErr()) {

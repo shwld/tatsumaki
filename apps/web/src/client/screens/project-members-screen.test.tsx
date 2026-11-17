@@ -98,6 +98,7 @@ describe("ProjectMembersScreen", () => {
     renderScreen();
 
     expect(await screen.findByDisplayValue("オーナー")).toBeDisabled();
+    expect(screen.queryByRole("link", { name: "招待を管理" })).toBeNull();
   });
 
   it("updates a member role and keeps the profile", async () => {

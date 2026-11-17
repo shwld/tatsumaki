@@ -18,6 +18,8 @@ export const projectMembersScreenJa = {
   projectInvitationsScreen: {
     title: "メンバーの招待",
     backToMembers: "メンバー一覧へ",
+    ownerOnly:
+      "メンバーの招待はプロジェクトのオーナーのみが行えます。招待が必要な場合はオーナーに依頼してください。",
     invitationError: "招待の作成に失敗しました",
     validation: { emailRequired: "メールアドレスを入力してください" },
     invite: {
@@ -72,6 +74,8 @@ export const projectMembersScreenEn = {
   projectInvitationsScreen: {
     title: "Invite members",
     backToMembers: "Back to members",
+    ownerOnly:
+      "Only project owners can invite members. Ask an owner to send an invitation.",
     invitationError: "Failed to create invitation",
     validation: { emailRequired: "Enter an email address" },
     invite: {
