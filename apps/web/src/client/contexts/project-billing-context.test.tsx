@@ -135,6 +135,29 @@ describe("ProjectBillingScope", () => {
     expect(await screen.findByText("editable")).toBeTruthy();
   });
 
+  it("ignores a slow earlier answer that arrives after a newer one", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    let releaseFirst: (r: Response) => void = () => {};
+    vi.mocked(fetch)
+      .mockReturnValueOnce(
+        new Promise<Response>((resolve) => {
+          releaseFirst = resolve;
+        }),
+      )
+      .mockResolvedValue(
+        json({ state: "suspended", role: "member", validUntil: null }),
+      );
+    renderScope();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    await waitFor(() => expect(screen.getByText("read-only")).toBeTruthy());
+    await act(async () => {
+      releaseFirst(json({ state: "active", role: "member", validUntil: null }));
+    });
+    expect(screen.getByText("read-only")).toBeTruthy();
+  });
+
   it("does not fetch outside a project", () => {
     render(
       <MemoryRouter initialEntries={["/projects/new"]}>

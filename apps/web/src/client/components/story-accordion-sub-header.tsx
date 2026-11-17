@@ -1,4 +1,5 @@
 import { memo, useCallback } from "react";
+import { useProjectReadOnly } from "../contexts/project-billing-context";
 import { useTranslation } from "react-i18next";
 import { Archive, Dice5, Trash2, UserCircle, Users } from "lucide-react";
 import { useToast } from "../contexts/toast-context";
@@ -30,6 +31,7 @@ function StoryAccordionSubHeaderComponent({
 }: StoryAccordionSubHeaderProps) {
   const { t } = useTranslation();
   const { showToast } = useToast();
+  const readOnly = useProjectReadOnly();
   const memberName = useMemberDisplayName();
   const { patchStory, isSaving } = useStoryPatch(
     story.projectId,
@@ -114,7 +116,7 @@ function StoryAccordionSubHeaderComponent({
                     <input
                       type="checkbox"
                       checked={checked}
-                      disabled={isSaving}
+                      disabled={isSaving || readOnly}
                       onChange={(e) =>
                         void handleOwnerToggle(member.id, e.target.checked)
                       }
@@ -165,7 +167,7 @@ function StoryAccordionSubHeaderComponent({
                 type="radio"
                 name={`requester-${story.id}`}
                 checked={story.requesterId === null}
-                disabled={isSaving}
+                disabled={isSaving || readOnly}
                 onChange={() => void handleRequesterChange(null)}
                 className="h-3.5 w-3.5"
               />
@@ -182,7 +184,7 @@ function StoryAccordionSubHeaderComponent({
                   type="radio"
                   name={`requester-${story.id}`}
                   checked={story.requesterId === member.id}
-                  disabled={isSaving}
+                  disabled={isSaving || readOnly}
                   onChange={() => void handleRequesterChange(member.id)}
                   className="h-3.5 w-3.5"
                 />
@@ -215,7 +217,7 @@ function StoryAccordionSubHeaderComponent({
             ? t("storyAccordion.subHeader.archive")
             : t("storyAccordion.subHeader.archiveUnavailable")
         }
-        disabled={!canArchiveStory(story.status)}
+        disabled={!canArchiveStory(story.status) || readOnly}
         className="ml-auto rounded p-1 text-gray-400 hover:text-gray-700 disabled:opacity-40"
         onClick={() => {
           void changeArchive(true)

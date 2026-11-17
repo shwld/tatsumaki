@@ -46,7 +46,9 @@ export function ProjectBillingScope({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!projectId) return;
     let ignore = false;
+    let latest = 0;
     const run = async () => {
+      const seq = ++latest;
       let value: Loaded = { state: "unknown", role: null, validUntil: null };
       try {
         const response = await fetch(
@@ -72,7 +74,7 @@ export function ProjectBillingScope({ children }: { children: ReactNode }) {
       } catch {
         // keep the fail-closed "unknown" value
       }
-      if (!ignore) setLoaded({ projectId, value });
+      if (!ignore && seq === latest) setLoaded({ projectId, value });
     };
     void run();
     const timer = window.setInterval(() => void run(), POLL_INTERVAL_MS);

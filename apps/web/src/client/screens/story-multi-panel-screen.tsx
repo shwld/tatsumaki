@@ -1019,7 +1019,7 @@ export function StoryMultiPanelScreen() {
   // --- Bulk operations ---
 
   const handleBulkStatusChange = async () => {
-    if (!projectId || selectedVisibleStoryIds.length === 0) return;
+    if (readOnly || !projectId || selectedVisibleStoryIds.length === 0) return;
 
     retryRequestRef.current = handleBulkStatusChange;
     setError(null);
@@ -1039,7 +1039,12 @@ export function StoryMultiPanelScreen() {
 
   const handleBulkAddLabel = async () => {
     const bulkLabel = projectLabels.find((label) => label.id === bulkLabelId);
-    if (!projectId || selectedVisibleStoryIds.length === 0 || !bulkLabel)
+    if (
+      readOnly ||
+      !projectId ||
+      selectedVisibleStoryIds.length === 0 ||
+      !bulkLabel
+    )
       return;
 
     retryRequestRef.current = handleBulkAddLabel;
@@ -2403,6 +2408,7 @@ export function StoryMultiPanelScreen() {
               className="rounded-md bg-blue-700 px-2 py-0.5 text-xs font-medium text-white disabled:bg-blue-300"
               onClick={() => void handleBulkStatusChange()}
               disabled={
+                readOnly ||
                 selectedVisibleStoryIds.length === 0 ||
                 !isBulkStatusAllowed(bulkStatus) ||
                 bulkStatusMutation.isPending
@@ -2434,6 +2440,7 @@ export function StoryMultiPanelScreen() {
                   className="rounded-md bg-blue-700 px-2 py-0.5 text-xs font-medium text-white disabled:bg-blue-300"
                   onClick={() => void handleBulkAddLabel()}
                   disabled={
+                    readOnly ||
                     selectedVisibleStoryIds.length === 0 ||
                     !bulkLabelId ||
                     bulkLabelMutation.isPending

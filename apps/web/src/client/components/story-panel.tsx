@@ -74,6 +74,7 @@ const StoryCardWorkflowActions = memo(function StoryCardWorkflowActions({
   workflowActions: ReturnType<typeof getWorkflowActions>;
   onStatusChange: (story: Story, status: StoryStatus) => void;
 }) {
+  const readOnly = useProjectReadOnly();
   return (
     <>
       {workflowActions.map((action) => (
@@ -81,7 +82,7 @@ const StoryCardWorkflowActions = memo(function StoryCardWorkflowActions({
           key={action.target}
           type="button"
           className={`inline-flex shrink-0 rounded px-2 py-0.5 text-xs font-medium ${
-            action.disabled
+            action.disabled || readOnly
               ? "cursor-not-allowed bg-gray-100 text-gray-400"
               : action.variant === "primary"
                 ? "bg-blue-600 text-white hover:bg-blue-700"
@@ -89,7 +90,7 @@ const StoryCardWorkflowActions = memo(function StoryCardWorkflowActions({
                   ? "bg-red-600 text-white hover:bg-red-700"
                   : "bg-gray-200 text-gray-700 hover:bg-gray-300"
           }`}
-          disabled={action.disabled}
+          disabled={action.disabled || readOnly}
           title={action.disabledReason ?? undefined}
           onClick={() => onStatusChange(story, action.target)}
         >

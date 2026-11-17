@@ -157,7 +157,7 @@ export function StoryMapMetaEditScreen() {
 
   const { map } = detail.structure;
   const archived = map.archivedAt !== null;
-  const canEdit = detail.role !== "viewer" && !readOnly;
+  const canEdit = detail.role !== "viewer";
 
   const messageEl = message ? (
     <p
@@ -196,7 +196,7 @@ export function StoryMapMetaEditScreen() {
         <MetaForm
           key={map.id}
           map={map}
-          busy={busy}
+          busy={busy || readOnly}
           cancelTo={detailPath}
           onInvalid={() =>
             setMessage({
