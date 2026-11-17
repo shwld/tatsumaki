@@ -138,6 +138,7 @@ function toStory(
 function toStorySummary(
   row: StoryRow,
   ownerIdsByStoryId: ReadonlyMap<string, string[]>,
+  labelsByStoryId: ReadonlyMap<string, { ids: string[]; names: string[] }>,
 ): Story {
   const rawStoryPoint = row.storyPoint;
   const storyPoint =
@@ -162,8 +163,8 @@ function toStorySummary(
     completedAt: row.completedAt ?? null,
     archivedAt: row.archivedAt,
     storyPoint,
-    labels: [],
-    labelIds: [],
+    labels: labelsByStoryId.get(row.id)?.names ?? [],
+    labelIds: labelsByStoryId.get(row.id)?.ids ?? [],
     iterationId: row.iterationId ?? null,
     isIcebox: row.isIcebox === 1,
     ownerIds: ownerIdsByStoryId.get(row.id) ?? [],
@@ -1604,13 +1605,13 @@ export class D1StoryRepository implements StoryRepository {
     const stories = await pagedQuery.all();
 
     if (input.detailLevel === "summary") {
-      const ownerIdsByStoryId = await this.listOwnerIdsByStoryIds(
-        stories.map((story) => story.id),
-      );
+      const summaryIds = stories.map((story) => story.id);
+      const ownerIdsByStoryId = await this.listOwnerIdsByStoryIds(summaryIds);
+      const labelsByStoryId = await this.listLabelsByStoryIds(summaryIds);
       return ok(
         await this.enrichSummaryBlockFlags(
           stories.map((row) => {
-            return toStorySummary(row, ownerIdsByStoryId);
+            return toStorySummary(row, ownerIdsByStoryId, labelsByStoryId);
           }),
         ),
       );
