@@ -38,6 +38,7 @@ import {
   hashInvitationLinkToken,
 } from "../../application/usecases/invitation-link-crypto";
 import type { Env } from "../../index";
+import { getProjectAccessState } from "../../infrastructure/entitlements/project-write-guard";
 import { createEntitlementProvider } from "./billing";
 import { requireProjectMembership } from "./project-membership";
 import { computeGravatarHash } from "../lib/gravatar";
@@ -790,6 +791,23 @@ projectsRoute.get("/projects/:projectId", async (c) => {
         project.customPointScale,
       ),
     },
+  });
+});
+
+projectsRoute.get("/projects/:projectId/billing-state", async (c) => {
+  const projectId = c.req.param("projectId");
+  const membership = await requireProjectMembership(c, projectId);
+  if (!membership.ok) {
+    return membership.response;
+  }
+  const role = membership.member.role;
+  const state = await getProjectAccessState(c.env, projectId);
+  // Payment details (grace deadline) are for owners only; members just see the state.
+  return c.json({
+    state: state.kind,
+    role,
+    validUntil:
+      state.kind === "grace" && role === "owner" ? state.validUntil : null,
   });
 });
 

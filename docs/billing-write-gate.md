@@ -66,3 +66,11 @@
 ### 本番有効化の前提
 
 停止中のエクスポート拒否は `PROJECT_WRITE_ENFORCEMENT` と同じスイッチで有効になる。本番では、公開準備 H で利用規約・プライバシーポリシーに「停止中はエクスポート不可、本人の開示・消去請求は運営者が個別対応」と明記してから有効化する。
+
+## 画面の表示と読み取り専用(story #435)
+
+`GET /api/projects/:projectId/billing-state` が同じキャッシュから `active` / `grace` / `suspended` / `unknown` を返す。猶予期限(`validUntil`)はオーナーにだけ返す。クライアントの `ProjectBillingScope` が開いているプロジェクトの状態を 60 秒ごと・タブ復帰時に取り直し、`suspended` と `unknown` では `useProjectReadOnly()` が true になる。
+
+- ストーリー作成・編集・並べ替え、ラベル・Story Map の編集入口はこのフックで無効にする。新しい編集入口を足すときも使う。
+- 状態を読めないときは active とみなさず、書き込み不可と再試行を出す。閲覧は続く。
+- オーナーには支払い管理(customer 単位の Portal)を出す。再購読ボタンは R2 の再開処理(01M7CM4B00A7JKF91BW3NTNS8F)ができるまで出さない。

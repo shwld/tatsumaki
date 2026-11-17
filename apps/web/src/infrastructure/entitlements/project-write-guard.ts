@@ -1,5 +1,6 @@
 import {
   ProjectEntitlementCache,
+  type ProjectAccessState,
   type ProjectWriteDecision,
 } from "../../application/services/project-entitlement-cache";
 import {
@@ -71,6 +72,16 @@ export const decideProjectWrite = async (
   if (!isProjectWriteEnforced(bindings)) return { kind: "allow" };
   if (!bindings.CONTROL_PLANE) return { kind: "unavailable" };
   return cacheFor(bindings.CONTROL_PLANE).decideWrite(projectId);
+};
+
+/** Billing state for display. Not enforcing (self-hosted etc.) is always active. */
+export const getProjectAccessState = async (
+  bindings: ProjectWriteGuardBindings,
+  projectId: string,
+): Promise<ProjectAccessState> => {
+  if (!isProjectWriteEnforced(bindings)) return { kind: "active" };
+  if (!bindings.CONTROL_PLANE) return { kind: "unknown" };
+  return cacheFor(bindings.CONTROL_PLANE).accessState(projectId);
 };
 
 export const invalidateProjectEntitlement = (

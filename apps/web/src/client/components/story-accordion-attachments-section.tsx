@@ -19,6 +19,7 @@ export type StoryAccordionAttachmentsSectionProps = {
   onUploadSubmit: (event: FormEvent<HTMLFormElement>) => void;
   deletingAttachmentId: string | null;
   onDeleteAttachment: (attachmentId: string) => void;
+  readOnly?: boolean;
 };
 
 export function StoryAccordionAttachmentsSection({
@@ -33,6 +34,7 @@ export function StoryAccordionAttachmentsSection({
   onUploadSubmit,
   deletingAttachmentId,
   onDeleteAttachment,
+  readOnly = false,
 }: StoryAccordionAttachmentsSectionProps) {
   const { t } = useTranslation();
   return (
@@ -53,6 +55,7 @@ export function StoryAccordionAttachmentsSection({
           id={`story-attachment-${storyId}`}
           className="mt-1 block w-full text-xs"
           type="file"
+          disabled={readOnly}
           onChange={(event) => {
             onAttachmentFileChange(event.target.files?.[0] ?? null);
           }}
@@ -60,7 +63,9 @@ export function StoryAccordionAttachmentsSection({
         <button
           type="submit"
           className="mt-2 rounded bg-blue-600 px-2 py-1 text-xs font-medium text-white disabled:bg-gray-300 dark:bg-blue-500 dark:hover:bg-blue-400 dark:disabled:bg-slate-600"
-          disabled={!selectedAttachmentFile || isUploadingAttachment}
+          disabled={
+            !selectedAttachmentFile || isUploadingAttachment || readOnly
+          }
         >
           {isUploadingAttachment
             ? t("storyAccordion.attachments.uploading")
@@ -121,7 +126,9 @@ export function StoryAccordionAttachmentsSection({
                   <button
                     type="button"
                     className="text-xs font-medium text-red-700 disabled:opacity-50"
-                    disabled={deletingAttachmentId === attachment.id}
+                    disabled={
+                      deletingAttachmentId === attachment.id || readOnly
+                    }
                     onClick={() => {
                       void onDeleteAttachment(attachment.id);
                     }}

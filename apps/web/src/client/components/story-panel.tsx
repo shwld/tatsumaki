@@ -35,6 +35,7 @@ import {
   calculateTotalPoints,
   groupStoriesByIteration,
 } from "../lib/story-panel-grouping";
+import { useProjectReadOnly } from "../contexts/project-billing-context";
 import { useToast } from "../contexts/toast-context";
 import { useStoryDragState } from "../contexts/story-drag-context";
 import { useStoryPatch } from "../hooks/use-story-patch";
@@ -73,6 +74,7 @@ const StoryCardWorkflowActions = memo(function StoryCardWorkflowActions({
   workflowActions: ReturnType<typeof getWorkflowActions>;
   onStatusChange: (story: Story, status: StoryStatus) => void;
 }) {
+  const readOnly = useProjectReadOnly();
   return (
     <>
       {workflowActions.map((action) => (
@@ -80,7 +82,7 @@ const StoryCardWorkflowActions = memo(function StoryCardWorkflowActions({
           key={action.target}
           type="button"
           className={`inline-flex shrink-0 rounded px-2 py-0.5 text-xs font-medium ${
-            action.disabled
+            action.disabled || readOnly
               ? "cursor-not-allowed bg-gray-100 text-gray-400"
               : action.variant === "primary"
                 ? "bg-blue-600 text-white hover:bg-blue-700"
@@ -88,7 +90,7 @@ const StoryCardWorkflowActions = memo(function StoryCardWorkflowActions({
                   ? "bg-red-600 text-white hover:bg-red-700"
                   : "bg-gray-200 text-gray-700 hover:bg-gray-300"
           }`}
-          disabled={action.disabled}
+          disabled={action.disabled || readOnly}
           title={action.disabledReason ?? undefined}
           onClick={() => onStatusChange(story, action.target)}
         >
@@ -635,7 +637,11 @@ const StoryCardWithInlineEdit = memo(function StoryCardWithInlineEdit({
     [patchStory, story.type],
   );
 
+  const readOnly = useProjectReadOnly();
+  const busy = isSaving || readOnly;
+
   const handleTitleSave = useCallback(async () => {
+    if (readOnly) return;
     const trimmed = titleDraft.trim();
     if (!trimmed || trimmed === story.title) {
       setTitlePopoverOpen(false);
@@ -643,9 +649,7 @@ const StoryCardWithInlineEdit = memo(function StoryCardWithInlineEdit({
     }
     await patchStory({ title: trimmed });
     setTitlePopoverOpen(false);
-  }, [titleDraft, story.title, patchStory]);
-
-  const busy = isSaving;
+  }, [readOnly, titleDraft, story.title, patchStory]);
 
   return (
     <div
@@ -850,7 +854,7 @@ const StoryCardWithInlineEdit = memo(function StoryCardWithInlineEdit({
                 titleDraft={titleDraft}
                 onTitleDraftChange={setTitleDraft}
                 originalTitle={story.title}
-                isSaving={isSaving}
+                isSaving={busy}
                 inputRef={titleInputRef}
                 onSave={() => void handleTitleSave()}
                 onCancel={() => setTitlePopoverOpen(false)}
@@ -930,6 +934,7 @@ const SortableStoryItem = memo(function SortableStoryItem({
   story,
   ...cardProps
 }: SortableStoryItemProps) {
+  const readOnlyDrag = useProjectReadOnly();
   const {
     attributes,
     listeners,
@@ -939,7 +944,10 @@ const SortableStoryItem = memo(function SortableStoryItem({
     isDragging,
     index,
     activeIndex,
-  } = useSortable({ id: story.id, disabled: Boolean(story.archivedAt) });
+  } = useSortable({
+    id: story.id,
+    disabled: Boolean(story.archivedAt) || readOnlyDrag,
+  });
   const { t } = useTranslation();
   const drag = useStoryDragState();
   const showInsertLine =

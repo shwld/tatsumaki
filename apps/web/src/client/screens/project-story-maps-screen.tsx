@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useProjectReadOnly } from "../contexts/project-billing-context";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router";
 
@@ -14,6 +15,7 @@ import { projectStoryMapPath } from "../lib/story-routes";
 import type { StoryMap } from "../types/story-map";
 
 export function ProjectStoryMapsScreen() {
+  const readOnly = useProjectReadOnly();
   const { t } = useTranslation();
   const { projectId = "" } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
@@ -43,7 +45,7 @@ export function ProjectStoryMapsScreen() {
   }, [projectId, includeArchived, reloadKey, notifySessionExpired]);
 
   const reload = useCallback(() => setReloadKey((key) => key + 1), []);
-  const canEdit = list !== null && list.role !== "viewer";
+  const canEdit = list !== null && list.role !== "viewer" && !readOnly;
 
   const setArchived = async (map: StoryMap, archived: boolean) => {
     setActionError(null);

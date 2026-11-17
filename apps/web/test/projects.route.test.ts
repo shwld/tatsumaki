@@ -41,6 +41,40 @@ describe("project routes", () => {
     });
   });
 
+  it("reports an active billing state to members and hides it from non-members", async () => {
+    const created = await SELF.fetch("https://localhost/api/projects", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        ...(await createAuthHeaders()),
+      },
+      body: JSON.stringify({ name: "Alpha Project" }),
+    });
+    const { project } = (await created.json()) as { project: { id: string } };
+
+    const response = await SELF.fetch(
+      `https://localhost/api/projects/${project.id}/billing-state`,
+      { headers: await createAuthHeaders() },
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      state: "active",
+      role: "owner",
+      validUntil: null,
+    });
+
+    const other = await SELF.fetch(
+      `https://localhost/api/projects/${project.id}/billing-state`,
+      {
+        headers: await createAuthHeaders({
+          sub: "github|another-user",
+          email: "another@example.com",
+        }),
+      },
+    );
+    expect(other.status).toBeGreaterThanOrEqual(403);
+  });
+
   it("lists projects only for current member", async () => {
     const createResponse = await SELF.fetch("https://localhost/api/projects", {
       method: "POST",

@@ -9,6 +9,7 @@ type EditableMarkdownProps = {
   mentionCandidates?: ProjectMemberProfile[];
   placeholder?: string;
   uploadPastedImage?: (file: File) => Promise<string | null>;
+  disabled?: boolean;
 };
 
 export function EditableMarkdown({
@@ -17,6 +18,7 @@ export function EditableMarkdown({
   mentionCandidates = [],
   placeholder = "入力してください...",
   uploadPastedImage,
+  disabled = false,
 }: EditableMarkdownProps) {
   const normalizeMentions = useCallback(
     (nextValue: string) =>
@@ -31,11 +33,12 @@ export function EditableMarkdown({
   }, [normalizeMentions, value]);
 
   const save = useCallback(() => {
+    if (disabled) return;
     const normalizedValue = normalizeMentions(value);
     if (draft !== normalizedValue) {
       onSave(draft);
     }
-  }, [draft, normalizeMentions, onSave, value]);
+  }, [disabled, draft, normalizeMentions, onSave, value]);
 
   const cancel = useCallback(() => {
     setDraft(normalizeMentions(value));
@@ -64,6 +67,7 @@ export function EditableMarkdown({
         placeholder={placeholder}
         minHeightClassName="min-h-24"
         uploadPastedImage={uploadPastedImage}
+        disabled={disabled}
         onBlur={(event) => {
           const relatedTarget = event.relatedTarget;
           if (

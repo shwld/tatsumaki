@@ -94,3 +94,44 @@ describe("decideProjectExport", () => {
     );
   });
 });
+
+describe("getProjectAccessState", () => {
+  it("reports active, grace, suspended, and expired grace as suspended", async () => {
+    const { getProjectAccessState } = await import(
+      "../src/infrastructure/entitlements/project-write-guard"
+    );
+    const state = (e: unknown) =>
+      getProjectAccessState(
+        bindings(async () => e),
+        projectId,
+      );
+    expect(await state(entitlement("active"))).toEqual({ kind: "active" });
+    expect(await state(entitlement("grace", "2999-01-01T00:00:00Z"))).toEqual({
+      kind: "grace",
+      validUntil: "2999-01-01T00:00:00Z",
+    });
+    expect(await state(entitlement("suspended"))).toEqual({
+      kind: "suspended",
+    });
+    expect(await state(entitlement("grace", "2000-01-01T00:00:00Z"))).toEqual({
+      kind: "suspended",
+    });
+  });
+
+  it("is unknown when the Control Plane fails, and active when not enforcing", async () => {
+    const { getProjectAccessState } = await import(
+      "../src/infrastructure/entitlements/project-write-guard"
+    );
+    expect(
+      await getProjectAccessState(
+        bindings(async () => {
+          throw new Error("down");
+        }),
+        "p-fail",
+      ),
+    ).toEqual({ kind: "unknown" });
+    expect(await getProjectAccessState({}, projectId)).toEqual({
+      kind: "active",
+    });
+  });
+});

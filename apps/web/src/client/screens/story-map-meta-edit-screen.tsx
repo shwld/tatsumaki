@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useProjectReadOnly } from "../contexts/project-billing-context";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router";
 
@@ -93,6 +94,7 @@ function MetaForm({
 }
 
 export function StoryMapMetaEditScreen() {
+  const readOnly = useProjectReadOnly();
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { projectId = "", mapId = "" } = useParams<{
@@ -194,7 +196,7 @@ export function StoryMapMetaEditScreen() {
         <MetaForm
           key={map.id}
           map={map}
-          busy={busy}
+          busy={busy || readOnly}
           cancelTo={detailPath}
           onInvalid={() =>
             setMessage({
@@ -207,9 +209,10 @@ export function StoryMapMetaEditScreen() {
       )}
       <button
         type="button"
-        disabled={busy}
+        disabled={busy || readOnly}
         className={buttonClass}
         onClick={() =>
+          !readOnly &&
           void run({ type: "updateMap", archived: !archived }, null)
         }
       >

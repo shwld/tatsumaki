@@ -35,7 +35,9 @@ export function StoryTitleEditPopoverFields({
           className="w-full resize-none rounded border border-gray-200 bg-white px-2 py-1 text-sm text-gray-900 focus:border-blue-300 focus:outline-none focus:ring-1 focus:ring-blue-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
           value={titleDraft}
           onChange={onTitleDraftChange}
-          onEnterKey={() => void onSave()}
+          onEnterKey={() => {
+            if (!isSaving) void onSave();
+          }}
           onEscapeKey={onCancel}
         />
         <button

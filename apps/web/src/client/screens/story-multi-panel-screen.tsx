@@ -19,6 +19,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams, useSearchParams } from "react-router";
+import { useProjectReadOnly } from "../contexts/project-billing-context";
 
 import { ErrorRetry } from "../components/error-retry";
 import {
@@ -196,6 +197,7 @@ function toCreatePayloadPanel(
 export function StoryMultiPanelScreen() {
   const { t } = useTranslation();
   const { projectId } = useParams();
+  const readOnly = useProjectReadOnly();
   const { notifySessionExpired } = useAuthError();
   const { showToast } = useToast();
   const { user, isLoading: isUserLoading } = useCurrentUser();
@@ -917,6 +919,7 @@ export function StoryMultiPanelScreen() {
   // --- Status change ---
 
   const handleStatusChange = async (story: Story, nextStatus: StoryStatus) => {
+    if (readOnly) return;
     retryRequestRef.current = () => handleStatusChange(story, nextStatus);
     setError(null);
 
@@ -1017,7 +1020,7 @@ export function StoryMultiPanelScreen() {
   // --- Bulk operations ---
 
   const handleBulkStatusChange = async () => {
-    if (!projectId || selectedVisibleStoryIds.length === 0) return;
+    if (readOnly || !projectId || selectedVisibleStoryIds.length === 0) return;
 
     retryRequestRef.current = handleBulkStatusChange;
     setError(null);
@@ -1037,7 +1040,12 @@ export function StoryMultiPanelScreen() {
 
   const handleBulkAddLabel = async () => {
     const bulkLabel = projectLabels.find((label) => label.id === bulkLabelId);
-    if (!projectId || selectedVisibleStoryIds.length === 0 || !bulkLabel)
+    if (
+      readOnly ||
+      !projectId ||
+      selectedVisibleStoryIds.length === 0 ||
+      !bulkLabel
+    )
       return;
 
     retryRequestRef.current = handleBulkAddLabel;
@@ -1457,10 +1465,14 @@ export function StoryMultiPanelScreen() {
     setActiveStoryId(orderedVisibleStories[0]?.id ?? null);
   }, [activeStoryId, orderedVisibleStories]);
 
-  const openCreateForm = useCallback((panel: CreateTargetPanel) => {
-    setCreateTargetPanel((current) => (current === panel ? current : panel));
-    setCreateError(null);
-  }, []);
+  const openCreateForm = useCallback(
+    (panel: CreateTargetPanel) => {
+      if (readOnly) return;
+      setCreateTargetPanel((current) => (current === panel ? current : panel));
+      setCreateError(null);
+    },
+    [readOnly],
+  );
 
   const closeCreateForm = useCallback(() => {
     setCreateTargetPanel(null);
@@ -1471,7 +1483,7 @@ export function StoryMultiPanelScreen() {
   }, []);
 
   const submitInlineStory = useCallback(async () => {
-    if (!projectId || !createTargetPanel) return;
+    if (readOnly || !projectId || !createTargetPanel) return;
     const title = createTitle.trim();
     if (!title) {
       setCreateError({
@@ -1547,6 +1559,7 @@ export function StoryMultiPanelScreen() {
     notifySessionExpired,
     panelQueries,
     projectId,
+    readOnly,
     showToast,
     t,
   ]);
@@ -1796,7 +1809,8 @@ export function StoryMultiPanelScreen() {
           <div className="relative">
             <button
               type="button"
-              className="text-xs font-medium text-blue-700"
+              className="text-xs font-medium text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={readOnly}
               onClick={() => openCreateForm(targetPanel)}
             >
               {t("storyMultiPanelScreen.create.button")}
@@ -1871,7 +1885,7 @@ export function StoryMultiPanelScreen() {
                     <button
                       type="submit"
                       className="rounded bg-blue-700 px-2 py-1 text-xs text-white disabled:opacity-60"
-                      disabled={createSubmitting}
+                      disabled={createSubmitting || readOnly}
                     >
                       {createSubmitting
                         ? t("storyMultiPanelScreen.create.submitting")
@@ -2391,6 +2405,7 @@ export function StoryMultiPanelScreen() {
               className="rounded-md bg-blue-700 px-2 py-0.5 text-xs font-medium text-white disabled:bg-blue-300"
               onClick={() => void handleBulkStatusChange()}
               disabled={
+                readOnly ||
                 selectedVisibleStoryIds.length === 0 ||
                 !isBulkStatusAllowed(bulkStatus) ||
                 bulkStatusMutation.isPending
@@ -2422,6 +2437,7 @@ export function StoryMultiPanelScreen() {
                   className="rounded-md bg-blue-700 px-2 py-0.5 text-xs font-medium text-white disabled:bg-blue-300"
                   onClick={() => void handleBulkAddLabel()}
                   disabled={
+                    readOnly ||
                     selectedVisibleStoryIds.length === 0 ||
                     !bulkLabelId ||
                     bulkLabelMutation.isPending
@@ -2495,6 +2511,7 @@ export function StoryMultiPanelScreen() {
               onDragMove={handleDndDragMove}
               onDragEnd={(event) => {
                 resetDndBodyCursor();
+                if (readOnly) return;
                 void handleDragEnd(event);
               }}
               onDragCancel={resetDndBodyCursor}

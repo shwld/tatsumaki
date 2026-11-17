@@ -1,4 +1,5 @@
 import { Info } from "lucide-react";
+import { useProjectReadOnly } from "../contexts/project-billing-context";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router";
@@ -15,6 +16,7 @@ const buttonClass =
   "rounded-md border border-gray-300 px-3 py-1 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-60";
 
 export function StoryMapEditScreen() {
+  const readOnly = useProjectReadOnly();
   const { t } = useTranslation();
   const { projectId = "", mapId = "" } = useParams<{
     projectId: string;
@@ -65,7 +67,7 @@ export function StoryMapEditScreen() {
 
   const { map } = detail.structure;
   const archived = map.archivedAt !== null;
-  const canEdit = detail.role !== "viewer";
+  const canEdit = detail.role !== "viewer" && !readOnly;
 
   return (
     <main className="flex min-h-0 flex-1 flex-col px-4 py-2">
