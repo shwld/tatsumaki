@@ -591,7 +591,8 @@ describe("story routes", () => {
         expect.objectContaining({
           title: "Summary target",
           description: "",
-          labels: [],
+          labels: ["perf"],
+          labelIds: [perfId],
           ownerIds: ["github|test-user"],
           isBlocked: false,
           isBlocking: false,
