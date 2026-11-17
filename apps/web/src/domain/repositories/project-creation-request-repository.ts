@@ -1,5 +1,8 @@
 import type { Result } from "neverthrow";
-import type { ProjectCreationRequest } from "../entities/project-creation-request";
+import type {
+  ProjectCreationRequest,
+  ProjectCreationStalledReason,
+} from "../entities/project-creation-request";
 import type { Project } from "../entities/project";
 
 export const PROJECT_CREATION_REQUEST_REPOSITORY_ERROR =
@@ -14,6 +17,16 @@ export type OpenProjectCreationRequestInput = {
   purchaserUserId: string;
   name: string;
   idempotencyKey: string;
+};
+
+export type RecordCreationAttemptInput = {
+  projectId: string;
+  attemptCount: number;
+  materializeFailureCount: number;
+  paymentEvidence: boolean;
+  nextAttemptAt: string | null;
+  lastError: string | null;
+  stalledReason: ProjectCreationStalledReason | null;
 };
 
 export interface ProjectCreationRequestRepository {
@@ -32,4 +45,15 @@ export interface ProjectCreationRequestRepository {
   materialize(
     request: ProjectCreationRequest,
   ): Promise<Result<Project, ProjectCreationRequestRepositoryError>>;
+  // 自動復旧の対象(未完了・停止していない・次回試行時刻に達した)を古い順に limit 件返す。
+  listRecoverable(
+    now: string,
+    limit: number,
+  ): Promise<
+    Result<ProjectCreationRequest[], ProjectCreationRequestRepositoryError>
+  >;
+  // 作成済みの要求は更新しない。
+  recordAttempt(
+    input: RecordCreationAttemptInput,
+  ): Promise<Result<void, ProjectCreationRequestRepositoryError>>;
 }

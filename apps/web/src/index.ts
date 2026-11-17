@@ -6,6 +6,7 @@ import {
 import { Hono, type Context } from "hono";
 import { recordBurndownSnapshotsAllActiveIterations } from "./application/usecases/burndown-chart";
 import { cleanupArtifactsScheduled } from "./presentation/scheduled/cleanup-artifacts";
+import { recoverProjectCreationsScheduled } from "./presentation/scheduled/recover-project-creations";
 import { ensureIterationsForAllProjects } from "./presentation/scheduled/ensure-iterations";
 import { healthRoute } from "./presentation/routes/health";
 import { projectsRoute } from "./presentation/routes/projects";
@@ -347,6 +348,7 @@ export default {
     );
     // Independent of the iteration work above: neither can fail the other.
     ctx.waitUntil(cleanupArtifactsScheduled(env));
+    ctx.waitUntil(recoverProjectCreationsScheduled(env));
   },
 };
 
