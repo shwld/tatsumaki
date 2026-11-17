@@ -155,6 +155,8 @@ export type StoryMapCommandRejection =
   | "target_gone"
   | "story_unavailable"
   | "limit"
+  | "suspended"
+  | "entitlement_unavailable"
   | "internal";
 
 export function parseStoryMapCommand(

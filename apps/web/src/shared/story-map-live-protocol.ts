@@ -17,6 +17,8 @@ export type StoryMapRejectionCode =
   | "story_unavailable"
   | "limit"
   | "rate_limited"
+  | "suspended"
+  | "entitlement_unavailable"
   | "internal";
 
 /** `command` is validated by the Durable Object, not trusted here. */

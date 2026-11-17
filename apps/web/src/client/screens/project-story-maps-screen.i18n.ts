@@ -139,6 +139,9 @@ export const projectStoryMapsScreenJa = {
       story_unavailable: "story を利用できません。",
       limit: "上限に達しているため操作できません。",
       rate_limited: "操作が多すぎます。少し待ってください。",
+      suspended: "このプロジェクトは停止中のため編集できません。",
+      entitlement_unavailable:
+        "課金状態を確認できないため、いまは編集できません。しばらくしてからやり直してください。",
       internal: "サーバーで問題が起きました。",
     },
   },
@@ -285,6 +288,9 @@ export const projectStoryMapsScreenEn = {
       story_unavailable: "The story is not available.",
       limit: "A limit was reached, so the change was not applied.",
       rate_limited: "Too many changes. Wait a moment.",
+      suspended: "This project is suspended and cannot be edited.",
+      entitlement_unavailable:
+        "The billing state could not be checked, so editing is unavailable. Try again later.",
       internal: "Something went wrong on the server.",
     },
   },

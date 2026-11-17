@@ -23,6 +23,7 @@
 - `docs/local-cloudflare-access-setup.md` | [link](local-cloudflare-access-setup.md) | 責務: ローカル Cloudflare Access 設定 | Load when: Access 連携や tunnel を扱うとき | 更新責任: Web 運用担当
 - `docs/hosted-access-rollout.md` | [link](hosted-access-rollout.md) | 責務: 公式ホスト版の Access 自由登録構成・バイパス確認・ロールバック | Load when: 本番の Access ポリシーや Turnstile 設定を変更するとき | 更新責任: Web 運用担当
 - `docs/billing-creation-recovery-runbook.md` | [link](billing-creation-recovery-runbook.md) | 責務: 決済後のプロジェクト作成の自動復旧と要調査の手順 | Load when: 購読作成の復旧処理や要調査の要求を扱うとき | 更新責任: Web 運用担当
+- `docs/billing-write-gate.md` | [link](billing-write-gate.md) | 責務: suspended の書き込み拒否の有効化手順と適用経路の一覧 | Load when: 書き込み経路を追加する、または課金停止の強制を調べるとき | 更新責任: Web 運用担当
 - `docs/pivotal-tracker-ui-specification.ja.md` | [link](pivotal-tracker-ui-specification.ja.md) | 責務: PivotalTracker 準拠 UI 仕様 | Load when: story UI/UX を変更するとき | 更新責任: Product/UI オーナー
 - `docs/story-delete-and-timeline-entries.md` | [link](story-delete-and-timeline-entries.md) | 責務: story 削除時の timeline 挙動 | Load when: story 削除や timeline を変更するとき | 更新責任: Web ドメイン実装者
 - `docs/epic-label-connection-preview.md` | [link](epic-label-connection-preview.md) | 責務: 既存 Epic を同名 Label に接続する migration の適用前 preview と合意手順 | Load when: migration 0061 をデプロイ済み DB に適用するとき | 更新責任: Web 運用担当 | 最終更新日: 2026-11-08

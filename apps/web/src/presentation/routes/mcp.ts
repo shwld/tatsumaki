@@ -37,6 +37,7 @@ import { requireProjectAccess } from "./mcp/project-access";
 
 type McpRequestContext = {
   db: D1Database;
+  env: Env["Bindings"];
   currentUser: CurrentUser;
 };
 
@@ -132,7 +133,11 @@ async function resolveMcpStoryId(
   return { ok: true, storyId: found.value.id };
 }
 
-function createMcpServer({ db, currentUser }: McpRequestContext): McpServer {
+function createMcpServer({
+  db,
+  env,
+  currentUser,
+}: McpRequestContext): McpServer {
   const server = new McpServer({
     name: "tatsumaki",
     version: "0.0.1",
@@ -158,6 +163,7 @@ function createMcpServer({ db, currentUser }: McpRequestContext): McpServer {
           new D1ProjectRepository(db),
           projectId,
           currentUser.id,
+          env,
         );
         if (!access.ok) return access.response;
         if (access.member.role === "viewer")
@@ -531,6 +537,7 @@ function createMcpServer({ db, currentUser }: McpRequestContext): McpServer {
         projectRepository,
         projectId,
         currentUser.id,
+        env,
       );
 
       if (!access.ok) {
@@ -609,6 +616,7 @@ function createMcpServer({ db, currentUser }: McpRequestContext): McpServer {
         projectRepository,
         projectId,
         currentUser.id,
+        env,
       );
 
       if (!access.ok) {
@@ -744,6 +752,7 @@ function createMcpServer({ db, currentUser }: McpRequestContext): McpServer {
         projectRepository,
         projectId,
         currentUser.id,
+        env,
       );
 
       if (!access.ok) {
@@ -861,6 +870,7 @@ function createMcpServer({ db, currentUser }: McpRequestContext): McpServer {
         projectRepository,
         projectId,
         currentUser.id,
+        env,
       );
 
       if (!access.ok) {
@@ -952,6 +962,7 @@ function createMcpServer({ db, currentUser }: McpRequestContext): McpServer {
         projectRepository,
         projectId,
         currentUser.id,
+        env,
       );
 
       if (!access.ok) {
@@ -1028,7 +1039,7 @@ function createMcpServer({ db, currentUser }: McpRequestContext): McpServer {
     },
   );
 
-  registerEpicTools(server, { db, currentUser });
+  registerEpicTools(server, { db, env, currentUser });
 
   return server;
 }
@@ -1038,7 +1049,7 @@ export async function handleMcpRequest(
   env: Env["Bindings"],
   currentUser: CurrentUser,
 ): Promise<Response> {
-  const server = createMcpServer({ db: env.DB, currentUser });
+  const server = createMcpServer({ db: env.DB, env, currentUser });
   const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
   });

@@ -53,6 +53,7 @@ import {
   rejectBlockedUser,
   requireAppEntitlement,
 } from "./presentation/middleware/app-entitlement";
+import { requireProjectWritable } from "./presentation/middleware/project-write-gate";
 import { devAuth } from "./presentation/middleware/dev-auth";
 import {
   handleConsentDecision,
@@ -85,6 +86,7 @@ export type Bindings = {
   STORY_MAP_DO: DurableObjectNamespace;
   CONTROL_PLANE?: ControlPlaneRpc;
   ENTITLEMENT_MODE?: string;
+  PROJECT_WRITE_ENFORCEMENT?: string;
   CHECKOUT_ENABLED?: string;
   TERMS_URL?: string;
   PRIVACY_URL?: string;
@@ -126,6 +128,7 @@ protectedApi.use("*", requireAccessAuth());
 protectedApi.use("/onboarding", rejectBlockedUser());
 protectedApi.route("/", onboardingRoute);
 protectedApi.use("*", requireAppEntitlement());
+protectedApi.use("*", requireProjectWritable());
 protectedApi.route("/", invitationLinksRoute);
 protectedApi.route("/", authRoute);
 protectedApi.route("/", projectsRoute);
@@ -166,6 +169,7 @@ const programmaticApi = new Hono<Env>();
 programmaticApi.use("*", devAuth());
 programmaticApi.use("*", requireAccessAuth());
 programmaticApi.use("*", requireAppEntitlement());
+programmaticApi.use("*", requireProjectWritable());
 programmaticApi.route("/", mcpRoute);
 programmaticApi.route("/", cliRoute);
 
@@ -227,6 +231,7 @@ class McpOAuthApiHandler extends WorkerEntrypoint<OAuthBindings> {
         c.set("currentUser", currentUser);
         await next();
       });
+      cliApp.use("*", requireProjectWritable());
       cliApp.route("/", cliRoute);
       const routedUrl = new URL(request.url);
       routedUrl.pathname = routedUrl.pathname.replace(

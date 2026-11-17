@@ -9,12 +9,16 @@ import type { StoryMapStructure } from "../domain/entities/story-map";
 import { D1ProjectRepository } from "../infrastructure/db/repositories/d1-project-repository";
 import { D1StoryMapRepository } from "../infrastructure/db/repositories/d1-story-map-repository";
 import {
+  decideProjectWrite,
+  type ProjectWriteGuardBindings,
+} from "../infrastructure/entitlements/project-write-guard";
+import {
   STORY_MAP_LIVE_LIMITS,
   type StoryMapClientMessage,
   type StoryMapServerMessage,
 } from "../shared/story-map-live-protocol";
 
-type Bindings = { DB: D1Database };
+type Bindings = { DB: D1Database } & ProjectWriteGuardBindings;
 
 type Attachment = {
   userId: string;
@@ -35,7 +39,7 @@ type CommandOutcome =
 
 const REJECTION_STATUS: Record<
   StoryMapCommandRejection,
-  400 | 403 | 404 | 409 | 500
+  400 | 403 | 404 | 409 | 500 | 503
 > = {
   invalid: 400,
   forbidden: 403,
@@ -44,6 +48,8 @@ const REJECTION_STATUS: Record<
   archived: 409,
   story_unavailable: 409,
   limit: 409,
+  suspended: 403,
+  entitlement_unavailable: 503,
   internal: 500,
 };
 
@@ -341,6 +347,11 @@ export class StoryMapDO {
         duplicate: true,
       };
     }
+
+    const writable = await decideProjectWrite(this.env, attachment.projectId);
+    if (writable.kind === "suspended") return reject("suspended");
+    if (writable.kind === "unavailable")
+      return reject("entitlement_unavailable");
 
     // Every write of the command carries its seq and op record in its own
     // batch, so a crash can never leave the effect without the op.
