@@ -754,7 +754,7 @@ function StoryAccordionDetailComponent({
         </p>
         <p className="text-sm">
           {t("storyAccordion.detail.labels")}:{" "}
-          {resolvedStory.labels.join(", ") || "—"}
+          {resolvedStory.labels.map((label) => label.name).join(", ") || "—"}
         </p>
         <p className="text-sm">
           {t("storyAccordion.subHeader.owners")}:{" "}
