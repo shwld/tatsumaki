@@ -332,6 +332,42 @@ describe("groupStoriesByIteration", () => {
     expect(result.map((group) => group.totalPoints)).toEqual([5, 5]);
   });
 
+  it("keeps auto-filled Current stories out of the future capacity allocation", () => {
+    const current = makeIteration("iter-cur", "2026-01-14", "2026-01-21");
+    const result = groupStoriesByIteration(
+      [
+        makeStory({
+          id: "auto",
+          iterationId: null,
+          storyPoint: 5,
+          position: 1,
+        }),
+        makeStory({ id: "b-3", iterationId: null, storyPoint: 3, position: 2 }),
+      ],
+      [current],
+      {
+        panelType: "Backlog",
+        velocity: 5,
+        currentTotalPoints: 5,
+        currentIterationId: "iter-cur",
+        currentStoryIds: new Set(["auto"]),
+        sprintDurationDays: 7,
+        currentIterationEndDate: "2026-01-21",
+      },
+    );
+
+    const currentGroup = result.find(
+      (group) => group.iterationId === "iter-cur",
+    );
+    expect(currentGroup?.stories.map((story) => story.id)).toEqual(["auto"]);
+    const future = result.filter(
+      (group) => group.groupType === "future-iteration",
+    );
+    expect(
+      future.flatMap((group) => group.stories.map((story) => story.id)),
+    ).toEqual(["b-3"]);
+  });
+
   it("merges the remaining current capacity of Backlog into the current iteration", () => {
     const current = makeIteration("iter-cur", "2026-01-14", "2026-01-21");
     const result = groupStoriesByIteration(
