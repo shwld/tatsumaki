@@ -15,6 +15,9 @@ import { createDb, type DbClient } from "../client";
 import { projectCreationRequestsTable } from "../schema";
 import { D1ProjectRepository } from "./d1-project-repository";
 
+// 完了済みの要求で再作成しない(作成後に削除されたプロジェクトを古い呼び出しが復活させないため)。
+const PENDING_REQUEST = `SELECT 1 FROM project_creation_requests WHERE project_id = ? AND status = 'pending'`;
+
 type Row = typeof projectCreationRequestsTable.$inferSelect;
 
 const toRequest = (row: Row): ProjectCreationRequest => ({
@@ -94,15 +97,19 @@ export class D1ProjectCreationRequestRepository
         this.d1
           .prepare(
             `INSERT INTO projects (id, name, sprint_duration_days)
-             VALUES (?, ?, 14) ON CONFLICT(id) DO NOTHING`,
+             SELECT ?, ?, 14
+             WHERE EXISTS (${PENDING_REQUEST})
+             ON CONFLICT(id) DO NOTHING`,
           )
-          .bind(request.projectId, request.name),
+          .bind(request.projectId, request.name, request.projectId),
         this.d1
           .prepare(
             `INSERT INTO project_members (project_id, user_id, role)
-             VALUES (?, ?, 'owner') ON CONFLICT(project_id, user_id) DO NOTHING`,
+             SELECT ?, ?, 'owner'
+             WHERE EXISTS (${PENDING_REQUEST})
+             ON CONFLICT(project_id, user_id) DO NOTHING`,
           )
-          .bind(request.projectId, request.purchaserUserId),
+          .bind(request.projectId, request.purchaserUserId, request.projectId),
         this.d1
           .prepare(
             `UPDATE project_creation_requests

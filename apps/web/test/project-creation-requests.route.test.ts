@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Bindings, Env } from "../src/index";
 import type { CurrentUser } from "../src/presentation/middleware/access-auth";
+import { D1ProjectCreationRequestRepository } from "../src/infrastructure/db/repositories/d1-project-creation-request-repository";
 import { projectCreationRequestsRoute } from "../src/presentation/routes/project-creation-requests";
 import { projectsRoute } from "../src/presentation/routes/projects";
 import { resetDatabase } from "./helpers/db";
@@ -299,6 +300,27 @@ describe("project creation requests", () => {
         {},
       );
       expect(response.status).toBe(404);
+      expect(await countProjects()).toBe(0);
+    });
+
+    it("does not let a stale completion resurrect a deleted project", async () => {
+      const ctx = setup();
+      const projectId = await open(ctx);
+      ctx.fake.state = "active";
+      const repository = new D1ProjectCreationRequestRepository(env.DB);
+      const stale = (await repository.findById(projectId))._unsafeUnwrap()!;
+      await ctx.post(
+        "user-1",
+        `/project-creation-requests/${projectId}/complete`,
+        {},
+      );
+      await env.DB.prepare("DELETE FROM projects WHERE id = ?")
+        .bind(projectId)
+        .run();
+
+      const result = await repository.materialize(stale);
+
+      expect(result.isErr()).toBe(true);
       expect(await countProjects()).toBe(0);
     });
 
