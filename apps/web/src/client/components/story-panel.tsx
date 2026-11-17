@@ -1159,6 +1159,7 @@ export type StoryPanelProps = {
   ) => void;
   currentIterationNumber?: number | null;
   currentIterationId?: string | null;
+  currentStoryIds?: ReadonlySet<string> | null;
   utilizationOverrideByIterationNumber?: Record<number, number>;
   /** When set, non-release story cards show title/type/point inline Popovers (single useStoryPatch). */
   storyInlineEdit?: StoryInlineEditContext | null;
@@ -1213,6 +1214,7 @@ function StoryPanelComponent({
   onIterationUtilizationChange,
   currentIterationNumber = null,
   currentIterationId = null,
+  currentStoryIds = null,
   utilizationOverrideByIterationNumber = {},
   storyInlineEdit = null,
   projectLabels,
@@ -1257,6 +1259,7 @@ function StoryPanelComponent({
       currentIterationEndDate,
       currentIterationNumber,
       currentIterationId,
+      currentStoryIds,
       utilizationOverrideByIterationNumber,
       formatStartLabel: (date) =>
         t("storyMultiPanelScreen.iteration.start", { date }),
@@ -1265,6 +1268,7 @@ function StoryPanelComponent({
   }, [
     currentIterationNumber,
     currentIterationId,
+    currentStoryIds,
     currentTotalPoints,
     currentIterationEndDate,
     iterationStartDay,

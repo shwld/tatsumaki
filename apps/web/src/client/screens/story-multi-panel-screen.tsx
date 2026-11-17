@@ -757,6 +757,7 @@ export function StoryMultiPanelScreen() {
       currentIterationEndDate: currentIteration?.endDate ?? null,
       currentIterationNumber: currentIteration?.iterationNumber ?? null,
       currentIterationId: currentIteration?.id ?? null,
+      currentStoryIds: currentStoryIdSet,
       utilizationOverrideByIterationNumber,
       formatStartLabel: (date) =>
         t("storyMultiPanelScreen.iteration.start", { date }),
@@ -774,6 +775,7 @@ export function StoryMultiPanelScreen() {
     currentIteration?.endDate,
     currentIteration?.iterationNumber,
     currentIteration?.id,
+    currentStoryIdSet,
     utilizationOverrideByIterationNumber,
     useLocalFilteredPoints,
     t,
@@ -1966,6 +1968,7 @@ export function StoryMultiPanelScreen() {
       currentIterationEndDate={currentIteration?.endDate ?? null}
       currentIterationNumber={currentIteration?.iterationNumber ?? null}
       currentIterationId={currentIteration?.id ?? null}
+      currentStoryIds={currentStoryIdSet}
       utilizationOverrideByIterationNumber={
         utilizationOverrideByIterationNumber
       }

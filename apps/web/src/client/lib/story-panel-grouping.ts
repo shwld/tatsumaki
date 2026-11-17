@@ -109,6 +109,7 @@ type GroupStoriesByIterationOptions = {
   currentIterationEndDate?: string | null;
   currentIterationNumber?: number | null;
   currentIterationId?: string | null;
+  currentStoryIds?: ReadonlySet<string> | null;
   utilizationOverrideByIterationNumber?: Record<number, number>;
   todayIso?: string;
   formatStartLabel?: (date: string) => string;
@@ -191,6 +192,7 @@ export function groupStoriesByIteration(
   );
   const groups = new Map<string, IterationGroup>();
   const unassignedStories: Story[] = [];
+  const currentOwnedStories: Story[] = [];
   const sprintDurationDays =
     typeof opts.sprintDurationDays === "number" && opts.sprintDurationDays > 0
       ? opts.sprintDurationDays
@@ -201,6 +203,10 @@ export function groupStoriesByIteration(
       isFutureIterationGroupingEnabled(opts.panelType) &&
       story.iterationId === null;
     if (useFutureIteration) {
+      if (opts.panelType === "Backlog" && opts.currentStoryIds?.has(story.id)) {
+        currentOwnedStories.push(story);
+        continue;
+      }
       unassignedStories.push(story);
       continue;
     }
@@ -234,7 +240,7 @@ export function groupStoriesByIteration(
     });
   }
 
-  if (unassignedStories.length > 0) {
+  if (unassignedStories.length > 0 || currentOwnedStories.length > 0) {
     const sortedUnassigned = [...unassignedStories].sort(
       (a, b) => a.position - b.position,
     );
@@ -294,7 +300,9 @@ export function groupStoriesByIteration(
     const capacities: number[] =
       velocity > 0 ? [firstBucketCapacity] : [Number.POSITIVE_INFINITY];
     const consumed: number[] = [0];
-    const groupedStories: Story[][] = [[]];
+    const groupedStories: Story[][] = [
+      [...currentOwnedStories].sort((a, b) => a.position - b.position),
+    ];
 
     for (const story of sortedUnassigned) {
       const points = story.storyPoint ?? 0;
