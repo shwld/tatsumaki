@@ -14,7 +14,7 @@ export function ProjectBillingBanner({ billing }: { billing: ProjectBilling }) {
   const [error, setError] = useState(false);
   const isOwner = billing.role === "owner";
 
-  if (billing.state === "active") return null;
+  if (billing.state === "active" || billing.state === "loading") return null;
   if (billing.state === "grace" && !isOwner) return null;
 
   const openPortal = async () => {

@@ -170,7 +170,8 @@ function StoryAccordionDetailComponent({
     null,
   );
   const readOnly = useProjectReadOnly();
-  const isSaving = isPatchSaving || readOnly;
+  const isSaving = isPatchSaving;
+  const locked = isPatchSaving || readOnly;
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
   const [titleDraft, setTitleDraft] = useState(story.title);
 
@@ -735,7 +736,8 @@ function StoryAccordionDetailComponent({
           <span>{t("storyAccordion.detail.archived")}</span>
           <button
             type="button"
-            className="underline"
+            className="underline disabled:opacity-50"
+            disabled={readOnly}
             onClick={() => {
               void restoreStory(false).catch(() =>
                 showToast("error", t("storyAccordion.detail.restoreFailed")),
@@ -864,14 +866,14 @@ function StoryAccordionDetailComponent({
           <input
             id={`story-title-${story.id}`}
             value={titleDraft}
-            disabled={isSaving}
+            disabled={locked}
             onChange={(event) => setTitleDraft(event.target.value)}
             className="min-w-0 flex-1 rounded border border-gray-200 bg-white px-2 py-1 text-sm text-gray-800 focus:border-blue-300 focus:outline-none focus:ring-1 focus:ring-blue-400 disabled:opacity-70 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-blue-400"
           />
           <button
             type="submit"
             disabled={
-              isSaving ||
+              locked ||
               titleDraft.trim().length === 0 ||
               titleDraft.trim() === resolvedStory.title
             }
@@ -898,7 +900,7 @@ function StoryAccordionDetailComponent({
           id={`story-status-${story.id}`}
           className="min-w-0 flex-1 rounded border border-gray-200 bg-white px-2 py-0.5 text-xs text-gray-700 focus:border-blue-300 focus:outline-none focus:ring-1 focus:ring-blue-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-blue-400"
           value={resolvedStory.status}
-          disabled={isSaving}
+          disabled={locked}
           onChange={(event) => {
             void patchStory({
               status: event.target.value as StoryStatus,
@@ -921,7 +923,7 @@ function StoryAccordionDetailComponent({
           projectId={story.projectId}
           selectedLabelIds={selectedLabelIds}
           projectLabels={projectLabels}
-          disabled={isSaving}
+          disabled={locked}
           onSelectedLabelIdsChange={handleLabelsChange}
         />
       </div>
@@ -946,7 +948,7 @@ function StoryAccordionDetailComponent({
             value={
               resolvedStory.storyPoint == null ? "" : resolvedStory.storyPoint
             }
-            disabled={isSaving}
+            disabled={locked}
             onChange={(event) => {
               const next =
                 event.target.value === "" ? null : Number(event.target.value);
@@ -980,6 +982,7 @@ function StoryAccordionDetailComponent({
           mentionCandidates={memberOptionsResolved}
           placeholder={t("storyAccordion.detail.descriptionPlaceholder")}
           uploadPastedImage={uploadPastedImageToStory}
+          disabled={readOnly}
         />
         {isStoryDetailLoading ? (
           <p className="mt-1 text-xs text-gray-400 dark:text-slate-400">
@@ -997,6 +1000,7 @@ function StoryAccordionDetailComponent({
         selectedAttachmentFile={selectedAttachmentFile}
         onAttachmentFileChange={setSelectedAttachmentFile}
         isUploadingAttachment={isUploadingAttachment}
+        readOnly={readOnly}
         onUploadSubmit={handleUploadAttachment}
         deletingAttachmentId={deletingAttachmentId}
         onDeleteAttachment={handleDeleteAttachment}
@@ -1007,7 +1011,7 @@ function StoryAccordionDetailComponent({
         resolvedStory={resolvedStory}
         blockerStorySearch={blockerStorySearch}
         onBlockerStorySearchChange={setBlockerStorySearch}
-        isUpdatingBlockers={isUpdatingBlockers}
+        isUpdatingBlockers={isUpdatingBlockers || readOnly}
         selectedBlockingStoryId={selectedBlockingStoryId}
         onSelectedBlockingStoryIdChange={setSelectedBlockingStoryId}
         selectedBlockedStoryId={selectedBlockedStoryId}
@@ -1101,10 +1105,10 @@ function StoryAccordionDetailComponent({
                           viewerUserId={viewer?.id ?? null}
                           viewerEmail={viewer?.email ?? null}
                           viewerDisplayName={viewer?.displayName ?? null}
-                          canMutateComment={userIdsEqual(
-                            viewer?.id,
-                            entry.actorUserId,
-                          )}
+                          canMutateComment={
+                            !readOnly &&
+                            userIdsEqual(viewer?.id, entry.actorUserId)
+                          }
                           onSave={(body) => {
                             void handleUpdateComment(entry.id, body);
                           }}
@@ -1133,6 +1137,7 @@ function StoryAccordionDetailComponent({
             mentionCandidates={memberOptionsResolved}
             placeholder={t("storyAccordion.timeline.commentPlaceholder")}
             minHeightClassName="min-h-20"
+            disabled={readOnly}
             onChange={setCommentBody}
             uploadPastedImage={uploadPastedImageToStory}
           />
@@ -1140,7 +1145,7 @@ function StoryAccordionDetailComponent({
             <button
               type="submit"
               className="rounded bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-700 dark:bg-blue-500 dark:hover:bg-blue-400 dark:disabled:bg-slate-600 dark:disabled:text-slate-200"
-              disabled={!commentBody.trim() || isSubmittingComment}
+              disabled={!commentBody.trim() || isSubmittingComment || readOnly}
             >
               {isSubmittingComment
                 ? t("storyAccordion.timeline.posting")

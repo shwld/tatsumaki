@@ -1459,10 +1459,14 @@ export function StoryMultiPanelScreen() {
     setActiveStoryId(orderedVisibleStories[0]?.id ?? null);
   }, [activeStoryId, orderedVisibleStories]);
 
-  const openCreateForm = useCallback((panel: CreateTargetPanel) => {
-    setCreateTargetPanel((current) => (current === panel ? current : panel));
-    setCreateError(null);
-  }, []);
+  const openCreateForm = useCallback(
+    (panel: CreateTargetPanel) => {
+      if (readOnly) return;
+      setCreateTargetPanel((current) => (current === panel ? current : panel));
+      setCreateError(null);
+    },
+    [readOnly],
+  );
 
   const closeCreateForm = useCallback(() => {
     setCreateTargetPanel(null);
@@ -1472,8 +1476,12 @@ export function StoryMultiPanelScreen() {
     setCreateSubmitting(false);
   }, []);
 
+  useEffect(() => {
+    if (readOnly) closeCreateForm();
+  }, [readOnly, closeCreateForm]);
+
   const submitInlineStory = useCallback(async () => {
-    if (!projectId || !createTargetPanel) return;
+    if (readOnly || !projectId || !createTargetPanel) return;
     const title = createTitle.trim();
     if (!title) {
       setCreateError({
@@ -1549,6 +1557,7 @@ export function StoryMultiPanelScreen() {
     notifySessionExpired,
     panelQueries,
     projectId,
+    readOnly,
     showToast,
     t,
   ]);

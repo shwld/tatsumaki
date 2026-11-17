@@ -10,7 +10,12 @@ import {
 import { useMatch } from "react-router";
 import { ProjectBillingBanner } from "../components/project-billing-banner";
 
-export type ProjectBillingState = "active" | "grace" | "suspended" | "unknown";
+export type ProjectBillingState =
+  | "loading"
+  | "active"
+  | "grace"
+  | "suspended"
+  | "unknown";
 
 export type ProjectBilling = {
   state: ProjectBillingState;
@@ -84,10 +89,15 @@ export function ProjectBillingScope({ children }: { children: ReactNode }) {
 
   const current =
     loaded && loaded.projectId === projectId ? loaded.value : null;
-  const value = useMemo<ProjectBilling | null>(
-    () => (current ? { ...current, refresh } : null),
-    [current, refresh],
-  );
+  const value = useMemo<ProjectBilling | null>(() => {
+    if (!projectId) return null;
+    const base: Loaded = current ?? {
+      state: "loading",
+      role: null,
+      validUntil: null,
+    };
+    return { ...base, refresh };
+  }, [projectId, current, refresh]);
 
   return (
     <ProjectBillingContext.Provider value={value}>
@@ -103,5 +113,9 @@ export function useProjectBilling(): ProjectBilling | null {
 
 export function useProjectReadOnly(): boolean {
   const billing = useProjectBilling();
-  return billing?.state === "suspended" || billing?.state === "unknown";
+  return (
+    billing?.state === "loading" ||
+    billing?.state === "suspended" ||
+    billing?.state === "unknown"
+  );
 }

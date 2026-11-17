@@ -122,6 +122,19 @@ describe("ProjectBillingScope", () => {
     await waitFor(() => expect(screen.getByText("read-only")).toBeTruthy());
   });
 
+  it("is read-only until the first answer arrives", async () => {
+    let release: (r: Response) => void = () => {};
+    vi.mocked(fetch).mockReturnValue(
+      new Promise<Response>((resolve) => {
+        release = resolve;
+      }),
+    );
+    renderScope();
+    expect(screen.getByText("read-only")).toBeTruthy();
+    release(json({ state: "active", role: "member", validUntil: null }));
+    expect(await screen.findByText("editable")).toBeTruthy();
+  });
+
   it("does not fetch outside a project", () => {
     render(
       <MemoryRouter initialEntries={["/projects/new"]}>
