@@ -177,11 +177,13 @@ describe("project labels routes", () => {
     storyNumber: number,
   ): Promise<{ labels: string[]; labelIds: string[] }> {
     const response = await fetchWithAuth(storyApiPath(projectId, storyNumber));
-    return (
-      (await response.json()) as {
-        story: { labels: string[]; labelIds: string[] };
-      }
-    ).story;
+    const { story } = (await response.json()) as {
+      story: { labels: Array<{ id: string; name: string }> };
+    };
+    return {
+      labels: story.labels.map((label) => label.name),
+      labelIds: story.labels.map((label) => label.id),
+    };
   }
 
   it("keeps story membership when a label is renamed", async () => {
@@ -282,10 +284,13 @@ describe("project labels routes", () => {
     expect(response.status).toBe(200);
 
     const payload = (await response.json()) as {
-      story: { title: string; labels: string[] };
+      story: { title: string; labels: Array<{ name: string }> };
     };
     expect(payload.story.title).toBe("Updated title");
-    expect(payload.story.labels.sort()).toEqual(["frontend", "priority:high"]);
+    expect(payload.story.labels.map((label) => label.name).sort()).toEqual([
+      "frontend",
+      "priority:high",
+    ]);
   });
 
   it("rejects invalid color format", async () => {

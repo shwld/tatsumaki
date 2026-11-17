@@ -197,10 +197,16 @@ function StoryAccordionDetailComponent({
   const handleLabelsChange = useCallback(
     (labelIds: string[]) => {
       setSelectedLabelIds(labelIds);
-      if (sameStringArray(labelIds, resolvedStory.labelIds)) return;
+      if (
+        sameStringArray(
+          labelIds,
+          resolvedStory.labels.map((label) => label.id),
+        )
+      )
+        return;
       void patchStory({ labelIds });
     },
-    [patchStory, resolvedStory.labelIds],
+    [patchStory, resolvedStory.labels],
   );
 
   const timelineGroups = useMemo(
@@ -211,19 +217,21 @@ function StoryAccordionDetailComponent({
   const appliedDetailLabelIdsKey = useRef<string | undefined>(undefined);
   useEffect(() => {
     appliedDetailLabelIdsKey.current = undefined;
-    setSelectedLabelIds(resolvedStory.labelIds);
+    setSelectedLabelIds(resolvedStory.labels.map((label) => label.id));
     setTitleDraft(resolvedStory.title);
     setMetadataFieldErrors({});
   }, [resolvedStory.id]);
 
   // 一覧の summary は labelIds を持たないため、詳細取得後に届いた値を選択状態へ反映する。
   // 保存中に届いた値は、保存の完了後に反映する。
-  const detailedLabelIdsKey = detailedStory?.labelIds.join(",");
+  const detailedLabelIdsKey = detailedStory?.labels
+    .map((label) => label.id)
+    .join(",");
   useEffect(() => {
     if (!detailedStory || isSaving) return;
     if (appliedDetailLabelIdsKey.current === detailedLabelIdsKey) return;
     appliedDetailLabelIdsKey.current = detailedLabelIdsKey;
-    setSelectedLabelIds(detailedStory.labelIds);
+    setSelectedLabelIds(detailedStory.labels.map((label) => label.id));
   }, [detailedLabelIdsKey, isSaving]);
 
   const attachmentsQuery = useQuery({
@@ -746,7 +754,7 @@ function StoryAccordionDetailComponent({
         </p>
         <p className="text-sm">
           {t("storyAccordion.detail.labels")}:{" "}
-          {resolvedStory.labels.join(", ") || "—"}
+          {resolvedStory.labels.map((label) => label.name).join(", ") || "—"}
         </p>
         <p className="text-sm">
           {t("storyAccordion.subHeader.owners")}:{" "}

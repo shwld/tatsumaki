@@ -16,6 +16,7 @@ import { err, ok, type Result } from "neverthrow";
 import { ulid } from "ulid";
 import type {
   Story,
+  StoryLabel,
   StoryPoint,
   StoryRelation,
   StoryPriorityHistory,
@@ -69,10 +70,7 @@ type StoryRow = typeof storiesTable.$inferSelect;
 type StoryPriorityHistoryRow = typeof storyPriorityHistoryTable.$inferSelect;
 type StoryBlockerRow = typeof storyBlockersTable.$inferSelect;
 
-type StoryLabelsByStoryId = ReadonlyMap<
-  string,
-  { ids: string[]; names: string[] }
->;
+type StoryLabelsByStoryId = ReadonlyMap<string, StoryLabel[]>;
 
 function toStoryRelation(row: {
   id: string;
@@ -118,8 +116,7 @@ function toStory(
     completedAt: row.completedAt ?? null,
     archivedAt: row.archivedAt,
     storyPoint,
-    labels: labelsByStoryId.get(row.id)?.names ?? [],
-    labelIds: labelsByStoryId.get(row.id)?.ids ?? [],
+    labels: labelsByStoryId.get(row.id) ?? [],
     iterationId: row.iterationId ?? null,
     isIcebox: row.isIcebox === 1,
     ownerIds: ownerIdsByStoryId.get(row.id) ?? [],
@@ -138,7 +135,7 @@ function toStory(
 function toStorySummary(
   row: StoryRow,
   ownerIdsByStoryId: ReadonlyMap<string, string[]>,
-  labelsByStoryId: ReadonlyMap<string, { ids: string[]; names: string[] }>,
+  labelsByStoryId: StoryLabelsByStoryId,
 ): Story {
   const rawStoryPoint = row.storyPoint;
   const storyPoint =
@@ -163,8 +160,7 @@ function toStorySummary(
     completedAt: row.completedAt ?? null,
     archivedAt: row.archivedAt,
     storyPoint,
-    labels: labelsByStoryId.get(row.id)?.names ?? [],
-    labelIds: labelsByStoryId.get(row.id)?.ids ?? [],
+    labels: labelsByStoryId.get(row.id) ?? [],
     iterationId: row.iterationId ?? null,
     isIcebox: row.isIcebox === 1,
     ownerIds: ownerIdsByStoryId.get(row.id) ?? [],
@@ -567,11 +563,8 @@ export class D1StoryRepository implements StoryRepository {
 
   private async listLabelsByStoryIds(
     storyIds: string[],
-  ): Promise<Map<string, { ids: string[]; names: string[] }>> {
-    const labelsByStoryId = new Map<
-      string,
-      { ids: string[]; names: string[] }
-    >();
+  ): Promise<Map<string, StoryLabel[]>> {
+    const labelsByStoryId = new Map<string, StoryLabel[]>();
     for (const chunk of chunkArray(storyIds, D1_MAX_BIND_PARAMS)) {
       const rows = await this.db
         .select({
@@ -588,12 +581,8 @@ export class D1StoryRepository implements StoryRepository {
         .orderBy(asc(storyLabelsTable.storyId), asc(projectLabelsTable.name))
         .all();
       for (const row of rows) {
-        const current = labelsByStoryId.get(row.storyId) ?? {
-          ids: [],
-          names: [],
-        };
-        current.ids.push(row.labelId);
-        current.names.push(row.name);
+        const current = labelsByStoryId.get(row.storyId) ?? [];
+        current.push({ id: row.labelId, name: row.name });
         labelsByStoryId.set(row.storyId, current);
       }
     }

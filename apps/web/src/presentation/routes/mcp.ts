@@ -404,7 +404,6 @@ function createMcpServer({ db, currentUser }: McpRequestContext): McpServer {
         storyPoint: story.storyPoint,
         type: story.type,
         labels: story.labels,
-        labelIds: story.labelIds,
         iterationId: story.iterationId,
       }));
 
@@ -502,7 +501,6 @@ function createMcpServer({ db, currentUser }: McpRequestContext): McpServer {
                 storyPoint: result.value.storyPoint,
                 type: result.value.type,
                 labels: result.value.labels,
-                labelIds: result.value.labelIds,
               },
             }),
           },
@@ -565,7 +563,6 @@ function createMcpServer({ db, currentUser }: McpRequestContext): McpServer {
         storyPoint: story.storyPoint,
         type: story.type,
         labels: story.labels,
-        labelIds: story.labelIds,
         iterationId: story.iterationId,
       }));
 
@@ -832,7 +829,6 @@ function createMcpServer({ db, currentUser }: McpRequestContext): McpServer {
                 storyPoint: result.value.storyPoint,
                 type: result.value.type,
                 labels: result.value.labels,
-                labelIds: result.value.labelIds,
               },
             }),
           },

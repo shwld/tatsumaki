@@ -20,7 +20,6 @@ function makeStory(overrides: Partial<Story> = {}): Story {
     statusChangedAt: "2026-01-01T00:00:00.000Z",
     storyPoint: null,
     labels: [],
-    labelIds: [],
     iterationId: null,
     isIcebox: false,
     ownerIds: [],

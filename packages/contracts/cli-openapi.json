@@ -88,13 +88,16 @@
               "labels": {
                 "type": "array",
                 "items": {
-                  "type": "string"
-                }
-              },
-              "labelIds": {
-                "type": "array",
-                "items": {
-                  "type": "string"
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["id", "name"]
                 }
               },
               "iterationId": {
@@ -150,7 +153,6 @@
               "completedAt",
               "storyPoint",
               "labels",
-              "labelIds",
               "iterationId",
               "ownerIds",
               "requesterId",

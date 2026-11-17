@@ -530,12 +530,9 @@ export function useStoryMutations({
       panelQueries.applyStoriesUpdate(
         stories.map((story) => ({
           ...story,
-          labels: story.labelIds.includes(labelId)
+          labels: story.labels.some((label) => label.id === labelId)
             ? story.labels
-            : [...story.labels, labelName],
-          labelIds: story.labelIds.includes(labelId)
-            ? story.labelIds
-            : [...story.labelIds, labelId],
+            : [...story.labels, { id: labelId, name: labelName }],
         })),
       );
       return { snapshot };

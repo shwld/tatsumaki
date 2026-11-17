@@ -123,9 +123,9 @@ function serializeStoryFieldValue(
     case "storyPoint":
       return story.storyPoint === null ? null : String(story.storyPoint);
     case "labels":
-      return JSON.stringify(story.labels);
+      return JSON.stringify(story.labels.map((label) => label.name));
     case "labelIds":
-      return JSON.stringify([...story.labelIds].sort());
+      return JSON.stringify(story.labels.map((label) => label.id).sort());
     case "story":
       return story.title;
   }

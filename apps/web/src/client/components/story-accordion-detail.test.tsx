@@ -170,7 +170,6 @@ function createStory(): Story {
     statusChangedAt: "2026-01-01T00:00:00.000Z",
     storyPoint: 3,
     labels: [],
-    labelIds: [],
     iterationId: null,
     isIcebox: false,
     ownerIds: [],
@@ -620,8 +619,7 @@ describe("StoryAccordionDetail", () => {
 
     mockStoryDetail.story = {
       ...createStory(),
-      labels: ["urgent"],
-      labelIds: ["label-1"],
+      labels: [{ id: "label-1", name: "urgent" }],
     };
     rerender();
 
@@ -669,8 +667,7 @@ describe("StoryAccordionDetail", () => {
 
     mockStoryDetail.story = {
       ...createStory(),
-      labels: ["urgent"],
-      labelIds: ["label-1"],
+      labels: [{ id: "label-1", name: "urgent" }],
     };
     rerender();
     expect(screen.getByText("ラベルを選択")).toBeTruthy();
@@ -681,8 +678,7 @@ describe("StoryAccordionDetail", () => {
           story: {
             ...createStory(),
             title: "Updated story title",
-            labels: ["urgent"],
-            labelIds: ["label-1"],
+            labels: [{ id: "label-1", name: "urgent" }],
           },
         }),
         { status: 200, headers: { "content-type": "application/json" } },

@@ -50,7 +50,6 @@ function buildStory(overrides: Partial<Story> = {}): Story {
     statusChangedAt: "2026-01-01T00:00:00.000Z",
     storyPoint: 3,
     labels: [],
-    labelIds: [],
     iterationId: null,
     isIcebox: false,
     ownerIds: [],
@@ -901,7 +900,9 @@ describe("useStoryMutations", () => {
   });
 
   it("applies optimistic bulk label immediately", async () => {
-    const story = buildStory({ labels: ["existing"] });
+    const story = buildStory({
+      labels: [{ id: "label-existing", name: "existing" }],
+    });
     const deferred = deferredResponse();
     const panelQueries = createPanelQueriesMock();
 
@@ -947,15 +948,25 @@ describe("useStoryMutations", () => {
     expect(panelQueries.applyStoriesUpdate).toHaveBeenCalledWith([
       expect.objectContaining({
         id: story.id,
-        labels: ["existing", "urgent"],
-        labelIds: ["label-urgent"],
+        labels: [
+          { id: "label-existing", name: "existing" },
+          { id: "label-urgent", name: "urgent" },
+        ],
       }),
     ]);
 
     deferred.resolve(
       new Response(
         JSON.stringify({
-          stories: [{ ...story, labels: ["existing", "urgent"] }],
+          stories: [
+            {
+              ...story,
+              labels: [
+                { id: "label-existing", name: "existing" },
+                { id: "label-urgent", name: "urgent" },
+              ],
+            },
+          ],
         }),
         {
           status: 200,
@@ -964,7 +975,12 @@ describe("useStoryMutations", () => {
       ),
     );
     await expect(mutationPromise).resolves.toEqual([
-      expect.objectContaining({ labels: ["existing", "urgent"] }),
+      expect.objectContaining({
+        labels: [
+          { id: "label-existing", name: "existing" },
+          { id: "label-urgent", name: "urgent" },
+        ],
+      }),
     ]);
   });
 });
