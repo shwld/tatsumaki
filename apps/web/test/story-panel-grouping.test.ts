@@ -333,6 +333,88 @@ describe("groupStoriesByIteration", () => {
     expect(result.map((group) => group.totalPoints)).toEqual([5, 5]);
   });
 
+  it("merges the remaining current capacity of Backlog into the current iteration", () => {
+    const current = makeIteration("iter-cur", "2026-01-14", "2026-01-21");
+    const result = groupStoriesByIteration(
+      [
+        makeStory({ id: "cur", iterationId: "iter-cur", storyPoint: 3 }),
+        makeStory({ id: "b-5", iterationId: null, storyPoint: 5, position: 1 }),
+        makeStory({
+          id: "b-5b",
+          iterationId: null,
+          storyPoint: 5,
+          position: 2,
+        }),
+        makeStory({ id: "b-3", iterationId: null, storyPoint: 3, position: 3 }),
+      ],
+      [current],
+      {
+        panelType: "Backlog",
+        velocity: 8,
+        currentTotalPoints: 3,
+        sprintDurationDays: 7,
+        currentIterationEndDate: "2026-01-21",
+        currentIterationId: "iter-cur",
+        todayIso: "2026-01-15",
+      },
+    );
+
+    expect(result).toHaveLength(2);
+    expect(result[0]?.iterationId).toBe("iter-cur");
+    expect(result[0]?.stories.map((s) => s.id)).toEqual(["cur", "b-5"]);
+    expect(result[0]?.totalPoints).toBe(8);
+    expect(result[1]?.label).toBe("2026-01-22");
+    expect(result[1]?.stories.map((s) => s.id)).toEqual(["b-5b", "b-3"]);
+  });
+
+  it("starts the first Backlog bucket at the next iteration when current capacity is full", () => {
+    const current = makeIteration("iter-cur", "2026-01-14", "2026-01-21");
+    const result = groupStoriesByIteration(
+      [
+        makeStory({ id: "cur", iterationId: "iter-cur", storyPoint: 8 }),
+        makeStory({ id: "b-2", iterationId: null, storyPoint: 2, position: 1 }),
+      ],
+      [current],
+      {
+        panelType: "Backlog",
+        velocity: 8,
+        currentTotalPoints: 8,
+        sprintDurationDays: 7,
+        currentIterationEndDate: "2026-01-21",
+        currentIterationId: "iter-cur",
+        todayIso: "2026-01-15",
+      },
+    );
+
+    expect(result).toHaveLength(2);
+    expect(result[0]?.totalPoints).toBe(8);
+    expect(result[1]?.groupType).toBe("future-iteration");
+    expect(result[1]?.label).toBe("2026-01-22");
+  });
+
+  it("does not merge Backlog into a current iteration with zero capacity", () => {
+    const current = {
+      ...makeIteration("iter-cur", "2026-01-14", "2026-01-21"),
+      effectiveSprintUtilizationPercent: 0,
+    };
+    const result = groupStoriesByIteration(
+      [makeStory({ id: "b-2", iterationId: null, storyPoint: 2, position: 1 })],
+      [current],
+      {
+        panelType: "Backlog",
+        velocity: 8,
+        currentTotalPoints: 0,
+        sprintDurationDays: 7,
+        currentIterationEndDate: "2026-01-21",
+        currentIterationId: "iter-cur",
+        todayIso: "2026-01-15",
+      },
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.groupType).toBe("future-iteration");
+  });
+
   it("allocates zero-point release stories to the next sprint when the first bucket is full", () => {
     const result = groupStoriesByIteration(
       [

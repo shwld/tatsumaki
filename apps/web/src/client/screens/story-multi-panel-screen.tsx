@@ -754,6 +754,7 @@ export function StoryMultiPanelScreen() {
       iterationStartDay: projectData?.project?.iterationStartDay ?? 1,
       currentIterationEndDate: currentIteration?.endDate ?? null,
       currentIterationNumber: currentIteration?.iterationNumber ?? null,
+      currentIterationId: currentIteration?.id ?? null,
       utilizationOverrideByIterationNumber,
       formatStartLabel: (date) =>
         t("storyMultiPanelScreen.iteration.start", { date }),
@@ -770,9 +771,34 @@ export function StoryMultiPanelScreen() {
     projectData?.project?.iterationStartDay,
     currentIteration?.endDate,
     currentIteration?.iterationNumber,
+    currentIteration?.id,
     utilizationOverrideByIterationNumber,
     useLocalFilteredPoints,
     t,
+  ]);
+  const combinedPointsWithMergedBacklog = useMemo(() => {
+    const currentIterationId = currentIteration?.id;
+    if (!currentIterationId) return currentBacklogCombinedPointsByIterationId;
+    const mergedGroup = combinedIterationGroups.find(
+      (group) => group.iterationId === currentIterationId,
+    );
+    if (!mergedGroup) return currentBacklogCombinedPointsByIterationId;
+    const mergedPoints = mergedGroup.stories.reduce(
+      (sum, story) =>
+        story.iterationId === null ? sum + (story.storyPoint ?? 0) : sum,
+      0,
+    );
+    if (mergedPoints === 0) return currentBacklogCombinedPointsByIterationId;
+    return {
+      ...currentBacklogCombinedPointsByIterationId,
+      [currentIterationId]:
+        (currentBacklogCombinedPointsByIterationId[currentIterationId] ?? 0) +
+        mergedPoints,
+    };
+  }, [
+    combinedIterationGroups,
+    currentBacklogCombinedPointsByIterationId,
+    currentIteration?.id,
   ]);
   const combinedTargetPanelByGroupKey = useMemo(() => {
     const map = new Map<string, PanelType>();
@@ -1881,7 +1907,7 @@ export function StoryMultiPanelScreen() {
       }
       iterationPointsByIterationId={
         panel === "CurrentBacklogCombined"
-          ? currentBacklogCombinedPointsByIterationId
+          ? combinedPointsWithMergedBacklog
           : panelIterationPointsById[panel]
       }
       isLoading={
@@ -1936,6 +1962,7 @@ export function StoryMultiPanelScreen() {
       iterationStartDay={projectData?.project?.iterationStartDay ?? 1}
       currentIterationEndDate={currentIteration?.endDate ?? null}
       currentIterationNumber={currentIteration?.iterationNumber ?? null}
+      currentIterationId={currentIteration?.id ?? null}
       utilizationOverrideByIterationNumber={
         utilizationOverrideByIterationNumber
       }
