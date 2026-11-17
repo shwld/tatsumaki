@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { useMatch } from "react-router";
+import { useAuthError } from "./auth-error-context";
 import { ProjectBillingBanner } from "../components/project-billing-banner";
 
 export type ProjectBillingState =
@@ -42,6 +43,7 @@ export function ProjectBillingScope({ children }: { children: ReactNode }) {
   } | null>(null);
   const [tick, setTick] = useState(0);
   const refresh = useCallback(() => setTick((n) => n + 1), []);
+  const { notifySessionExpired } = useAuthError();
 
   useEffect(() => {
     if (!projectId) return;
@@ -68,8 +70,8 @@ export function ProjectBillingScope({ children }: { children: ReactNode }) {
               validUntil: data.validUntil ?? null,
             };
           }
-        } else if (response.status === 401 || response.status === 403) {
-          return;
+        } else if (response.status === 401) {
+          notifySessionExpired();
         }
       } catch {
         // keep the fail-closed "unknown" value
@@ -87,7 +89,7 @@ export function ProjectBillingScope({ children }: { children: ReactNode }) {
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [projectId, tick]);
+  }, [projectId, tick, notifySessionExpired]);
 
   const current =
     loaded && loaded.projectId === projectId ? loaded.value : null;

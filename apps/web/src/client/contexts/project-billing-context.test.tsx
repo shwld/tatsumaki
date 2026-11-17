@@ -109,6 +109,12 @@ describe("ProjectBillingScope", () => {
     expect(await screen.findByText("read-only")).toBeTruthy();
   });
 
+  it("fails closed when the state request is unauthorized or forbidden", async () => {
+    respond({ error: "forbidden" }, 403);
+    renderScope();
+    expect(await screen.findByText("read-only")).toBeTruthy();
+  });
+
   it("follows a state change on an already open screen", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     respond({ state: "active", role: "member", validUntil: null });

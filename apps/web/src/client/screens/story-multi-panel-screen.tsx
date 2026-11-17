@@ -1481,10 +1481,6 @@ export function StoryMultiPanelScreen() {
     setCreateSubmitting(false);
   }, []);
 
-  useEffect(() => {
-    if (readOnly) closeCreateForm();
-  }, [readOnly, closeCreateForm]);
-
   const submitInlineStory = useCallback(async () => {
     if (readOnly || !projectId || !createTargetPanel) return;
     const title = createTitle.trim();
@@ -1888,7 +1884,7 @@ export function StoryMultiPanelScreen() {
                     <button
                       type="submit"
                       className="rounded bg-blue-700 px-2 py-1 text-xs text-white disabled:opacity-60"
-                      disabled={createSubmitting}
+                      disabled={createSubmitting || readOnly}
                     >
                       {createSubmitting
                         ? t("storyMultiPanelScreen.create.submitting")

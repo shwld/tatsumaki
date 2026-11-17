@@ -248,7 +248,7 @@ function StoryAccordionSubHeaderComponent({
           type="button"
           title={t("storyAccordion.subHeader.deleteStory")}
           className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:text-gray-300"
-          disabled={isDeleting}
+          disabled={isDeleting || readOnly}
           onClick={() => onDelete(story)}
         >
           <Trash2 className="h-3.5 w-3.5" />
