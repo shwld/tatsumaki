@@ -80,3 +80,31 @@ export const invalidateProjectEntitlement = (
   if (bindings.CONTROL_PLANE)
     cacheFor(bindings.CONTROL_PLANE).invalidate(projectId);
 };
+
+export const EXPORT_OWNER_ONLY_CODE = "EXPORT_OWNER_ONLY";
+
+export type ProjectExportDenial =
+  | ProjectWriteDenial
+  | { status: 403; body: { error: string; code: "EXPORT_OWNER_ONLY" } };
+
+/**
+ * Every project export path asks this (ADR-0015): owners only, in every state,
+ * and nobody while suspended. Role is checked first so billing state is never
+ * revealed to non-owners. Enforcement follows the same switch as writes.
+ */
+export const decideProjectExport = async (
+  bindings: ProjectWriteGuardBindings,
+  projectId: string,
+  role: "owner" | "member" | "viewer",
+): Promise<ProjectExportDenial | null> => {
+  if (role !== "owner") {
+    return {
+      status: 403,
+      body: {
+        error: "Only the project owner can export project data.",
+        code: EXPORT_OWNER_ONLY_CODE,
+      },
+    };
+  }
+  return toProjectWriteDenial(await decideProjectWrite(bindings, projectId));
+};
