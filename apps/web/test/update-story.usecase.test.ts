@@ -19,7 +19,6 @@ function buildStory(overrides?: Partial<Story>): Story {
     archivedAt: null,
     storyPoint: null,
     labels: [],
-    labelIds: [],
     iterationId: null,
     isIcebox: false,
     ownerIds: [],

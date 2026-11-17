@@ -179,7 +179,7 @@ export function createStoryMultiPanelFetchMock(
           (story) =>
             story.title.toLowerCase().includes(q) ||
             story.description.toLowerCase().includes(q) ||
-            story.labels.some((label) => label.toLowerCase().includes(q)),
+            story.labels.some((label) => label.name.toLowerCase().includes(q)),
         );
       }
       if (statuses) {

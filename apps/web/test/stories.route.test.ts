@@ -291,8 +291,10 @@ describe("story routes", () => {
         completedAt: null,
         archivedAt: null,
         storyPoint: 3,
-        labels: ["auth", "backend"],
-        labelIds: [authId, backendId],
+        labels: [
+          { id: authId, name: "auth" },
+          { id: backendId, name: "backend" },
+        ],
         iterationId: null,
         isIcebox: false,
         ownerIds: [],
@@ -377,8 +379,10 @@ describe("story routes", () => {
         completedAt: null,
         archivedAt: null,
         storyPoint: 8,
-        labels: ["priority:high", "ui"],
-        labelIds: expect.arrayContaining([uiId, highId]),
+        labels: [
+          { id: highId, name: "priority:high" },
+          { id: uiId, name: "ui" },
+        ],
         iterationId: null,
         isIcebox: false,
         ownerIds: [],
@@ -591,8 +595,7 @@ describe("story routes", () => {
         expect.objectContaining({
           title: "Summary target",
           description: "",
-          labels: ["perf"],
-          labelIds: [perfId],
+          labels: [{ id: perfId, name: "perf" }],
           ownerIds: ["github|test-user"],
           isBlocked: false,
           isBlocking: false,
@@ -840,7 +843,7 @@ describe("story routes", () => {
         id: created.story.id,
         title: "Detail target",
         description: "Detailed body",
-        labelIds: [uiLabelId],
+        labels: [{ id: uiLabelId, name: "ui" }],
       }),
     });
   });
@@ -881,7 +884,6 @@ describe("story routes", () => {
         archivedAt: null,
         storyPoint: null,
         labels: [],
-        labelIds: [],
         iterationId: null,
         isIcebox: false,
         ownerIds: [],
@@ -1313,11 +1315,11 @@ describe("story routes", () => {
       stories: [
         expect.objectContaining({
           id: first.story.id,
-          labels: ["backend"],
+          labels: [{ id: backendId, name: "backend" }],
         }),
         expect.objectContaining({
           id: second.story.id,
-          labels: ["backend"],
+          labels: [{ id: backendId, name: "backend" }],
         }),
       ],
     });

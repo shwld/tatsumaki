@@ -8,7 +8,7 @@ story の Label 所属を Label ID だけで扱うようにした変更(story #3
 - story 一覧の絞り込み `labels` / `label`(名前)は `labelIds`(ID のカンマ区切り、OR)に置き換わった。`labels` / `label` を送ると 400 を返す
 - `PATCH /projects/:projectId/stories/bulk-labels` は `labels` ではなく `labelIds` を受け取る
 - 保存済みフィルターの条件 `labels` は `labelIds` に置き換わった。`labels` を送ると 400 を返す
-- story のレスポンスの `labels`(名前)は表示用で、書き込みには使えない。参照元は `labelIds`
+- story のレスポンスの `labels` は `[{id, name}]` に一本化した。レスポンスの `labelIds` は廃止した(story #423)。書き込みの `labelIds` / `addLabelIds` / `removeLabelIds` は ID を送る契約のまま変わらない。`labels` を文字列配列として読む client は `labels[].name` に、`labelIds` を読む client は `labels[].id` に置き換える
 - `tm story create / update / list` に `--label` などを追加した。名前は CLI が ID に解決する
 - MCP の `update_story` の `labels` は `labelIds` / `addLabelIds` / `removeLabelIds` に、`create_story` と `list_stories` は `labelIds` を受け取る
 - Web の URL クエリ `labels` は `labelIds` に変わった。古い URL の絞り込みは無視される

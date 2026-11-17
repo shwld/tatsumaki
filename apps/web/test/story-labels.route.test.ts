@@ -7,9 +7,13 @@ import { D1StoryRepository } from "../src/infrastructure/db/repositories/d1-stor
 type StoryPayload = {
   id: string;
   storyNumber: number;
-  labels: string[];
-  labelIds: string[];
+  labels: Array<{ id: string; name: string }>;
 };
+
+const labelIdsOf = (story: StoryPayload) =>
+  story.labels.map((label) => label.id);
+const labelNamesOf = (story: StoryPayload) =>
+  story.labels.map((label) => label.name);
 
 describe("story labels by ID", () => {
   beforeEach(async () => {
@@ -78,8 +82,8 @@ describe("story labels by ID", () => {
     });
 
     expect(status).toBe(201);
-    expect(story.labelIds).toEqual([backend]);
-    expect(story.labels).toEqual(["backend"]);
+    expect(story.labels).toEqual([{ id: backend, name: "backend" }]);
+    expect(story).not.toHaveProperty("labelIds");
   });
 
   it("rejects labels from another project", async () => {
@@ -111,12 +115,12 @@ describe("story labels by ID", () => {
     const added = await patchStory(projectId, story.storyNumber, {
       addLabelIds: [b, c, b],
     });
-    expect(added.story.labels).toEqual(["a", "b", "c"]);
+    expect(labelNamesOf(added.story)).toEqual(["a", "b", "c"]);
 
     const removed = await patchStory(projectId, story.storyNumber, {
       removeLabelIds: [a],
     });
-    expect(removed.story.labelIds.sort()).toEqual([b, c].sort());
+    expect(labelIdsOf(removed.story).sort()).toEqual([b, c].sort());
   });
 
   it("does not drop labels added concurrently", async () => {
@@ -134,7 +138,7 @@ describe("story labels by ID", () => {
       `/projects/${projectId}/stories/${story.storyNumber}`,
     );
     const stored = ((await res.json()) as { story: StoryPayload }).story;
-    expect(stored.labels).toEqual(["a", "b"]);
+    expect(labelNamesOf(stored)).toEqual(["a", "b"]);
   });
 
   it("replaces the set with labelIds", async () => {
@@ -146,7 +150,7 @@ describe("story labels by ID", () => {
     const replaced = await patchStory(projectId, story.storyNumber, {
       labelIds: [b],
     });
-    expect(replaced.story.labelIds).toEqual([b]);
+    expect(labelIdsOf(replaced.story)).toEqual([b]);
   });
 
   it("rejects label names on create, update and bulk add", async () => {
@@ -218,17 +222,17 @@ describe("story labels by ID", () => {
 
     const { status, story } = await createStory(projectId, { labelIds: ids });
     expect(status).toBe(201);
-    expect(story.labelIds).toHaveLength(150);
+    expect(story.labels).toHaveLength(150);
 
     const cleared = await patchStory(projectId, story.storyNumber, {
       labelIds: [],
     });
-    expect(cleared.story.labelIds).toEqual([]);
+    expect(cleared.story.labels).toEqual([]);
 
     const readded = await patchStory(projectId, story.storyNumber, {
       addLabelIds: ids.slice(0, 120),
     });
-    expect(readded.story.labelIds).toHaveLength(120);
+    expect(readded.story.labels).toHaveLength(120);
   });
 
   it("filters by more label IDs than the D1 bind limit", async () => {

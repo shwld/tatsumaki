@@ -44,7 +44,7 @@ describe("D1StoryRepository.list summary labels", () => {
     ]);
   });
 
-  it("returns labels and labelIds for each story, empty when unlabeled", async () => {
+  it("returns labels as {id, name} for each story, empty when unlabeled", async () => {
     const repository = new D1StoryRepository(env.DB);
     const result = await repository.list({
       projectId: PROJECT_ID,
@@ -53,11 +53,13 @@ describe("D1StoryRepository.list summary labels", () => {
     if (result.isErr()) throw new Error("Failed to list stories");
 
     const byId = new Map(result.value.map((story) => [story.id, story]));
-    expect(byId.get("story-01")?.labels).toEqual(["alpha", "beta"]);
-    expect(byId.get("story-01")?.labelIds).toEqual(["label-a", "label-b"]);
-    expect(byId.get("story-02")?.labels).toEqual(["alpha"]);
-    expect(byId.get("story-02")?.labelIds).toEqual(["label-a"]);
+    expect(byId.get("story-01")?.labels).toEqual([
+      { id: "label-a", name: "alpha" },
+      { id: "label-b", name: "beta" },
+    ]);
+    expect(byId.get("story-02")?.labels).toEqual([
+      { id: "label-a", name: "alpha" },
+    ]);
     expect(byId.get("story-03")?.labels).toEqual([]);
-    expect(byId.get("story-03")?.labelIds).toEqual([]);
   });
 });

@@ -131,6 +131,8 @@ export function resolveStoryIsIcebox(input: {
   return ok(undefined);
 }
 
+export type StoryLabel = { id: string; name: string };
+
 export type Story = {
   __typename: "Story";
   id: string;
@@ -145,9 +147,7 @@ export type Story = {
   completedAt: string | null;
   archivedAt: string | null;
   storyPoint: StoryPoint | null;
-  /** Label names derived from labelIds (presentation only). */
-  labels: string[];
-  labelIds: string[];
+  labels: StoryLabel[];
   iterationId: string | null;
   isIcebox: boolean;
   ownerIds: string[];

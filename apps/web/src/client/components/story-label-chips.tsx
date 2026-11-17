@@ -4,7 +4,7 @@ import type { ProjectLabel } from "../types/project-label";
 export const UNKNOWN_LABEL_COLOR = "#6b7280";
 
 type StoryLabelChipsProps = {
-  labels: string[];
+  labels: { id: string; name: string }[];
   projectLabels?: ProjectLabel[];
   maxVisible?: number;
 };
@@ -15,7 +15,7 @@ export function StoryLabelChips({
   maxVisible = 3,
 }: StoryLabelChipsProps) {
   const labelMap = useMemo(
-    () => new Map(projectLabels?.map((pl) => [pl.name, pl]) ?? []),
+    () => new Map(projectLabels?.map((pl) => [pl.id, pl]) ?? []),
     [projectLabels],
   );
 
@@ -26,11 +26,11 @@ export function StoryLabelChips({
 
   return (
     <div className="mt-0.5 flex flex-wrap gap-1">
-      {visible.map((name) => {
-        const meta = labelMap.get(name);
+      {visible.map(({ id, name }) => {
+        const meta = labelMap.get(id);
         return (
           <span
-            key={name}
+            key={id}
             className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium text-white"
             style={{ backgroundColor: meta?.color ?? UNKNOWN_LABEL_COLOR }}
           >

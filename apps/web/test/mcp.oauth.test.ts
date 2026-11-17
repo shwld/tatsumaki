@@ -714,8 +714,8 @@ describe("MCP OAuth", () => {
     const updated = await call({ addLabelIds: [labelId] });
     expect(updated.result?.isError).not.toBe(true);
     expect(
-      JSON.parse(updated.result?.content?.[0]?.text ?? "{}").story.labelIds,
-    ).toEqual([labelId]);
+      JSON.parse(updated.result?.content?.[0]?.text ?? "{}").story.labels,
+    ).toEqual([{ id: labelId, name: expect.any(String) }]);
 
     const rejected = await call({ title: "x", labels: ["backend"] });
     expect(rejected.result?.isError).toBe(true);
@@ -884,7 +884,6 @@ describe("MCP OAuth", () => {
         storyPoint: 2,
         type: "feature",
         labels: [],
-        labelIds: [],
       },
     });
   });
@@ -927,7 +926,6 @@ describe("MCP OAuth", () => {
         storyPoint: null,
         type: "feature",
         labels: [],
-        labelIds: [],
       },
     });
   });
