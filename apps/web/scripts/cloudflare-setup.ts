@@ -535,7 +535,7 @@ export function renderWranglerConfig(
   const controlPlaneBinding = controlPlaneService
     ? `
 [vars]
-ENTITLEMENT_MODE = "control-plane"
+ENTITLEMENT_MODE = "control-plane"${plan.environment === "staging" ? '\nCHECKOUT_ENABLED = "true"' : ""}
 
 [[services]]
 binding = "CONTROL_PLANE"

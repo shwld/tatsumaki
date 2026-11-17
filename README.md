@@ -118,7 +118,7 @@ CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_ACCESS_TEAM_DOMAIN
 
 `--with-staging` and `--staging-only` are mutually exclusive. Add `--dry-run` first to confirm that only the `[staging]` plan is shown.
 
-Hosted operators can optionally connect only the staging Worker to a private WorkerEntrypoint RPC service. Add `--staging-control-plane-service <worker-name>` together with `--staging-only` or `--with-staging`. The option is rejected for production-only setup, and self-hosted installations that omit it continue to use unlimited local entitlements.
+Hosted operators can optionally connect only the staging Worker to a private WorkerEntrypoint RPC service. Add `--staging-control-plane-service <worker-name>` together with `--staging-only` or `--with-staging`. The option is rejected for production-only setup, and self-hosted installations that omit it continue to use unlimited local entitlements. The generated staging configuration also sets `CHECKOUT_ENABLED="true"` so the staging Worker can start Checkout against the Control Plane (Stripe test mode); production configuration never sets it.
 
 The command is restartable. It looks up resources by their exact names and reuses them, so after a network error or permission fix, run the same command again. It will not create duplicate named resources. A different `--name-prefix` can be used when an account already uses the default names for another installation.
 

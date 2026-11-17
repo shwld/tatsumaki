@@ -114,9 +114,23 @@ describe("Cloudflare self-hosting setup", () => {
     expect(config).toContain('binding = "CONTROL_PLANE"');
     expect(config).toContain('service = "tatsumaki-control-plane-staging"');
     expect(config).toContain('ENTITLEMENT_MODE = "control-plane"');
+    expect(config).toContain('CHECKOUT_ENABLED = "true"');
     expect(config).toContain('name = "ONBOARDING_RATE_LIMITER"');
     expect(config).toContain('name = "API_KEY_RATE_LIMITER"');
     expect(config).toContain('name = "OAUTH_REGISTER_RATE_LIMITER"');
+  });
+
+  it("never enables Checkout in the production configuration", () => {
+    const [plan] = buildEnvironmentPlans("tatsumaki", "production");
+    const config = renderWranglerConfig(
+      plan,
+      "d1-id",
+      "kv-id",
+      "tatsumaki-control-plane-production",
+    );
+
+    expect(config).toContain('ENTITLEMENT_MODE = "control-plane"');
+    expect(config).not.toContain("CHECKOUT_ENABLED");
   });
 
   it("does not contact Cloudflare or run commands in dry-run mode", async () => {
