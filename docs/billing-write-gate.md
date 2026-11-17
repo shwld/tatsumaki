@@ -46,3 +46,23 @@
 ## 新しい書き込み経路を足すとき
 
 `/projects/:projectId/` 配下に置けば自動でゲートを通る。パスにプロジェクト ID を持たない経路や、MCP tool、Durable Object の直接入口を足すときは、`decideProjectWrite` を明示的に呼び、この表に行を足す。
+
+## エクスポート(story #434)
+
+[ADR-0015](adr/adr-0015-project-scoped-billing.md) は、エクスポートを全状態でオーナーのみ、`suspended` では全員不可とする。
+
+### 棚卸し結果
+
+プロジェクトデータを一括で取り出す入口(CSV/JSON/一括ダウンロード、生成済み成果物・保存済みリンク)は現状存在しない。確認した近い経路は次のとおりで、いずれもエクスポートではなく閲覧の一部として扱い、制限しない。
+
+- ストーリー添付の取得(`stories.ts` の attachment content、`?download=1` を含む)。個別ファイルの閲覧。
+- アーティファクトの配信(`artifacts/routes.ts`)。個別成果物の閲覧。
+- GET の読み取り API 全般。
+
+### 新しいエクスポート入口を足すとき
+
+メンバーの role を取得したうえで `decideProjectExport(bindings, projectId, role)`(`project-write-guard.ts`)を呼び、null でなければ `denial.status` / `denial.body` を返す。ロールは先に判定するので、非オーナーには課金状態が見えない。判定は書き込みと同じキャッシュ・fail closed(503)を使う。#130 のような汎用入出力は別 story。
+
+### 本番有効化の前提
+
+停止中のエクスポート拒否は `PROJECT_WRITE_ENFORCEMENT` と同じスイッチで有効になる。本番では、公開準備 H で利用規約・プライバシーポリシーに「停止中はエクスポート不可、本人の開示・消去請求は運営者が個別対応」と明記してから有効化する。
