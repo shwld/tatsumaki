@@ -13,9 +13,10 @@ export const installScreenJa = {
       platforms:
         "配布済みの対応環境: macOS (Apple Silicon / arm64)。その他の環境は README のビルド手順でソースからビルドしてください。",
       download:
-        "GitHub Releases から tm-aarch64-apple-darwin.tar.gz と sha256sums.txt を取得します。",
+        "GitHub Releases の最新の cli-v タグを確認し、TM_VERSION をそのバージョンに合わせて tm-aarch64-apple-darwin.tar.gz と sha256sums.txt を取得します。",
       verify: "チェックサムを検証してから展開します。",
-      install: "展開した tm を PATH の通ったディレクトリに配置します。",
+      install:
+        "展開した tm を ~/.local/bin に配置し、PATH に追加します (永続化はシェルの設定ファイルに追記してください)。",
       configure: "接続先を設定してからサインインし、ユーザーを確認します。",
       confirm:
         "確認: tm --version でバージョンが表示され、tm whoami でユーザーが表示されること。",
@@ -54,9 +55,10 @@ export const installScreenEn = {
       platforms:
         "Published build: macOS (Apple Silicon / arm64). On other platforms, build from source by following the README build steps.",
       download:
-        "Download tm-aarch64-apple-darwin.tar.gz and sha256sums.txt from GitHub Releases.",
+        "Check the latest cli-v tag on GitHub Releases, set TM_VERSION to that version, then download tm-aarch64-apple-darwin.tar.gz and sha256sums.txt.",
       verify: "Verify the checksum, then extract the archive.",
-      install: "Place the extracted tm in a directory on your PATH.",
+      install:
+        "Place the extracted tm in ~/.local/bin and add it to your PATH (add the export to your shell profile to persist it).",
       configure: "Set the server URL, sign in, and confirm the user.",
       confirm:
         "Check: tm --version prints the version and tm whoami shows your user.",

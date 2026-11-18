@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 
 const RELEASES_URL = "https://github.com/shwld/tatsumaki/releases";
-const RELEASE_BASE = `${RELEASES_URL}/download/cli-v<version>`;
+const RELEASE_BASE = `${RELEASES_URL}/download/cli-v$TM_VERSION`;
 
 function Code({ children }: { children: string }) {
   return (
@@ -49,11 +49,14 @@ export function InstallScreen() {
           <li>{t("installScreen.cli.install")}</li>
           <li>{t("installScreen.cli.configure")}</li>
         </ol>
-        <Code>{`curl -LO ${RELEASE_BASE}/tm-aarch64-apple-darwin.tar.gz
+        <Code>{`TM_VERSION=0.0.17
+curl -LO ${RELEASE_BASE}/tm-aarch64-apple-darwin.tar.gz
 curl -LO ${RELEASE_BASE}/sha256sums.txt
 shasum -a 256 -c sha256sums.txt --ignore-missing
 tar -xzf tm-aarch64-apple-darwin.tar.gz
-install -m 755 tm /usr/local/bin/tm
+mkdir -p ~/.local/bin
+install -m 755 tm ~/.local/bin/tm
+export PATH="$HOME/.local/bin:$PATH"
 tm config set base-url ${window.location.origin}
 tm login
 tm whoami
