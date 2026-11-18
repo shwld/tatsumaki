@@ -31,6 +31,7 @@ import { NavigateToProjectStories } from "./components/navigate-to-project-stori
 import { StoryDetailScreen } from "./screens/story-detail-screen";
 import { StoryMultiPanelScreen } from "./screens/story-multi-panel-screen";
 import { AccountScreen } from "./screens/account-screen";
+import { InstallScreen } from "./screens/install-screen";
 import { ProjectHistoryScreen } from "./screens/project-history-screen";
 import { ProjectInvitationAcceptScreen } from "./screens/project-invitation-accept-screen";
 import { SingleUseInvitationAcceptScreen } from "./screens/single-use-invitation-accept-screen";
@@ -148,6 +149,7 @@ export function App() {
                         element={<ArtifactDetailScreen />}
                       />
                       <Route path="/account" element={<AccountScreen />} />
+                      <Route path="/install" element={<InstallScreen />} />
                       <Route
                         path="/projects/:projectId"
                         element={<StoryMultiPanelScreen />}

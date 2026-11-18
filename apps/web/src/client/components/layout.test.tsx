@@ -65,6 +65,9 @@ describe("Layout", () => {
     await userEvent.click(trigger);
     expect(await screen.findByText("テーマ")).toBeInTheDocument();
     expect(
+      screen.getByRole("menuitem", { name: "インストール" }),
+    ).toHaveAttribute("href", "/install");
+    expect(
       screen.getByRole("menuitem", { name: "ログアウト" }),
     ).toHaveAttribute("href", "/cdn-cgi/access/logout");
   });
