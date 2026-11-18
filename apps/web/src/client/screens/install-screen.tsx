@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 
 const RELEASES_URL = "https://github.com/shwld/tatsumaki/releases";
+const RELEASE_BASE = `${RELEASES_URL}/download/cli-v<version>`;
 
 function Code({ children }: { children: string }) {
   return (
@@ -46,12 +47,17 @@ export function InstallScreen() {
           <li>{t("installScreen.cli.download")}</li>
           <li>{t("installScreen.cli.verify")}</li>
           <li>{t("installScreen.cli.install")}</li>
+          <li>{t("installScreen.cli.configure")}</li>
         </ol>
-        <Code>{`curl -LO https://github.com/shwld/tatsumaki/releases/download/cli-v<version>/tm-<target>.tar.gz
-curl -LO https://github.com/shwld/tatsumaki/releases/download/cli-v<version>/sha256sums.txt
-sha256sum -c sha256sums.txt --ignore-missing
-tar -xzf tm-<target>.tar.gz
-./tm --version`}</Code>
+        <Code>{`curl -LO ${RELEASE_BASE}/tm-aarch64-apple-darwin.tar.gz
+curl -LO ${RELEASE_BASE}/sha256sums.txt
+shasum -a 256 -c sha256sums.txt --ignore-missing
+tar -xzf tm-aarch64-apple-darwin.tar.gz
+install -m 755 tm /usr/local/bin/tm
+tm config set base-url ${window.location.origin}
+tm login
+tm whoami
+tm --version`}</Code>
         <p className="text-sm text-gray-700">
           {t("installScreen.cli.confirm")}
         </p>

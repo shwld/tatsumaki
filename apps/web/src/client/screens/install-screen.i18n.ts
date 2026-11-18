@@ -10,13 +10,15 @@ export const installScreenJa = {
       "tatsumaki の CLI (tm) と、agent から tatsumaki を操作するための連携を導入する方法です。",
     cli: {
       title: "CLI (tm)",
-      platforms: "対応環境: macOS (arm64 / x64)、Linux (x64 / arm64)。",
+      platforms:
+        "配布済みの対応環境: macOS (Apple Silicon / arm64)。その他の環境は README のビルド手順でソースからビルドしてください。",
       download:
-        "GitHub Releases から使用する環境の tarball と sha256sums.txt を取得します。",
+        "GitHub Releases から tm-aarch64-apple-darwin.tar.gz と sha256sums.txt を取得します。",
       verify: "チェックサムを検証してから展開します。",
-      install: "展開した tm を実行します。",
+      install: "展開した tm を PATH の通ったディレクトリに配置します。",
+      configure: "接続先を設定してからサインインし、ユーザーを確認します。",
       confirm:
-        "確認: tm --version でバージョンが表示されること。続けて tm login でサインインし、tm whoami でユーザーを確認します。",
+        "確認: tm --version でバージョンが表示され、tm whoami でユーザーが表示されること。",
       releases: "GitHub Releases",
       detail: "CLI の詳細 (README)",
     },
@@ -49,13 +51,15 @@ export const installScreenEn = {
       "How to install the tatsumaki CLI (tm) and the integrations that let agents operate tatsumaki.",
     cli: {
       title: "CLI (tm)",
-      platforms: "Supported: macOS (arm64 / x64) and Linux (x64 / arm64).",
+      platforms:
+        "Published build: macOS (Apple Silicon / arm64). On other platforms, build from source by following the README build steps.",
       download:
-        "Download the tarball for your platform and sha256sums.txt from GitHub Releases.",
+        "Download tm-aarch64-apple-darwin.tar.gz and sha256sums.txt from GitHub Releases.",
       verify: "Verify the checksum, then extract the archive.",
-      install: "Run the extracted tm binary.",
+      install: "Place the extracted tm in a directory on your PATH.",
+      configure: "Set the server URL, sign in, and confirm the user.",
       confirm:
-        "Check: tm --version prints the version. Then sign in with tm login and confirm the user with tm whoami.",
+        "Check: tm --version prints the version and tm whoami shows your user.",
       releases: "GitHub Releases",
       detail: "CLI details (README)",
     },
