@@ -26,6 +26,7 @@ export const layoutJa = {
       themeDark: "ダーク",
       themeSystem: "システム",
       account: "アカウント",
+      install: "インストール",
       logout: "ログアウト",
     },
     language: {
@@ -64,6 +65,7 @@ export const layoutEn = {
       themeDark: "Dark",
       themeSystem: "System",
       account: "Account",
+      install: "Install",
       logout: "Logout",
     },
     language: {

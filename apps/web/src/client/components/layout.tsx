@@ -363,6 +363,9 @@ export function Layout({ children }: LayoutProps) {
                         <Link to="/account">{t("layout.menu.account")}</Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
+                        <Link to="/install">{t("layout.menu.install")}</Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
                         <a href="/cdn-cgi/access/logout">
                           {t("layout.menu.logout")}
                         </a>

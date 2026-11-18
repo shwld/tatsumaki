@@ -63,6 +63,10 @@ import {
 } from "../screens/project-settings-screen.i18n";
 import { loginScreenEn, loginScreenJa } from "../screens/login-screen.i18n";
 import {
+  installScreenEn,
+  installScreenJa,
+} from "../screens/install-screen.i18n";
+import {
   onboardingScreenEn,
   onboardingScreenJa,
 } from "../screens/onboarding-screen.i18n";
@@ -132,6 +136,7 @@ i18n.use(initReactI18next).init({
         ...actorLabelJa,
         ...projectNavJa,
         ...loginScreenJa,
+        ...installScreenJa,
         ...onboardingScreenJa,
         ...projectListScreenJa,
         ...projectListContentJa,
@@ -167,6 +172,7 @@ i18n.use(initReactI18next).init({
         ...actorLabelEn,
         ...projectNavEn,
         ...loginScreenEn,
+        ...installScreenEn,
         ...onboardingScreenEn,
         ...projectListScreenEn,
         ...projectListContentEn,
