@@ -191,6 +191,29 @@ describe("Access JWT verification (remote JWKS)", () => {
     expect(results.every((r) => r?.id === "github|test-user")).toBe(true);
   });
 
+  it("accepts concurrent valid requests signed by a rotated-in key during the refresh", async () => {
+    const domain = `rotate-concurrent-${(domainSeq += 1)}.example.test`;
+    const bindings = bindingsFor(domain);
+    await getCurrentUserFromAccessRequest(
+      requestWith(await sign(privateKey, "old", domain)),
+      bindings,
+    );
+
+    jwksResponse = { keys: [publicJwk, newPublicJwk] };
+    fetchSpy.mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      return Response.json(jwksResponse);
+    });
+    const newToken = await sign(newPrivateKey, "new", domain);
+    const results = await Promise.all(
+      Array.from({ length: 5 }, () =>
+        getCurrentUserFromAccessRequest(requestWith(newToken), bindings),
+      ),
+    );
+    expect(results.every((r) => r?.id === "github|test-user")).toBe(true);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
   it("rejects when the JWKS fetch fails", async () => {
     const domain = `fail-${(domainSeq += 1)}.example.test`;
     fetchSpy.mockImplementation(

@@ -12,12 +12,14 @@ import { ACCESS_CERTS_PATH, resolveAccessUrl } from "../cloudflare-access";
 const JWKS_COOLDOWN_MS = 30 * 1000;
 const JWKS_CACHE_MAX_AGE_MS = 10 * 60 * 1000;
 const JWKS_FETCH_TIMEOUT_MS = 5 * 1000;
+const REFRESH_POLL_MS = 25;
 
 // jose 単体では同時多発の未知 kid で取得が増幅するため cooldown を自前で掛ける
 const withFetchGate = (
   remote: ReturnType<typeof createRemoteJWKSet>,
 ): JWTVerifyGetKey => {
   let lastFetchAt = Number.NEGATIVE_INFINITY;
+  let refreshing = false;
   return async (protectedHeader, token) => {
     const kid = protectedHeader.kid;
     const loaded = remote.jwks()?.keys;
@@ -26,12 +28,25 @@ const withFetchGate = (
     // 鍵が未取得(cold start)・期限切れの取得は正規リクエストを拒否しないよう制限しない。
     // 取得済みで fresh なのに kid が未知のときだけ cooldown で再取得を絞る。
     if (loaded && remote.fresh && !known) {
-      const now = Date.now();
-      if (now - lastFetchAt < JWKS_COOLDOWN_MS) {
-        throw new Error("Access JWKS refresh is cooling down");
+      if (refreshing) {
+        // 別リクエストの取得 Promise は共有できないため、完了フラグだけを待つ
+        const deadline = Date.now() + JWKS_FETCH_TIMEOUT_MS;
+        while (refreshing && Date.now() < deadline) {
+          await new Promise((resolve) => setTimeout(resolve, REFRESH_POLL_MS));
+        }
+      } else {
+        const now = Date.now();
+        if (now - lastFetchAt < JWKS_COOLDOWN_MS) {
+          throw new Error("Access JWKS refresh is cooling down");
+        }
+        lastFetchAt = now;
+        refreshing = true;
+        try {
+          await remote.reload();
+        } finally {
+          refreshing = false;
+        }
       }
-      lastFetchAt = now;
-      await remote.reload();
     }
     return remote(protectedHeader, token);
   };
