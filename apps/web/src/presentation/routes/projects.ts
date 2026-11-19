@@ -25,7 +25,10 @@ import {
   type ProjectInvitationStatus,
   type ProjectMemberRole,
 } from "../../domain/entities/project-member";
-import { PROJECT_REPOSITORY_ERROR } from "../../domain/repositories/project-repository";
+import {
+  LAST_PROJECT_OWNER_ERROR,
+  PROJECT_REPOSITORY_ERROR,
+} from "../../domain/repositories/project-repository";
 import { D1IterationRepository } from "../../infrastructure/db/repositories/d1-iteration-repository";
 import { D1NotificationRepository } from "../../infrastructure/db/repositories/d1-notification-repository";
 import { D1ProjectRepository } from "../../infrastructure/db/repositories/d1-project-repository";
@@ -756,6 +759,16 @@ projectsRoute.patch("/projects/:projectId/members/:memberUserId", async (c) => {
   });
 
   if (updatedResult.isErr()) {
+    if (updatedResult.error === LAST_PROJECT_OWNER_ERROR) {
+      return c.json(
+        {
+          error:
+            "A project needs at least one owner. Promote another member to owner first.",
+          code: "last_project_owner",
+        },
+        409,
+      );
+    }
     return c.json({ error: "Failed to update member role" }, 500);
   }
 

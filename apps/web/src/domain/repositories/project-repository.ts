@@ -49,6 +49,12 @@ export const PROJECT_REPOSITORY_ERROR = "PROJECT_REPOSITORY_ERROR" as const;
 
 export type ProjectRepositoryError = typeof PROJECT_REPOSITORY_ERROR;
 
+export const LAST_PROJECT_OWNER_ERROR = "LAST_PROJECT_OWNER_ERROR" as const;
+
+export type UpdateMemberRoleError =
+  | ProjectRepositoryError
+  | typeof LAST_PROJECT_OWNER_ERROR;
+
 export interface ProjectRepository {
   listSoleOwnerProjectIds(
     userId: string,
@@ -116,7 +122,7 @@ export interface ProjectRepository {
     projectId: string;
     userId: string;
     role: ProjectMemberRole;
-  }): Promise<Result<ProjectMember | null, ProjectRepositoryError>>;
+  }): Promise<Result<ProjectMember | null, UpdateMemberRoleError>>;
   findById(
     projectId: string,
   ): Promise<Result<Project | null, ProjectRepositoryError>>;

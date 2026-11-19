@@ -820,11 +820,11 @@ describe("artifact API", () => {
 
     it("denies writes once the key owner was demoted to viewer", async () => {
       const rawKey = await issueKey(["artifact:read", "artifact:write"]);
-      await new D1ProjectRepository(env.DB).upsertMember({
-        projectId,
-        userId: OWNER.sub,
-        role: "viewer",
-      });
+      await env.DB.prepare(
+        "update project_members set role = 'viewer' where project_id = ? and user_id = ?",
+      )
+        .bind(projectId, OWNER.sub)
+        .run();
 
       const response = await call("POST", "/artifact-uploads", {
         root: keyBase,
