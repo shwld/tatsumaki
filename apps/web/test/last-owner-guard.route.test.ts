@@ -153,13 +153,19 @@ describe("last owner guard", () => {
     expect(await ownerCount(projectId)).toBe(1);
   });
 
-  it("does not remove a sole-owner membership when the account is deleted", async () => {
+  it("aborts account deletion without side effects when it would remove the sole owner", async () => {
     const projectId = await createProject();
     await createAuthHeaders();
 
-    await new D1UserRepository(env.DB).delete(OWNER);
+    const result = await new D1UserRepository(env.DB).delete(OWNER);
 
+    expect(result.isErr()).toBe(true);
     expect(await roleOf(projectId, OWNER)).toBe("owner");
+    expect(
+      await env.DB.prepare("select id from users where id = ?")
+        .bind(OWNER)
+        .first(),
+    ).not.toBeNull();
   });
 
   it("removes an owner membership on account deletion when another owner exists", async () => {
