@@ -94,6 +94,7 @@ export function createProjectRepositoryMock(
     listMembers: async () => ok([buildProjectMember()]),
     listInvitations: async () => ok([buildProjectInvitation()]),
     findInvitation: async () => ok(buildProjectInvitation()),
+    findActiveSingleUseInvitationByTokenHash: async () => ok(null),
     findPendingInvitationByTarget: async () => ok(null),
     createInvitation: async () => ok(buildProjectInvitation()),
     createSingleUseInvitation: async () =>

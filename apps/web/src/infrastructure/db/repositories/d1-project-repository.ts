@@ -352,6 +352,27 @@ export class D1ProjectRepository implements ProjectRepository {
     return ok(toProjectInvitation(row));
   }
 
+  async findActiveSingleUseInvitationByTokenHash(
+    tokenHash: string,
+  ): Promise<Result<ProjectInvitation | null, ProjectRepositoryError>> {
+    try {
+      const row = await this.db
+        .select()
+        .from(projectInvitationsTable)
+        .where(
+          and(
+            eq(projectInvitationsTable.tokenHash, tokenHash),
+            eq(projectInvitationsTable.status, "pending"),
+            sql`datetime(${projectInvitationsTable.expiresAt}) > CURRENT_TIMESTAMP`,
+          ),
+        )
+        .get();
+      return ok(row ? toProjectInvitation(row) : null);
+    } catch {
+      return err(PROJECT_REPOSITORY_ERROR);
+    }
+  }
+
   async findPendingInvitationByTarget(input: {
     projectId: string;
     targetUserId: string | null;

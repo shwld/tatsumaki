@@ -41,7 +41,11 @@ import {
   hashInvitationLinkToken,
 } from "../../application/usecases/invitation-link-crypto";
 import type { Env } from "../../index";
-import { getProjectAccessState } from "../../infrastructure/entitlements/project-write-guard";
+import {
+  decideProjectWrite,
+  getProjectAccessState,
+  toProjectWriteDenial,
+} from "../../infrastructure/entitlements/project-write-guard";
 import { createEntitlementProvider } from "./billing";
 import { requireProjectMembership } from "./project-membership";
 import { computeGravatarHash } from "../lib/gravatar";
@@ -459,6 +463,11 @@ projectsRoute.post(
         403,
       );
     }
+
+    const denial = toProjectWriteDenial(
+      await decideProjectWrite(c.env, projectId),
+    );
+    if (denial) return c.json(denial.body, denial.status);
 
     const memberResult = await repository.upsertMember({
       projectId,
