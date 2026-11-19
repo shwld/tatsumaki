@@ -1,5 +1,6 @@
 import type { MiddlewareHandler } from "hono";
 import type { Env } from "../../index";
+import { resolveAccessUrl } from "../cloudflare-access";
 
 const JWT_HEADER_NAME = "Cf-Access-Jwt-Assertion";
 
@@ -55,11 +56,13 @@ const encodeBase64Url = (input: string | Uint8Array): string => {
 const createDevJwt = async (
   email: string,
   audience: string,
+  teamDomain: string,
 ): Promise<string> => {
   const key = await getSigningKey();
 
   const header = { alg: "RS256", typ: "JWT", kid: TEST_KEY_ID };
   const payload = {
+    iss: resolveAccessUrl(teamDomain, ""),
     aud: [audience],
     exp: Math.floor(Date.now() / 1000) + 300,
     sub: "dev|local",
@@ -95,7 +98,12 @@ export const devAuth = (): MiddlewareHandler<Env> => {
       return next();
     }
 
-    const jwt = await createDevJwt(devEmail, audience);
+    const teamDomain = c.env.ACCESS_TEAM_DOMAIN;
+    if (!teamDomain) {
+      return next();
+    }
+
+    const jwt = await createDevJwt(devEmail, audience, teamDomain);
     const headers = new Headers(c.req.raw.headers);
     headers.set(JWT_HEADER_NAME, jwt);
     c.req.raw = new Request(c.req.raw, { headers });

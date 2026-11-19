@@ -1,15 +1,15 @@
 import type { Context, MiddlewareHandler } from "hono";
 import type { Env } from "../../index";
-import {
-  decodeJsonSegment,
-  hasExpectedAudience,
-  isTokenActive,
-  selectJwk,
-  verifyRs256Signature,
-  type AccessJwtHeader,
-  type AccessJwtPayload,
-} from "./access-jwt";
-import { loadJwks } from "./access-jwks";
+import { jwtVerify, type JWTPayload } from "jose";
+import { resolveAccessUrl } from "../cloudflare-access";
+import { resolveAccessJwks } from "./access-jwks";
+
+export type AccessJwtPayload = {
+  aud?: string | string[];
+  exp?: number;
+  sub?: string;
+  email?: string;
+};
 
 type AccessAuthOptions = {
   redirectOnFailure?: boolean;
@@ -60,50 +60,36 @@ export async function getCurrentUserFromAccessRequest(
     return null;
   }
 
-  const [encodedHeader, encodedPayload, encodedSignature] = token.split(".");
-  if (!encodedHeader || !encodedPayload || !encodedSignature) {
-    return null;
-  }
-
-  const header = decodeJsonSegment<AccessJwtHeader>(encodedHeader);
-  const payload = decodeJsonSegment<AccessJwtPayload>(encodedPayload);
-
-  if (header.alg !== "RS256") {
-    return null;
-  }
-
   const expectedAudience = bindings.ACCESS_AUD;
   if (!expectedAudience) {
     throw new Error("ACCESS_AUD is not configured");
   }
+  const teamDomain = bindings.ACCESS_TEAM_DOMAIN;
+  if (!teamDomain) {
+    throw new Error("ACCESS_TEAM_DOMAIN is not configured");
+  }
 
-  const jwks = await loadJwks(bindings);
-  const verificationKey = selectJwk(jwks, header.kid);
-  if (!verificationKey) {
+  let payload: JWTPayload;
+  try {
+    ({ payload } = await jwtVerify(token, resolveAccessJwks(bindings), {
+      algorithms: ["RS256"],
+      audience: expectedAudience,
+      issuer: resolveAccessUrl(teamDomain, ""),
+      requiredClaims: ["exp", "sub"],
+    }));
+  } catch {
+    // 署名・claims 不正と JWKS 取得失敗はいずれも認証拒否として扱う
     return null;
   }
 
-  const validSignature = await verifyRs256Signature(
-    `${encodedHeader}.${encodedPayload}`,
-    encodedSignature,
-    verificationKey,
-  );
-  if (!validSignature) {
-    return null;
-  }
-
-  if (!hasExpectedAudience(payload.aud, expectedAudience)) {
-    return null;
-  }
-
-  if (!isTokenActive(payload.exp) || !payload.sub) {
+  if (typeof payload.sub !== "string" || payload.sub === "") {
     return null;
   }
 
   return {
     id: payload.sub,
-    email: payload.email,
-    claims: payload,
+    email: typeof payload.email === "string" ? payload.email : undefined,
+    claims: payload as AccessJwtPayload,
   };
 }
 

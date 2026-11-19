@@ -7,6 +7,9 @@ const TEST_KEY_ID = "test-access-key";
 const encoder = new TextEncoder();
 
 type JwtOverrides = {
+  iss?: string;
+  nbf?: number;
+  kid?: string;
   aud?: string | string[];
   exp?: number;
   sub?: string;
@@ -21,6 +24,8 @@ type AccessJwk = JsonWebKey & { kid?: string };
 let signerPromise: Promise<SignerState> | null = null;
 
 export const TEST_ACCESS_AUD = "test-access-audience";
+export const TEST_ACCESS_TEAM_DOMAIN = "test-team.cloudflareaccess.com";
+export const TEST_ACCESS_ISSUER = `https://${TEST_ACCESS_TEAM_DOMAIN}`;
 const TEST_PRIVATE_JWK: AccessJwk = {
   kty: "RSA",
   n: "puuPKyVCxnuIEolWMa6tTQCX-MdNi7QAdt7DhB_XOpL9vPD9gZK-3JUhVGHmCvrBFJoaBeu72i5CIQ5uFZi2xkx0_m1Wuzd0Cx3ALWIr1gv3w_n1qEAy88LRa2olF7BB74U5dFvdFZc0i1E40xZc5srcFP2QTsqwwRLX-vNjOgLJ15m_xKlXgNSgzDeIA7YZBMPBnkLbpvkMO8JI3dqzQX3mh1cS41GCQFqM9Wi66fVs-6imzMSLdvfbr3BFbn73NT6R1iaq74fHu-y3JLdk42VLymZxHT7cQMLCoyz9mi61jc0lYpOOh8MomQlFwWwBQOb9SkiwPH-mh4M8JI5cNQ",
@@ -47,7 +52,7 @@ export const setupAccessBindings = async (env: {
 }) => {
   env.ACCESS_AUD = TEST_ACCESS_AUD;
   env.ACCESS_JWKS_JSON = TEST_JWKS_JSON;
-  env.ACCESS_TEAM_DOMAIN = "test-team.cloudflareaccess.com";
+  env.ACCESS_TEAM_DOMAIN = TEST_ACCESS_TEAM_DOMAIN;
 };
 
 export const createAccessJwt = async (overrides: JwtOverrides = {}) => {
@@ -56,15 +61,17 @@ export const createAccessJwt = async (overrides: JwtOverrides = {}) => {
   const header = {
     alg: "RS256",
     typ: "JWT",
-    kid: TEST_KEY_ID,
+    kid: overrides.kid ?? TEST_KEY_ID,
   };
 
+  const { kid: _kid, ...claims } = overrides;
   const payload = {
+    iss: TEST_ACCESS_ISSUER,
     aud: [TEST_ACCESS_AUD],
     exp: Math.floor(Date.now() / 1000) + 300,
     sub: "github|test-user",
     email: "tester@example.com",
-    ...overrides,
+    ...claims,
   };
 
   const encodedHeader = encodeBase64Url(JSON.stringify(header));
