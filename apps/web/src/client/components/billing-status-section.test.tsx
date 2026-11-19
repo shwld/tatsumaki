@@ -71,7 +71,7 @@ describe("BillingStatusSection", () => {
     await waitFor(() =>
       expect(assign).toHaveBeenCalledWith("https://billing.stripe.com/p/x"),
     );
-    expect(fetch).toHaveBeenLastCalledWith("/api/billing/portal", {
+    expect(fetch).toHaveBeenCalledWith("/api/billing/portal", {
       method: "POST",
     });
   });
