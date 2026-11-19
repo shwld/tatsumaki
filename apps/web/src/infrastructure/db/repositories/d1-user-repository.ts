@@ -1,4 +1,4 @@
-import { eq, inArray, or } from "drizzle-orm";
+import { and, eq, inArray, or, sql } from "drizzle-orm";
 import { err, ok, type Result } from "neverthrow";
 import type { User } from "../../../domain/entities/user";
 import type {
@@ -152,9 +152,17 @@ export class D1UserRepository implements UserRepository {
               eq(projectInvitationsTable.acceptedByUserId, id),
             ),
           ),
-        this.db
-          .delete(projectMembersTable)
-          .where(eq(projectMembersTable.userId, id)),
+        this.db.delete(projectMembersTable).where(
+          and(
+            eq(projectMembersTable.userId, id),
+            sql`(${projectMembersTable.role} <> 'owner' OR EXISTS (
+              SELECT 1 FROM project_members other
+              WHERE other.project_id = ${projectMembersTable.projectId}
+                AND other.role = 'owner'
+                AND other.user_id <> ${id}
+            ))`,
+          ),
+        ),
         this.db.delete(usersTable).where(eq(usersTable.id, id)),
       ]);
 

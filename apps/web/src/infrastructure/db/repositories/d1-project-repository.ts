@@ -25,8 +25,12 @@ import type {
   UpdateProjectSettingsInput,
   ProjectRepository,
   ProjectRepositoryError,
+  UpdateMemberRoleError,
 } from "../../../domain/repositories/project-repository";
-import { PROJECT_REPOSITORY_ERROR } from "../../../domain/repositories/project-repository";
+import {
+  LAST_PROJECT_OWNER_ERROR,
+  PROJECT_REPOSITORY_ERROR,
+} from "../../../domain/repositories/project-repository";
 import { createDb, type DbClient } from "../client";
 import {
   projectInvitationsTable,
@@ -587,12 +591,8 @@ export class D1ProjectRepository implements ProjectRepository {
         userId: input.userId,
         role: input.role,
       })
-      .onConflictDoUpdate({
+      .onConflictDoNothing({
         target: [projectMembersTable.projectId, projectMembersTable.userId],
-        set: {
-          role: input.role,
-          updatedAt: sql`CURRENT_TIMESTAMP`,
-        },
       });
 
     const upserted = await this.db
@@ -681,36 +681,42 @@ export class D1ProjectRepository implements ProjectRepository {
     projectId: string;
     userId: string;
     role: ProjectMemberRole;
-  }): Promise<Result<ProjectMember | null, ProjectRepositoryError>> {
-    await this.db
-      .update(projectMembersTable)
+  }): Promise<Result<ProjectMember | null, UpdateMemberRoleError>> {
+    const pm = projectMembersTable;
+    const where = and(
+      eq(pm.projectId, input.projectId),
+      eq(pm.userId, input.userId),
+    );
+
+    const updated = await this.db
+      .update(pm)
       .set({
         role: input.role,
         updatedAt: sql`CURRENT_TIMESTAMP`,
       })
       .where(
         and(
-          eq(projectMembersTable.projectId, input.projectId),
-          eq(projectMembersTable.userId, input.userId),
-        ),
-      );
-
-    const updated = await this.db
-      .select()
-      .from(projectMembersTable)
-      .where(
-        and(
-          eq(projectMembersTable.projectId, input.projectId),
-          eq(projectMembersTable.userId, input.userId),
+          where,
+          sql`(${pm.role} <> 'owner' OR ${input.role} = 'owner' OR EXISTS (
+            SELECT 1 FROM project_members other
+            WHERE other.project_id = ${input.projectId}
+              AND other.role = 'owner'
+              AND other.user_id <> ${input.userId}
+          ))`,
         ),
       )
+      .returning()
       .get();
 
-    if (!updated) {
-      return ok(null);
+    if (updated) {
+      return ok(toProjectMember(updated));
     }
 
-    return ok(toProjectMember(updated));
+    const existing = await this.db.select().from(pm).where(where).get();
+    if (!existing) {
+      return ok(null);
+    }
+    return err(LAST_PROJECT_OWNER_ERROR);
   }
 
   async updatePointScale(input: {
