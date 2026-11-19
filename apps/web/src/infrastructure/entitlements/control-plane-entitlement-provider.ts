@@ -11,6 +11,10 @@ export interface ControlPlaneRpc {
     successUrl: string;
     cancelUrl: string;
   }): Promise<unknown>;
+  listProjectBilling(input: {
+    billingAccountId: string;
+    projectIds: string[];
+  }): Promise<unknown>;
   createPortalSession(input: {
     billingAccountId: string;
     returnUrl: string;

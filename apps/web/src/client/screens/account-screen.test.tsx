@@ -49,6 +49,7 @@ describe("AccountScreen", () => {
       )
       .mockResolvedValueOnce(buildJsonResponse(defaultNotificationSettings))
       .mockResolvedValueOnce(buildJsonResponse(defaultBillingResponse))
+      .mockResolvedValueOnce(buildJsonResponse({ projects: [] }))
       .mockResolvedValueOnce(
         buildJsonResponse({
           id: "github|test-user",
@@ -108,6 +109,7 @@ describe("AccountScreen", () => {
       )
       .mockResolvedValueOnce(buildJsonResponse(defaultNotificationSettings))
       .mockResolvedValueOnce(buildJsonResponse(defaultBillingResponse))
+      .mockResolvedValueOnce(buildJsonResponse({ projects: [] }))
       .mockResolvedValueOnce(
         buildJsonResponse(
           {
@@ -194,6 +196,7 @@ describe("AccountScreen", () => {
       )
       .mockResolvedValueOnce(buildJsonResponse(defaultNotificationSettings))
       .mockResolvedValueOnce(buildJsonResponse(defaultBillingResponse))
+      .mockResolvedValueOnce(buildJsonResponse({ projects: [] }))
       .mockResolvedValueOnce(
         buildJsonResponse({
           ...defaultNotificationSettings,

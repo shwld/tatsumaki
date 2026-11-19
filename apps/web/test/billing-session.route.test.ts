@@ -29,6 +29,7 @@ describe("billing portal route", () => {
         CONTROL_PLANE: {
           getProjectEntitlement: vi.fn(),
           createCheckoutSession: vi.fn(),
+          listProjectBilling: vi.fn(),
           createPortalSession,
         },
       }),
@@ -49,6 +50,7 @@ describe("billing portal route", () => {
         CONTROL_PLANE: {
           getProjectEntitlement: vi.fn(),
           createCheckoutSession: vi.fn(),
+          listProjectBilling: vi.fn(),
           createPortalSession: vi.fn(async () => {
             throw new Error("CUSTOMER_NOT_FOUND");
           }),
@@ -67,6 +69,7 @@ describe("billing portal route", () => {
         CONTROL_PLANE: {
           getProjectEntitlement: vi.fn(),
           createCheckoutSession: vi.fn(),
+          listProjectBilling: vi.fn(),
           createPortalSession: vi.fn(async () => ({
             url: "https://evil.example/p",
           })),

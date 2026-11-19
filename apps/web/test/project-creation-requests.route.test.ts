@@ -58,6 +58,7 @@ const setup = () => {
     CONTROL_PLANE: {
       getProjectEntitlement,
       createCheckoutSession,
+      listProjectBilling: vi.fn(),
       createPortalSession: vi.fn(),
     },
   } as unknown as Bindings;
