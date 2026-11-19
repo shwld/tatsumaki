@@ -20,10 +20,12 @@ const withFetchGate = (
   let lastFetchAt = Number.NEGATIVE_INFINITY;
   return async (protectedHeader, token) => {
     const kid = protectedHeader.kid;
+    const loaded = remote.jwks()?.keys;
     const known =
-      kid !== undefined &&
-      (remote.jwks()?.keys.some((key) => key.kid === kid) ?? false);
-    if (!(remote.fresh && known)) {
+      kid !== undefined && (loaded?.some((key) => key.kid === kid) ?? false);
+    // 鍵が未取得(cold start)・期限切れの取得は正規リクエストを拒否しないよう制限しない。
+    // 取得済みで fresh なのに kid が未知のときだけ cooldown で再取得を絞る。
+    if (loaded && remote.fresh && !known) {
       const now = Date.now();
       if (now - lastFetchAt < JWKS_COOLDOWN_MS) {
         throw new Error("Access JWKS refresh is cooling down");

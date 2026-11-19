@@ -167,7 +167,7 @@ describe("Access JWT verification (remote JWKS)", () => {
       ),
     );
     expect(results.every((r) => r === null)).toBe(true);
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
 
     vi.setSystemTime(Date.now() + 60 * 1000);
     const burst = await Promise.all(
@@ -176,7 +176,19 @@ describe("Access JWT verification (remote JWKS)", () => {
       ),
     );
     expect(burst.every((r) => r === null)).toBe(true);
-    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+  });
+
+  it("accepts concurrent valid requests on a cold cache", async () => {
+    const domain = `cold-${(domainSeq += 1)}.example.test`;
+    const bindings = bindingsFor(domain);
+    const token = await sign(privateKey, "old", domain);
+    const results = await Promise.all(
+      Array.from({ length: 5 }, () =>
+        getCurrentUserFromAccessRequest(requestWith(token), bindings),
+      ),
+    );
+    expect(results.every((r) => r?.id === "github|test-user")).toBe(true);
   });
 
   it("rejects when the JWKS fetch fails", async () => {
