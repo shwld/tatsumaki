@@ -91,6 +91,7 @@ describe("createEntitlementProvider", () => {
         CONTROL_PLANE: {
           getProjectEntitlement: vi.fn(),
           createCheckoutSession: vi.fn(),
+          listProjectBilling: vi.fn(),
           createPortalSession: vi.fn(),
         },
       }),

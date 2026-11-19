@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuthError } from "../contexts/auth-error-context";
 import { isAuthError } from "../lib/api-error";
+import { OwnedProjectSubscriptions } from "./owned-project-subscriptions";
 
 type BillingInfo = {
   mode: "control-plane" | "self-hosted";
@@ -111,6 +112,7 @@ export function BillingStatusSection() {
           >
             {t("billingStatusSection.actions.manage")}
           </button>
+          <OwnedProjectSubscriptions />
           {error ? (
             <p className="text-sm text-red-600" role="alert">
               {error}
