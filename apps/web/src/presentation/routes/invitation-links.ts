@@ -6,6 +6,10 @@ import {
 import { hashInvitationLinkToken } from "../../application/usecases/invitation-link-crypto";
 import { D1ProjectRepository } from "../../infrastructure/db/repositories/d1-project-repository";
 import type { Env } from "../../index";
+import {
+  decideProjectWrite,
+  toProjectWriteDenial,
+} from "../../infrastructure/entitlements/project-write-guard";
 
 export const invitationLinksRoute = new Hono<Env>();
 
@@ -31,10 +35,22 @@ invitationLinksRoute.post("/invitation-links/accept", async (c) => {
     );
   }
 
-  const result = await new D1ProjectRepository(
-    c.env.DB,
-  ).acceptSingleUseInvitation({
-    tokenHash: await hashInvitationLinkToken(token),
+  const repository = new D1ProjectRepository(c.env.DB);
+  const tokenHash = await hashInvitationLinkToken(token);
+  const pending =
+    await repository.findActiveSingleUseInvitationByTokenHash(tokenHash);
+  if (pending.isErr()) {
+    return c.json({ error: "Failed to accept invitation" }, 500);
+  }
+  if (pending.value) {
+    const denial = toProjectWriteDenial(
+      await decideProjectWrite(c.env, pending.value.projectId),
+    );
+    if (denial) return c.json(denial.body, denial.status);
+  }
+
+  const result = await repository.acceptSingleUseInvitation({
+    tokenHash,
     userId: currentUser.id,
     email: emailResult.value,
     displayName: deriveInitialDisplayName(currentUser.id, emailResult.value),

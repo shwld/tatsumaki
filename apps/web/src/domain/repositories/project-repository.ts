@@ -83,6 +83,9 @@ export interface ProjectRepository {
     projectId: string,
     invitationId: string,
   ): Promise<Result<ProjectInvitation | null, ProjectRepositoryError>>;
+  findActiveSingleUseInvitationByTokenHash(
+    tokenHash: string,
+  ): Promise<Result<ProjectInvitation | null, ProjectRepositoryError>>;
   findPendingInvitationByTarget(input: {
     projectId: string;
     targetUserId: string | null;
