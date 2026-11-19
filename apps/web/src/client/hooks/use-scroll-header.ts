@@ -69,7 +69,16 @@ export function useScrollHeader({
       if (top <= 8) {
         setHidden(false);
       } else if (delta !== 0 && distance >= 12) {
-        setHidden(direction > 0);
+        if (direction > 0) {
+          // Hiding grows the panel viewport by the header height. Without enough
+          // overflow left afterwards, nothing can scroll up to reveal it again.
+          const headerHeight = header?.offsetHeight ?? 0;
+          if (maxTop === undefined || maxTop - headerHeight > 8) {
+            setHidden(true);
+          }
+        } else {
+          setHidden(false);
+        }
       }
     },
     [headerRef, pinned],

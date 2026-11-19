@@ -7,6 +7,54 @@ import {
   themeVariants,
 } from "./helpers";
 
+test("header stays recoverable when overflow is smaller than the header", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockAuthMe(page);
+  await mockStoriesList(page);
+  await page.route("**/api/projects/project-1/stories?**", async (route) => {
+    await route.fulfill({
+      json: {
+        stories: Array.from({ length: 6 }, (_, index) => ({
+          ...mockStoriesResponse.stories[0],
+          id: `short-story-${index}`,
+          storyNumber: index + 1,
+          title: `Short story ${index + 1}`,
+          position: index,
+        })),
+      },
+    });
+  });
+  await page.goto("/projects/project-1");
+  const header = page.getByTestId("app-header-container");
+  const panel = page.getByTestId("panel-scroll-Current");
+  await expect(panel.getByText("Short story 1", { exact: true })).toBeVisible();
+
+  const { content, panel: panelHeight } = await panel.evaluate((el) => {
+    const { flex, height } = el.style;
+    el.style.flex = "none";
+    el.style.height = "0px";
+    const content = el.scrollHeight;
+    el.style.flex = flex;
+    el.style.height = height;
+    return { content, panel: el.clientHeight };
+  });
+  // Make the panel overflow by 30px, less than the 48px header.
+  await page.setViewportSize({
+    width: 1440,
+    height: 900 - (panelHeight - (content - 30)),
+  });
+  await expect
+    .poll(() => panel.evaluate((el) => el.scrollHeight - el.clientHeight))
+    .toBe(30);
+
+  await panel.hover();
+  await page.mouse.wheel(0, 500);
+  await page.mouse.wheel(0, 500);
+  await expect(header).toHaveAttribute("data-hidden", "false");
+});
+
 for (const theme of themeVariants) {
   for (const width of [1440, 390]) {
     test(`compact header scrolling (${theme}, ${width})`, async ({ page }) => {
