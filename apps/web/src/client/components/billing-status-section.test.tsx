@@ -76,6 +76,49 @@ describe("BillingStatusSection", () => {
     });
   });
 
+  it("opens the portal once for a double click and states the customer-wide scope", async () => {
+    routeFetch({
+      "GET /api/billing/entitlement": hosted,
+      "GET /api/billing/subscriptions": emptyList,
+      "POST /api/billing/portal": () =>
+        json({ url: "https://billing.stripe.com/p/x" }),
+    });
+    renderSection();
+
+    const button = await screen.findByRole("button", { name: "支払いを管理" });
+    expect(screen.getByText(/全プロジェクトの支払いをまとめて/)).toBeTruthy();
+    fireEvent.click(button);
+    fireEvent.click(button);
+
+    await waitFor(() => expect(assign).toHaveBeenCalledTimes(1));
+    expect(
+      vi
+        .mocked(fetch)
+        .mock.calls.filter(([url]) => url === "/api/billing/portal"),
+    ).toHaveLength(1);
+  });
+
+  it("reloads subscriptions when the page is restored from the back/forward cache", async () => {
+    routeFetch({
+      "GET /api/billing/entitlement": hosted,
+      "GET /api/billing/subscriptions": emptyList,
+    });
+    renderSection();
+    await screen.findByText("所有しているプロジェクトはありません。");
+    const count = () =>
+      vi
+        .mocked(fetch)
+        .mock.calls.filter(([url]) => url === "/api/billing/subscriptions")
+        .length;
+    expect(count()).toBe(1);
+
+    const event = new Event("pageshow") as PageTransitionEvent;
+    Object.defineProperty(event, "persisted", { value: true });
+    window.dispatchEvent(event);
+
+    await waitFor(() => expect(count()).toBe(2));
+  });
+
   it("shows an error when the portal cannot be opened", async () => {
     routeFetch({
       "GET /api/billing/entitlement": hosted,

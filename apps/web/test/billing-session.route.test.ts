@@ -79,4 +79,41 @@ describe("billing portal route", () => {
 
     expect(response.status).toBe(503);
   });
+
+  it("keeps the portal available while checkout is disabled and never logs the session URL", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const ok = await buildApp().request(
+      "https://tatsumaki.example/billing/portal",
+      { method: "POST" },
+      buildBindings({
+        CHECKOUT_ENABLED: "false",
+        CONTROL_PLANE: {
+          getProjectEntitlement: vi.fn(),
+          createCheckoutSession: vi.fn(),
+          listProjectBilling: vi.fn(),
+          createPortalSession: vi.fn(async () => ({
+            url: "https://billing.stripe.com/p/session/ok",
+          })),
+        },
+      }),
+    );
+    expect(ok.status).toBe(200);
+
+    await buildApp().request(
+      "https://tatsumaki.example/billing/portal",
+      { method: "POST" },
+      buildBindings({
+        CONTROL_PLANE: {
+          getProjectEntitlement: vi.fn(),
+          createCheckoutSession: vi.fn(),
+          listProjectBilling: vi.fn(),
+          createPortalSession: vi.fn(async () => ({
+            url: "https://evil.example/secret-token",
+          })),
+        },
+      }),
+    );
+    expect(JSON.stringify(errorSpy.mock.calls)).not.toContain("secret-token");
+    errorSpy.mockRestore();
+  });
 });

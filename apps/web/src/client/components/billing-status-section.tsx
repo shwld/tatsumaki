@@ -51,8 +51,10 @@ export function BillingStatusSection() {
   }, [notifySessionExpired]);
 
   const openPortal = async () => {
+    if (pending) return;
     setPending(true);
     setError(null);
+    let navigating = false;
     try {
       const response = await fetch("/api/billing/portal", { method: "POST" });
       if (!response.ok) {
@@ -68,11 +70,12 @@ export function BillingStatusSection() {
         setError(t("billingStatusSection.actions.error"));
         return;
       }
+      navigating = true;
       window.location.assign(data.url);
     } catch {
       setError(t("billingStatusSection.actions.error"));
     } finally {
-      setPending(false);
+      if (!navigating) setPending(false);
     }
   };
 
@@ -103,6 +106,9 @@ export function BillingStatusSection() {
         <div className="space-y-2">
           <p className="text-sm text-gray-600">
             {t("billingStatusSection.guidance.perProject")}
+          </p>
+          <p className="text-sm text-gray-600">
+            {t("billingStatusSection.portalScope")}
           </p>
           <button
             type="button"
