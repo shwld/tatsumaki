@@ -22,20 +22,23 @@ export function ProjectBillingBanner({ billing }: { billing: ProjectBilling }) {
   const [searchParams] = useSearchParams();
   const isOwner = billing.role === "owner";
   const returned = searchParams.get("billing");
-  const waitingForResume =
+  const settling =
     returned === "resume" &&
-    (billing.state === "suspended" || billing.state === "loading");
+    (billing.state === "suspended" ||
+      billing.state === "loading" ||
+      billing.state === "unknown");
+  const waitingForResume = settling && billing.state !== "unknown";
   const [pollCount, setPollCount] = useState(0);
   const { refresh } = billing;
 
   useEffect(() => {
-    if (!waitingForResume || pollCount >= SETTLE_POLL_LIMIT) return;
+    if (!settling || pollCount >= SETTLE_POLL_LIMIT) return;
     const timer = window.setTimeout(() => {
       setPollCount((n) => n + 1);
       refresh();
     }, SETTLE_POLL_INTERVAL_MS);
     return () => window.clearTimeout(timer);
-  }, [waitingForResume, pollCount, refresh]);
+  }, [settling, pollCount, refresh]);
 
   if (billing.state === "active" || billing.state === "loading") return null;
   if (billing.state === "grace" && !isOwner) return null;

@@ -203,6 +203,32 @@ describe("ProjectBillingScope", () => {
       expect(screen.queryByTestId("project-billing-banner")).toBeNull();
     });
 
+    it("keeps polling after a transient failure on return from checkout", async () => {
+      vi.useFakeTimers();
+      let calls = 0;
+      vi.mocked(fetch).mockImplementation(async () => {
+        calls += 1;
+        return calls === 1
+          ? json({ error: "x" }, 503)
+          : json({ state: "active", role: "owner", validUntil: null });
+      });
+      render(
+        <MemoryRouter initialEntries={["/projects/p1?billing=resume"]}>
+          <AuthErrorProvider>
+            <ProjectBillingScope>
+              <Probe />
+            </ProjectBillingScope>
+          </AuthErrorProvider>
+        </MemoryRouter>,
+      );
+      await act(async () => {});
+      expect(screen.getByText("read-only")).toBeTruthy();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5_000);
+      });
+      expect(screen.getByText("editable")).toBeTruthy();
+    });
+
     it("applies a slow active answer even when polling asks again before it arrives", async () => {
       vi.useFakeTimers();
       let calls = 0;
