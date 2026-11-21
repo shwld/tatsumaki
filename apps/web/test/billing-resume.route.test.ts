@@ -1,5 +1,6 @@
 import { env } from "cloudflare:test";
 import { Hono } from "hono";
+import { z } from "zod";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { D1ProjectRepository } from "../src/infrastructure/db/repositories/d1-project-repository";
 import type { Bindings, Env } from "../src/index";
@@ -137,6 +138,7 @@ describe("billing resume route", () => {
     );
     expect(ids).toHaveLength(2);
     expect(ids[0]).toBe(ids[1]);
+    expect(z.uuid().safeParse(ids[0]).success).toBe(true);
   });
 
   it("rejects non-owner members and hides the project from non-members", async () => {
