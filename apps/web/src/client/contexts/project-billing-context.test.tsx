@@ -203,6 +203,39 @@ describe("ProjectBillingScope", () => {
       expect(screen.queryByTestId("project-billing-banner")).toBeNull();
     });
 
+    it("applies a slow active answer even when polling asks again before it arrives", async () => {
+      vi.useFakeTimers();
+      let calls = 0;
+      vi.mocked(fetch).mockImplementation(async () => {
+        calls += 1;
+        if (calls === 1) {
+          return json({ state: "suspended", role: "owner", validUntil: null });
+        }
+        await new Promise((resolve) => setTimeout(resolve, 7_000));
+        return json({ state: "active", role: "owner", validUntil: null });
+      });
+      render(
+        <MemoryRouter initialEntries={["/projects/p1?billing=resume"]}>
+          <AuthErrorProvider>
+            <ProjectBillingScope>
+              <Probe />
+            </ProjectBillingScope>
+          </AuthErrorProvider>
+        </MemoryRouter>,
+      );
+      await act(async () => {});
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5_000);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5_000);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3_000);
+      });
+      expect(screen.getByText("editable")).toBeTruthy();
+    });
+
     it("tells the owner nothing was charged after a canceled checkout", async () => {
       respond({ state: "suspended", role: "owner", validUntil: null });
       render(
