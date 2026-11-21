@@ -74,6 +74,14 @@ export function OwnedProjectSubscriptions() {
   }, [notifySessionExpired, attempt]);
 
   const reload = useCallback(() => setAttempt((value) => value + 1), []);
+
+  useEffect(() => {
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) reload();
+    };
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
+  }, [reload]);
   const locale = i18n.language;
 
   const nextBillingText = (nextBilling: NextBilling) => {

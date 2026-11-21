@@ -74,3 +74,13 @@
 - ストーリー作成・編集・並べ替え、ラベル・Story Map の編集入口はこのフックで無効にする。新しい編集入口を足すときも使う。
 - 状態を読めないときは active とみなさず、書き込み不可と再試行を出す。閲覧は続く。
 - オーナーには支払い管理(customer 単位の Portal)を出す。再購読ボタンは R2 の再開処理(01M7CM4B00A7JKF91BW3NTNS8F)ができるまで出さない。
+
+## 支払い管理 Portal の運用(story #441)
+
+`POST /billing/portal` は `currentUser.id` の customer 単位の Stripe Portal を開き、`/account` に戻す。`CHECKOUT_ENABLED` や課金状態(`suspended` を含む)では止めない。`/account` の購読一覧は、Portal から戻ったとき(bfcache 復帰を含む)に再取得する。
+
+- Portal で使えるのは支払い方法の更新と請求履歴・領収書の閲覧だけ。プラン・数量の変更は Stripe の Portal 設定で無効にする。本体にカード入力や請求書発行は実装しない。
+- プロジェクトを選ぶ解約は後続の専用フローで扱う。
+- test mode の設定と確認: Portal 設定で「支払い方法の更新」「請求履歴」を有効、「サブスクリプションの更新・数量変更」を無効にし、test card で更新と請求書閲覧を確認する。
+- 税込 Price・Stripe Tax・適格請求書登録番号は公開準備 #417 の担当で、本 story では確認済みとして扱わない。
+

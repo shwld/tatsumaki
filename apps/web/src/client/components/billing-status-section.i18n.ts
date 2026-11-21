@@ -8,6 +8,8 @@ export const billingStatusSectionJa = {
       manage: "支払いを管理",
       error: "処理を開始できませんでした。時間をおいてもう一度お試しください。",
     },
+    portalScope:
+      "支払い方法の更新と請求書・領収書の確認は、あなたの所有する全プロジェクトの支払いをまとめて扱う Stripe の画面で行います。プランや数量の変更はできません。",
     subscriptions: {
       title: "所有プロジェクトの購読",
       loading: "購読状況を読み込み中...",
@@ -43,6 +45,8 @@ export const billingStatusSectionEn = {
       manage: "Manage payment",
       error: "Could not start the request. Please try again in a moment.",
     },
+    portalScope:
+      "Update payment methods and view invoices and receipts in Stripe. This covers the payments for all projects you own together. Plans and quantities cannot be changed there.",
     subscriptions: {
       title: "Subscriptions for projects you own",
       loading: "Loading subscriptions...",
