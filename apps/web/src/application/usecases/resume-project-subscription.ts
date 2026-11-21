@@ -61,12 +61,15 @@ export async function resumeProjectSubscription(
     );
     if (state !== "suspended") return err(RESUME_NOT_SUSPENDED_ERROR);
 
-    const [billing] = await deps.billing.listProjectBilling({
-      billingAccountId: input.userId,
-      projectIds: [input.projectId],
-    });
+    const billing = (
+      await deps.billing.listProjectBilling({
+        billingAccountId: input.userId,
+        projectIds: [input.projectId],
+      })
+    ).find((entry) => entry.projectId === input.projectId);
+    if (!billing) return err(RESUME_UNAVAILABLE_ERROR);
     if (
-      billing?.subscription &&
+      billing.subscription &&
       !TERMINAL_SUBSCRIPTION_STATUSES.has(billing.subscription.status)
     ) {
       return err(RESUME_PAYMENT_ACTION_REQUIRED_ERROR);

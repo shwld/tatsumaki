@@ -23,6 +23,7 @@ type Options = {
   entitlementFails?: boolean;
   checkoutFails?: boolean;
   checkoutEnabled?: boolean;
+  omitBilling?: boolean;
 };
 
 const setup = (options: Options = {}) => {
@@ -42,7 +43,7 @@ const setup = (options: Options = {}) => {
   });
   const listProjectBilling = vi.fn(
     async ({ projectIds }: { projectIds: string[] }) => ({
-      projects: projectIds.map((projectId) => ({
+      projects: (options.omitBilling ? [] : projectIds).map((projectId) => ({
         projectId,
         entitlementState: options.state ?? "suspended",
         subscription:
@@ -214,6 +215,13 @@ describe("billing resume route", () => {
     const projectId = await createProject("owner");
     const { resume } = setup(options);
     expect((await resume("owner", projectId)).status).toBe(503);
+  });
+
+  it("does not create a checkout when the billing record for the project is missing", async () => {
+    const projectId = await createProject("owner");
+    const { resume, createCheckoutSession } = setup({ omitBilling: true });
+    expect((await resume("owner", projectId)).status).toBe(503);
+    expect(createCheckoutSession).not.toHaveBeenCalled();
   });
 
   it("is unavailable on self-hosted", async () => {
