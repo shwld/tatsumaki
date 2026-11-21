@@ -19,6 +19,11 @@ export interface ControlPlaneRpc {
     billingAccountId: string;
     returnUrl: string;
   }): Promise<unknown>;
+  createSubscriptionCancelSession(input: {
+    billingAccountId: string;
+    projectId: string;
+    returnUrl: string;
+  }): Promise<unknown>;
 }
 
 const STRIPE_SESSION_HOSTS = new Set([

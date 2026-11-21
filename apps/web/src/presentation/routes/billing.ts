@@ -16,6 +16,14 @@ import {
   RESUME_PAYMENT_ACTION_REQUIRED_ERROR,
   resumeProjectSubscription,
 } from "../../application/usecases/resume-project-subscription";
+import {
+  CANCEL_ALREADY_SCHEDULED_ERROR,
+  CANCEL_FORBIDDEN_ERROR,
+  CANCEL_NO_SUBSCRIPTION_ERROR,
+  CANCEL_NOT_FOUND_ERROR,
+  startProjectSubscriptionCancel,
+} from "../../application/usecases/start-project-subscription-cancel";
+import { ControlPlaneSubscriptionCancelGateway } from "../../infrastructure/entitlements/control-plane-subscription-cancel-gateway";
 import { ControlPlaneCheckoutGateway } from "../../infrastructure/entitlements/control-plane-checkout-gateway";
 import { D1ProjectRepository } from "../../infrastructure/db/repositories/d1-project-repository";
 import { ControlPlaneProjectBillingGateway } from "../../infrastructure/entitlements/control-plane-project-billing-gateway";
@@ -153,5 +161,52 @@ billingRoute.post("/billing/projects/:projectId/resume", async (c) => {
     default:
       console.error("Failed to start project resume", { reason: result.error });
       return c.json({ error: "Resume is temporarily unavailable" }, 503);
+  }
+});
+
+billingRoute.post("/billing/projects/:projectId/cancel", async (c) => {
+  if (c.env.ENTITLEMENT_MODE !== "control-plane" || !c.env.CONTROL_PLANE) {
+    return c.json({ error: "Billing is not available" }, 409);
+  }
+  const projectId = c.req.param("projectId");
+  const origin = new URL(c.req.url).origin;
+
+  const result = await startProjectSubscriptionCancel(
+    {
+      projects: new D1ProjectRepository(c.env.DB),
+      billing: new ControlPlaneProjectBillingGateway(c.env.CONTROL_PLANE),
+      cancel: new ControlPlaneSubscriptionCancelGateway(c.env.CONTROL_PLANE),
+    },
+    {
+      userId: c.get("currentUser").id,
+      projectId,
+      returnUrl: `${origin}/account?billing=cancel`,
+    },
+  );
+
+  if (result.isOk()) return c.json({ url: result.value.url }, 201);
+  switch (result.error) {
+    case CANCEL_NOT_FOUND_ERROR:
+      return c.json({ error: "Project not found" }, 404);
+    case CANCEL_FORBIDDEN_ERROR:
+      return c.json({ error: "Only the owner can cancel" }, 403);
+    case CANCEL_NO_SUBSCRIPTION_ERROR:
+      return c.json(
+        { error: "No active subscription", code: "no_subscription" },
+        409,
+      );
+    case CANCEL_ALREADY_SCHEDULED_ERROR:
+      return c.json(
+        {
+          error: "Cancellation is already scheduled",
+          code: "already_scheduled",
+        },
+        409,
+      );
+    default:
+      console.error("Failed to start subscription cancellation", {
+        reason: result.error,
+      });
+      return c.json({ error: "Cancellation is temporarily unavailable" }, 503);
   }
 });

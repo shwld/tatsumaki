@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useSearchParams } from "react-router";
 import { useAuthError } from "../contexts/auth-error-context";
 import { isAuthError } from "../lib/api-error";
 
@@ -12,7 +13,11 @@ type ProjectSubscription = {
   projectId: string;
   projectName: string;
   entitlementState: "active" | "grace" | "suspended";
-  subscription: { endsAt: string | null; nextBilling: NextBilling } | null;
+  subscription: {
+    status: string;
+    endsAt: string | null;
+    nextBilling: NextBilling;
+  } | null;
 };
 
 type LoadState =
@@ -34,11 +39,20 @@ const formatAmount = (minor: number, currency: string, locale: string) => {
   return formatter.format(minor / 10 ** digits);
 };
 
+const TERMINAL_STATUSES = new Set(["canceled", "incomplete_expired"]);
+
 export function OwnedProjectSubscriptions() {
   const { t, i18n } = useTranslation();
   const { notifySessionExpired } = useAuthError();
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [attempt, setAttempt] = useState(0);
+  const [cancelingId, setCancelingId] = useState<string | null>(null);
+  const [cancelNotice, setCancelNotice] = useState<{
+    projectId: string;
+    kind: "error" | "stale";
+  } | null>(null);
+  const [searchParams] = useSearchParams();
+  const returnedFromCancel = searchParams.get("billing") === "cancel";
 
   useEffect(() => {
     let ignore = false;
@@ -84,6 +98,42 @@ export function OwnedProjectSubscriptions() {
   }, [reload]);
   const locale = i18n.language;
 
+  const cancel = async (projectId: string) => {
+    setCancelingId(projectId);
+    setCancelNotice(null);
+    try {
+      const response = await fetch(
+        `/api/billing/projects/${encodeURIComponent(projectId)}/cancel`,
+        { method: "POST" },
+      );
+      if (isAuthError(response.status)) {
+        notifySessionExpired();
+        return;
+      }
+      const data = (await response.json().catch(() => ({}))) as {
+        url?: string;
+        code?: string;
+      };
+      if (response.ok && data.url) {
+        window.location.assign(data.url);
+        return;
+      }
+      if (
+        data.code === "no_subscription" ||
+        data.code === "already_scheduled"
+      ) {
+        setCancelNotice({ projectId, kind: "stale" });
+        reload();
+      } else {
+        setCancelNotice({ projectId, kind: "error" });
+      }
+    } catch {
+      setCancelNotice({ projectId, kind: "error" });
+    } finally {
+      setCancelingId(null);
+    }
+  };
+
   const nextBillingText = (nextBilling: NextBilling) => {
     if (nextBilling.status === "scheduled") {
       return `${formatDate(nextBilling.date, locale)} / ${formatAmount(
@@ -102,6 +152,11 @@ export function OwnedProjectSubscriptions() {
       <h3 className="text-sm font-semibold text-gray-900">
         {t("billingStatusSection.subscriptions.title")}
       </h3>
+      {returnedFromCancel ? (
+        <p className="text-sm text-gray-600" role="status">
+          {t("billingStatusSection.subscriptions.cancel.returned")}
+        </p>
+      ) : null}
       {state.status === "loading" ? (
         <p className="text-sm text-gray-600">
           {t("billingStatusSection.subscriptions.loading")}
@@ -150,8 +205,30 @@ export function OwnedProjectSubscriptions() {
                       {formatDate(project.subscription.endsAt, locale)}
                     </p>
                   ) : null}
+                  {!TERMINAL_STATUSES.has(project.subscription.status) &&
+                  project.subscription.endsAt === null ? (
+                    <button
+                      type="button"
+                      className="inline-flex min-h-11 items-center justify-center rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-800 transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={cancelingId !== null}
+                      aria-label={t(
+                        "billingStatusSection.subscriptions.cancel.buttonFor",
+                        { name: project.projectName },
+                      )}
+                      onClick={() => void cancel(project.projectId)}
+                    >
+                      {t("billingStatusSection.subscriptions.cancel.button")}
+                    </button>
+                  ) : null}
                 </>
               )}
+              {cancelNotice?.projectId === project.projectId ? (
+                <p className="text-red-600" role="alert">
+                  {t(
+                    `billingStatusSection.subscriptions.cancel.${cancelNotice.kind}`,
+                  )}
+                </p>
+              ) : null}
             </li>
           ))}
         </ul>

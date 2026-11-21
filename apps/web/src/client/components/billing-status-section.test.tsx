@@ -222,6 +222,124 @@ describe("BillingStatusSection", () => {
     expect(rows[3]?.textContent).toContain("購読なし");
   });
 
+  const twoProjects = () =>
+    json({
+      projects: [
+        {
+          projectId: "p1",
+          projectName: "Alpha",
+          entitlementState: "active",
+          subscription: {
+            status: "active",
+            endsAt: null,
+            nextBilling: { status: "none" },
+          },
+        },
+        {
+          projectId: "p2",
+          projectName: "Beta",
+          entitlementState: "active",
+          subscription: {
+            status: "active",
+            endsAt: "2026-12-25T12:00:00.000Z",
+            nextBilling: { status: "none" },
+          },
+        },
+        {
+          projectId: "p3",
+          projectName: "Gamma",
+          entitlementState: "suspended",
+          subscription: {
+            status: "canceled",
+            endsAt: null,
+            nextBilling: { status: "none" },
+          },
+        },
+      ],
+    });
+
+  it("offers cancellation only for a live subscription not already scheduled to end", async () => {
+    routeFetch({
+      "GET /api/billing/entitlement": hosted,
+      "GET /api/billing/subscriptions": twoProjects,
+    });
+    renderSection();
+
+    await screen.findAllByRole("listitem");
+    expect(
+      screen.getAllByRole("button", { name: /期間末に解約/ }),
+    ).toHaveLength(1);
+    expect(
+      screen.getByRole("button", { name: "Alpha の購読を期間末に解約" }),
+    ).toBeTruthy();
+  });
+
+  it("sends only the project id to start the cancellation and follows the returned URL", async () => {
+    routeFetch({
+      "GET /api/billing/entitlement": hosted,
+      "GET /api/billing/subscriptions": twoProjects,
+      "POST /api/billing/projects/p1/cancel": () =>
+        json({ url: "https://billing.stripe.com/p/session/cancel" }, 201),
+    });
+    renderSection();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Alpha の購読を期間末に解約" }),
+    );
+
+    await waitFor(() =>
+      expect(assign).toHaveBeenCalledWith(
+        "https://billing.stripe.com/p/session/cancel",
+      ),
+    );
+    expect(fetch).toHaveBeenCalledWith("/api/billing/projects/p1/cancel", {
+      method: "POST",
+    });
+  });
+
+  it("does not claim the subscription is canceled when the session cannot be created", async () => {
+    routeFetch({
+      "GET /api/billing/entitlement": hosted,
+      "GET /api/billing/subscriptions": twoProjects,
+      "POST /api/billing/projects/p1/cancel": () =>
+        json({ error: "down" }, 503),
+    });
+    renderSection();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Alpha の購読を期間末に解約" }),
+    );
+
+    expect(
+      await screen.findByText(/解約の確認画面を開けませんでした/),
+    ).toBeTruthy();
+    expect(assign).not.toHaveBeenCalled();
+    expect(screen.queryByText(/終了予定日: 2026\/12\/2[^5]/)).toBeNull();
+  });
+
+  it("reloads the list when the subscription state had already changed", async () => {
+    let listCalls = 0;
+    routeFetch({
+      "GET /api/billing/entitlement": hosted,
+      "GET /api/billing/subscriptions": () => {
+        listCalls += 1;
+        return twoProjects();
+      },
+      "POST /api/billing/projects/p1/cancel": () =>
+        json({ error: "x", code: "already_scheduled" }, 409),
+    });
+    renderSection();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Alpha の購読を期間末に解約" }),
+    );
+
+    expect(
+      await screen.findByText(/購読の状態が変わっていました/),
+    ).toBeTruthy();
+    await waitFor(() => expect(listCalls).toBe(2));
+  });
+
   it("shows an empty state when the user owns no projects", async () => {
     routeFetch({
       "GET /api/billing/entitlement": hosted,
