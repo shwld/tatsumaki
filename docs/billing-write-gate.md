@@ -39,7 +39,7 @@
 - `DELETE /projects/:projectId`(オーナーの削除)。ルート側でオーナーを確認する。
 - `POST /projects`、`/project-creation-requests`(作成。権利が `active` になった後に別経路で行う)。
 - `POST /invitation-links/accept`(パスにプロジェクト ID がない参加。メンバーを増やすのは編集にあたらないが、必要になれば受諾時に判定する)。
-- `/auth/me/**`(個人設定)、`POST /billing/portal`、onboarding。
+- `/auth/me/**`(個人設定)、`POST /billing/portal`、`POST /billing/projects/:projectId/resume`(再購読)、onboarding。
 - メンバー本人の脱退: 現在そのルートは存在しない。追加するときはこの一覧に加え、ゲートから除外する。
 - 読み取り(GET/HEAD/OPTIONS、および MCP の読み取り tool)。
 
@@ -73,7 +73,7 @@
 
 - ストーリー作成・編集・並べ替え、ラベル・Story Map の編集入口はこのフックで無効にする。新しい編集入口を足すときも使う。
 - 状態を読めないときは active とみなさず、書き込み不可と再試行を出す。閲覧は続く。
-- オーナーには支払い管理(customer 単位の Portal)を出す。再購読ボタンは R2 の再開処理(01M7CM4B00A7JKF91BW3NTNS8F)ができるまで出さない。
+- オーナーには支払い管理(customer 単位の Portal)を出す。`suspended` のオーナーには再購読ボタンも出す(story #442、下記)。
 
 ## 支払い管理 Portal の運用(story #441)
 
@@ -84,3 +84,18 @@
 - test mode の設定と確認: Portal 設定で「支払い方法の更新」「請求履歴」を有効、「サブスクリプションの更新・数量変更」を無効にし、test card で更新と請求書閲覧を確認する。
 - 税込 Price・Stripe Tax・適格請求書登録番号は公開準備 #417 の担当で、本 story では確認済みとして扱わない。
 
+## 停止したプロジェクトの再購読(story #442)
+
+`POST /billing/projects/:projectId/resume` は、オーナーが同じ projectId の Checkout を始める。`/projects/` 配下に置かないので書き込みゲートの対象外で、課金回復のためだけに停止中でも通る。
+
+| 条件 | 応答 |
+| --- | --- |
+| オーナー | 続行 |
+| 非オーナーのメンバー / 非メンバー | 403 / 404 |
+| 権利が `active` / `grace` | 409 `not_suspended`(重複購入させない) |
+| 終了していない購読がある(`past_due`、`unpaid` など) | 409 `payment_action_required`。画面は新規購入せず Portal へ誘導 |
+| 購読なし / `canceled` / `incomplete_expired` | `CHECKOUT_ENABLED=true` なら Checkout の URL(201)、false なら 409 `checkout_disabled`(Portal は引き続き使える) |
+| Control Plane 障害 | 503(編集は開放しない) |
+
+- Checkout の `requestId` は projectId と UTC 日付から決めるので、二重クリック・再試行は同じセッションになる。重複購読の最終拒否は Control Plane の `checkoutRefusal`。
+- 戻り先は `/projects/:projectId?billing=resume`(キャンセルは `resume-cancel`)。戻り URL だけでは権利を与えず、バナーが権利を再取得して `active` になるまで読み取り専用のまま待つ(5 秒間隔で最大 2 分、その後は再読み込みを案内)。

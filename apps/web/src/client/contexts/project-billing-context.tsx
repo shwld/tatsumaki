@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -19,6 +20,7 @@ export type ProjectBillingState =
   | "unknown";
 
 export type ProjectBilling = {
+  projectId: string;
   state: ProjectBillingState;
   role: "owner" | "member" | "viewer" | null;
   validUntil: string | null;
@@ -29,7 +31,7 @@ const POLL_INTERVAL_MS = 60_000;
 
 const ProjectBillingContext = createContext<ProjectBilling | null>(null);
 
-type Loaded = Omit<ProjectBilling, "refresh">;
+type Loaded = Omit<ProjectBilling, "refresh" | "projectId">;
 
 // ADR-0015: a state that cannot be read is never treated as active.
 // Writes stay off and viewing continues.
@@ -41,16 +43,17 @@ export function ProjectBillingScope({ children }: { children: ReactNode }) {
     projectId: string;
     value: Loaded;
   } | null>(null);
-  const [tick, setTick] = useState(0);
-  const refresh = useCallback(() => setTick((n) => n + 1), []);
+  const runRef = useRef<(() => void) | null>(null);
+  const refresh = useCallback(() => runRef.current?.(), []);
   const { notifySessionExpired } = useAuthError();
 
   useEffect(() => {
     if (!projectId) return;
     let ignore = false;
-    let latest = 0;
+    let issued = 0;
+    let applied = 0;
     const run = async () => {
-      const seq = ++latest;
+      const seq = ++issued;
       let value: Loaded = { state: "unknown", role: null, validUntil: null };
       try {
         const response = await fetch(
@@ -76,8 +79,11 @@ export function ProjectBillingScope({ children }: { children: ReactNode }) {
       } catch {
         // keep the fail-closed "unknown" value
       }
-      if (!ignore && seq === latest) setLoaded({ projectId, value });
+      if (ignore || seq < applied) return;
+      applied = seq;
+      setLoaded({ projectId, value });
     };
+    runRef.current = () => void run();
     void run();
     const timer = window.setInterval(() => void run(), POLL_INTERVAL_MS);
     const onVisible = () => {
@@ -86,10 +92,11 @@ export function ProjectBillingScope({ children }: { children: ReactNode }) {
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       ignore = true;
+      runRef.current = null;
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [projectId, tick, notifySessionExpired]);
+  }, [projectId, notifySessionExpired]);
 
   const current =
     loaded && loaded.projectId === projectId ? loaded.value : null;
@@ -100,7 +107,7 @@ export function ProjectBillingScope({ children }: { children: ReactNode }) {
       role: null,
       validUntil: null,
     };
-    return { ...base, refresh };
+    return { ...base, projectId, refresh };
   }, [projectId, current, refresh]);
 
   return (

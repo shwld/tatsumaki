@@ -84,14 +84,209 @@ describe("ProjectBillingScope", () => {
     expect(screen.getByText("read-only")).toBeTruthy();
   });
 
-  it("guides the owner without a resubscribe button while resuming is not available", async () => {
+  it("offers the owner a resume button and keeps editing off", async () => {
     respond({ state: "suspended", role: "owner", validUntil: null });
     renderScope();
-    const banner = await screen.findByTestId("project-billing-banner");
-    expect(banner.textContent).toContain("再開機能は準備中");
-    expect(screen.getAllByRole("button")).toHaveLength(1);
+    await screen.findByTestId("project-billing-banner");
+    expect(
+      screen.getByRole("button", { name: "プロジェクトを再開" }),
+    ).toBeTruthy();
     expect(screen.getByRole("button", { name: "支払いを管理" })).toBeTruthy();
     expect(screen.getByText("read-only")).toBeTruthy();
+  });
+
+  describe("resuming", () => {
+    const assign = vi.fn();
+    beforeEach(() => {
+      vi.stubGlobal("location", { ...window.location, assign });
+    });
+    afterEach(() => assign.mockReset());
+
+    const suspendedOwner = () =>
+      vi.mocked(fetch).mockImplementation(async (input, init) => {
+        if (String(input).endsWith("/resume")) {
+          return resumeResponse();
+        }
+        expect(init?.method).toBeUndefined();
+        return json({ state: "suspended", role: "owner", validUntil: null });
+      });
+    let resumeResponse: () => Response;
+
+    it("sends the owner to checkout for the same project", async () => {
+      resumeResponse = () =>
+        json({ url: "https://checkout.stripe.com/c/pay/x" }, 201);
+      suspendedOwner();
+      renderScope();
+      fireEvent.click(
+        await screen.findByRole("button", { name: "プロジェクトを再開" }),
+      );
+      await waitFor(() =>
+        expect(assign).toHaveBeenCalledWith(
+          "https://checkout.stripe.com/c/pay/x",
+        ),
+      );
+      expect(fetch).toHaveBeenCalledWith("/api/billing/projects/p1/resume", {
+        method: "POST",
+      });
+    });
+
+    it("guides to payment repair without leaving when a live subscription needs payment", async () => {
+      resumeResponse = () =>
+        json({ code: "payment_action_required", error: "x" }, 409);
+      suspendedOwner();
+      renderScope();
+      fireEvent.click(
+        await screen.findByRole("button", { name: "プロジェクトを再開" }),
+      );
+      expect(await screen.findByText(/支払いの確認が必要な購読/)).toBeTruthy();
+      expect(assign).not.toHaveBeenCalled();
+    });
+
+    it("hides the resume button when new subscriptions are disabled", async () => {
+      resumeResponse = () =>
+        json({ code: "checkout_disabled", error: "x" }, 409);
+      suspendedOwner();
+      renderScope();
+      fireEvent.click(
+        await screen.findByRole("button", { name: "プロジェクトを再開" }),
+      );
+      expect(
+        await screen.findByText(/新しい購読の開始を受け付けていません/),
+      ).toBeTruthy();
+      expect(
+        screen.queryByRole("button", { name: "プロジェクトを再開" }),
+      ).toBeNull();
+      expect(screen.getByRole("button", { name: "支払いを管理" })).toBeTruthy();
+    });
+
+    it("shows an error and allows a retry when the request fails", async () => {
+      resumeResponse = () => json({ error: "x" }, 503);
+      suspendedOwner();
+      renderScope();
+      fireEvent.click(
+        await screen.findByRole("button", { name: "プロジェクトを再開" }),
+      );
+      expect(await screen.findByRole("alert")).toBeTruthy();
+      expect(
+        (
+          screen.getByRole("button", {
+            name: "プロジェクトを再開",
+          }) as HTMLButtonElement
+        ).disabled,
+      ).toBe(false);
+    });
+
+    it("waits without opening editing after returning from checkout, then follows the entitlement", async () => {
+      vi.useFakeTimers();
+      let state = "suspended";
+      vi.mocked(fetch).mockImplementation(async () =>
+        json({ state, role: "owner", validUntil: null }),
+      );
+      render(
+        <MemoryRouter initialEntries={["/projects/p1?billing=resume"]}>
+          <AuthErrorProvider>
+            <ProjectBillingScope>
+              <Probe />
+            </ProjectBillingScope>
+          </AuthErrorProvider>
+        </MemoryRouter>,
+      );
+      await act(async () => {});
+      expect(screen.getByText(/反映を待っています/)).toBeTruthy();
+      expect(screen.getByText("read-only")).toBeTruthy();
+
+      state = "active";
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5_000);
+      });
+      expect(screen.getByText("editable")).toBeTruthy();
+      expect(screen.queryByTestId("project-billing-banner")).toBeNull();
+    });
+
+    it("keeps polling after a transient failure on return from checkout", async () => {
+      vi.useFakeTimers();
+      let calls = 0;
+      vi.mocked(fetch).mockImplementation(async () => {
+        calls += 1;
+        return calls === 1
+          ? json({ error: "x" }, 503)
+          : json({ state: "active", role: "owner", validUntil: null });
+      });
+      render(
+        <MemoryRouter initialEntries={["/projects/p1?billing=resume"]}>
+          <AuthErrorProvider>
+            <ProjectBillingScope>
+              <Probe />
+            </ProjectBillingScope>
+          </AuthErrorProvider>
+        </MemoryRouter>,
+      );
+      await act(async () => {});
+      expect(screen.getByText("read-only")).toBeTruthy();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5_000);
+      });
+      expect(screen.getByText("editable")).toBeTruthy();
+    });
+
+    it("applies a slow active answer even when polling asks again before it arrives", async () => {
+      vi.useFakeTimers();
+      let calls = 0;
+      vi.mocked(fetch).mockImplementation(async () => {
+        calls += 1;
+        if (calls === 1) {
+          return json({ state: "suspended", role: "owner", validUntil: null });
+        }
+        await new Promise((resolve) => setTimeout(resolve, 7_000));
+        return json({ state: "active", role: "owner", validUntil: null });
+      });
+      render(
+        <MemoryRouter initialEntries={["/projects/p1?billing=resume"]}>
+          <AuthErrorProvider>
+            <ProjectBillingScope>
+              <Probe />
+            </ProjectBillingScope>
+          </AuthErrorProvider>
+        </MemoryRouter>,
+      );
+      await act(async () => {});
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5_000);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5_000);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3_000);
+      });
+      expect(screen.getByText("editable")).toBeTruthy();
+    });
+
+    it("tells the owner nothing was charged after a canceled checkout", async () => {
+      respond({ state: "suspended", role: "owner", validUntil: null });
+      render(
+        <MemoryRouter initialEntries={["/projects/p1?billing=resume-cancel"]}>
+          <AuthErrorProvider>
+            <ProjectBillingScope>
+              <Probe />
+            </ProjectBillingScope>
+          </AuthErrorProvider>
+        </MemoryRouter>,
+      );
+      expect(await screen.findByText(/完了していません/)).toBeTruthy();
+      expect(
+        screen.getByRole("button", { name: "プロジェクトを再開" }),
+      ).toBeTruthy();
+    });
+  });
+
+  it("does not show the resume button to members", async () => {
+    respond({ state: "suspended", role: "member", validUntil: null });
+    renderScope();
+    await screen.findByTestId("project-billing-banner");
+    expect(
+      screen.queryByRole("button", { name: "プロジェクトを再開" }),
+    ).toBeNull();
   });
 
   it("fails closed with a retry when the state cannot be read", async () => {
