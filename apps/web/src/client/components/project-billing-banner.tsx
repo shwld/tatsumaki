@@ -1,8 +1,12 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { useSearchParams } from "react-router";
 import { useAuthError } from "../contexts/auth-error-context";
 import type { ProjectBilling } from "../contexts/project-billing-context";
 import { isAuthError } from "../lib/api-error";
+
+const SETTLE_POLL_INTERVAL_MS = 5_000;
+const SETTLE_POLL_LIMIT = 24;
 
 const BUTTON_CLASS =
   "inline-flex min-h-11 items-center justify-center rounded-md border border-current px-3 py-1.5 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-60";
@@ -12,7 +16,26 @@ export function ProjectBillingBanner({ billing }: { billing: ProjectBilling }) {
   const { notifySessionExpired } = useAuthError();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState(false);
+  const [resumeNotice, setResumeNotice] = useState<
+    "paymentAction" | "checkoutDisabled" | null
+  >(null);
+  const [searchParams] = useSearchParams();
   const isOwner = billing.role === "owner";
+  const returned = searchParams.get("billing");
+  const waitingForResume =
+    returned === "resume" &&
+    (billing.state === "suspended" || billing.state === "loading");
+  const [pollCount, setPollCount] = useState(0);
+  const { refresh } = billing;
+
+  useEffect(() => {
+    if (!waitingForResume || pollCount >= SETTLE_POLL_LIMIT) return;
+    const timer = window.setTimeout(() => {
+      setPollCount((n) => n + 1);
+      refresh();
+    }, SETTLE_POLL_INTERVAL_MS);
+    return () => window.clearTimeout(timer);
+  }, [waitingForResume, pollCount, refresh]);
 
   if (billing.state === "active" || billing.state === "loading") return null;
   if (billing.state === "grace" && !isOwner) return null;
@@ -34,6 +57,43 @@ export function ProjectBillingBanner({ billing }: { billing: ProjectBilling }) {
         return;
       }
       window.location.assign(data.url);
+    } catch {
+      setError(true);
+    } finally {
+      setPending(false);
+    }
+  };
+
+  const resume = async () => {
+    setPending(true);
+    setError(false);
+    setResumeNotice(null);
+    try {
+      const response = await fetch(
+        `/api/billing/projects/${encodeURIComponent(billing.projectId)}/resume`,
+        { method: "POST" },
+      );
+      if (isAuthError(response.status)) {
+        notifySessionExpired();
+        return;
+      }
+      const data = (await response.json().catch(() => ({}))) as {
+        url?: string;
+        code?: string;
+      };
+      if (response.ok && data.url) {
+        window.location.assign(data.url);
+        return;
+      }
+      if (data.code === "payment_action_required") {
+        setResumeNotice("paymentAction");
+      } else if (data.code === "checkout_disabled") {
+        setResumeNotice("checkoutDisabled");
+      } else if (data.code === "not_suspended") {
+        refresh();
+      } else {
+        setError(true);
+      }
     } catch {
       setError(true);
     } finally {
@@ -86,7 +146,28 @@ export function ProjectBillingBanner({ billing }: { billing: ProjectBilling }) {
         </p>
         {isOwner ? (
           <>
-            <p>{t("projectBillingBanner.suspended.resumeSoon")}</p>
+            {waitingForResume ? (
+              <p role="status">
+                {pollCount >= SETTLE_POLL_LIMIT
+                  ? t("projectBillingBanner.resume.delayed")
+                  : t("projectBillingBanner.resume.waiting")}
+              </p>
+            ) : returned === "resume-cancel" ? (
+              <p>{t("projectBillingBanner.resume.canceled")}</p>
+            ) : null}
+            {resumeNotice ? (
+              <p>{t(`projectBillingBanner.resume.${resumeNotice}`)}</p>
+            ) : null}
+            {resumeNotice === "checkoutDisabled" ? null : (
+              <button
+                type="button"
+                className={BUTTON_CLASS}
+                disabled={pending}
+                onClick={() => void resume()}
+              >
+                {t("projectBillingBanner.resume.button")}
+              </button>
+            )}
             {manageButton}
           </>
         ) : null}

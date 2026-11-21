@@ -8,6 +8,15 @@ import {
   BILLING_GATEWAY_ERROR,
   listOwnedProjectBilling,
 } from "../../application/usecases/list-owned-project-billing";
+import {
+  RESUME_CHECKOUT_DISABLED_ERROR,
+  RESUME_FORBIDDEN_ERROR,
+  RESUME_NOT_FOUND_ERROR,
+  RESUME_NOT_SUSPENDED_ERROR,
+  RESUME_PAYMENT_ACTION_REQUIRED_ERROR,
+  resumeProjectSubscription,
+} from "../../application/usecases/resume-project-subscription";
+import { ControlPlaneCheckoutGateway } from "../../infrastructure/entitlements/control-plane-checkout-gateway";
 import { D1ProjectRepository } from "../../infrastructure/db/repositories/d1-project-repository";
 import { ControlPlaneProjectBillingGateway } from "../../infrastructure/entitlements/control-plane-project-billing-gateway";
 import { UnlimitedEntitlementProvider } from "../../infrastructure/entitlements/unlimited-entitlement-provider";
@@ -91,5 +100,58 @@ billingRoute.post("/billing/portal", async (c) => {
       errorType: error instanceof Error ? error.name : "unknown",
     });
     return c.json({ error: "Billing portal is temporarily unavailable" }, 503);
+  }
+});
+
+// /projects/:projectId 配下に置くと停止中の書き込みゲートに止められるため、別パスにする。
+billingRoute.post("/billing/projects/:projectId/resume", async (c) => {
+  if (c.env.ENTITLEMENT_MODE !== "control-plane" || !c.env.CONTROL_PLANE) {
+    return c.json({ error: "Billing is not available" }, 409);
+  }
+  const projectId = c.req.param("projectId");
+  const origin = new URL(c.req.url).origin;
+  const base = `${origin}/projects/${encodeURIComponent(projectId)}`;
+
+  const result = await resumeProjectSubscription(
+    {
+      projects: new D1ProjectRepository(c.env.DB),
+      entitlements: createEntitlementProvider(c.env),
+      billing: new ControlPlaneProjectBillingGateway(c.env.CONTROL_PLANE),
+      checkout: new ControlPlaneCheckoutGateway(c.env.CONTROL_PLANE),
+    },
+    {
+      userId: c.get("currentUser").id,
+      projectId,
+      now: new Date(),
+      successUrl: `${base}?billing=resume`,
+      cancelUrl: `${base}?billing=resume-cancel`,
+    },
+    isCheckoutEnabled(c.env),
+  );
+
+  if (result.isOk()) return c.json({ url: result.value.url }, 201);
+  switch (result.error) {
+    case RESUME_NOT_FOUND_ERROR:
+      return c.json({ error: "Project not found" }, 404);
+    case RESUME_FORBIDDEN_ERROR:
+      return c.json({ error: "Only the owner can resume" }, 403);
+    case RESUME_NOT_SUSPENDED_ERROR:
+      return c.json(
+        { error: "Project is not suspended", code: "not_suspended" },
+        409,
+      );
+    case RESUME_PAYMENT_ACTION_REQUIRED_ERROR:
+      return c.json(
+        { error: "Payment needs attention", code: "payment_action_required" },
+        409,
+      );
+    case RESUME_CHECKOUT_DISABLED_ERROR:
+      return c.json(
+        { error: "Checkout is not available", code: "checkout_disabled" },
+        409,
+      );
+    default:
+      console.error("Failed to start project resume", { reason: result.error });
+      return c.json({ error: "Resume is temporarily unavailable" }, 503);
   }
 });

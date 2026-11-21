@@ -19,6 +19,7 @@ export type ProjectBillingState =
   | "unknown";
 
 export type ProjectBilling = {
+  projectId: string;
   state: ProjectBillingState;
   role: "owner" | "member" | "viewer" | null;
   validUntil: string | null;
@@ -29,7 +30,7 @@ const POLL_INTERVAL_MS = 60_000;
 
 const ProjectBillingContext = createContext<ProjectBilling | null>(null);
 
-type Loaded = Omit<ProjectBilling, "refresh">;
+type Loaded = Omit<ProjectBilling, "refresh" | "projectId">;
 
 // ADR-0015: a state that cannot be read is never treated as active.
 // Writes stay off and viewing continues.
@@ -100,7 +101,7 @@ export function ProjectBillingScope({ children }: { children: ReactNode }) {
       role: null,
       validUntil: null,
     };
-    return { ...base, refresh };
+    return { ...base, projectId, refresh };
   }, [projectId, current, refresh]);
 
   return (
