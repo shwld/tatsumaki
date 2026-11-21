@@ -30,6 +30,7 @@ describe("billing portal route", () => {
           getProjectEntitlement: vi.fn(),
           createCheckoutSession: vi.fn(),
           listProjectBilling: vi.fn(),
+          createSubscriptionCancelSession: vi.fn(),
           createPortalSession,
         },
       }),
@@ -51,6 +52,7 @@ describe("billing portal route", () => {
           getProjectEntitlement: vi.fn(),
           createCheckoutSession: vi.fn(),
           listProjectBilling: vi.fn(),
+          createSubscriptionCancelSession: vi.fn(),
           createPortalSession: vi.fn(async () => {
             throw new Error("CUSTOMER_NOT_FOUND");
           }),
@@ -70,6 +72,7 @@ describe("billing portal route", () => {
           getProjectEntitlement: vi.fn(),
           createCheckoutSession: vi.fn(),
           listProjectBilling: vi.fn(),
+          createSubscriptionCancelSession: vi.fn(),
           createPortalSession: vi.fn(async () => ({
             url: "https://evil.example/p",
           })),
@@ -91,6 +94,7 @@ describe("billing portal route", () => {
           getProjectEntitlement: vi.fn(),
           createCheckoutSession: vi.fn(),
           listProjectBilling: vi.fn(),
+          createSubscriptionCancelSession: vi.fn(),
           createPortalSession: vi.fn(async () => ({
             url: "https://billing.stripe.com/p/session/ok",
           })),
@@ -107,6 +111,7 @@ describe("billing portal route", () => {
           getProjectEntitlement: vi.fn(),
           createCheckoutSession: vi.fn(),
           listProjectBilling: vi.fn(),
+          createSubscriptionCancelSession: vi.fn(),
           createPortalSession: vi.fn(async () => ({
             url: "https://evil.example/secret-token",
           })),

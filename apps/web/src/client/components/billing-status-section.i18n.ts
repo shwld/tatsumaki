@@ -26,6 +26,15 @@ export const billingStatusSectionJa = {
       nextBillingNone: "なし",
       nextBillingUnavailable: "取得できません",
       endsAt: "終了予定日",
+      cancel: {
+        button: "期間末に解約",
+        buttonFor: "{{name}} の購読を期間末に解約",
+        returned:
+          "Stripe の画面から戻りました。解約を確定した場合、終了予定日が表示されます。表示まで時間がかかることがあります。確定せず戻った場合は何も変わりません。",
+        error:
+          "解約の確認画面を開けませんでした。時間をおいてもう一度お試しください。",
+        stale: "購読の状態が変わっていました。最新の状態を表示しています。",
+      },
     },
     guidance: {
       selfHosted: "このサービスには利用上限がありません。",
@@ -63,6 +72,15 @@ export const billingStatusSectionEn = {
       nextBillingNone: "None",
       nextBillingUnavailable: "Unavailable",
       endsAt: "Ends on",
+      cancel: {
+        button: "Cancel at period end",
+        buttonFor: "Cancel the subscription for {{name}} at the period end",
+        returned:
+          "You returned from Stripe. If you confirmed the cancellation, the end date appears here; it may take a moment. If you went back without confirming, nothing changed.",
+        error:
+          "Could not open the cancellation confirmation. Please try again in a moment.",
+        stale: "The subscription state had changed. Showing the latest state.",
+      },
     },
     guidance: {
       selfHosted: "This service has no usage limits.",
