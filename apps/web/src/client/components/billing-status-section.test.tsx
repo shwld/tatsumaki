@@ -119,6 +119,28 @@ describe("BillingStatusSection", () => {
     await waitFor(() => expect(count()).toBe(2));
   });
 
+  it("re-enables the payment button when restored from the back/forward cache", async () => {
+    routeFetch({
+      "GET /api/billing/entitlement": hosted,
+      "GET /api/billing/subscriptions": emptyList,
+      "POST /api/billing/portal": () =>
+        json({ url: "https://billing.stripe.com/p/x" }),
+    });
+    renderSection();
+    const button = await screen.findByRole("button", { name: "支払いを管理" });
+    fireEvent.click(button);
+    await waitFor(() => expect(assign).toHaveBeenCalled());
+    expect((button as HTMLButtonElement).disabled).toBe(true);
+
+    const event = new Event("pageshow") as PageTransitionEvent;
+    Object.defineProperty(event, "persisted", { value: true });
+    window.dispatchEvent(event);
+
+    await waitFor(() =>
+      expect((button as HTMLButtonElement).disabled).toBe(false),
+    );
+  });
+
   it("shows an error when the portal cannot be opened", async () => {
     routeFetch({
       "GET /api/billing/entitlement": hosted,

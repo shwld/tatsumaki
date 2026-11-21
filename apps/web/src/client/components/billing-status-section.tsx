@@ -50,6 +50,14 @@ export function BillingStatusSection() {
     };
   }, [notifySessionExpired]);
 
+  useEffect(() => {
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) setPending(false);
+    };
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
+  }, []);
+
   const openPortal = async () => {
     if (pending) return;
     setPending(true);
