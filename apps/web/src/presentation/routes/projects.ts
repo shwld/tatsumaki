@@ -49,6 +49,7 @@ import {
 } from "../../infrastructure/entitlements/project-write-guard";
 import {
   createDeleteProjectBilling,
+  createProjectDisplayNameGateway,
   createEntitlementProvider,
 } from "./billing";
 import { requireProjectMembership } from "./project-membership";
@@ -630,6 +631,17 @@ projectsRoute.patch("/projects/:projectId/settings", async (c) => {
   }
 
   const updatedProject = updatedResult.value;
+  if (name !== undefined && name !== beforeProject.name) {
+    // 名前変更は購読の表示名の同期失敗で失敗させない。購読一覧を開いたときにも再同期される。
+    try {
+      await createProjectDisplayNameGateway(c.env)?.syncProjectDisplayNames({
+        billingAccountId: membership.member.userId,
+        projects: [{ projectId, name }],
+      });
+    } catch {
+      console.error("Failed to sync project display name");
+    }
+  }
   const calendarChanged =
     (sprintDurationDays !== undefined &&
       sprintDurationDays !== beforeProject.sprintDurationDays) ||

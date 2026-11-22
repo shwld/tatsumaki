@@ -32,7 +32,12 @@ const subscription = (projectId: string) => ({
   },
 });
 
-const setup = (listProjectBilling: ReturnType<typeof vi.fn>) => {
+const setup = (
+  listProjectBilling: ReturnType<typeof vi.fn>,
+  syncProjectDisplayNames: ReturnType<typeof vi.fn> = vi.fn(async () => ({
+    updatedSubscriptionCount: 0,
+  })),
+) => {
   const bindings = {
     DB: env.DB,
     ENTITLEMENT_MODE: "control-plane",
@@ -41,6 +46,7 @@ const setup = (listProjectBilling: ReturnType<typeof vi.fn>) => {
       createCheckoutSession: vi.fn(),
       createPortalSession: vi.fn(),
       listProjectBilling,
+      syncProjectDisplayNames,
     },
   } as unknown as Bindings;
   const get = (userId: string, overrides: Partial<Bindings> = {}) =>
@@ -98,6 +104,28 @@ describe("billing subscriptions route", () => {
     );
     expect(await response.json()).toEqual({
       projects: [{ ...subscription(owned), projectName: "Owned" }],
+    });
+  });
+
+  it("repairs subscription display names for owned projects and still lists when that fails", async () => {
+    const owned = await createProject("Owned", "user-1");
+    const listProjectBilling = vi.fn(
+      async ({ projectIds }: { projectIds: string[] }) => ({
+        projects: projectIds.map(subscription),
+      }),
+    );
+    const syncProjectDisplayNames = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("cp down"))
+      .mockResolvedValue({ updatedSubscriptionCount: 1 });
+    const { get } = setup(listProjectBilling, syncProjectDisplayNames);
+
+    expect((await get("user-1")).status).toBe(200);
+    expect((await get("user-1")).status).toBe(200);
+
+    expect(syncProjectDisplayNames).toHaveBeenCalledWith({
+      billingAccountId: "user-1",
+      projects: [{ projectId: owned, name: "Owned" }],
     });
   });
 

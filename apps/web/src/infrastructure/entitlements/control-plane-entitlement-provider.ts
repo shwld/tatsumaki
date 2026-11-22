@@ -7,9 +7,14 @@ export interface ControlPlaneRpc {
   createCheckoutSession(input: {
     billingAccountId: string;
     projectId: string;
+    projectName: string;
     requestId: string;
     successUrl: string;
     cancelUrl: string;
+  }): Promise<unknown>;
+  syncProjectDisplayNames(input: {
+    billingAccountId: string;
+    projects: { projectId: string; name: string }[];
   }): Promise<unknown>;
   listProjectBilling(input: {
     billingAccountId: string;

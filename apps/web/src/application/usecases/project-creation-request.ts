@@ -84,6 +84,7 @@ export async function startProjectCreation(
     const session = await deps.checkout.createProjectCheckout({
       billingAccountId: input.userId,
       projectId: request.projectId,
+      projectName: request.name,
       requestId: request.checkoutRequestId,
       successUrl: input.successUrl(request.projectId),
       cancelUrl: input.cancelUrl,
