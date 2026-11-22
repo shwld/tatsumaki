@@ -23,7 +23,7 @@ export const projectSettingsScreenJa = {
       deleteFailed: "プロジェクトの削除に失敗しました",
       deleted: "プロジェクトを削除しました",
       deletePending:
-        "削除を受け付けましたが、課金の終了をまだ確認できていません。プロジェクトは削除されておらず、自動で再試行します",
+        "削除を受け付けましたが、まだ完了していません。課金の終了などを確認でき次第、自動で再試行して削除します",
     },
     general: {
       title: "基本設定",
@@ -121,7 +121,7 @@ export const projectSettingsScreenEn = {
       deleteFailed: "Failed to delete the project",
       deleted: "Project deleted",
       deletePending:
-        "Deletion was accepted, but ending the billing could not be confirmed yet. The project is not deleted yet and will be retried automatically",
+        "Deletion was accepted but is not complete yet. It will be retried automatically once billing is confirmed ended",
     },
     general: {
       title: "General settings",

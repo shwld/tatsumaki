@@ -10,14 +10,14 @@ import type { ProjectBillingCloseGateway } from "../ports/project-billing-close-
 export const PROJECT_NOT_FOUND_ERROR = "PROJECT_NOT_FOUND_ERROR" as const;
 export const PROJECT_NAME_CONFIRMATION_MISMATCH_ERROR =
   "PROJECT_NAME_CONFIRMATION_MISMATCH_ERROR" as const;
-// 課金の終了を確認できていない。削除要求は保持済みで、確認できるまで本体は消さない。
-export const PROJECT_DELETE_BILLING_PENDING_ERROR =
-  "PROJECT_DELETE_BILLING_PENDING_ERROR" as const;
+// 削除要求は保持済みだが未完了(課金の終了未確認、または本体削除の失敗)。定期復旧が完了させる。
+export const PROJECT_DELETE_PENDING_ERROR =
+  "PROJECT_DELETE_PENDING_ERROR" as const;
 
 export type DeleteProjectError =
   | typeof PROJECT_NOT_FOUND_ERROR
   | typeof PROJECT_NAME_CONFIRMATION_MISMATCH_ERROR
-  | typeof PROJECT_DELETE_BILLING_PENDING_ERROR
+  | typeof PROJECT_DELETE_PENDING_ERROR
   | ProjectRepositoryError;
 
 // 公式ホスト版のみ billing を渡す。セルフホストは課金 RPC なしで従来どおり削除する。
@@ -46,7 +46,7 @@ async function closeBillingAndDelete(
     await billing.gateway.closeProjectBilling({ projectId });
   } catch (error) {
     await billing.requests.recordFailure(projectId, failureMessage(error));
-    return err(PROJECT_DELETE_BILLING_PENDING_ERROR);
+    return err(PROJECT_DELETE_PENDING_ERROR);
   }
 
   let deleteResult: Awaited<ReturnType<ProjectRepository["delete"]>>;
@@ -54,11 +54,11 @@ async function closeBillingAndDelete(
     deleteResult = await repository.delete(projectId);
   } catch (error) {
     await billing.requests.recordFailure(projectId, failureMessage(error));
-    return err(PROJECT_REPOSITORY_ERROR);
+    return err(PROJECT_DELETE_PENDING_ERROR);
   }
   if (deleteResult.isErr()) {
     await billing.requests.recordFailure(projectId, "project_delete_failed");
-    return err(deleteResult.error);
+    return err(PROJECT_DELETE_PENDING_ERROR);
   }
   const completed = await billing.requests.complete(projectId);
   if (completed.isErr()) {

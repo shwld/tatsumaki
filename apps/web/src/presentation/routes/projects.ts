@@ -6,7 +6,7 @@ import {
 } from "../../application/usecases/create-project";
 import {
   deleteProject,
-  PROJECT_DELETE_BILLING_PENDING_ERROR,
+  PROJECT_DELETE_PENDING_ERROR,
   PROJECT_NAME_CONFIRMATION_MISMATCH_ERROR,
   PROJECT_NOT_FOUND_ERROR,
 } from "../../application/usecases/delete-project";
@@ -717,12 +717,12 @@ projectsRoute.delete("/projects/:projectId", async (c) => {
     },
   );
   if (result.isErr()) {
-    if (result.error === PROJECT_DELETE_BILLING_PENDING_ERROR) {
-      // 受付済みだが課金の終了を確認できていない。成功とは返さない。
+    if (result.error === PROJECT_DELETE_PENDING_ERROR) {
+      // 受付済みだが未完了(課金の終了未確認、または本体削除の失敗)。成功とは返さない。
       return c.json(
         {
           error:
-            "Project deletion was accepted, but ending its billing could not be confirmed yet. The project is not deleted; it will be retried automatically.",
+            "Project deletion was accepted, but it could not be completed yet. The project is not deleted yet; it will be retried automatically.",
           code: "project_delete_pending",
         },
         202,

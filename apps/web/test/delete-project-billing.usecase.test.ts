@@ -2,7 +2,7 @@ import { env } from "cloudflare:test";
 import { err } from "neverthrow";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  PROJECT_DELETE_BILLING_PENDING_ERROR,
+  PROJECT_DELETE_PENDING_ERROR,
   PROJECT_NAME_CONFIRMATION_MISMATCH_ERROR,
   deleteProject,
   recoverProjectDeletions,
@@ -89,9 +89,7 @@ describe("deleteProject with billing", () => {
       confirmProjectName: "Billing Target",
     });
 
-    expect(result._unsafeUnwrapErr()).toBe(
-      PROJECT_DELETE_BILLING_PENDING_ERROR,
-    );
+    expect(result._unsafeUnwrapErr()).toBe(PROJECT_DELETE_PENDING_ERROR);
     expect(await exists(project.id)).toBe(true);
     expect(await pendingRequest(project.id)).toMatchObject({
       projectId: project.id,
@@ -115,6 +113,24 @@ describe("deleteProject with billing", () => {
     expect(closeProjectBilling).toHaveBeenCalledTimes(2);
     expect(await exists(project.id)).toBe(false);
     expect(await pendingRequest(project.id)).toBeNull();
+  });
+
+  it("reports a persisted request as pending when the database delete fails after billing ended", async () => {
+    const project = await seedProject();
+    const { deps, exists, pendingRequest } = setup();
+    deps.repository.delete = async () => {
+      throw new Error("d1 down");
+    };
+
+    const result = await deleteProject(deps, {
+      projectId: project.id,
+      userId: "owner",
+      confirmProjectName: "Billing Target",
+    });
+
+    expect(result._unsafeUnwrapErr()).toBe(PROJECT_DELETE_PENDING_ERROR);
+    expect(await exists(project.id)).toBe(true);
+    expect(await pendingRequest(project.id)).toMatchObject({ attemptCount: 1 });
   });
 
   it("does not report acceptance when the request cannot be persisted", async () => {
@@ -253,6 +269,11 @@ describe("recoverProjectDeletions", () => {
       projectId: second.id,
       requestedByUserId: "owner",
     });
+    await env.DB.prepare(
+      "update project_deletion_requests set updated_at = '2020-06-01 00:00:00' where project_id = ?",
+    )
+      .bind(second.id)
+      .run();
     await deps.billing.requests.recordFailure(first.id, "cp down");
 
     const pending = (
