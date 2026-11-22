@@ -24,7 +24,7 @@ const entry = (projectId: string, endsAt: string | null = null) => ({
   projectName: projectId,
   entitlementState: "active",
   subscription: {
-    status: "active",
+    lifecycle: "live",
     endsAt,
     nextBilling: { status: "none" },
   },
@@ -161,11 +161,11 @@ describe("ProjectSubscriptionSection", () => {
     expect(screen.queryByRole("button", { name: "期間末に解約" })).toBeNull();
   });
 
-  it("shows the return notice after coming back from Stripe", async () => {
+  it("shows the return notice after coming back from the payment page", async () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(json({ mode: "control-plane" }))
       .mockResolvedValueOnce(json({ projects: [entry("p1")] }));
     renderSection("?billing=cancel");
-    expect(await screen.findByText(/Stripe の画面から戻りました/)).toBeTruthy();
+    expect(await screen.findByText(/決済画面から戻りました/)).toBeTruthy();
   });
 });

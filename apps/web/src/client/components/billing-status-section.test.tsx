@@ -230,7 +230,7 @@ describe("BillingStatusSection", () => {
           projectName: "Alpha",
           entitlementState: "active",
           subscription: {
-            status: "active",
+            lifecycle: "live",
             endsAt: null,
             nextBilling: { status: "none" },
           },
@@ -240,7 +240,7 @@ describe("BillingStatusSection", () => {
           projectName: "Beta",
           entitlementState: "active",
           subscription: {
-            status: "active",
+            lifecycle: "ending",
             endsAt: "2026-12-25T12:00:00.000Z",
             nextBilling: { status: "none" },
           },
@@ -250,7 +250,7 @@ describe("BillingStatusSection", () => {
           projectName: "Gamma",
           entitlementState: "suspended",
           subscription: {
-            status: "canceled",
+            lifecycle: "ended",
             endsAt: null,
             nextBilling: { status: "none" },
           },

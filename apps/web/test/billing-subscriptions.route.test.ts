@@ -21,7 +21,7 @@ const subscription = (projectId: string) => ({
   projectId,
   entitlementState: "active" as const,
   subscription: {
-    status: "active",
+    lifecycle: "live",
     endsAt: null,
     nextBilling: {
       status: "scheduled" as const,

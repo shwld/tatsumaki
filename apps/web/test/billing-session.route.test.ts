@@ -67,7 +67,7 @@ describe("billing portal route", () => {
     expect(response.status).toBe(503);
   });
 
-  it("rejects session URLs outside the Stripe hosts", async () => {
+  it("rejects session URLs that are not https", async () => {
     const response = await buildApp().request(
       "https://tatsumaki.example/billing/portal",
       { method: "POST" },
@@ -80,7 +80,7 @@ describe("billing portal route", () => {
           createPaymentMethodUpdateSession: vi.fn(),
           closeProjectBilling: vi.fn(),
           createPortalSession: vi.fn(async () => ({
-            url: "https://evil.example/p",
+            url: "http://payments.example/p",
           })),
         },
       }),
