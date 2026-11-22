@@ -3,6 +3,7 @@ import type {
   ProjectBilling,
   ProjectBillingGateway,
 } from "../../application/ports/project-billing-gateway";
+import { SUBSCRIPTION_LIFECYCLES } from "../../domain/entities/subscription-lifecycle";
 import type { ControlPlaneRpc } from "./control-plane-entitlement-provider";
 
 const nextBillingSchema = z.discriminatedUnion("status", [
@@ -23,7 +24,7 @@ const responseSchema = z.object({
       entitlementState: z.enum(["active", "grace", "suspended"]),
       subscription: z
         .object({
-          status: z.string().min(1),
+          lifecycle: z.enum(SUBSCRIPTION_LIFECYCLES),
           endsAt: z.iso.datetime().nullable(),
           nextBilling: nextBillingSchema,
         })

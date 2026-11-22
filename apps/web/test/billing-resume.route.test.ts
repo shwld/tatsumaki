@@ -20,7 +20,7 @@ const buildApp = (userId: string) => {
 
 type Options = {
   state?: "active" | "grace" | "suspended";
-  subscriptionStatus?: string | null;
+  lifecycle?: "live" | "ending" | "ended" | null;
   entitlementFails?: boolean;
   checkoutFails?: boolean;
   checkoutEnabled?: boolean;
@@ -48,10 +48,10 @@ const setup = (options: Options = {}) => {
         projectId,
         entitlementState: options.state ?? "suspended",
         subscription:
-          options.subscriptionStatus == null
+          options.lifecycle == null
             ? null
             : {
-                status: options.subscriptionStatus,
+                lifecycle: options.lifecycle,
                 endsAt: null,
                 nextBilling: { status: "none" as const },
               },
@@ -102,7 +102,7 @@ describe("billing resume route", () => {
   it("starts a checkout for the same project id with return URLs back to it", async () => {
     const projectId = await createProject("owner");
     const { resume, createCheckoutSession } = setup({
-      subscriptionStatus: "canceled",
+      lifecycle: "ended",
     });
 
     const response = await resume("owner", projectId);
@@ -129,7 +129,7 @@ describe("billing resume route", () => {
       .bind(projectId, "owner")
       .run();
     const { resume, createCheckoutSession } = setup({
-      subscriptionStatus: "canceled",
+      lifecycle: "ended",
     });
 
     const response = await resume("owner", projectId);
@@ -141,14 +141,14 @@ describe("billing resume route", () => {
 
   it("allows a project that never had a subscription", async () => {
     const projectId = await createProject("owner");
-    const { resume } = setup({ subscriptionStatus: null });
+    const { resume } = setup({ lifecycle: null });
     expect((await resume("owner", projectId)).status).toBe(201);
   });
 
   it("uses the same request id for repeated requests so double clicks share one checkout", async () => {
     const projectId = await createProject("owner");
     const { resume, createCheckoutSession } = setup({
-      subscriptionStatus: "canceled",
+      lifecycle: "ended",
     });
     await Promise.all([resume("owner", projectId), resume("owner", projectId)]);
     const ids = createCheckoutSession.mock.calls.map(
@@ -163,7 +163,7 @@ describe("billing resume route", () => {
     const projectId = await createProject("owner");
     await addMember(projectId, "member", "member");
     const { resume, createCheckoutSession } = setup({
-      subscriptionStatus: "canceled",
+      lifecycle: "ended",
     });
 
     expect((await resume("member", projectId)).status).toBe(403);
@@ -178,7 +178,7 @@ describe("billing resume route", () => {
     const projectId = await createProject("owner");
     const { resume, createCheckoutSession } = setup({
       state,
-      subscriptionStatus: "active",
+      lifecycle: "live",
     });
     const response = await resume("owner", projectId);
     expect(response.status).toBe(409);
@@ -187,14 +187,12 @@ describe("billing resume route", () => {
   });
 
   it.each([
-    "past_due",
-    "unpaid",
-    "incomplete",
-    "paused",
-  ])("guides to payment repair instead of a new checkout for a %s subscription", async (status) => {
+    "live",
+    "ending",
+  ] as const)("guides to payment repair instead of a new checkout for a %s subscription", async (status) => {
     const projectId = await createProject("owner");
     const { resume, createCheckoutSession } = setup({
-      subscriptionStatus: status,
+      lifecycle: status,
     });
     const response = await resume("owner", projectId);
     expect(response.status).toBe(409);
@@ -207,7 +205,7 @@ describe("billing resume route", () => {
   it("does not start a new subscription when checkout is disabled", async () => {
     const projectId = await createProject("owner");
     const { resume, createCheckoutSession } = setup({
-      subscriptionStatus: "canceled",
+      lifecycle: "ended",
       checkoutEnabled: false,
     });
     const response = await resume("owner", projectId);
@@ -219,7 +217,7 @@ describe("billing resume route", () => {
   it("still routes payment repair when checkout is disabled", async () => {
     const projectId = await createProject("owner");
     const { resume } = setup({
-      subscriptionStatus: "past_due",
+      lifecycle: "live",
       checkoutEnabled: false,
     });
     const response = await resume("owner", projectId);
@@ -230,7 +228,7 @@ describe("billing resume route", () => {
 
   it.each([
     ["entitlement", { entitlementFails: true }],
-    ["checkout", { checkoutFails: true, subscriptionStatus: "canceled" }],
+    ["checkout", { checkoutFails: true, lifecycle: "ended" }],
   ] as const)("returns 503 when the Control Plane %s call fails", async (_, options) => {
     const projectId = await createProject("owner");
     const { resume } = setup(options);

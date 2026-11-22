@@ -3,6 +3,10 @@ import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router";
 import { useAuthError } from "../contexts/auth-error-context";
 import { isAuthError } from "../lib/api-error";
+import {
+  isSubscriptionEnded,
+  type SubscriptionLifecycle,
+} from "../../domain/entities/subscription-lifecycle";
 
 type NextBilling =
   | { status: "scheduled"; date: string; amount: number; currency: string }
@@ -14,7 +18,7 @@ type ProjectSubscription = {
   projectName: string;
   entitlementState: "active" | "grace" | "suspended";
   subscription: {
-    status: string;
+    lifecycle: SubscriptionLifecycle;
     endsAt: string | null;
     nextBilling: NextBilling;
   } | null;
@@ -38,8 +42,6 @@ const formatAmount = (minor: number, currency: string, locale: string) => {
   const digits = formatter.resolvedOptions().maximumFractionDigits ?? 0;
   return formatter.format(minor / 10 ** digits);
 };
-
-const TERMINAL_STATUSES = new Set(["canceled", "incomplete_expired"]);
 
 export function OwnedProjectSubscriptions() {
   const { t, i18n } = useTranslation();
@@ -205,7 +207,7 @@ export function OwnedProjectSubscriptions() {
                       {formatDate(project.subscription.endsAt, locale)}
                     </p>
                   ) : null}
-                  {!TERMINAL_STATUSES.has(project.subscription.status) &&
+                  {!isSubscriptionEnded(project.subscription.lifecycle) &&
                   project.subscription.endsAt === null ? (
                     <button
                       type="button"

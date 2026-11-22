@@ -4,6 +4,10 @@ import { useSearchParams } from "react-router";
 import { useAuthError } from "../contexts/auth-error-context";
 import { isAuthError } from "../lib/api-error";
 import { ProjectSection } from "./project-section";
+import {
+  isSubscriptionEnded,
+  type SubscriptionLifecycle,
+} from "../../domain/entities/subscription-lifecycle";
 
 type NextBilling =
   | { status: "scheduled"; date: string; amount: number; currency: string }
@@ -14,7 +18,7 @@ type ProjectSubscription = {
   projectId: string;
   entitlementState: "active" | "grace" | "suspended";
   subscription: {
-    status: string;
+    lifecycle: SubscriptionLifecycle;
     endsAt: string | null;
     nextBilling: NextBilling;
   } | null;
@@ -25,8 +29,6 @@ type LoadState =
   | { status: "hidden" }
   | { status: "error" }
   | { status: "ready"; project: ProjectSubscription | null };
-
-const TERMINAL_STATUSES = new Set(["canceled", "incomplete_expired"]);
 
 const BUTTON_CLASS =
   "inline-flex min-h-11 items-center justify-center rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-800 transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60";
@@ -186,7 +188,7 @@ export function ProjectSubscriptionSection({
   const project = state.status === "ready" ? state.project : null;
   const subscription = project?.subscription ?? null;
   const live =
-    subscription !== null && !TERMINAL_STATUSES.has(subscription.status);
+    subscription !== null && !isSubscriptionEnded(subscription.lifecycle);
 
   return (
     <ProjectSection title={t("projectSubscriptionSection.title")}>

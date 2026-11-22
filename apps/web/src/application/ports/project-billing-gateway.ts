@@ -1,10 +1,12 @@
+import type { SubscriptionLifecycle } from "../../domain/entities/subscription-lifecycle";
+
 export type NextBilling =
   | { status: "scheduled"; date: string; amount: number; currency: string }
   | { status: "none" }
   | { status: "unavailable" };
 
 export type ProjectBillingSubscription = {
-  status: string;
+  lifecycle: SubscriptionLifecycle;
   endsAt: string | null;
   nextBilling: NextBilling;
 };

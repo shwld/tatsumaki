@@ -18,7 +18,7 @@ const buildApp = (userId: string) => {
 };
 
 type Options = {
-  subscriptionStatus?: string | null;
+  lifecycle?: "live" | "ending" | "ended" | null;
   sessionFails?: boolean;
   listFails?: boolean;
   omitBilling?: boolean;
@@ -40,10 +40,10 @@ const setup = (options: Options = {}) => {
           projectId,
           entitlementState: "active",
           subscription:
-            options.subscriptionStatus === null
+            options.lifecycle === null
               ? null
               : {
-                  status: options.subscriptionStatus ?? "active",
+                  lifecycle: options.lifecycle ?? "live",
                   endsAt: null,
                   nextBilling: { status: "none" as const },
                 },
@@ -140,12 +140,11 @@ describe("billing payment-method route", () => {
 
   it.each([
     null,
-    "canceled",
-    "incomplete_expired",
-  ])("refuses when the project has no live subscription (%s)", async (status) => {
+    "ended",
+  ] as const)("refuses when the project has no live subscription (%s)", async (status) => {
     const projectId = await createProject("owner");
     const { start, createPaymentMethodUpdateSession } = setup({
-      subscriptionStatus: status,
+      lifecycle: status,
     });
     const response = await start("owner", projectId);
     expect(response.status).toBe(409);

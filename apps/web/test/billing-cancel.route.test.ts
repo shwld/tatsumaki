@@ -18,7 +18,7 @@ const buildApp = (userId: string) => {
 };
 
 type Options = {
-  subscriptionStatus?: string | null;
+  lifecycle?: "live" | "ending" | "ended" | null;
   endsAt?: string | null;
   cancelFails?: boolean;
   listFails?: boolean;
@@ -45,10 +45,10 @@ const setup = (options: Options = {}) => {
           projectId,
           entitlementState: "active",
           subscription:
-            options.subscriptionStatus === null
+            options.lifecycle === null
               ? null
               : {
-                  status: options.subscriptionStatus ?? "active",
+                  lifecycle: options.lifecycle ?? "live",
                   endsAt: options.endsAt ?? null,
                   nextBilling: { status: "none" as const },
                 },
@@ -172,12 +172,11 @@ describe("billing cancel route", () => {
 
   it.each([
     null,
-    "canceled",
-    "incomplete_expired",
-  ])("refuses when there is no live subscription (%s)", async (status) => {
+    "ended",
+  ] as const)("refuses when there is no live subscription (%s)", async (status) => {
     const projectId = await createProject("owner");
     const { cancel, createSubscriptionCancelSession } = setup({
-      subscriptionStatus: status,
+      lifecycle: status,
     });
     const response = await cancel("owner", projectId);
     expect(response.status).toBe(409);

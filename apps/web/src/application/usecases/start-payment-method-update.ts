@@ -1,5 +1,6 @@
 import type { Result } from "neverthrow";
 import { err, ok } from "neverthrow";
+import { isSubscriptionEnded } from "../../domain/entities/subscription-lifecycle";
 import type { ProjectRepository } from "../../domain/repositories/project-repository";
 import type { ProjectBillingGateway } from "../ports/project-billing-gateway";
 import type { ProjectPaymentMethodGateway } from "../ports/project-payment-method-gateway";
@@ -18,11 +19,6 @@ export type StartPaymentMethodUpdateError =
   | typeof PAYMENT_METHOD_FORBIDDEN_ERROR
   | typeof PAYMENT_METHOD_NO_SUBSCRIPTION_ERROR
   | typeof PAYMENT_METHOD_UNAVAILABLE_ERROR;
-
-const TERMINAL_SUBSCRIPTION_STATUSES = new Set([
-  "canceled",
-  "incomplete_expired",
-]);
 
 /**
  * 支払い方法は顧客（ユーザー）単位で、所有する全プロジェクトの購読に共通する。
@@ -51,7 +47,7 @@ export async function startPaymentMethodUpdate(
     if (!billing) return err(PAYMENT_METHOD_UNAVAILABLE_ERROR);
     if (
       !billing.subscription ||
-      TERMINAL_SUBSCRIPTION_STATUSES.has(billing.subscription.status)
+      isSubscriptionEnded(billing.subscription.lifecycle)
     ) {
       return err(PAYMENT_METHOD_NO_SUBSCRIPTION_ERROR);
     }

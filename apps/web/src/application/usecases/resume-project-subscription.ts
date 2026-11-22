@@ -1,6 +1,7 @@
 import type { Result } from "neverthrow";
 import { err, ok } from "neverthrow";
 import type { ProjectDeletionRequestRepository } from "../../domain/repositories/project-deletion-request-repository";
+import { isSubscriptionEnded } from "../../domain/entities/subscription-lifecycle";
 import type { ProjectRepository } from "../../domain/repositories/project-repository";
 import type { EntitlementProvider } from "../ports/entitlement-provider";
 import type { ProjectBillingGateway } from "../ports/project-billing-gateway";
@@ -25,12 +26,6 @@ export type ResumeProjectSubscriptionError =
   | typeof RESUME_PAYMENT_ACTION_REQUIRED_ERROR
   | typeof RESUME_PROJECT_DELETING_ERROR
   | typeof RESUME_UNAVAILABLE_ERROR;
-
-// Control Plane の checkoutRefusal と同じ終了状態。ここで live と判れば Checkout を作らず Portal に導く。
-const TERMINAL_SUBSCRIPTION_STATUSES = new Set([
-  "canceled",
-  "incomplete_expired",
-]);
 
 // Control Plane は requestId に UUID を要求する。同じ入力から同じ UUID(version 8)を作る。
 async function deterministicRequestId(seed: string): Promise<string> {
@@ -91,7 +86,7 @@ export async function resumeProjectSubscription(
     if (!billing) return err(RESUME_UNAVAILABLE_ERROR);
     if (
       billing.subscription &&
-      !TERMINAL_SUBSCRIPTION_STATUSES.has(billing.subscription.status)
+      !isSubscriptionEnded(billing.subscription.lifecycle)
     ) {
       return err(RESUME_PAYMENT_ACTION_REQUIRED_ERROR);
     }

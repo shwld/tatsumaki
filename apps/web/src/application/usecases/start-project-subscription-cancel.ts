@@ -1,5 +1,6 @@
 import type { Result } from "neverthrow";
 import { err, ok } from "neverthrow";
+import { isSubscriptionEnded } from "../../domain/entities/subscription-lifecycle";
 import type { ProjectRepository } from "../../domain/repositories/project-repository";
 import type { ProjectBillingGateway } from "../ports/project-billing-gateway";
 import type { ProjectSubscriptionCancelGateway } from "../ports/project-subscription-cancel-gateway";
@@ -19,14 +20,9 @@ export type StartProjectSubscriptionCancelError =
   | typeof CANCEL_ALREADY_SCHEDULED_ERROR
   | typeof CANCEL_UNAVAILABLE_ERROR;
 
-const TERMINAL_SUBSCRIPTION_STATUSES = new Set([
-  "canceled",
-  "incomplete_expired",
-]);
-
 /**
  * 一覧で選んだプロジェクトの購読だけを期間末解約する確認画面へ導く。
- * Stripe の ID はクライアントから受け取らず、Control Plane が billing account と
+ * 決済事業者側の ID はクライアントから受け取らず、Control Plane が billing account と
  * projectId から解決する。ここでは権限と、再操作しても安全な状態かだけを確かめる。
  */
 export async function startProjectSubscriptionCancel(
@@ -51,10 +47,7 @@ export async function startProjectSubscriptionCancel(
     ).find((entry) => entry.projectId === input.projectId);
     if (!billing) return err(CANCEL_UNAVAILABLE_ERROR);
     const { subscription } = billing;
-    if (
-      !subscription ||
-      TERMINAL_SUBSCRIPTION_STATUSES.has(subscription.status)
-    ) {
+    if (!subscription || isSubscriptionEnded(subscription.lifecycle)) {
       return err(CANCEL_NO_SUBSCRIPTION_ERROR);
     }
     if (subscription.endsAt !== null)

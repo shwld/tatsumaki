@@ -17,7 +17,7 @@ export const projectSubscriptionSectionJa = {
     cancel: {
       button: "期間末に解約",
       returned:
-        "Stripe の画面から戻りました。解約を確定した場合、終了予定日が表示されます。表示まで時間がかかることがあります。確定せず戻った場合は何も変わりません。",
+        "決済画面から戻りました。解約を確定した場合、終了予定日が表示されます。表示まで時間がかかることがあります。確定せず戻った場合は何も変わりません。",
       error:
         "解約の確認画面を開けませんでした。時間をおいてもう一度お試しください。",
       stale: "購読の状態が変わっていました。最新の状態を表示しています。",
@@ -27,7 +27,7 @@ export const projectSubscriptionSectionJa = {
       scope:
         "支払い方法はあなたの所有する全プロジェクトの購読の支払いに使われます。このプロジェクトだけ別のカードにはできません。",
       returned:
-        "Stripe の画面から戻りました。支払い方法を更新した場合、次回以降の請求に使われます。",
+        "決済画面から戻りました。支払い方法を更新した場合、次回以降の請求に使われます。",
       error:
         "支払い方法の更新画面を開けませんでした。時間をおいてもう一度お試しください。",
     },
@@ -53,7 +53,7 @@ export const projectSubscriptionSectionEn = {
     cancel: {
       button: "Cancel at period end",
       returned:
-        "You returned from Stripe. If you confirmed the cancellation, the end date is shown here; it may take a moment to appear. If you did not confirm, nothing changed.",
+        "You returned from the payment page. If you confirmed the cancellation, the end date is shown here; it may take a moment to appear. If you did not confirm, nothing changed.",
       error:
         "Could not open the cancellation confirmation. Please try again in a moment.",
       stale: "The subscription state had changed. Showing the latest state.",
@@ -63,7 +63,7 @@ export const projectSubscriptionSectionEn = {
       scope:
         "The payment method is used for the subscriptions of all projects you own. It cannot be set for this project alone.",
       returned:
-        "You returned from Stripe. If you updated the payment method, it is used for upcoming charges.",
+        "You returned from the payment page. If you updated the payment method, it is used for upcoming charges.",
       error:
         "Could not open the payment method update. Please try again in a moment.",
     },

@@ -9,7 +9,7 @@ export const billingStatusSectionJa = {
       error: "処理を開始できませんでした。時間をおいてもう一度お試しください。",
     },
     portalScope:
-      "支払い方法の更新と請求書・領収書の確認は、あなたの所有する全プロジェクトの支払いをまとめて扱う Stripe の画面で行います。プランや数量の変更はできません。",
+      "支払い方法の更新と請求書・領収書の確認は、あなたの所有する全プロジェクトの支払いをまとめて扱う決済画面で行います。プランや数量の変更はできません。",
     subscriptions: {
       title: "所有プロジェクトの購読",
       loading: "購読状況を読み込み中...",
@@ -30,7 +30,7 @@ export const billingStatusSectionJa = {
         button: "期間末に解約",
         buttonFor: "{{name}} の購読を期間末に解約",
         returned:
-          "Stripe の画面から戻りました。解約を確定した場合、終了予定日が表示されます。表示まで時間がかかることがあります。確定せず戻った場合は何も変わりません。",
+          "決済画面から戻りました。解約を確定した場合、終了予定日が表示されます。表示まで時間がかかることがあります。確定せず戻った場合は何も変わりません。",
         error:
           "解約の確認画面を開けませんでした。時間をおいてもう一度お試しください。",
         stale: "購読の状態が変わっていました。最新の状態を表示しています。",
@@ -55,7 +55,7 @@ export const billingStatusSectionEn = {
       error: "Could not start the request. Please try again in a moment.",
     },
     portalScope:
-      "Update payment methods and view invoices and receipts in Stripe. This covers the payments for all projects you own together. Plans and quantities cannot be changed there.",
+      "Update payment methods and view invoices and receipts on the payment page. This covers the payments for all projects you own together. Plans and quantities cannot be changed there.",
     subscriptions: {
       title: "Subscriptions for projects you own",
       loading: "Loading subscriptions...",
@@ -76,7 +76,7 @@ export const billingStatusSectionEn = {
         button: "Cancel at period end",
         buttonFor: "Cancel the subscription for {{name}} at the period end",
         returned:
-          "You returned from Stripe. If you confirmed the cancellation, the end date appears here; it may take a moment. If you went back without confirming, nothing changed.",
+          "You returned from the payment page. If you confirmed the cancellation, the end date appears here; it may take a moment. If you went back without confirming, nothing changed.",
         error:
           "Could not open the cancellation confirmation. Please try again in a moment.",
         stale: "The subscription state had changed. Showing the latest state.",
