@@ -23,7 +23,7 @@ export interface ProjectDeletionRequestRepository {
   ): Promise<
     Result<ProjectDeletionRequest | null, ProjectDeletionRequestRepositoryError>
   >;
-  // 未完了の要求を古い順に limit 件返す。
+  // 未完了の要求を、最後に試行した時刻の古い順に limit 件返す。
   listPending(
     limit: number,
   ): Promise<

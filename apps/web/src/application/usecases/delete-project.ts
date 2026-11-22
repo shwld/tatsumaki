@@ -1,8 +1,9 @@
 import { err, ok, type Result } from "neverthrow";
 import type { ProjectDeletionRequestRepository } from "../../domain/repositories/project-deletion-request-repository";
-import type {
-  ProjectRepository,
-  ProjectRepositoryError,
+import {
+  PROJECT_REPOSITORY_ERROR,
+  type ProjectRepository,
+  type ProjectRepositoryError,
 } from "../../domain/repositories/project-repository";
 import type { ProjectBillingCloseGateway } from "../ports/project-billing-close-gateway";
 
@@ -48,8 +49,15 @@ async function closeBillingAndDelete(
     return err(PROJECT_DELETE_BILLING_PENDING_ERROR);
   }
 
-  const deleteResult = await repository.delete(projectId);
+  let deleteResult: Awaited<ReturnType<ProjectRepository["delete"]>>;
+  try {
+    deleteResult = await repository.delete(projectId);
+  } catch (error) {
+    await billing.requests.recordFailure(projectId, failureMessage(error));
+    return err(PROJECT_REPOSITORY_ERROR);
+  }
   if (deleteResult.isErr()) {
+    await billing.requests.recordFailure(projectId, "project_delete_failed");
     return err(deleteResult.error);
   }
   const completed = await billing.requests.complete(projectId);
@@ -85,7 +93,8 @@ export async function deleteProject(
       requestedByUserId: input.userId,
     });
     if (opened.isErr()) {
-      return err(PROJECT_DELETE_BILLING_PENDING_ERROR);
+      // 要求を残せていないので「受付済み」とは扱わない。
+      return err(PROJECT_REPOSITORY_ERROR);
     }
     deleted = await closeBillingAndDelete(
       deps.repository,
@@ -136,16 +145,25 @@ export async function recoverProjectDeletions(
 
   for (const request of listed.value) {
     summary.examined += 1;
-    const result = await closeBillingAndDelete(
-      deps.repository,
-      deps.billing,
-      request.projectId,
-    );
-    if (result.isErr()) {
+    try {
+      const result = await closeBillingAndDelete(
+        deps.repository,
+        deps.billing,
+        request.projectId,
+      );
+      if (result.isErr()) {
+        summary.stillPending += 1;
+        continue;
+      }
+      summary.completed += 1;
+    } catch (error) {
+      // 1 件の例外でバッチ全体を止めない。要求は残り、次回再試行される。
       summary.stillPending += 1;
-      continue;
+      console.error("Project deletion recovery attempt failed", {
+        projectId: request.projectId,
+        errorType: error instanceof Error ? error.name : "unknown",
+      });
     }
-    summary.completed += 1;
   }
   return summary;
 }

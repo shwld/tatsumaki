@@ -1,4 +1,5 @@
 import { env } from "cloudflare:test";
+import { err } from "neverthrow";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   PROJECT_DELETE_BILLING_PENDING_ERROR,
@@ -116,6 +117,23 @@ describe("deleteProject with billing", () => {
     expect(await pendingRequest(project.id)).toBeNull();
   });
 
+  it("does not report acceptance when the request cannot be persisted", async () => {
+    const project = await seedProject();
+    const { deps, closeProjectBilling, exists } = setup();
+    deps.billing.requests.open = async () =>
+      err("PROJECT_DELETION_REQUEST_REPOSITORY_ERROR");
+
+    const result = await deleteProject(deps, {
+      projectId: project.id,
+      userId: "owner",
+      confirmProjectName: "Billing Target",
+    });
+
+    expect(result._unsafeUnwrapErr()).toBe("PROJECT_REPOSITORY_ERROR");
+    expect(closeProjectBilling).not.toHaveBeenCalled();
+    expect(await exists(project.id)).toBe(true);
+  });
+
   it("deletes without any billing call for self-hosted deployments", async () => {
     const project = await seedProject();
     const repository = new D1ProjectRepository(env.DB);
@@ -188,5 +206,59 @@ describe("recoverProjectDeletions", () => {
     closeProjectBilling.mockResolvedValue(undefined);
     expect(await recoverProjectDeletions(deps)).toMatchObject({ completed: 1 });
     expect(await exists(project.id)).toBe(false);
+  });
+
+  it("keeps processing the rest of the batch when one request throws", async () => {
+    const first = await seedProject("First");
+    const second = await seedProject("Second");
+    const { deps, exists, pendingRequest } = setup();
+    for (const project of [first, second]) {
+      await deps.billing.requests.open({
+        projectId: project.id,
+        requestedByUserId: "owner",
+      });
+    }
+    const realDelete = deps.repository.delete.bind(deps.repository);
+    deps.repository.delete = async (projectId: string) => {
+      if (projectId === first.id) throw new Error("d1 down");
+      return realDelete(projectId);
+    };
+
+    const summary = await recoverProjectDeletions(deps);
+
+    expect(summary).toMatchObject({
+      examined: 2,
+      completed: 1,
+      stillPending: 1,
+    });
+    expect(await exists(first.id)).toBe(true);
+    expect(await pendingRequest(first.id)).toMatchObject({ attemptCount: 1 });
+    expect(await exists(second.id)).toBe(false);
+  });
+
+  it("rotates failing requests behind newer ones", async () => {
+    const first = await seedProject("First");
+    const second = await seedProject("Second");
+    const { deps } = setup();
+    await deps.billing.requests.open({
+      projectId: first.id,
+      requestedByUserId: "owner",
+    });
+    await env.DB.prepare(
+      "update project_deletion_requests set created_at = '2026-01-01 00:00:00', updated_at = '2026-01-01 00:00:00' where project_id = ?",
+    )
+      .bind(first.id)
+      .run();
+    await deps.billing.requests.open({
+      projectId: second.id,
+      requestedByUserId: "owner",
+    });
+    await deps.billing.requests.recordFailure(first.id, "cp down");
+
+    const pending = (
+      await deps.billing.requests.listPending(1)
+    )._unsafeUnwrap();
+
+    expect(pending.map((request) => request.projectId)).toEqual([second.id]);
   });
 });

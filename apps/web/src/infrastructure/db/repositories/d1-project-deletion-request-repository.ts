@@ -67,7 +67,8 @@ export class D1ProjectDeletionRequestRepository
       const rows = await this.db
         .select()
         .from(projectDeletionRequestsTable)
-        .orderBy(asc(projectDeletionRequestsTable.createdAt))
+        // 失敗すると updatedAt が進むため、失敗中の要求が後続を飢えさせない。
+        .orderBy(asc(projectDeletionRequestsTable.updatedAt))
         .limit(limit)
         .all();
       return ok(rows.map(toRequest));
@@ -86,7 +87,7 @@ export class D1ProjectDeletionRequestRepository
         .set({
           attemptCount: sql`${projectDeletionRequestsTable.attemptCount} + 1`,
           lastError: error,
-          updatedAt: new Date().toISOString(),
+          updatedAt: sql`CURRENT_TIMESTAMP`,
         })
         .where(eq(projectDeletionRequestsTable.projectId, projectId));
       return ok(undefined);
