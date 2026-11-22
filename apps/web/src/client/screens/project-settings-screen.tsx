@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from "react-router";
 
 import { ProjectPage } from "../components/project-page";
 import { ProjectSection } from "../components/project-section";
+import { ProjectSubscriptionSection } from "../components/project-subscription-section";
 import { useAuthError } from "../contexts/auth-error-context";
 import { useToast } from "../contexts/toast-context";
 import { isAuthError } from "../lib/api-error";
@@ -685,6 +686,10 @@ export function ProjectSettingsScreen() {
               {t("projectSettingsScreen.apiKeys.open")}
             </Link>
           </ProjectSection>
+        ) : null}
+
+        {projectId && isOwner ? (
+          <ProjectSubscriptionSection projectId={projectId} />
         ) : null}
 
         {project && projectId && isOwner ? (

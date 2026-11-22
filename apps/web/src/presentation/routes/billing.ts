@@ -24,6 +24,13 @@ import {
   CANCEL_NOT_FOUND_ERROR,
   startProjectSubscriptionCancel,
 } from "../../application/usecases/start-project-subscription-cancel";
+import {
+  PAYMENT_METHOD_FORBIDDEN_ERROR,
+  PAYMENT_METHOD_NO_SUBSCRIPTION_ERROR,
+  PAYMENT_METHOD_NOT_FOUND_ERROR,
+  startPaymentMethodUpdate,
+} from "../../application/usecases/start-payment-method-update";
+import { ControlPlanePaymentMethodGateway } from "../../infrastructure/entitlements/control-plane-payment-method-gateway";
 import { ControlPlaneSubscriptionCancelGateway } from "../../infrastructure/entitlements/control-plane-subscription-cancel-gateway";
 import type { ProjectBillingCloseGateway } from "../../application/ports/project-billing-close-gateway";
 import { ControlPlaneProjectBillingCloseGateway } from "../../infrastructure/entitlements/control-plane-project-billing-close-gateway";
@@ -203,6 +210,10 @@ billingRoute.post("/billing/projects/:projectId/cancel", async (c) => {
   }
   const projectId = c.req.param("projectId");
   const origin = new URL(c.req.url).origin;
+  const returnPath =
+    c.req.query("from") === "settings"
+      ? `/projects/${encodeURIComponent(projectId)}/settings`
+      : "/account";
 
   const result = await startProjectSubscriptionCancel(
     {
@@ -213,7 +224,7 @@ billingRoute.post("/billing/projects/:projectId/cancel", async (c) => {
     {
       userId: c.get("currentUser").id,
       projectId,
-      returnUrl: `${origin}/account?billing=cancel`,
+      returnUrl: `${origin}${returnPath}?billing=cancel`,
     },
   );
 
@@ -241,5 +252,47 @@ billingRoute.post("/billing/projects/:projectId/cancel", async (c) => {
         reason: result.error,
       });
       return c.json({ error: "Cancellation is temporarily unavailable" }, 503);
+  }
+});
+
+billingRoute.post("/billing/projects/:projectId/payment-method", async (c) => {
+  if (c.env.ENTITLEMENT_MODE !== "control-plane" || !c.env.CONTROL_PLANE) {
+    return c.json({ error: "Billing is not available" }, 409);
+  }
+  const projectId = c.req.param("projectId");
+  const origin = new URL(c.req.url).origin;
+
+  const result = await startPaymentMethodUpdate(
+    {
+      projects: new D1ProjectRepository(c.env.DB),
+      billing: new ControlPlaneProjectBillingGateway(c.env.CONTROL_PLANE),
+      paymentMethod: new ControlPlanePaymentMethodGateway(c.env.CONTROL_PLANE),
+    },
+    {
+      userId: c.get("currentUser").id,
+      projectId,
+      returnUrl: `${origin}/projects/${encodeURIComponent(projectId)}/settings?billing=payment-method`,
+    },
+  );
+
+  if (result.isOk()) return c.json({ url: result.value.url }, 201);
+  switch (result.error) {
+    case PAYMENT_METHOD_NOT_FOUND_ERROR:
+      return c.json({ error: "Project not found" }, 404);
+    case PAYMENT_METHOD_FORBIDDEN_ERROR:
+      return c.json({ error: "Only the owner can manage payment" }, 403);
+    case PAYMENT_METHOD_NO_SUBSCRIPTION_ERROR:
+      return c.json(
+        { error: "No active subscription", code: "no_subscription" },
+        409,
+      );
+    default:
+      console.error("Failed to start payment method update", {
+        reason: result.error,
+      });
+      return c.json(
+        { error: "Payment update is temporarily unavailable" },
+        503,
+      );
   }
 });

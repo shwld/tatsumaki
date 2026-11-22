@@ -68,9 +68,14 @@ const setup = (options: Options = {}) => {
       listProjectBilling,
     },
   } as unknown as Bindings;
-  const cancel = (userId: string, projectId: string, body?: unknown) =>
+  const cancel = (
+    userId: string,
+    projectId: string,
+    body?: unknown,
+    query = "",
+  ) =>
     buildApp(userId).request(
-      `https://tatsumaki.example/billing/projects/${projectId}/cancel`,
+      `https://tatsumaki.example/billing/projects/${projectId}/cancel${query}`,
       {
         method: "POST",
         ...(body === undefined
@@ -122,6 +127,22 @@ describe("billing cancel route", () => {
       billingAccountId: "owner",
       projectId: first,
       returnUrl: "https://tatsumaki.example/account?billing=cancel",
+    });
+  });
+
+  it("returns to Project Settings when started from there", async () => {
+    const projectId = await createProject("owner");
+    const { cancel, createSubscriptionCancelSession } = setup();
+    const response = await cancel(
+      "owner",
+      projectId,
+      undefined,
+      "?from=settings",
+    );
+    expect(response.status).toBe(201);
+    expect(createSubscriptionCancelSession.mock.calls[0]?.[0]).toMatchObject({
+      projectId,
+      returnUrl: `https://tatsumaki.example/projects/${projectId}/settings?billing=cancel`,
     });
   });
 
