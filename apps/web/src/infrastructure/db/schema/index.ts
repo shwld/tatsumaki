@@ -34,3 +34,4 @@ export {
   storyMapCardsTable,
 } from "./story-maps";
 export { projectCreationRequestsTable } from "./project-creation-requests";
+export { projectDeletionRequestsTable } from "./project-deletion-requests";

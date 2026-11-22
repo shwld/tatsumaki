@@ -6,6 +6,7 @@ import {
 } from "../../application/usecases/create-project";
 import {
   deleteProject,
+  PROJECT_DELETE_BILLING_PENDING_ERROR,
   PROJECT_NAME_CONFIRMATION_MISMATCH_ERROR,
   PROJECT_NOT_FOUND_ERROR,
 } from "../../application/usecases/delete-project";
@@ -46,7 +47,10 @@ import {
   getProjectAccessState,
   toProjectWriteDenial,
 } from "../../infrastructure/entitlements/project-write-guard";
-import { createEntitlementProvider } from "./billing";
+import {
+  createDeleteProjectBilling,
+  createEntitlementProvider,
+} from "./billing";
 import { requireProjectMembership } from "./project-membership";
 import { computeGravatarHash } from "../lib/gravatar";
 
@@ -701,11 +705,29 @@ projectsRoute.delete("/projects/:projectId", async (c) => {
     );
   }
 
-  const result = await deleteProject(membership.repository, {
-    projectId,
-    confirmProjectName: body.confirmProjectName,
-  });
+  const result = await deleteProject(
+    {
+      repository: membership.repository,
+      billing: createDeleteProjectBilling(c.env),
+    },
+    {
+      projectId,
+      userId: c.get("currentUser").id,
+      confirmProjectName: body.confirmProjectName,
+    },
+  );
   if (result.isErr()) {
+    if (result.error === PROJECT_DELETE_BILLING_PENDING_ERROR) {
+      // 受付済みだが課金の終了を確認できていない。成功とは返さない。
+      return c.json(
+        {
+          error:
+            "Project deletion was accepted, but ending its billing could not be confirmed yet. The project is not deleted; it will be retried automatically.",
+          code: "project_delete_pending",
+        },
+        202,
+      );
+    }
     if (result.error === PROJECT_NAME_CONFIRMATION_MISMATCH_ERROR) {
       return c.json(
         {

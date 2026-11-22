@@ -22,6 +22,8 @@ export const projectSettingsScreenJa = {
         "対象プロジェクトが見つかりません。既に削除されている可能性があります。",
       deleteFailed: "プロジェクトの削除に失敗しました",
       deleted: "プロジェクトを削除しました",
+      deletePending:
+        "削除を受け付けましたが、課金の終了をまだ確認できていません。プロジェクトは削除されておらず、自動で再試行します",
     },
     general: {
       title: "基本設定",
@@ -86,7 +88,7 @@ export const projectSettingsScreenJa = {
     danger: {
       title: "危険操作: プロジェクト削除",
       description:
-        "この操作は取り消せません。削除するにはプロジェクト名を正確に入力してください。",
+        "この操作は取り消せません。有料プランの購読は即時に解約され、未使用の期間も返金されません。期間末まで使いたい場合は、削除する前にアカウントの購読一覧から期間末解約を選んでください。削除するにはプロジェクト名を正確に入力してください。",
       confirmName: "確認用プロジェクト名",
       delete: "プロジェクトを削除する",
       deleting: "削除中...",
@@ -118,6 +120,8 @@ export const projectSettingsScreenEn = {
         "The project was not found. It may have already been deleted.",
       deleteFailed: "Failed to delete the project",
       deleted: "Project deleted",
+      deletePending:
+        "Deletion was accepted, but ending the billing could not be confirmed yet. The project is not deleted yet and will be retried automatically",
     },
     general: {
       title: "General settings",
@@ -182,7 +186,7 @@ export const projectSettingsScreenEn = {
     danger: {
       title: "Danger zone: delete project",
       description:
-        "This cannot be undone. Enter the project name exactly to delete it.",
+        "This cannot be undone. Any paid subscription is canceled immediately and the unused period is not refunded. To use it until the period end, choose cancel at period end from your subscriptions before deleting. Enter the project name exactly to delete it.",
       confirmName: "Confirm project name",
       delete: "Delete project",
       deleting: "Deleting...",

@@ -325,6 +325,11 @@ export function ProjectSettingsScreen() {
         return;
       }
 
+      if (response.status === 202) {
+        showToast("error", t("projectSettingsScreen.toast.deletePending"));
+        return;
+      }
+
       if (!response.ok) {
         const data = (await response.json()) as {
           code?: string;

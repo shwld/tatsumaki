@@ -24,6 +24,7 @@ export interface ControlPlaneRpc {
     projectId: string;
     returnUrl: string;
   }): Promise<unknown>;
+  closeProjectBilling(input: { projectId: string }): Promise<unknown>;
 }
 
 const STRIPE_SESSION_HOSTS = new Set([
