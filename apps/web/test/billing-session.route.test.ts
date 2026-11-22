@@ -31,6 +31,7 @@ describe("billing portal route", () => {
           createCheckoutSession: vi.fn(),
           listProjectBilling: vi.fn(),
           createSubscriptionCancelSession: vi.fn(),
+          createPaymentMethodUpdateSession: vi.fn(),
           closeProjectBilling: vi.fn(),
           createPortalSession,
         },
@@ -54,6 +55,7 @@ describe("billing portal route", () => {
           createCheckoutSession: vi.fn(),
           listProjectBilling: vi.fn(),
           createSubscriptionCancelSession: vi.fn(),
+          createPaymentMethodUpdateSession: vi.fn(),
           closeProjectBilling: vi.fn(),
           createPortalSession: vi.fn(async () => {
             throw new Error("CUSTOMER_NOT_FOUND");
@@ -75,6 +77,7 @@ describe("billing portal route", () => {
           createCheckoutSession: vi.fn(),
           listProjectBilling: vi.fn(),
           createSubscriptionCancelSession: vi.fn(),
+          createPaymentMethodUpdateSession: vi.fn(),
           closeProjectBilling: vi.fn(),
           createPortalSession: vi.fn(async () => ({
             url: "https://evil.example/p",
@@ -98,6 +101,7 @@ describe("billing portal route", () => {
           createCheckoutSession: vi.fn(),
           listProjectBilling: vi.fn(),
           createSubscriptionCancelSession: vi.fn(),
+          createPaymentMethodUpdateSession: vi.fn(),
           closeProjectBilling: vi.fn(),
           createPortalSession: vi.fn(async () => ({
             url: "https://billing.stripe.com/p/session/ok",
@@ -116,6 +120,7 @@ describe("billing portal route", () => {
           createCheckoutSession: vi.fn(),
           listProjectBilling: vi.fn(),
           createSubscriptionCancelSession: vi.fn(),
+          createPaymentMethodUpdateSession: vi.fn(),
           closeProjectBilling: vi.fn(),
           createPortalSession: vi.fn(async () => ({
             url: "https://evil.example/secret-token",

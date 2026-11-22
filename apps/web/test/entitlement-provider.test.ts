@@ -93,6 +93,7 @@ describe("createEntitlementProvider", () => {
           createCheckoutSession: vi.fn(),
           listProjectBilling: vi.fn(),
           createSubscriptionCancelSession: vi.fn(),
+          createPaymentMethodUpdateSession: vi.fn(),
           closeProjectBilling: vi.fn(),
           createPortalSession: vi.fn(),
         },

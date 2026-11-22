@@ -24,6 +24,10 @@ export interface ControlPlaneRpc {
     projectId: string;
     returnUrl: string;
   }): Promise<unknown>;
+  createPaymentMethodUpdateSession(input: {
+    billingAccountId: string;
+    returnUrl: string;
+  }): Promise<unknown>;
   closeProjectBilling(input: { projectId: string }): Promise<unknown>;
 }
 

@@ -10,6 +10,10 @@ import {
   billingStatusSectionEn,
   billingStatusSectionJa,
 } from "../components/billing-status-section.i18n";
+import {
+  projectSubscriptionSectionEn,
+  projectSubscriptionSectionJa,
+} from "../components/project-subscription-section.i18n";
 import { layoutEn, layoutJa } from "../components/layout.i18n";
 import {
   permissionDeniedEn,
@@ -130,6 +134,7 @@ i18n.use(initReactI18next).init({
       common: {
         ...layoutJa,
         ...billingStatusSectionJa,
+        ...projectSubscriptionSectionJa,
         ...projectBillingBannerJa,
         ...permissionDeniedJa,
         ...errorRetryJa,
@@ -166,6 +171,7 @@ i18n.use(initReactI18next).init({
       common: {
         ...layoutEn,
         ...billingStatusSectionEn,
+        ...projectSubscriptionSectionEn,
         ...projectBillingBannerEn,
         ...permissionDeniedEn,
         ...errorRetryEn,
