@@ -33,6 +33,8 @@ import {
 import { ControlPlanePaymentMethodGateway } from "../../infrastructure/entitlements/control-plane-payment-method-gateway";
 import { ControlPlaneSubscriptionCancelGateway } from "../../infrastructure/entitlements/control-plane-subscription-cancel-gateway";
 import type { ProjectBillingCloseGateway } from "../../application/ports/project-billing-close-gateway";
+import type { ProjectDisplayNameGateway } from "../../application/ports/project-display-name-gateway";
+import { ControlPlaneProjectDisplayNameGateway } from "../../infrastructure/entitlements/control-plane-project-display-name-gateway";
 import { ControlPlaneProjectBillingCloseGateway } from "../../infrastructure/entitlements/control-plane-project-billing-close-gateway";
 import { ControlPlaneCheckoutGateway } from "../../infrastructure/entitlements/control-plane-checkout-gateway";
 import { D1ProjectDeletionRequestRepository } from "../../infrastructure/db/repositories/d1-project-deletion-request-repository";
@@ -73,6 +75,14 @@ export const createProjectBillingCloseGateway = (
   return new ControlPlaneProjectBillingCloseGateway(bindings.CONTROL_PLANE);
 };
 
+/** セルフホストは課金 RPC を呼ばないため undefined。 */
+export const createProjectDisplayNameGateway = (
+  bindings: Bindings,
+): ProjectDisplayNameGateway | undefined =>
+  bindings.ENTITLEMENT_MODE === "control-plane" && bindings.CONTROL_PLANE
+    ? new ControlPlaneProjectDisplayNameGateway(bindings.CONTROL_PLANE)
+    : undefined;
+
 export const createDeleteProjectBilling = (bindings: Bindings) => {
   const gateway = createProjectBillingCloseGateway(bindings);
   return gateway
@@ -111,6 +121,7 @@ billingRoute.get("/billing/subscriptions", async (c) => {
     new D1ProjectRepository(c.env.DB),
     new ControlPlaneProjectBillingGateway(c.env.CONTROL_PLANE),
     c.get("currentUser").id,
+    createProjectDisplayNameGateway(c.env),
   );
   if (result.isErr()) {
     if (result.error === BILLING_GATEWAY_ERROR) {

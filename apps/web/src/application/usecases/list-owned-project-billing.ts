@@ -3,6 +3,7 @@ import type {
   ProjectBilling,
   ProjectBillingGateway,
 } from "../ports/project-billing-gateway";
+import type { ProjectDisplayNameGateway } from "../ports/project-display-name-gateway";
 import {
   PROJECT_REPOSITORY_ERROR,
   type ProjectRepository,
@@ -20,6 +21,7 @@ export async function listOwnedProjectBilling(
   repository: ProjectRepository,
   gateway: ProjectBillingGateway,
   userId: string,
+  displayNames?: ProjectDisplayNameGateway,
 ): Promise<Result<OwnedProjectBilling[], ListOwnedProjectBillingError>> {
   const projects = await repository.listByMember(userId);
   if (projects.isErr()) {
@@ -40,6 +42,18 @@ export async function listOwnedProjectBilling(
     });
   } catch {
     return err(BILLING_GATEWAY_ERROR);
+  }
+
+  // 名前変更時の同期失敗と、表示名導入前の購読を、一覧を開くたびに直す。失敗しても一覧は返す。
+  if (displayNames) {
+    try {
+      await displayNames.syncProjectDisplayNames({
+        billingAccountId: userId,
+        projects: owned.map(({ id, name }) => ({ projectId: id, name })),
+      });
+    } catch {
+      console.error("Failed to sync project display names");
+    }
   }
 
   const billingByProject = new Map(

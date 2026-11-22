@@ -111,6 +111,7 @@ describe("project creation requests", () => {
     expect(createCheckoutSession).toHaveBeenCalledWith({
       billingAccountId: "user-1",
       projectId: body.projectId,
+      projectName: expect.any(String),
       requestId: expect.stringMatching(/^[0-9a-f-]{36}$/),
       successUrl: `${ORIGIN}/projects/new/complete?request=${body.projectId}`,
       cancelUrl: `${ORIGIN}/projects/new?checkout=cancel`,

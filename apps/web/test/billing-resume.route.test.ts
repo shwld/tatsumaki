@@ -115,6 +115,7 @@ describe("billing resume route", () => {
       expect.objectContaining({
         billingAccountId: "owner",
         projectId,
+        projectName: expect.any(String),
         successUrl: `https://tatsumaki.example/projects/${projectId}?billing=resume`,
         cancelUrl: `https://tatsumaki.example/projects/${projectId}?billing=resume-cancel`,
       }),

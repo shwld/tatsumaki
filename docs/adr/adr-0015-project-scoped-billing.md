@@ -126,3 +126,15 @@
 - **応答**: `suspended` は HTTP 403 と `code: PROJECT_SUSPENDED`、状態が分からないときは HTTP 503 と `code: ENTITLEMENT_UNAVAILABLE`。MCP は同じ code を含むエラー文、story map のライブ編集は `suspended` / `entitlement_unavailable` の reject code で返す。
 - **応答の古い値**: キャッシュは revision が戻る応答を採用しない。
 - **脱退**: 現在のコードにメンバー本人が脱退する経路はない。追加するときは書き込みから除外する(経路一覧の例外に記載)。
+
+## Amendment 2026-11-22 (story #447)
+
+Stripe Portal の購読一覧で、プロジェクトを区別できるようにした。
+
+- **方式**: 共通の Price と商品を使い続け、購読の `description` に `<プロジェクト名> (<projectId 末尾6文字>)` を入れる。Portal は商品名の下に購読ごとの description を表示する(staging の Sandbox で確認)。末尾6文字で同名プロジェクトを区別する。商品名の置き換えや購読ごとの商品作成はしない。
+- **請求書・領収書**: description は出ない前提で扱う。請求書の明細説明やカスタムフィールドに出すかは、必要になった時点で別 story にする。
+- **同期**: Checkout 時に設定する。名前変更時と、オーナーが購読一覧を開いたときに、Control Plane の `syncProjectDisplayNames` で差分だけ更新する。冪等なので、名前変更時の同期失敗は一覧を開くたびに直り、表示名導入前の購読もこの経路で移行される。同期に失敗しても名前変更は成功させる。
+- **識別**: 名前は表示用。購読と権利の識別は引き続き projectId が担う。
+- **個人情報**: プロジェクト名はユーザーが入力した文字列で、Stripe に送られる。プライバシーポリシーに「購読の表示名としてプロジェクト名を決済事業者へ送る」旨を書き、プロジェクト名に機微な情報を入れないよう案内する。公開準備(ADR-0015 の法務表示)と同じ扱いで、本番有効化の前に反映する。
+
+根拠: https://docs.stripe.com/api/subscriptions/update

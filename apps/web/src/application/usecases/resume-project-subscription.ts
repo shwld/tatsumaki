@@ -46,7 +46,7 @@ async function deterministicRequestId(seed: string): Promise<string> {
  */
 export async function resumeProjectSubscription(
   deps: {
-    projects: Pick<ProjectRepository, "findMember">;
+    projects: Pick<ProjectRepository, "findMember" | "findById">;
     deletions: Pick<ProjectDeletionRequestRepository, "findById">;
     entitlements: EntitlementProvider;
     billing: ProjectBillingGateway;
@@ -92,9 +92,13 @@ export async function resumeProjectSubscription(
     }
     if (!checkoutEnabled) return err(RESUME_CHECKOUT_DISABLED_ERROR);
 
+    const project = await deps.projects.findById(input.projectId);
+    if (project.isErr() || !project.value) return err(RESUME_UNAVAILABLE_ERROR);
+
     const session = await deps.checkout.createProjectCheckout({
       billingAccountId: input.userId,
       projectId: input.projectId,
+      projectName: project.value.name,
       requestId: await deterministicRequestId(
         `resume:${input.projectId}:${input.now.toISOString().slice(0, 10)}`,
       ),
