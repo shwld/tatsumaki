@@ -245,7 +245,7 @@ describe("recoverProjectDeletions", () => {
       requestedByUserId: "owner",
     });
     await env.DB.prepare(
-      "update project_deletion_requests set created_at = '2026-01-01 00:00:00', updated_at = '2026-01-01 00:00:00' where project_id = ?",
+      "update project_deletion_requests set created_at = '2020-01-01 00:00:00', updated_at = '2020-01-01 00:00:00' where project_id = ?",
     )
       .bind(first.id)
       .run();
