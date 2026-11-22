@@ -1,5 +1,6 @@
 import type { Result } from "neverthrow";
 import { err, ok } from "neverthrow";
+import type { ProjectDeletionRequestRepository } from "../../domain/repositories/project-deletion-request-repository";
 import type { ProjectRepository } from "../../domain/repositories/project-repository";
 import type { EntitlementProvider } from "../ports/entitlement-provider";
 import type { ProjectBillingGateway } from "../ports/project-billing-gateway";
@@ -12,6 +13,8 @@ export const RESUME_CHECKOUT_DISABLED_ERROR =
 export const RESUME_NOT_SUSPENDED_ERROR = "RESUME_NOT_SUSPENDED_ERROR" as const;
 export const RESUME_PAYMENT_ACTION_REQUIRED_ERROR =
   "RESUME_PAYMENT_ACTION_REQUIRED_ERROR" as const;
+export const RESUME_PROJECT_DELETING_ERROR =
+  "RESUME_PROJECT_DELETING_ERROR" as const;
 export const RESUME_UNAVAILABLE_ERROR = "RESUME_UNAVAILABLE_ERROR" as const;
 
 export type ResumeProjectSubscriptionError =
@@ -20,6 +23,7 @@ export type ResumeProjectSubscriptionError =
   | typeof RESUME_CHECKOUT_DISABLED_ERROR
   | typeof RESUME_NOT_SUSPENDED_ERROR
   | typeof RESUME_PAYMENT_ACTION_REQUIRED_ERROR
+  | typeof RESUME_PROJECT_DELETING_ERROR
   | typeof RESUME_UNAVAILABLE_ERROR;
 
 // Control Plane の checkoutRefusal と同じ終了状態。ここで live と判れば Checkout を作らず Portal に導く。
@@ -48,6 +52,7 @@ async function deterministicRequestId(seed: string): Promise<string> {
 export async function resumeProjectSubscription(
   deps: {
     projects: Pick<ProjectRepository, "findMember">;
+    deletions: Pick<ProjectDeletionRequestRepository, "findById">;
     entitlements: EntitlementProvider;
     billing: ProjectBillingGateway;
     checkout: ProjectCheckoutGateway;
@@ -65,6 +70,11 @@ export async function resumeProjectSubscription(
   if (member.isErr()) return err(RESUME_UNAVAILABLE_ERROR);
   if (!member.value) return err(RESUME_NOT_FOUND_ERROR);
   if (member.value.role !== "owner") return err(RESUME_FORBIDDEN_ERROR);
+
+  // 削除要求の受付後は再購読させない。Control Plane 側の閉鎖が最終防衛線。
+  const deletion = await deps.deletions.findById(input.projectId);
+  if (deletion.isErr()) return err(RESUME_UNAVAILABLE_ERROR);
+  if (deletion.value) return err(RESUME_PROJECT_DELETING_ERROR);
 
   try {
     const { state } = await deps.entitlements.getProjectEntitlement(

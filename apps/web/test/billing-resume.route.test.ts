@@ -121,6 +121,24 @@ describe("billing resume route", () => {
     );
   });
 
+  it("refuses to resume a project whose deletion was accepted", async () => {
+    const projectId = await createProject("owner");
+    await env.DB.prepare(
+      "insert into project_deletion_requests (project_id, requested_by_user_id) values (?, ?)",
+    )
+      .bind(projectId, "owner")
+      .run();
+    const { resume, createCheckoutSession } = setup({
+      subscriptionStatus: "canceled",
+    });
+
+    const response = await resume("owner", projectId);
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: "project_deleting" });
+    expect(createCheckoutSession).not.toHaveBeenCalled();
+  });
+
   it("allows a project that never had a subscription", async () => {
     const projectId = await createProject("owner");
     const { resume } = setup({ subscriptionStatus: null });

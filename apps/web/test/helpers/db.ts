@@ -25,6 +25,7 @@ import {
   artifactsTable,
 } from "../../src/infrastructure/db/schema/artifacts";
 import { projectCreationRequestsTable } from "../../src/infrastructure/db/schema/project-creation-requests";
+import { projectDeletionRequestsTable } from "../../src/infrastructure/db/schema/project-deletion-requests";
 import { usersTable } from "../../src/infrastructure/db/schema/users";
 
 /**
@@ -38,6 +39,7 @@ import { usersTable } from "../../src/infrastructure/db/schema/users";
 export async function resetDatabase(db: D1Database): Promise<void> {
   const client = createDb(db);
   await client.delete(projectCreationRequestsTable);
+  await client.delete(projectDeletionRequestsTable);
   await client.delete(artifactPinsTable);
   await client.delete(artifactUploadSessionFilesTable);
   await client.delete(artifactUploadSessionsTable);

@@ -14,6 +14,7 @@ import {
   RESUME_NOT_FOUND_ERROR,
   RESUME_NOT_SUSPENDED_ERROR,
   RESUME_PAYMENT_ACTION_REQUIRED_ERROR,
+  RESUME_PROJECT_DELETING_ERROR,
   resumeProjectSubscription,
 } from "../../application/usecases/resume-project-subscription";
 import {
@@ -24,7 +25,10 @@ import {
   startProjectSubscriptionCancel,
 } from "../../application/usecases/start-project-subscription-cancel";
 import { ControlPlaneSubscriptionCancelGateway } from "../../infrastructure/entitlements/control-plane-subscription-cancel-gateway";
+import type { ProjectBillingCloseGateway } from "../../application/ports/project-billing-close-gateway";
+import { ControlPlaneProjectBillingCloseGateway } from "../../infrastructure/entitlements/control-plane-project-billing-close-gateway";
 import { ControlPlaneCheckoutGateway } from "../../infrastructure/entitlements/control-plane-checkout-gateway";
+import { D1ProjectDeletionRequestRepository } from "../../infrastructure/db/repositories/d1-project-deletion-request-repository";
 import { D1ProjectRepository } from "../../infrastructure/db/repositories/d1-project-repository";
 import { ControlPlaneProjectBillingGateway } from "../../infrastructure/entitlements/control-plane-project-billing-gateway";
 import { UnlimitedEntitlementProvider } from "../../infrastructure/entitlements/unlimited-entitlement-provider";
@@ -47,6 +51,29 @@ export const createEntitlementProvider = (
     );
   }
   return new UnlimitedEntitlementProvider();
+};
+
+/** セルフホストは課金 RPC を呼ばないため undefined。 */
+export const createProjectBillingCloseGateway = (
+  bindings: Bindings,
+): ProjectBillingCloseGateway | undefined => {
+  if (bindings.ENTITLEMENT_MODE !== "control-plane") return undefined;
+  if (!bindings.CONTROL_PLANE) {
+    throw new Error(
+      "CONTROL_PLANE binding is required in control-plane entitlement mode",
+    );
+  }
+  return new ControlPlaneProjectBillingCloseGateway(bindings.CONTROL_PLANE);
+};
+
+export const createDeleteProjectBilling = (bindings: Bindings) => {
+  const gateway = createProjectBillingCloseGateway(bindings);
+  return gateway
+    ? {
+        requests: new D1ProjectDeletionRequestRepository(bindings.DB),
+        gateway,
+      }
+    : undefined;
 };
 
 export const isCheckoutEnabled = (bindings: Bindings): boolean =>
@@ -123,6 +150,7 @@ billingRoute.post("/billing/projects/:projectId/resume", async (c) => {
   const result = await resumeProjectSubscription(
     {
       projects: new D1ProjectRepository(c.env.DB),
+      deletions: new D1ProjectDeletionRequestRepository(c.env.DB),
       entitlements: createEntitlementProvider(c.env),
       billing: new ControlPlaneProjectBillingGateway(c.env.CONTROL_PLANE),
       checkout: new ControlPlaneCheckoutGateway(c.env.CONTROL_PLANE),
@@ -151,6 +179,11 @@ billingRoute.post("/billing/projects/:projectId/resume", async (c) => {
     case RESUME_PAYMENT_ACTION_REQUIRED_ERROR:
       return c.json(
         { error: "Payment needs attention", code: "payment_action_required" },
+        409,
+      );
+    case RESUME_PROJECT_DELETING_ERROR:
+      return c.json(
+        { error: "Project is being deleted", code: "project_deleting" },
         409,
       );
     case RESUME_CHECKOUT_DISABLED_ERROR:
