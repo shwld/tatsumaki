@@ -108,6 +108,25 @@ describe("deleteProject with billing", () => {
     expect(closeProjectBilling).not.toHaveBeenCalled();
   });
 
+  it("reports not found when a concurrent deletion removed the project before the request opened", async () => {
+    const project = await seedProject();
+    const { deps, closeProjectBilling } = setup();
+    const realOpen = deps.billing.requests.open.bind(deps.billing.requests);
+    deps.billing.requests.open = async (input) => {
+      await deps.repository.delete(input.projectId);
+      return realOpen(input);
+    };
+
+    const result = await deleteProject(deps, {
+      projectId: project.id,
+      userId: "owner",
+      confirmProjectName: "Billing Target",
+    });
+
+    expect(result._unsafeUnwrapErr()).toBe("PROJECT_NOT_FOUND_ERROR");
+    expect(closeProjectBilling).not.toHaveBeenCalled();
+  });
+
   it("changes neither billing nor data when the name does not match", async () => {
     const project = await seedProject();
     const { deps, closeProjectBilling, exists, pendingRequest } = setup();

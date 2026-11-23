@@ -100,6 +100,11 @@ export async function deleteProject(
       return err(PROJECT_REPOSITORY_ERROR);
     }
     if (!opened.value) {
+      // 並行する削除で本体が既に無い場合は、権限不足ではなく未検出として返す。
+      const current = await deps.repository.findById(input.projectId);
+      if (current.isOk() && current.value === null) {
+        return err(PROJECT_NOT_FOUND_ERROR);
+      }
       return err(PROJECT_DELETE_FORBIDDEN_ERROR);
     }
     deleted = await closeBillingAndDelete(
