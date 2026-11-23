@@ -149,24 +149,22 @@ describe("App story detail route", () => {
       </QueryClientProvider>,
     );
 
-    await waitFor(() =>
-      expect(document.title).toBe("[Alpha] | ストーリー詳細"),
-    );
+    await waitFor(() => expect(document.title).toBe("Alpha | ストーリー詳細"));
 
     await user.click(screen.getByRole("link", { name: "Other project" }));
     await waitFor(() =>
-      expect(document.title).toBe("[Beta] | ページが見つかりません"),
+      expect(document.title).toBe("Beta | ページが見つかりません"),
     );
 
     await user.click(screen.getByRole("link", { name: "設定" }));
     const projectName = await screen.findByRole("textbox", {
       name: "プロジェクト名",
     });
-    expect(document.title).toBe("[Beta] | プロジェクト設定");
+    expect(document.title).toBe("Beta | プロジェクト設定");
     await user.clear(projectName);
     await user.type(projectName, "Renamed Beta{Enter}");
     await waitFor(() =>
-      expect(document.title).toBe("[Renamed Beta] | プロジェクト設定"),
+      expect(document.title).toBe("Renamed Beta | プロジェクト設定"),
     );
 
     await user.click(screen.getByRole("link", { name: "Sign in page" }));

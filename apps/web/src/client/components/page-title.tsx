@@ -11,7 +11,7 @@ export function PageTitle({
 }) {
   const { t } = useTranslation();
   const { name } = useProjectName();
-  const prefix = name ? `[${name}]` : t("app.name");
+  const prefix = name || t("app.name");
   const title = `${prefix} | ${t(titleKey)}`;
 
   useEffect(() => {
