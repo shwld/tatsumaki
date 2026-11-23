@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, lte, or } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, lte, or } from "drizzle-orm";
 import { err, ok, type Result } from "neverthrow";
 import { ulid } from "ulid";
 import {
@@ -199,7 +199,7 @@ export class D1ProjectOwnershipTransferRepository
           and(
             eq(table.projectId, projectId),
             eq(table.status, "completed"),
-            eq(table.settlementStatus, "pending"),
+            inArray(table.settlementStatus, ["pending", "review"]),
           ),
         )
         .limit(1)
@@ -210,7 +210,7 @@ export class D1ProjectOwnershipTransferRepository
     }
   }
 
-  async findLatestInvolving(
+  async findNoticeFor(
     projectId: string,
     userId: string,
   ): Promise<
@@ -223,7 +223,17 @@ export class D1ProjectOwnershipTransferRepository
         .where(
           and(
             eq(table.projectId, projectId),
-            or(eq(table.fromUserId, userId), eq(table.toUserId, userId)),
+            or(
+              and(
+                eq(table.status, "completed"),
+                or(eq(table.fromUserId, userId), eq(table.toUserId, userId)),
+              ),
+              and(
+                eq(table.settlementOutcome, "not-switched"),
+                eq(table.settlementStatus, "review"),
+                eq(table.toUserId, userId),
+              ),
+            ),
           ),
         )
         .orderBy(desc(table.createdAt), desc(table.id))
@@ -313,7 +323,7 @@ export class D1ProjectOwnershipTransferRepository
                                WHERE d.project_id = project_ownership_transfers.project_id)
                AND NOT EXISTS (SELECT 1 FROM project_ownership_transfers earlier
                                WHERE earlier.project_id = project_ownership_transfers.project_id
-                                 AND earlier.status = 'completed' AND earlier.settlement_status = 'pending')`,
+                                 AND earlier.status = 'completed' AND earlier.settlement_status IN ('pending', 'review'))`,
           )
           .bind(nowIso, input.id),
         this.d1

@@ -76,14 +76,17 @@ export interface ProjectOwnershipTransferRepository {
   ): Promise<
     Result<OwnershipTransfer | null, OwnershipTransferRepositoryError>
   >;
-  /** 完了済みで精算がまだ済んでいない申請。この間は同じプロジェクトの次の切替を待たせる。 */
+  /** 完了済みで精算が済んでいない(処理中または運営の調査待ち)申請。この間は同じプロジェクトの次の切替を待たせる。 */
   findUnsettledSwitch(
     projectId: string,
   ): Promise<
     Result<OwnershipTransfer | null, OwnershipTransferRepositoryError>
   >;
-  /** その利用者が当事者の最新の申請。新しい申請に隠れた、自分に関わる通知を探す。 */
-  findLatestInvolving(
+  /**
+   * その利用者に見せる通知の元になる最新の申請。完了した譲渡、または自分が受け手で返金が運営の調査待ちの
+   * 譲渡。新しい申請や、通知のない終了済みの申請に隠れない。
+   */
+  findNoticeFor(
     projectId: string,
     userId: string,
   ): Promise<

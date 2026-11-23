@@ -528,6 +528,41 @@ describe("ownership transfer switch", () => {
     });
   });
 
+  describe("a switch whose settlement needs review", () => {
+    it("blocks the next switch until an operator resolves it", async () => {
+      const { call, bindings, state } = setup();
+      const { projectId, transferId } = await seedTransfer(call);
+      state.payment.recipientSubscribed = true;
+      state.settlement = {
+        status: "review",
+        reviewReason: "recipient_payment_not_found",
+      };
+      await call("bob", projectId, "GET");
+      expect((await transferRow(transferId))?.settlement).toBe("review");
+
+      await env.DB.prepare(
+        "insert into project_ownership_transfers (id, project_id, from_user_id, to_user_id, expires_at, created_at) values (?, ?, 'bob', 'carol', ?, ?)",
+      )
+        .bind(
+          "t_next",
+          projectId,
+          new Date(Date.now() + 86_400_000).toISOString(),
+          new Date(Date.now() + 1000).toISOString(),
+        )
+        .run();
+      await recoverOwnershipTransfersScheduled(bindings);
+      expect(await roleOf(projectId, "carol")).toBe("member");
+
+      await env.DB.prepare(
+        "update project_ownership_transfers set settlement_status = 'settled' where id = ?",
+      )
+        .bind(transferId)
+        .run();
+      await recoverOwnershipTransfersScheduled(bindings);
+      expect(await roleOf(projectId, "carol")).toBe("owner");
+    });
+  });
+
   describe("recovery job", () => {
     it("rotates the batch so a newer transfer is not starved by older ones", async () => {
       const { call, bindings, state, confirmTransferPayment } = setup();
