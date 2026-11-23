@@ -2,6 +2,7 @@ import { env } from "cloudflare:test";
 import { err } from "neverthrow";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  PROJECT_DELETE_FORBIDDEN_ERROR,
   PROJECT_DELETE_PENDING_ERROR,
   PROJECT_NAME_CONFIRMATION_MISMATCH_ERROR,
   deleteProject,
@@ -58,6 +59,72 @@ describe("deleteProject with billing", () => {
     });
     expect(await exists(project.id)).toBe(false);
     expect(await pendingRequest(project.id)).toBeNull();
+  });
+
+  it("rejects a request from a user demoted by an ownership transfer, without any billing call", async () => {
+    const project = await seedProject();
+    await env.DB.prepare(
+      "UPDATE project_members SET role = 'member' WHERE project_id = ?1 AND user_id = 'owner'",
+    )
+      .bind(project.id)
+      .run();
+    const { deps, closeProjectBilling, exists, pendingRequest } = setup();
+
+    const result = await deleteProject(deps, {
+      projectId: project.id,
+      userId: "owner",
+      confirmProjectName: "Billing Target",
+    });
+
+    expect(result._unsafeUnwrapErr()).toBe(PROJECT_DELETE_FORBIDDEN_ERROR);
+    expect(closeProjectBilling).not.toHaveBeenCalled();
+    expect(await exists(project.id)).toBe(true);
+    expect(await pendingRequest(project.id)).toBeNull();
+  });
+
+  it("does not let a demoted user ride on a request opened by the new owner", async () => {
+    const project = await seedProject();
+    await env.DB.batch([
+      env.DB.prepare(
+        "UPDATE project_members SET role = 'member' WHERE project_id = ?1 AND user_id = 'owner'",
+      ).bind(project.id),
+      env.DB.prepare(
+        "INSERT INTO project_members (project_id, user_id, role) VALUES (?1, 'new-owner', 'owner')",
+      ).bind(project.id),
+    ]);
+    const { deps, closeProjectBilling } = setup();
+    await deps.billing.requests.open({
+      projectId: project.id,
+      requestedByUserId: "new-owner",
+    });
+
+    const result = await deleteProject(deps, {
+      projectId: project.id,
+      userId: "owner",
+      confirmProjectName: "Billing Target",
+    });
+
+    expect(result._unsafeUnwrapErr()).toBe(PROJECT_DELETE_FORBIDDEN_ERROR);
+    expect(closeProjectBilling).not.toHaveBeenCalled();
+  });
+
+  it("reports not found when a concurrent deletion removed the project before the request opened", async () => {
+    const project = await seedProject();
+    const { deps, closeProjectBilling } = setup();
+    const realOpen = deps.billing.requests.open.bind(deps.billing.requests);
+    deps.billing.requests.open = async (input) => {
+      await deps.repository.delete(input.projectId);
+      return realOpen(input);
+    };
+
+    const result = await deleteProject(deps, {
+      projectId: project.id,
+      userId: "owner",
+      confirmProjectName: "Billing Target",
+    });
+
+    expect(result._unsafeUnwrapErr()).toBe("PROJECT_NOT_FOUND_ERROR");
+    expect(closeProjectBilling).not.toHaveBeenCalled();
   });
 
   it("changes neither billing nor data when the name does not match", async () => {
