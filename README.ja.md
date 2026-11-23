@@ -2,6 +2,8 @@
 
 [English README](README.md)
 
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/shwld/tatsumaki/badge)](https://scorecard.dev/viewer/?uri=github.com/shwld/tatsumaki)
+
 tatsumaki is an agile project management tool for small Scrum teams that want a fast, story-centered workflow with point estimation, velocity tracking, and backlog forecasting.
 
 The project is inspired by the workflow strengths of Pivotal Tracker, while being built as self-hostable open source software for modern web, CLI, and automation workflows.
