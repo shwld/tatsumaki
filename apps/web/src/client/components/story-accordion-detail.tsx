@@ -954,7 +954,7 @@ function StoryAccordionDetailComponent({
           <button
             type="button"
             className="rounded border border-gray-200 px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-slate-600 dark:text-slate-100 dark:hover:bg-slate-800"
-            disabled={readOnly || !resolvedStory.releaseDate}
+            disabled={locked || !resolvedStory.releaseDate}
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => {
               setReleaseDateDraft("");

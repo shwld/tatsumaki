@@ -22,6 +22,7 @@ import {
   INVALID_STORY_STATUS_ERROR,
   INVALID_STORY_TITLE_ERROR,
   INVALID_STORY_TYPE_ERROR,
+  RELEASE_DATE_REQUIRES_RELEASE_TYPE_ERROR,
   normalizeStoryDescription,
   normalizeStoryLabelIds,
   normalizeStoryPoint,
@@ -70,6 +71,7 @@ export type UpdateStoryError =
   | typeof NO_STORY_FIELDS_TO_UPDATE_ERROR
   | typeof INVALID_STORY_TITLE_ERROR
   | typeof INVALID_STORY_TYPE_ERROR
+  | typeof RELEASE_DATE_REQUIRES_RELEASE_TYPE_ERROR
   | typeof INVALID_STORY_STATUS_ERROR
   | typeof INVALID_STORY_LABELS_ERROR
   | typeof INVALID_STORY_POINT_ERROR
@@ -237,6 +239,13 @@ export async function updateStory(
     input.type !== undefined ? normalizeStoryType(input.type) : undefined;
   if (normalizedType?.isErr()) {
     return err(normalizedType.error);
+  }
+
+  const effectiveType = normalizedType?.isOk()
+    ? normalizedType.value
+    : currentResult.value.type;
+  if (typeof input.releaseDate === "string" && effectiveType !== "release") {
+    return err(RELEASE_DATE_REQUIRES_RELEASE_TYPE_ERROR);
   }
 
   const normalizedStatus =

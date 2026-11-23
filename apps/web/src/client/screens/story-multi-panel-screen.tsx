@@ -1826,8 +1826,8 @@ export function StoryMultiPanelScreen() {
             {canCreateReleaseMarker ? (
               <button
                 type="button"
-                className="text-xs font-medium text-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={readOnly}
+                className="text-xs font-medium text-purple-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-purple-300"
+                disabled={readOnly || creatingReleaseMarker}
                 onClick={() => setShowReleaseMarkerDialog(true)}
               >
                 {t("storyMultiPanelScreen.create.releaseMarkerButton")}

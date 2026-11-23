@@ -123,6 +123,33 @@ describe("release date on the programmatic API", () => {
     expect((await getStory(storyNumber)).releaseDate).toBe("2026-12-01");
   });
 
+  it("rejects a planned date on stories that are not releases", async () => {
+    const created = await call("", "POST", {
+      title: "feature",
+      type: "feature",
+      description: "",
+    });
+    const feature = ((await created.json()) as { story: Story }).story;
+
+    const onCreate = await call("", "POST", {
+      title: "dated feature",
+      type: "feature",
+      description: "",
+      releaseDate: "2026-12-01",
+    });
+    expect(onCreate.status).toBe(400);
+
+    const onUpdate = await call(`/${feature.storyNumber}`, "PATCH", {
+      releaseDate: "2026-12-01",
+    });
+    expect(onUpdate.status).toBe(400);
+
+    const clear = await call(`/${feature.storyNumber}`, "PATCH", {
+      releaseDate: null,
+    });
+    expect(clear.status).toBe(200);
+  });
+
   it("applies the same rules on the web API", async () => {
     const created = await SELF.fetch(webStoriesUrl, {
       method: "POST",
