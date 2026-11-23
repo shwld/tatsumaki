@@ -86,7 +86,6 @@ export async function settleTransfer(
 export async function reconcilePendingTransfer(
   deps: SettleDeps,
   transfer: OwnershipTransfer,
-  now: Date,
 ): Promise<PendingTransferOutcome> {
   try {
     const payment = await deps.settlement.confirmPayment({
@@ -144,7 +143,7 @@ export async function advanceOwnershipTransfer(
 ): Promise<void> {
   let current = transfer;
   if (current.status === "pending") {
-    const outcome = await reconcilePendingTransfer(deps, current, now);
+    const outcome = await reconcilePendingTransfer(deps, current);
     if (outcome === "waiting" || outcome === "unavailable") return;
     const latest = await deps.transfers.findById(current.id);
     if (latest.isErr() || !latest.value) return;
