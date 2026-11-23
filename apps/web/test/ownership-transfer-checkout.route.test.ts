@@ -451,7 +451,7 @@ describe("ownership transfer checkout", () => {
     ).not.toHaveProperty("recipientSubscribed");
   });
 
-  it("does not count the recipient's subscription paid for another request", async () => {
+  it("does not count the recipient's subscription paid for another request, and offers no Checkout while it lasts", async () => {
     const { call, transferIds } = setup({ subscriptions: { bob: "live" } });
     const { projectId } = await seedTransfer(call);
     transferIds.bob = "transfer-cancelled-earlier";
@@ -460,8 +460,8 @@ describe("ownership transfer checkout", () => {
 
     expect(
       ((await recipient.json()) as { transfer: Record<string, unknown> })
-        .transfer.recipientSubscribed,
-    ).toBe(false);
+        .transfer,
+    ).toMatchObject({ recipientSubscribed: false, checkoutAvailable: false });
   });
 
   it("does not mistake the current owner's live subscription for the recipient's", async () => {

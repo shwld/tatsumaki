@@ -184,4 +184,4 @@ Stripe Portal の購読一覧で、プロジェクトを区別できるように
 
 - **申請IDの受け渡し**: Control Plane は購読 metadata の `transferId` を購読スナップショットに保存し、`listProjectBilling` の `subscription.transferId` で返す(通常の購読は `null`)。web は Control Plane のこの変更が先にデプロイされている前提で `transferId` を必須として読む。
 - **照合する判定**: 受け手の画面の `recipientSubscribed` と、取消・辞退の拒否(`payment_confirmed`)は、受け手自身の有効な購読のうち `transferId` が現在の申請IDと一致するものだけを決済済みとみなす。
-- **照合しない判定**: 譲渡の Checkout の重複防止は従来どおり billing account 単位で、別の申請の購読でも受け手自身の有効な購読があれば開始しない。古い申請の遅延決済は、#451 の精算が申請IDで特定して全額返金する。
+- **照合しない判定**: 譲渡の Checkout の重複防止は従来どおり billing account 単位で、別の申請の購読でも受け手自身の有効な購読があれば開始しない。その間は受け手の画面に購読の操作を出さない(`checkoutAvailable: false`)。古い申請の遅延決済は、#451 の精算が申請IDで特定して全額返金する。
