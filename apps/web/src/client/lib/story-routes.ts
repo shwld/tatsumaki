@@ -107,7 +107,7 @@ export function projectStoriesApiPath(
 }
 
 export function projectPlanningPokerSessionsApiPath(projectId: string): string {
-  return `/api/projects/${projectId}/planning-poker/sessions`;
+  return `/api/projects/${encodeURIComponent(projectId)}/planning-poker/sessions`;
 }
 
 export function projectPlanningPokerActiveSessionApiPath(
@@ -120,7 +120,7 @@ export function projectPlanningPokerSessionApiPath(
   projectId: string,
   sessionId: string,
 ): string {
-  return `${projectPlanningPokerSessionsApiPath(projectId)}/${sessionId}`;
+  return `${projectPlanningPokerSessionsApiPath(projectId)}/${encodeURIComponent(sessionId)}`;
 }
 
 export function projectPlanningPokerVotesApiPath(
