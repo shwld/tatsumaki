@@ -409,9 +409,7 @@ describe("OwnershipTransferSection", () => {
     });
     renderSection(false);
 
-    expect(
-      await screen.findByText(/解約\(返金の対象であれば返金も\)が完了すると/),
-    ).toBeTruthy();
+    expect(await screen.findByText(/その購読が解約されると/)).toBeTruthy();
     expect(screen.queryByText(/3,850 円/)).toBe(null);
     expect(screen.queryByRole("button", { name: "購読して引き継ぐ" })).toBe(
       null,
