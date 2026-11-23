@@ -190,6 +190,6 @@ Stripe Portal の購読一覧で、プロジェクトを区別できるように
 
 申請の終了後に受け手の open な Checkout を失効させる保証を、リクエスト内の即時失効ではなく毎時の精算に置く。
 
-- **即時失効は最善努力**: 取消・辞退・資格喪失(ロール変更・アカウント削除)の即時失効は、リクエストの後処理(`waitUntil`)またはリクエスト内で1回だけ試す。失敗・中断しても再試行しない。期限切れは即時失効を試さない。
-- **精算による保証**: いずれの終了経路も、申請を終える書き込みで `settlement_outcome = 'not-switched'` / `settlement_status = 'pending'` を記録する。毎時の定期ジョブ(`recoverOwnershipTransfers`)が精算待ちを拾い、Control Plane の `settleOwnershipTransfer` は `not-switched` の精算で最初に受け手の open な Checkout を `expireTransferCheckoutSessions` で失効させる。精算は確認期間(25 時間)が過ぎるまで毎時繰り返す。
+- **即時失効は最善努力**: 取消・辞退・資格喪失(ロール変更・アカウント削除)で申請を終える操作は、即時失効をリクエスト内またはリクエストの後処理(`waitUntil`)で1回だけ試し、失敗・中断しても再試行しない。期限切れで終わる場合は試さない。これとは別に、Checkout の作成中に申請が終わった場合は、作成した側がその Checkout を失効させる。
+- **精算による保証**: いずれの終了経路も、申請を終える書き込みで `settlement_outcome = 'not-switched'` / `settlement_status = 'pending'` を記録する。毎時の定期ジョブ(`recoverOwnershipTransfers`)が精算待ちを拾い、Control Plane の `settleOwnershipTransfer` は `not-switched` の精算で最初に受け手の open な Checkout を `expireTransferCheckoutSessions` で失効させる。精算は確認期間(25 時間)が過ぎるまで毎時繰り返す。web のテスト(`ownership-transfer-checkout-expiry-recovery.route.test.ts`)は、各終了経路で即時失効が失敗しても毎時の scheduled ハンドラが `not-switched` の精算を依頼することを確かめ、Control Plane のテストは `not-switched` の精算が受け手の Checkout を失効させることを確かめる。
 - **許容する遅延**: 即時失効が行われなくても、通常は次の定期ジョブ(約1時間以内)で失効する。これは定期ジョブの間隔による目安で、厳密な上限ではない。1回に扱う件数(50件)を超える精算待ちがある場合や、Control Plane・Stripe が失敗した場合は、次回以降の定期ジョブに持ち越す。その間に支払われた決済は、同じ精算が申請IDで特定して全額返金する。新たな outbox や定期ジョブの間隔の変更は行わない。

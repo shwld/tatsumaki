@@ -3,12 +3,11 @@ import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { D1ProjectRepository } from "../src/infrastructure/db/repositories/d1-project-repository";
 import { D1UserRepository } from "../src/infrastructure/db/repositories/d1-user-repository";
-import type { Bindings, Env } from "../src/index";
+import worker, { type Bindings, type Env } from "../src/index";
 import type { CurrentUser } from "../src/presentation/middleware/access-auth";
 import { authRoute } from "../src/presentation/routes/auth";
 import { billingRoute } from "../src/presentation/routes/billing";
 import { projectsRoute } from "../src/presentation/routes/projects";
-import { recoverOwnershipTransfersScheduled } from "../src/presentation/scheduled/recover-ownership-transfers";
 import { resetDatabase } from "./helpers/db";
 
 const buildApp = (userId: string) => {
@@ -102,6 +101,16 @@ const setup = () => {
 };
 
 type Request = ReturnType<typeof setup>["request"];
+
+/** Worker の毎時の scheduled ハンドラを実行し、登録された処理の完了を待つ。 */
+const runHourlyJob = async (bindings: Bindings) => {
+  const tasks: Promise<unknown>[] = [];
+  await worker.scheduled({} as ScheduledEvent, bindings, {
+    waitUntil: (task: Promise<unknown>) => tasks.push(task),
+    passThroughOnException() {},
+  } as unknown as ExecutionContext);
+  await Promise.all(tasks);
+};
 
 const addMember = (projectId: string, userId: string, role: string) =>
   env.DB.prepare(
@@ -226,14 +235,14 @@ const endings: [string, EndTransfer, string, boolean][] = [
   ],
 ];
 
-describe("recipient's Checkout after a transfer request ends", () => {
+describe("recipient's open Checkout after a transfer request ends", () => {
   beforeEach(async () => {
     await resetDatabase(env.DB);
   });
 
   it.each(
     endings,
-  )("is expired by the hourly settlement when the request is %s and the immediate expiry did not happen", async (_label, endTransfer, endedStatus, expiresImmediately) => {
+  )("is handed to the hourly not-switched settlement when the request is %s and the immediate expiry did not happen", async (_label, endTransfer, endedStatus, expiresImmediately) => {
     const {
       bindings,
       request,
@@ -261,7 +270,7 @@ describe("recipient's Checkout after a transfer request ends", () => {
       outcome: "not-switched",
       toBillingAccountId: "bob",
     });
-    await recoverOwnershipTransfersScheduled(bindings);
+    await runHourlyJob(bindings);
     expect(settleOwnershipTransfer).toHaveBeenCalledWith(notSwitched);
     expect(await transferRow(seeded.transferId)).toMatchObject({
       status: endedStatus,
@@ -269,7 +278,7 @@ describe("recipient's Checkout after a transfer request ends", () => {
       settlement: "pending",
     });
 
-    await recoverOwnershipTransfersScheduled(bindings);
+    await runHourlyJob(bindings);
     expect(settleOwnershipTransfer).toHaveBeenCalledTimes(2);
     expect(settleOwnershipTransfer).toHaveBeenLastCalledWith(notSwitched);
   });
