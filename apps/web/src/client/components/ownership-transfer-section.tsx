@@ -139,7 +139,9 @@ export function OwnershipTransferSection({
   };
 
   if (state.status === "hidden") return null;
-  if (state.status === "ready" && !state.transfer && !isOwner) return null;
+  if (state.status === "ready" && !state.transfer && !isOwner && !errorKey) {
+    return null;
+  }
 
   const nameOf = (userId: string) =>
     members.find((member) => member.userId === userId)?.displayName ??

@@ -11,7 +11,8 @@ const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const PREVIEW_TOKEN_PATH =
   /^\/artifacts\/[^/]+\/versions\/[^/]+\/preview-token$/;
 // 課金の回復・譲渡の経路は停止中でも通す。ゲートの対象は /projects/:id 配下だけ。
-const BILLING_PROJECT_PATH = /(?:^|\/)billing\/projects\//;
+const BILLING_PROJECT_PATH =
+  /^(?:\/api)?\/billing\/projects\/[^/]+\/(?:resume|cancel|payment-method|ownership-transfer)(?:\/|$)/;
 const PROJECT_PATH = /(?:^|\/)projects\/([^/]+)(\/.*)?$/;
 
 /**
