@@ -7,6 +7,8 @@ import type {
   UserRepository,
   UserRepositoryError,
 } from "../../domain/repositories/user-repository";
+import type { TransferCheckoutExpiryGateway } from "../ports/transfer-checkout-expiry-gateway";
+import { expireTransferCheckouts } from "./ownership-transfer";
 
 export const ACCOUNT_NOT_FOUND_ERROR = "ACCOUNT_NOT_FOUND_ERROR" as const;
 export const ACCOUNT_HAS_SOLE_OWNER_PROJECTS_ERROR =
@@ -29,7 +31,8 @@ export type DeleteAccountError =
 export async function deleteAccount(
   userRepository: UserRepository,
   projectRepository: ProjectRepository,
-  input: { userId: string; confirmEmail: string },
+  input: { userId: string; confirmEmail: string; now: Date },
+  checkoutExpiry?: TransferCheckoutExpiryGateway,
 ): Promise<Result<true, DeleteAccountError>> {
   const userResult = await userRepository.findById(input.userId);
   if (userResult.isErr()) return err(userResult.error);
@@ -63,9 +66,14 @@ export async function deleteAccount(
   //   project_api_keys              → DELETE
   //   project_invitations           → DELETE
   //   project_members               → DELETE
+  //   project_ownership_transfers   → 当事者でなくなった有効な申請を cancelled
   //   users                         → DELETE
-  const deleteResult = await userRepository.delete(input.userId);
+  const deleteResult = await userRepository.delete(input.userId, input.now);
   if (deleteResult.isErr()) return err(deleteResult.error);
+  await expireTransferCheckouts(
+    checkoutExpiry,
+    deleteResult.value.voidedTransfers,
+  );
 
   return ok(true);
 }

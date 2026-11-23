@@ -22,6 +22,7 @@ import type {
   CreateProjectInput,
   CreateProjectInvitationInput,
   CreateSingleUseInvitationInput,
+  MemberRoleChange,
   UpdateProjectSettingsInput,
   ProjectRepository,
   ProjectRepositoryError,
@@ -32,6 +33,10 @@ import {
   PROJECT_REPOSITORY_ERROR,
 } from "../../../domain/repositories/project-repository";
 import { createDb, type DbClient } from "../client";
+import {
+  toTransfer,
+  voidIneligibleTransfers,
+} from "./d1-project-ownership-transfer-repository";
 import {
   projectInvitationsTable,
   projectMembersTable,
@@ -702,35 +707,50 @@ export class D1ProjectRepository implements ProjectRepository {
     projectId: string;
     userId: string;
     role: ProjectMemberRole;
-  }): Promise<Result<ProjectMember | null, UpdateMemberRoleError>> {
+    now: Date;
+  }): Promise<Result<MemberRoleChange | null, UpdateMemberRoleError>> {
     const pm = projectMembersTable;
     const where = and(
       eq(pm.projectId, input.projectId),
       eq(pm.userId, input.userId),
     );
 
-    const updated = await this.db
-      .update(pm)
-      .set({
-        role: input.role,
-        updatedAt: sql`CURRENT_TIMESTAMP`,
-      })
-      .where(
-        and(
-          where,
-          sql`(${pm.role} <> 'owner' OR ${input.role} = 'owner' OR EXISTS (
-            SELECT 1 FROM project_members other
-            WHERE other.project_id = ${input.projectId}
-              AND other.role = 'owner'
-              AND other.user_id <> ${input.userId}
-          ))`,
-        ),
-      )
-      .returning()
-      .get();
+    const [updatedRows, voidedRows] = await this.db.batch([
+      this.db
+        .update(pm)
+        .set({
+          role: input.role,
+          updatedAt: sql`CURRENT_TIMESTAMP`,
+        })
+        .where(
+          and(
+            where,
+            sql`(${pm.role} <> 'owner' OR ${input.role} = 'owner' OR EXISTS (
+              SELECT 1 FROM project_members other
+              WHERE other.project_id = ${input.projectId}
+                AND other.role = 'owner'
+                AND other.user_id <> ${input.userId}
+            ))`,
+          ),
+        )
+        .returning(),
+      voidIneligibleTransfers(this.db, {
+        after: {
+          kind: "role-changed",
+          projectId: input.projectId,
+          userId: input.userId,
+          role: input.role,
+        },
+        now: input.now,
+      }),
+    ]);
 
+    const updated = updatedRows[0];
     if (updated) {
-      return ok(toProjectMember(updated));
+      return ok({
+        member: toProjectMember(updated),
+        voidedTransfers: voidedRows.map(toTransfer),
+      });
     }
 
     const existing = await this.db.select().from(pm).where(where).get();

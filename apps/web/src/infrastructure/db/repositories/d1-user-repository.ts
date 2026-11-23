@@ -8,7 +8,12 @@ import type {
   UserRepositoryError,
 } from "../../../domain/repositories/user-repository";
 import { USER_REPOSITORY_ERROR } from "../../../domain/repositories/user-repository";
+import type { OwnershipTransfer } from "../../../domain/repositories/project-ownership-transfer-repository";
 import { createDb, type DbClient } from "../client";
+import {
+  toTransfer,
+  voidIneligibleTransfers,
+} from "./d1-project-ownership-transfer-repository";
 import {
   usersTable,
   notificationsTable,
@@ -118,12 +123,17 @@ export class D1UserRepository implements UserRepository {
     return ok(updated ? toUser(updated) : null);
   }
 
-  async delete(id: string): Promise<Result<true, UserRepositoryError>> {
+  async delete(
+    id: string,
+    now: Date,
+  ): Promise<
+    Result<{ voidedTransfers: OwnershipTransfer[] }, UserRepositoryError>
+  > {
     try {
       // Execute all cleanup and the user delete atomically via D1 batch.
       // Order: children first, then project_members, then users (FK cascade handles
       // notification_settings and saved_filters automatically).
-      await this.db.batch([
+      const [, , , , , , , , voidedRows] = await this.db.batch([
         this.db
           .update(storiesTable)
           .set({ requesterId: null })
@@ -163,6 +173,10 @@ export class D1UserRepository implements UserRepository {
             ))`,
           ),
         ),
+        voidIneligibleTransfers(this.db, {
+          after: { kind: "user-removed", userId: id },
+          now,
+        }),
         // usecase の事前チェックと並行操作で競合しても、owner 不在や孤児 owner を残さないため。
         this.db.insert(usersTable).select(
           this.db
@@ -181,7 +195,7 @@ export class D1UserRepository implements UserRepository {
         this.db.delete(usersTable).where(eq(usersTable.id, id)),
       ]);
 
-      return ok(true);
+      return ok({ voidedTransfers: voidedRows.map(toTransfer) });
     } catch {
       return err(USER_REPOSITORY_ERROR);
     }

@@ -11,6 +11,7 @@ import {
   PROJECT_NAME_CONFIRMATION_MISMATCH_ERROR,
   PROJECT_NOT_FOUND_ERROR,
 } from "../../application/usecases/delete-project";
+import { changeProjectMemberRole } from "../../application/usecases/change-project-member-role";
 import { listProjects } from "../../application/usecases/list-projects";
 import { rebuildIterations } from "../../application/usecases/manage-iterations";
 import {
@@ -52,6 +53,7 @@ import {
   createDeleteProjectBilling,
   createProjectDisplayNameGateway,
   createEntitlementProvider,
+  createTransferCheckoutExpiry,
 } from "./billing";
 import { requireProjectMembership } from "./project-membership";
 import { computeGravatarHash } from "../lib/gravatar";
@@ -805,11 +807,13 @@ projectsRoute.patch("/projects/:projectId/members/:memberUserId", async (c) => {
     return c.json({ error: "Role must be owner, member, or viewer" }, 400);
   }
 
-  const updatedResult = await membership.repository.updateMemberRole({
-    projectId,
-    userId: memberUserId,
-    role,
-  });
+  const updatedResult = await changeProjectMemberRole(
+    {
+      projects: membership.repository,
+      checkoutExpiry: createTransferCheckoutExpiry(c.env),
+    },
+    { projectId, userId: memberUserId, role, now: new Date() },
+  );
 
   if (updatedResult.isErr()) {
     if (updatedResult.error === LAST_PROJECT_OWNER_ERROR) {

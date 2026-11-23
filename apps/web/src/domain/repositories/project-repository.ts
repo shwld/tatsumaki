@@ -10,6 +10,7 @@ import type {
   ProjectMember,
   ProjectMemberRole,
 } from "../entities/project-member";
+import type { OwnershipTransfer } from "./project-ownership-transfer-repository";
 
 export type CreateProjectInput = {
   name: string;
@@ -54,6 +55,12 @@ export const LAST_PROJECT_OWNER_ERROR = "LAST_PROJECT_OWNER_ERROR" as const;
 export type UpdateMemberRoleError =
   | ProjectRepositoryError
   | typeof LAST_PROJECT_OWNER_ERROR;
+
+export type MemberRoleChange = {
+  member: ProjectMember;
+  /** このロール変更で当事者が資格を失い、同じトランザクションで cancelled にした譲渡申請。 */
+  voidedTransfers: OwnershipTransfer[];
+};
 
 export interface ProjectRepository {
   listSoleOwnerProjectIds(
@@ -125,7 +132,8 @@ export interface ProjectRepository {
     projectId: string;
     userId: string;
     role: ProjectMemberRole;
-  }): Promise<Result<ProjectMember | null, UpdateMemberRoleError>>;
+    now: Date;
+  }): Promise<Result<MemberRoleChange | null, UpdateMemberRoleError>>;
   findById(
     projectId: string,
   ): Promise<Result<Project | null, ProjectRepositoryError>>;

@@ -109,11 +109,13 @@ describe("last owner guard", () => {
         projectId,
         userId: OWNER,
         role: "viewer",
+        now: new Date(),
       }),
       repository.updateMemberRole({
         projectId,
         userId: "github|second-owner",
         role: "viewer",
+        now: new Date(),
       }),
     ]);
 
@@ -157,7 +159,7 @@ describe("last owner guard", () => {
     const projectId = await createProject();
     await createAuthHeaders();
 
-    const result = await new D1UserRepository(env.DB).delete(OWNER);
+    const result = await new D1UserRepository(env.DB).delete(OWNER, new Date());
 
     expect(result.isErr()).toBe(true);
     expect(await roleOf(projectId, OWNER)).toBe("owner");
@@ -172,7 +174,7 @@ describe("last owner guard", () => {
     const projectId = await createProject();
     await addMember(projectId, "github|second-owner", "owner");
 
-    await new D1UserRepository(env.DB).delete(OWNER);
+    await new D1UserRepository(env.DB).delete(OWNER, new Date());
 
     expect(await roleOf(projectId, OWNER)).toBeUndefined();
     expect(await ownerCount(projectId)).toBe(1);

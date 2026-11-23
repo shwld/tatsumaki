@@ -117,7 +117,8 @@ export function createProjectRepositoryMock(
     acceptInvitation: async () =>
       ok(buildProjectInvitation({ status: "accepted" })),
     upsertMember: async () => ok(buildProjectMember()),
-    updateMemberRole: async ({ role }) => ok(buildProjectMember({ role })),
+    updateMemberRole: async ({ role }) =>
+      ok({ member: buildProjectMember({ role }), voidedTransfers: [] }),
     findById: async () => ok(buildProject()),
     updateSettings: async () => ok(buildProject()),
     updatePointScale: async ({ pointScaleType, customPointScale }) =>

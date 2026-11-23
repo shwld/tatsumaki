@@ -414,17 +414,19 @@ export const createTransferSettlement = (bindings: Bindings) =>
       }
     : undefined;
 
-const transferDeps = (bindings: Bindings) => ({
-  projects: new D1ProjectRepository(bindings.DB),
-  transfers: new D1ProjectOwnershipTransferRepository(bindings.DB),
-  ...(bindings.CONTROL_PLANE
-    ? {
-        checkoutExpiry: new ControlPlaneTransferCheckoutExpiryGateway(
-          bindings.CONTROL_PLANE,
-        ),
-      }
-    : {}),
-});
+export const createTransferCheckoutExpiry = (bindings: Bindings) =>
+  bindings.CONTROL_PLANE
+    ? new ControlPlaneTransferCheckoutExpiryGateway(bindings.CONTROL_PLANE)
+    : undefined;
+
+const transferDeps = (bindings: Bindings) => {
+  const checkoutExpiry = createTransferCheckoutExpiry(bindings);
+  return {
+    projects: new D1ProjectRepository(bindings.DB),
+    transfers: new D1ProjectOwnershipTransferRepository(bindings.DB),
+    ...(checkoutExpiry ? { checkoutExpiry } : {}),
+  };
+};
 
 // セルフホストは従来のロール操作を維持するため、課金付き譲渡は公式ホスト版だけ。
 billingRoute.use(

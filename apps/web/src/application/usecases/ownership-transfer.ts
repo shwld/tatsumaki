@@ -148,23 +148,28 @@ const isStillEligible = async (
  * 申請の終了後に受け手の未決済 Checkout を無効にする。失敗しても終了は覆さない。
  * 先に確定した決済は、申請IDを持つ購読として切替側が照合する。
  */
-const expireRecipientCheckout = async (
-  deps: Deps,
-  transfer: OwnershipTransfer,
+export const expireTransferCheckouts = async (
+  checkoutExpiry: TransferCheckoutExpiryGateway | undefined,
+  transfers: OwnershipTransfer[],
 ): Promise<void> => {
-  if (!deps.checkoutExpiry) return;
-  try {
-    await deps.checkoutExpiry.expireTransferCheckout({
-      billingAccountId: transfer.toUserId,
-      projectId: transfer.projectId,
-      transferId: transfer.id,
-    });
-  } catch (error) {
-    console.error("Failed to expire transfer checkout", {
-      errorType: error instanceof Error ? error.name : "unknown",
-    });
+  if (!checkoutExpiry) return;
+  for (const transfer of transfers) {
+    try {
+      await checkoutExpiry.expireTransferCheckout({
+        billingAccountId: transfer.toUserId,
+        projectId: transfer.projectId,
+        transferId: transfer.id,
+      });
+    } catch (error) {
+      console.error("Failed to expire transfer checkout", {
+        errorType: error instanceof Error ? error.name : "unknown",
+      });
+    }
   }
 };
+
+const expireRecipientCheckout = (deps: Deps, transfer: OwnershipTransfer) =>
+  expireTransferCheckouts(deps.checkoutExpiry, [transfer]);
 
 /** 資格を失った申請を終了させ、後で資格が戻っても復活しないようにする。 */
 const voidIfIneligible = async (
