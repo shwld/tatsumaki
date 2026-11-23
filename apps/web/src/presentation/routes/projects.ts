@@ -7,6 +7,7 @@ import {
 import {
   deleteProject,
   PROJECT_DELETE_PENDING_ERROR,
+  PROJECT_DELETE_FORBIDDEN_ERROR,
   PROJECT_NAME_CONFIRMATION_MISMATCH_ERROR,
   PROJECT_NOT_FOUND_ERROR,
 } from "../../application/usecases/delete-project";
@@ -747,6 +748,15 @@ projectsRoute.delete("/projects/:projectId", async (c) => {
           code: "project_name_mismatch",
         },
         400,
+      );
+    }
+    if (result.error === PROJECT_DELETE_FORBIDDEN_ERROR) {
+      return c.json(
+        {
+          error: "Only the project owner can delete the project",
+          code: "project_delete_forbidden",
+        },
+        403,
       );
     }
     if (result.error === PROJECT_NOT_FOUND_ERROR) {

@@ -8,6 +8,8 @@ import {
 import type { ProjectBillingCloseGateway } from "../ports/project-billing-close-gateway";
 
 export const PROJECT_NOT_FOUND_ERROR = "PROJECT_NOT_FOUND_ERROR" as const;
+export const PROJECT_DELETE_FORBIDDEN_ERROR =
+  "PROJECT_DELETE_FORBIDDEN_ERROR" as const;
 export const PROJECT_NAME_CONFIRMATION_MISMATCH_ERROR =
   "PROJECT_NAME_CONFIRMATION_MISMATCH_ERROR" as const;
 // 削除要求は保持済みだが未完了(課金の終了未確認、または本体削除の失敗)。定期復旧が完了させる。
@@ -16,6 +18,7 @@ export const PROJECT_DELETE_PENDING_ERROR =
 
 export type DeleteProjectError =
   | typeof PROJECT_NOT_FOUND_ERROR
+  | typeof PROJECT_DELETE_FORBIDDEN_ERROR
   | typeof PROJECT_NAME_CONFIRMATION_MISMATCH_ERROR
   | typeof PROJECT_DELETE_PENDING_ERROR
   | ProjectRepositoryError;
@@ -95,6 +98,9 @@ export async function deleteProject(
     if (opened.isErr()) {
       // 要求を残せていないので「受付済み」とは扱わない。
       return err(PROJECT_REPOSITORY_ERROR);
+    }
+    if (!opened.value) {
+      return err(PROJECT_DELETE_FORBIDDEN_ERROR);
     }
     deleted = await closeBillingAndDelete(
       deps.repository,

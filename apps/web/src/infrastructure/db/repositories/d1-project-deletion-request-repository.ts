@@ -22,20 +22,31 @@ export class D1ProjectDeletionRequestRepository
 {
   private readonly db: DbClient;
 
-  constructor(d1: D1Database) {
+  constructor(private readonly d1: D1Database) {
     this.db = createDb(d1);
   }
 
   async open(input: {
     projectId: string;
     requestedByUserId: string;
-  }): Promise<Result<void, ProjectDeletionRequestRepositoryError>> {
+  }): Promise<Result<boolean, ProjectDeletionRequestRepositoryError>> {
     try {
-      await this.db
-        .insert(projectDeletionRequestsTable)
-        .values(input)
-        .onConflictDoNothing();
-      return ok(undefined);
+      await this.d1
+        .prepare(
+          `INSERT INTO project_deletion_requests (project_id, requested_by_user_id)
+           SELECT ?1, ?2
+           WHERE EXISTS (SELECT 1 FROM project_members m
+                         WHERE m.project_id = ?1 AND m.user_id = ?2 AND m.role = 'owner')
+           ON CONFLICT DO NOTHING`,
+        )
+        .bind(input.projectId, input.requestedByUserId)
+        .run();
+      const row = await this.db
+        .select()
+        .from(projectDeletionRequestsTable)
+        .where(eq(projectDeletionRequestsTable.projectId, input.projectId))
+        .get();
+      return ok(row !== undefined);
     } catch {
       return err(PROJECT_DELETION_REQUEST_REPOSITORY_ERROR);
     }

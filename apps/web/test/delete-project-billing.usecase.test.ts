@@ -2,6 +2,7 @@ import { env } from "cloudflare:test";
 import { err } from "neverthrow";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  PROJECT_DELETE_FORBIDDEN_ERROR,
   PROJECT_DELETE_PENDING_ERROR,
   PROJECT_NAME_CONFIRMATION_MISMATCH_ERROR,
   deleteProject,
@@ -57,6 +58,27 @@ describe("deleteProject with billing", () => {
       projectId: project.id,
     });
     expect(await exists(project.id)).toBe(false);
+    expect(await pendingRequest(project.id)).toBeNull();
+  });
+
+  it("rejects a request from a user demoted by an ownership transfer, without any billing call", async () => {
+    const project = await seedProject();
+    await env.DB.prepare(
+      "UPDATE project_members SET role = 'member' WHERE project_id = ?1 AND user_id = 'owner'",
+    )
+      .bind(project.id)
+      .run();
+    const { deps, closeProjectBilling, exists, pendingRequest } = setup();
+
+    const result = await deleteProject(deps, {
+      projectId: project.id,
+      userId: "owner",
+      confirmProjectName: "Billing Target",
+    });
+
+    expect(result._unsafeUnwrapErr()).toBe(PROJECT_DELETE_FORBIDDEN_ERROR);
+    expect(closeProjectBilling).not.toHaveBeenCalled();
+    expect(await exists(project.id)).toBe(true);
     expect(await pendingRequest(project.id)).toBeNull();
   });
 

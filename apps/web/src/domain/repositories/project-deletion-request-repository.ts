@@ -13,11 +13,12 @@ export type ProjectDeletionRequest = {
 };
 
 export interface ProjectDeletionRequestRepository {
-  // 同じ projectId は最初の要求をそのまま残す。
+  // 同じ projectId は最初の要求をそのまま残す。要求者が今も owner のときだけ保存し、
+  // 所有権の切替で降格済みなら保存せず false を返す(権限の確認と保存を同じ書き込みで行う)。
   open(input: {
     projectId: string;
     requestedByUserId: string;
-  }): Promise<Result<void, ProjectDeletionRequestRepositoryError>>;
+  }): Promise<Result<boolean, ProjectDeletionRequestRepositoryError>>;
   findById(
     projectId: string,
   ): Promise<
