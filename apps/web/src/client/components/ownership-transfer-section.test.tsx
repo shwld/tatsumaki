@@ -53,6 +53,7 @@ const pendingTransfer = (role: "requester" | "recipient") => ({
   toUserId: "bob",
   expiresAt: "2030-01-08T00:00:00.000Z",
   role,
+  state: "pending",
 });
 
 describe("OwnershipTransferSection", () => {
@@ -132,6 +133,22 @@ describe("OwnershipTransferSection", () => {
         expect.objectContaining({ method: "POST" }),
       ),
     );
+  });
+
+  it.each([
+    ["processing", "requester", /Bob さんに移しました.*日割り返金を処理/],
+    ["processing", "recipient", /あなたがオーナーになりました/],
+    ["completed", "requester", /Bob さんに譲渡しました.*返金しました/],
+    ["completed", "recipient", /所有権の譲渡が完了しました/],
+    ["review", "requester", /返金を自動では処理できませんでした/],
+    ["review", "recipient", /運営が確認しています/],
+  ] as const)("shows the %s state to the %s without any action", async (transferState, role, text) => {
+    routes({ ...pendingTransfer(role), state: transferState });
+    renderSection(role === "requester");
+
+    expect(await screen.findByText(text)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "申請を取り消す" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "辞退する" })).toBeNull();
   });
 
   it("explains a rejected request from a non-payer", async () => {

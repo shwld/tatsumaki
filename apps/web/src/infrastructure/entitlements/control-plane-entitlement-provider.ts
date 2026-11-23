@@ -18,6 +18,20 @@ export interface ControlPlaneRpc {
     projectId: string;
     transferId: string;
   }): Promise<unknown>;
+  confirmTransferPayment(input: {
+    projectId: string;
+    transferId: string;
+    fromBillingAccountId: string;
+    toBillingAccountId: string;
+  }): Promise<unknown>;
+  settleOwnershipTransfer(input: {
+    projectId: string;
+    transferId: string;
+    outcome: "switched" | "not-switched";
+    fromBillingAccountId: string;
+    toBillingAccountId: string;
+    switchedAt: string;
+  }): Promise<unknown>;
   syncProjectDisplayNames(input: {
     billingAccountId: string;
     projects: { projectId: string; name: string }[];

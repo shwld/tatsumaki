@@ -96,6 +96,8 @@ describe("createEntitlementProvider", () => {
           createPaymentMethodUpdateSession: vi.fn(),
           closeProjectBilling: vi.fn(),
           expireTransferCheckout: vi.fn(),
+          confirmTransferPayment: vi.fn(),
+          settleOwnershipTransfer: vi.fn(),
           syncProjectDisplayNames: vi.fn(),
           createPortalSession: vi.fn(),
         },

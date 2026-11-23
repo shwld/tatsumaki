@@ -12,6 +12,7 @@ type Transfer = {
   toUserId: string;
   expiresAt: string;
   role: "requester" | "recipient";
+  state: "pending" | "processing" | "completed" | "review";
   recipientSubscribed?: boolean | null;
   checkoutAvailable?: boolean;
 };
@@ -130,8 +131,10 @@ export function OwnershipTransferSection({
   // 購読の反映は決済の後に遅れる。戻り先や別タブに依らず、確認できるまで(確認不能も含め)取り直す。
   const awaitingPayment =
     state.status === "ready" &&
-    state.transfer?.role === "recipient" &&
-    state.transfer.recipientSubscribed !== true;
+    ((state.transfer?.state === "pending" &&
+      state.transfer.role === "recipient" &&
+      state.transfer.recipientSubscribed !== true) ||
+      state.transfer?.state === "processing");
   const pollsLeft = useRef(RETURN_POLL_MAX_ATTEMPTS);
   useEffect(() => {
     if (!awaitingPayment || pollsLeft.current <= 0) return;
@@ -243,6 +246,21 @@ export function OwnershipTransferSection({
             <button type="button" className={BUTTON_CLASS} onClick={reload}>
               {t("ownershipTransferSection.retry")}
             </button>
+          </div>
+        ) : state.transfer && state.transfer.state !== "pending" ? (
+          <div className="space-y-2">
+            <p className="font-semibold text-gray-900">
+              {t(
+                `ownershipTransferSection.${state.transfer.state}.${state.transfer.role}`,
+                {
+                  name: nameOf(
+                    state.transfer.role === "requester"
+                      ? state.transfer.toUserId
+                      : state.transfer.fromUserId,
+                  ),
+                },
+              )}
+            </p>
           </div>
         ) : state.transfer ? (
           <div className="space-y-2">
