@@ -10,6 +10,9 @@ import {
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const PREVIEW_TOKEN_PATH =
   /^\/artifacts\/[^/]+\/versions\/[^/]+\/preview-token$/;
+// 課金の回復・譲渡の経路は停止中でも通す。ゲートの対象は /projects/:id 配下だけ。
+const BILLING_PROJECT_PATH =
+  /^(?:\/api)?\/billing\/projects\/[^/]+\/(?:resume|cancel|payment-method|ownership-transfer)(?:\/|$)/;
 const PROJECT_PATH = /(?:^|\/)projects\/([^/]+)(\/.*)?$/;
 
 /**
@@ -23,6 +26,7 @@ export const requireProjectWritable = (): MiddlewareHandler<Env> => {
     if (SAFE_METHODS.has(c.req.method) || !isProjectWriteEnforced(c.env)) {
       return next();
     }
+    if (BILLING_PROJECT_PATH.test(c.req.path)) return next();
     const match = PROJECT_PATH.exec(c.req.path);
     if (!match) return next();
     const projectId = decodeURIComponent(match[1]);

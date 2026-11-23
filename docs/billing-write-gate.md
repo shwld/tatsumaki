@@ -99,3 +99,5 @@
 
 - Checkout の `requestId` は projectId と UTC 日付から決めるので、二重クリック・再試行は同じセッションになる。重複購読の最終拒否は Control Plane の `checkoutRefusal`。
 - 戻り先は `/projects/:projectId?billing=resume`(キャンセルは `resume-cancel`)。戻り URL だけでは権利を与えず、バナーが権利を再取得して `active` になるまで読み取り専用のまま待つ(5 秒間隔で最大 2 分、その後は再読み込みを案内)。
+
+`/billing/projects/:projectId/**`(再購読・解約・支払い方法・所有権の譲渡申請)は `/projects/:id` 配下ではないため、ゲートは対象外にする。停止中でも課金の回復と申請の取消・辞退ができる。

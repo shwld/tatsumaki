@@ -63,6 +63,19 @@ const call = (method: string, path: string, env: Record<string, unknown>) =>
   buildApp().request(path.replace("p1", projectId), { method }, env);
 
 describe("requireProjectWritable", () => {
+  it("lets billing recovery and ownership-transfer routes through a suspended project", async () => {
+    const env = bindings(async () => entitlement("suspended"));
+    for (const path of [
+      "/api/billing/projects/p1/resume",
+      "/api/billing/projects/p1/ownership-transfer",
+      "/api/billing/projects/p1/ownership-transfer/cancel",
+      "/api/billing/projects/p1/ownership-transfer/decline",
+    ]) {
+      const response = await call("POST", path, env);
+      expect(response.status, path).toBe(200);
+    }
+  });
+
   it("rejects every write method on a suspended project with a machine-readable code", async () => {
     const env = bindings(async () => entitlement("suspended"));
     for (const method of ["POST", "PUT", "PATCH", "DELETE"]) {
