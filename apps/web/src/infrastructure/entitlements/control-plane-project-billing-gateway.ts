@@ -27,6 +27,7 @@ const responseSchema = z.object({
           lifecycle: z.enum(SUBSCRIPTION_LIFECYCLES),
           endsAt: z.iso.datetime().nullable(),
           nextBilling: nextBillingSchema,
+          transferId: z.string().min(1).nullable(),
         })
         .nullable(),
     }),

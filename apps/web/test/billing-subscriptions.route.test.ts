@@ -29,6 +29,7 @@ const subscription = (projectId: string) => ({
       amount: 3850,
       currency: "jpy",
     },
+    transferId: null,
   },
 });
 

@@ -33,6 +33,8 @@ const setup = (
     string,
     Lifecycle
   >;
+  /** 購読が所有権譲渡のどの申請の決済か。未指定は通常の購読。 */
+  const transferIds: Record<string, string> = {};
   const listProjectBilling = vi.fn(
     async ({
       billingAccountId,
@@ -55,6 +57,7 @@ const setup = (
                   lifecycle,
                   endsAt: null,
                   nextBilling: { status: "none" as const },
+                  transferId: transferIds[billingAccountId] ?? null,
                 }
               : null,
           };
@@ -105,6 +108,7 @@ const setup = (
     );
   return {
     call,
+    transferIds,
     listProjectBilling,
     createCheckoutSession,
     expireTransferCheckout,
@@ -350,10 +354,11 @@ describe("ownership transfer checkout", () => {
     ["cancel", "owner"],
     ["decline", "bob"],
   ])("refuses to %s once the recipient's subscription is confirmed", async (path, userId) => {
-    const { call, expireTransferCheckout } = setup({
+    const { call, transferIds, expireTransferCheckout } = setup({
       subscriptions: { bob: "live" },
     });
     const { projectId, transferId } = await seedTransfer(call);
+    transferIds.bob = transferId;
 
     const response = await call(userId, projectId, "POST", `/${path}`, {
       transferId,
@@ -364,6 +369,21 @@ describe("ownership transfer checkout", () => {
     expect(expireTransferCheckout).not.toHaveBeenCalled();
     const view = await call("owner", projectId, "GET");
     expect(await view.json()).toMatchObject({ transfer: { id: transferId } });
+  });
+
+  it.each([
+    ["cancel", "owner"],
+    ["decline", "bob"],
+  ])("lets the parties %s when the recipient's subscription paid for another request", async (path, userId) => {
+    const { call, transferIds } = setup({ subscriptions: { bob: "live" } });
+    const { projectId, transferId } = await seedTransfer(call);
+    transferIds.bob = "transfer-cancelled-earlier";
+
+    const response = await call(userId, projectId, "POST", `/${path}`, {
+      transferId,
+    });
+
+    expect(response.status).toBe(200);
   });
 
   it("lets either party close the request when the recipient's subscription cannot be checked", async () => {
@@ -414,8 +434,9 @@ describe("ownership transfer checkout", () => {
   });
 
   it("tells the recipient, not the requester, whether their own subscription is live", async () => {
-    const { call } = setup({ subscriptions: { bob: "live" } });
-    const { projectId } = await seedTransfer(call);
+    const { call, transferIds } = setup({ subscriptions: { bob: "live" } });
+    const { projectId, transferId } = await seedTransfer(call);
+    transferIds.bob = transferId;
 
     const recipient = await call("bob", projectId, "GET");
     const requester = await call("owner", projectId, "GET");
@@ -428,6 +449,19 @@ describe("ownership transfer checkout", () => {
       ((await requester.json()) as { transfer: Record<string, unknown> })
         .transfer,
     ).not.toHaveProperty("recipientSubscribed");
+  });
+
+  it("does not count the recipient's subscription paid for another request", async () => {
+    const { call, transferIds } = setup({ subscriptions: { bob: "live" } });
+    const { projectId } = await seedTransfer(call);
+    transferIds.bob = "transfer-cancelled-earlier";
+
+    const recipient = await call("bob", projectId, "GET");
+
+    expect(
+      ((await recipient.json()) as { transfer: Record<string, unknown> })
+        .transfer.recipientSubscribed,
+    ).toBe(false);
   });
 
   it("does not mistake the current owner's live subscription for the recipient's", async () => {

@@ -337,16 +337,22 @@ export async function getOwnershipTransfer(
       deps.billing,
       input.userId,
       input.projectId,
+      transfer.id,
     );
   }
   return ok(view);
 }
 
-/** 権利の集約値ではなく、その利用者自身の購読だけを見る。確認できなければ null。 */
+/**
+ * 権利の集約値ではなく、その利用者自身の購読だけを見る。確認できなければ null。
+ * transferId を渡すと、その申請の決済として購読したものだけを数える。取消済みの申請の遅れて
+ * 確定した購読を、同じ受け手への新しい申請の決済と取り違えないため。
+ */
 const hasLiveSubscription = async (
   billing: ProjectBillingGateway,
   userId: string,
   projectId: string,
+  transferId?: string,
 ): Promise<boolean | null> => {
   try {
     const entry = (
@@ -358,7 +364,8 @@ const hasLiveSubscription = async (
     if (!entry) return null;
     return (
       entry.subscription !== null &&
-      !isSubscriptionEnded(entry.subscription.lifecycle)
+      !isSubscriptionEnded(entry.subscription.lifecycle) &&
+      (transferId === undefined || entry.subscription.transferId === transferId)
     );
   } catch {
     return null;
@@ -402,12 +409,13 @@ export async function closeOwnershipTransfer(
       transfer?.toUserId === input.userId;
     return err(isParty ? TRANSFER_FORBIDDEN_ERROR : TRANSFER_NOT_PENDING_ERROR);
   }
-  // 受け手の購読が有効になった後は決済確定済みとして、取消・辞退を受け付けない。
+  // 受け手がこの申請の決済として購読した後は決済確定済みとして、取消・辞退を受け付けない。
   if (deps.billing) {
     const subscribed = await hasLiveSubscription(
       deps.billing,
       transfer.toUserId,
       transfer.projectId,
+      transfer.id,
     );
     // 確認できないときも閉じられる。決済が先に確定していた場合は、申請IDから後続が返金する。
     if (subscribed) return err(TRANSFER_PAYMENT_CONFIRMED_ERROR);

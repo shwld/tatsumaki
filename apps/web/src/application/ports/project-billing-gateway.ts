@@ -9,6 +9,8 @@ export type ProjectBillingSubscription = {
   lifecycle: SubscriptionLifecycle;
   endsAt: string | null;
   nextBilling: NextBilling;
+  /** 所有権譲渡の受け手として購読した場合の申請ID。通常の購読では null。 */
+  transferId: string | null;
 };
 
 export type ProjectBilling = {
