@@ -157,8 +157,8 @@ Stripe Portal の購読一覧で、プロジェクトを区別できるように
 - **旧購読との関係**: 通常の Checkout はプロジェクトの購読が他の決済アカウントのものでも重複として拒否する。譲渡の Checkout は Control Plane の `createCheckoutSession` に `transferId` を付け、受け手自身の未終了の購読だけを重複とみなす。価格は常に通常の月額税込3,850円で、旧購読の0円 Price は使わない。
 - **照合**: 受け手の購読が有効かは、権限の集約値ではなく受け手自身の billing account の `listProjectBilling` で確認する(`recipientSubscribed`、受け手の画面にだけ返す)。決済画面から戻らなくても、設定画面が反映まで取り直す。同じ申請で開き直しても requestId は申請IDだけから決まり(日付を含めず、日をまたいでも同じセッションを返す)、受け手の購読は1本のまま。
 - **競合の引き渡し**: Checkout セッションと購読に `transferId` を保存する。受け手の購読が有効になった後は取消・辞退を受け付けない(購読の状況を確認できないときは可用性を優先して閉じ、先に決済が確定していた場合は `transferId` から #451 が返金する)。取消・辞退・失効が先に確定した後に決済が確定した場合は、`transferId` から取引を特定して #451 が旧購読を維持したまま解約・全額返金する。
-- **未決済の無効化**: 取消・辞退・資格喪失で申請が終わると、Control Plane の `expireTransferCheckout` が受け手の open な Checkout を expire する。失敗しても申請の終了は覆さない(失効はログに残す)。
-- **残課題**: 期限切れ(7日)による自動 expire は、決済確定の照合を #451 が行うため入れていない。Stripe の Checkout は作成から最大24時間で失効する。
+- **未決済の無効化**: 取消・辞退・資格喪失で申請が終わると、Control Plane の `expireTransferCheckout` が受け手の open な Checkout を expire する。失敗しても申請の終了は覆さない(失効はログに残す)。この即時失効は最善努力で、リクエストの中断や失敗で行われないことがある。失効の保証は毎時の精算が担う(story #456)。
+- **残課題**: 期限切れ(7日)では即時の expire を試さない。受け手の open な Checkout は毎時の精算が失効させる(story #456)。Stripe の Checkout は作成から最大24時間で失効する。
 - **既知の限界**: 受け手の購読の確認は billing account 単位で、申請IDとは照合していない(別の申請で先に払われた購読を、新しい申請の決済済みと見なしうる。#454 で申請IDの照合に改めた)。当事者がロール変更で資格を失った申請の即時無効化は #453。決済確定と取消・辞退の同時実行は、先に確定したほうを採り、後から確定した決済は `transferId` を手掛かりに #451 が返金する。
 
 ## Amendment 2026-11-23 (story #451)
@@ -185,3 +185,11 @@ Stripe Portal の購読一覧で、プロジェクトを区別できるように
 - **申請IDの受け渡し**: Control Plane は購読 metadata の `transferId` を購読スナップショットに保存し、`listProjectBilling` の `subscription.transferId` で返す(通常の購読は `null`)。web は Control Plane のこの変更が先にデプロイされている前提で `transferId` を必須として読む。
 - **照合する判定**: 受け手の画面の `recipientSubscribed` と、取消・辞退の拒否(`payment_confirmed`)は、受け手自身の有効な購読のうち `transferId` が現在の申請IDと一致するものだけを決済済みとみなす。
 - **照合しない判定**: 譲渡の Checkout の重複防止は従来どおり billing account 単位で、別の申請の購読でも受け手自身の有効な購読があれば開始しない。その間は受け手の画面に購読の操作を出さない(`checkoutAvailable: false`)。古い申請の遅延決済は、#451 の精算が申請IDで特定して全額返金する。
+
+## Amendment 2026-11-23 (story #456)
+
+申請の終了後に受け手の open な Checkout を失効させる保証を、リクエスト内の即時失効ではなく毎時の精算に置く。
+
+- **即時失効は最善努力**: 取消・辞退・資格喪失(ロール変更・アカウント削除)の即時失効は、リクエストの後処理(`waitUntil`)またはリクエスト内で1回だけ試す。失敗・中断しても再試行しない。期限切れは即時失効を試さない。
+- **精算による保証**: いずれの終了経路も、申請を終える書き込みで `settlement_outcome = 'not-switched'` / `settlement_status = 'pending'` を記録する。毎時の定期ジョブ(`recoverOwnershipTransfers`)が精算待ちを拾い、Control Plane の `settleOwnershipTransfer` は `not-switched` の精算で最初に受け手の open な Checkout を `expireTransferCheckoutSessions` で失効させる。精算は確認期間(25 時間)が過ぎるまで毎時繰り返す。
+- **許容する遅延**: 即時失効が行われなくても、遅くとも約1時間(定期ジョブの間隔)で失効する。その間に支払われた決済は、同じ精算が申請IDで特定して全額返金する。新たな outbox や定期ジョブの間隔の変更は行わない。
