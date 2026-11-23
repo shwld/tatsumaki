@@ -302,6 +302,44 @@ describe("StoryAccordionDetail", () => {
     await waitFor(() => expect(patched).toEqual([{ releaseDate: null }]));
   });
 
+  it("saves the edited planned date when focus tabs past the clear button", async () => {
+    const story: Story = {
+      ...createStory(),
+      type: "release",
+      releaseDate: "2026-12-01",
+    };
+    const patched: unknown[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (init?.method === "PATCH") {
+          const fields = JSON.parse(String(init.body));
+          patched.push(fields);
+          return new Response(
+            JSON.stringify({ story: { ...story, ...fields } }),
+            { status: 200 },
+          );
+        }
+        return (
+          baselineFetchResponse(String(input)) ??
+          new Response("{}", { status: 500 })
+        );
+      }),
+    );
+
+    renderDetail(undefined, [], story);
+
+    const dateInput = screen.getByLabelText("リリース予定日");
+    const clear = screen.getByRole("button", { name: "予定日を解除" });
+    fireEvent.change(dateInput, { target: { value: "2027-02-01" } });
+    fireEvent.blur(dateInput, { relatedTarget: clear });
+    expect(patched).toEqual([]);
+    fireEvent.blur(clear, { relatedTarget: document.body });
+    await waitFor(() =>
+      expect(patched).toEqual([{ releaseDate: "2027-02-01" }]),
+    );
+  });
+
   it("does not show a planned date field for other story types", () => {
     vi.stubGlobal(
       "fetch",

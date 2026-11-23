@@ -232,8 +232,6 @@ function StoryAccordionDetailComponent({
     setReleaseDateDraft(resolvedStory.releaseDate ?? "");
   }, [resolvedStory.releaseDate]);
 
-  const clearReleaseDateRef = useRef<HTMLButtonElement>(null);
-
   const commitReleaseDate = () => {
     if (!releaseDateDraft) {
       setReleaseDateDraft(resolvedStory.releaseDate ?? "");
@@ -934,7 +932,16 @@ function StoryAccordionDetailComponent({
       </div>
 
       {resolvedStory.type === "release" ? (
-        <div className="flex min-w-0 items-center gap-2 text-xs">
+        <div
+          className="flex min-w-0 items-center gap-2 text-xs"
+          onBlur={(event) => {
+            if (
+              event.currentTarget.contains(event.relatedTarget as Node | null)
+            )
+              return;
+            commitReleaseDate();
+          }}
+        >
           <label
             htmlFor={`story-release-date-${story.id}`}
             className="shrink-0 font-medium text-gray-500 dark:text-slate-300"
@@ -948,16 +955,11 @@ function StoryAccordionDetailComponent({
             value={releaseDateDraft}
             disabled={locked}
             onChange={(event) => setReleaseDateDraft(event.target.value)}
-            onBlur={(event) => {
-              if (event.relatedTarget === clearReleaseDateRef.current) return;
-              commitReleaseDate();
-            }}
             onKeyDown={(event) => {
               if (event.key === "Enter") commitReleaseDate();
             }}
           />
           <button
-            ref={clearReleaseDateRef}
             type="button"
             className="rounded border border-gray-200 px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-slate-600 dark:text-slate-100 dark:hover:bg-slate-800"
             disabled={locked || !resolvedStory.releaseDate}
