@@ -8,7 +8,10 @@ import {
   type OwnershipTransfer,
   type ProjectOwnershipTransferRepository,
 } from "../../domain/repositories/project-ownership-transfer-repository";
-import type { ProjectBillingGateway } from "../ports/project-billing-gateway";
+import type {
+  ProjectBillingGateway,
+  ProjectBillingSubscription,
+} from "../ports/project-billing-gateway";
 import type { ProjectCheckoutGateway } from "../ports/project-checkout-gateway";
 import type { TransferCheckoutExpiryGateway } from "../ports/transfer-checkout-expiry-gateway";
 import { deterministicRequestId } from "./deterministic-request-id";
@@ -330,24 +333,25 @@ export async function getOwnershipTransfer(
     );
   }
   const view = toView(transfer, input.userId);
-  if (view.role === "recipient")
-    view.checkoutAvailable = !!deps.checkoutAvailable;
-  if (view.role === "recipient" && deps.billing) {
-    view.recipientSubscribed = await hasLiveSubscription(
-      deps.billing,
-      input.userId,
-      input.projectId,
-    );
+  if (view.role === "recipient") {
+    const own = deps.billing
+      ? await findLiveSubscription(deps.billing, input.userId, input.projectId)
+      : undefined;
+    // 別の申請の購読が残る間は、Checkout を開始しても重複として拒否されるため出さない。
+    view.checkoutAvailable = !!deps.checkoutAvailable && !own;
+    if (own !== undefined) {
+      view.recipientSubscribed = own === null ? null : paidFor(own, transfer);
+    }
   }
   return ok(view);
 }
 
-/** 権利の集約値ではなく、その利用者自身の購読だけを見る。確認できなければ null。 */
-const hasLiveSubscription = async (
+/** 権利の集約値ではなく、その利用者自身の有効な購読を返す。無ければ false、確認できなければ null。 */
+const findLiveSubscription = async (
   billing: ProjectBillingGateway,
   userId: string,
   projectId: string,
-): Promise<boolean | null> => {
+): Promise<ProjectBillingSubscription | false | null> => {
   try {
     const entry = (
       await billing.listProjectBilling({
@@ -356,14 +360,23 @@ const hasLiveSubscription = async (
       })
     ).find((billing) => billing.projectId === projectId);
     if (!entry) return null;
-    return (
-      entry.subscription !== null &&
+    return entry.subscription !== null &&
       !isSubscriptionEnded(entry.subscription.lifecycle)
-    );
+      ? entry.subscription
+      : false;
   } catch {
     return null;
   }
 };
+
+/**
+ * 受け手の購読がこの申請の決済か。取消済みの申請の遅れて確定した購読を、同じ受け手への
+ * 新しい申請の決済と取り違えない。
+ */
+const paidFor = (
+  subscription: ProjectBillingSubscription | false,
+  transfer: OwnershipTransfer,
+): boolean => subscription !== false && subscription.transferId === transfer.id;
 
 /** 申請者は取消、受け手は辞退。終わった申請(決済確定後を含む)は操作できない。 */
 export async function closeOwnershipTransfer(
@@ -402,15 +415,17 @@ export async function closeOwnershipTransfer(
       transfer?.toUserId === input.userId;
     return err(isParty ? TRANSFER_FORBIDDEN_ERROR : TRANSFER_NOT_PENDING_ERROR);
   }
-  // 受け手の購読が有効になった後は決済確定済みとして、取消・辞退を受け付けない。
+  // 受け手がこの申請の決済として購読した後は決済確定済みとして、取消・辞退を受け付けない。
   if (deps.billing) {
-    const subscribed = await hasLiveSubscription(
+    const own = await findLiveSubscription(
       deps.billing,
       transfer.toUserId,
       transfer.projectId,
     );
     // 確認できないときも閉じられる。決済が先に確定していた場合は、申請IDから後続が返金する。
-    if (subscribed) return err(TRANSFER_PAYMENT_CONFIRMED_ERROR);
+    if (own !== null && paidFor(own, transfer)) {
+      return err(TRANSFER_PAYMENT_CONFIRMED_ERROR);
+    }
   }
   const closed = await deps.transfers.close({
     id: transfer.id,
@@ -474,13 +489,13 @@ export async function startTransferCheckout(
     if (deletion.isErr()) return err(TRANSFER_UNAVAILABLE_ERROR);
     if (deletion.value) return err(TRANSFER_PROJECT_DELETING_ERROR);
 
-    const subscribed = await hasLiveSubscription(
+    const own = await findLiveSubscription(
       deps.billing,
       input.userId,
       input.projectId,
     );
-    if (subscribed === null) return err(TRANSFER_UNAVAILABLE_ERROR);
-    if (subscribed) return err(TRANSFER_ALREADY_SUBSCRIBED_ERROR);
+    if (own === null) return err(TRANSFER_UNAVAILABLE_ERROR);
+    if (own) return err(TRANSFER_ALREADY_SUBSCRIBED_ERROR);
 
     const project = await deps.projectNames.findById(input.projectId);
     if (project.isErr() || !project.value) {

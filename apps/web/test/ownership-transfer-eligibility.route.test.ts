@@ -42,6 +42,7 @@ const setup = (
                 lifecycle: "live",
                 endsAt: null,
                 nextBilling: { status: "none" as const },
+                transferId: null,
               }
             : null,
       })),
