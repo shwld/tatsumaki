@@ -6,7 +6,8 @@
 
 - `main` に branch protection または ruleset を設定する
 - Pull Request review を必須にする
-- Required status checks に `CI / check`, release 関連 check を追加する（Scorecard は PR で動かないため含めない）
+- Required status checks に `lint`, `typecheck`, `openapi-check`, `test`, `cli-build`, `ui-screenshot-diff`, `artifact-sandbox`（いずれも GitHub Actions の check）を追加する
+  - Scorecard と release 系 workflow は PR で動かないため含めない
 - Conversation resolution を必須にする
 - Force push と branch deletion を許可しない
 - 管理者 bypass を許可する場合も、通常運用では Pull Request を使う
