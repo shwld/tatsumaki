@@ -24,9 +24,14 @@ const buildApp = (userId: string) => {
 
 /** 申請の終了時に行う受け手の Checkout の即時失効が、毎回失敗する Control Plane を用意する。 */
 const setup = () => {
-  const expireTransferCheckout = vi.fn(async (_input: unknown) => {
-    throw new Error("stripe down");
-  });
+  /** 即時失効を呼んだ時点の申請の記録。中断されても精算待ちが残っていることを確かめる。 */
+  const rowsAtExpiry: unknown[] = [];
+  const expireTransferCheckout = vi.fn(
+    async (input: { transferId: string }) => {
+      rowsAtExpiry.push(await transferRow(input.transferId));
+      throw new Error("stripe down");
+    },
+  );
   const confirmTransferPayment = vi.fn(async (_input: unknown) => ({
     recipientSubscribed: false,
     previousSubscriptionLive: true,
@@ -97,7 +102,13 @@ const setup = () => {
     await Promise.all(afterCommitTasks);
     return response;
   };
-  return { bindings, request, expireTransferCheckout, settleOwnershipTransfer };
+  return {
+    bindings,
+    request,
+    expireTransferCheckout,
+    rowsAtExpiry,
+    settleOwnershipTransfer,
+  };
 };
 
 type Request = ReturnType<typeof setup>["request"];
@@ -247,6 +258,7 @@ describe("recipient's open Checkout after a transfer request ends", () => {
       bindings,
       request,
       expireTransferCheckout,
+      rowsAtExpiry,
       settleOwnershipTransfer,
     } = setup();
     const seeded = await seedTransfer(request);
@@ -259,6 +271,9 @@ describe("recipient's open Checkout after a transfer request ends", () => {
         projectId: seeded.projectId,
         transferId: seeded.transferId,
       });
+      expect(rowsAtExpiry).toEqual([
+        { status: endedStatus, outcome: "not-switched", settlement: "pending" },
+      ]);
     } else {
       expect(expireTransferCheckout).not.toHaveBeenCalled();
     }
