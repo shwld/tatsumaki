@@ -1,6 +1,7 @@
 import type { Result } from "neverthrow";
 import { err, ok } from "neverthrow";
 import { isSubscriptionEnded } from "../../domain/entities/subscription-lifecycle";
+import type { ProjectDeletionRequestRepository } from "../../domain/repositories/project-deletion-request-repository";
 import type { ProjectRepository } from "../../domain/repositories/project-repository";
 import {
   OWNERSHIP_TRANSFER_CONFLICT_ERROR,
@@ -24,6 +25,10 @@ export const TRANSFER_NOT_PENDING_ERROR = "TRANSFER_NOT_PENDING_ERROR" as const;
 export const TRANSFER_UNAVAILABLE_ERROR = "TRANSFER_UNAVAILABLE_ERROR" as const;
 export const TRANSFER_CHECKOUT_DISABLED_ERROR =
   "TRANSFER_CHECKOUT_DISABLED_ERROR" as const;
+export const TRANSFER_PAYMENT_CONFIRMED_ERROR =
+  "TRANSFER_PAYMENT_CONFIRMED_ERROR" as const;
+export const TRANSFER_PROJECT_DELETING_ERROR =
+  "TRANSFER_PROJECT_DELETING_ERROR" as const;
 export const TRANSFER_ALREADY_SUBSCRIBED_ERROR =
   "TRANSFER_ALREADY_SUBSCRIBED_ERROR" as const;
 
@@ -36,7 +41,9 @@ export type OwnershipTransferError =
   | typeof TRANSFER_NOT_PENDING_ERROR
   | typeof TRANSFER_UNAVAILABLE_ERROR
   | typeof TRANSFER_CHECKOUT_DISABLED_ERROR
-  | typeof TRANSFER_ALREADY_SUBSCRIBED_ERROR;
+  | typeof TRANSFER_ALREADY_SUBSCRIBED_ERROR
+  | typeof TRANSFER_PAYMENT_CONFIRMED_ERROR
+  | typeof TRANSFER_PROJECT_DELETING_ERROR;
 
 type Deps = {
   projects: Pick<ProjectRepository, "findMember">;
@@ -295,7 +302,7 @@ export async function closeOwnershipTransfer(
       transfer.projectId,
     );
     if (subscribed === null) return err(TRANSFER_UNAVAILABLE_ERROR);
-    if (subscribed) return err(TRANSFER_NOT_PENDING_ERROR);
+    if (subscribed) return err(TRANSFER_PAYMENT_CONFIRMED_ERROR);
   }
   const closed = await deps.transfers.close({
     id: transfer.id,
@@ -317,6 +324,8 @@ export async function startTransferCheckout(
     billing: ProjectBillingGateway;
     checkout: ProjectCheckoutGateway;
     projectNames: Pick<ProjectRepository, "findById">;
+    deletions: Pick<ProjectDeletionRequestRepository, "findById">;
+    clock: () => Date;
   },
   input: {
     userId: string;
@@ -332,18 +341,15 @@ export async function startTransferCheckout(
   if (member.isErr()) return err(TRANSFER_UNAVAILABLE_ERROR);
   if (!member.value) return err(TRANSFER_NOT_FOUND_ERROR);
 
-  const isCurrent = async (): Promise<
-    Result<OwnershipTransfer | null, OwnershipTransferError>
-  > => {
-    const pending = await deps.transfers.findPending(
-      input.projectId,
-      input.now,
-    );
+  const isCurrent = async (
+    at: Date,
+  ): Promise<Result<OwnershipTransfer | null, OwnershipTransferError>> => {
+    const pending = await deps.transfers.findPending(input.projectId, at);
     if (pending.isErr()) return err(TRANSFER_UNAVAILABLE_ERROR);
     return ok(pending.value?.id === input.transferId ? pending.value : null);
   };
 
-  const current = await isCurrent();
+  const current = await isCurrent(input.now);
   if (current.isErr()) return err(current.error);
   const transfer = current.value;
   if (!transfer) return err(TRANSFER_NOT_PENDING_ERROR);
@@ -354,6 +360,11 @@ export async function startTransferCheckout(
       return err(TRANSFER_NOT_PENDING_ERROR);
     }
     if (!checkoutEnabled) return err(TRANSFER_CHECKOUT_DISABLED_ERROR);
+
+    // 削除要求の受付後は購読させない。Control Plane 側の閉鎖が最終防衛線。
+    const deletion = await deps.deletions.findById(input.projectId);
+    if (deletion.isErr()) return err(TRANSFER_UNAVAILABLE_ERROR);
+    if (deletion.value) return err(TRANSFER_PROJECT_DELETING_ERROR);
 
     const subscribed = await hasLiveSubscription(
       deps.billing,
@@ -380,7 +391,7 @@ export async function startTransferCheckout(
     });
 
     // 作成の間に取消・辞退・失効が確定した場合、開いた Checkout を残さない。
-    const after = await isCurrent();
+    const after = await isCurrent(deps.clock());
     if (after.isErr() || !after.value) {
       await expireRecipientCheckout(deps, transfer);
       return err(TRANSFER_NOT_PENDING_ERROR);

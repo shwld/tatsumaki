@@ -37,6 +37,8 @@ import {
   TRANSFER_NO_SUBSCRIPTION_ERROR,
   TRANSFER_NOT_FOUND_ERROR,
   TRANSFER_NOT_PENDING_ERROR,
+  TRANSFER_PAYMENT_CONFIRMED_ERROR,
+  TRANSFER_PROJECT_DELETING_ERROR,
   type OwnershipTransferError,
 } from "../../application/usecases/ownership-transfer";
 import { ControlPlaneTransferCheckoutExpiryGateway } from "../../infrastructure/entitlements/control-plane-transfer-checkout-expiry-gateway";
@@ -360,6 +362,19 @@ const ownershipTransferErrorResponse = (error: OwnershipTransferError) => {
         body: { error: "No pending transfer", code: "not_pending" },
         status: 409 as const,
       };
+    case TRANSFER_PAYMENT_CONFIRMED_ERROR:
+      return {
+        body: {
+          error: "The recipient's payment is already confirmed",
+          code: "payment_confirmed",
+        },
+        status: 409 as const,
+      };
+    case TRANSFER_PROJECT_DELETING_ERROR:
+      return {
+        body: { error: "Project is being deleted", code: "project_deleting" },
+        status: 409 as const,
+      };
     case TRANSFER_CHECKOUT_DISABLED_ERROR:
       return {
         body: {
@@ -487,6 +502,8 @@ billingRoute.post(
         ...transferDeps(c.env),
         projects,
         projectNames: projects,
+        deletions: new D1ProjectDeletionRequestRepository(c.env.DB),
+        clock: () => new Date(),
         billing: new ControlPlaneProjectBillingGateway(controlPlane),
         checkout: new ControlPlaneCheckoutGateway(controlPlane),
       },

@@ -35,6 +35,9 @@ export const ownershipTransferSectionJa = {
       notPending: "申請はすでに終了しています。最新の状態を表示します。",
       checkoutDisabled: "現在、新しい購読の受け付けを停止しています。",
       alreadySubscribed: "すでにこのプロジェクトを購読しています。",
+      paymentConfirmed:
+        "相手の購読がすでに確認されたため、取消・辞退できません。所有権の切り替えをお待ちください。",
+      projectDeleting: "このプロジェクトは削除手続き中のため、購読できません。",
     },
   },
 } as const;
@@ -76,6 +79,10 @@ export const ownershipTransferSectionEn = {
       notPending: "The request has already ended. Showing the latest state.",
       checkoutDisabled: "New subscriptions are currently paused.",
       alreadySubscribed: "You already subscribe to this project.",
+      paymentConfirmed:
+        "The subscription has already been confirmed, so the request can no longer be cancelled or declined. Please wait for the ownership switch.",
+      projectDeleting:
+        "This project is being deleted, so it cannot be subscribed.",
     },
   },
 } as const;

@@ -28,6 +28,8 @@ type ErrorKey =
   | "invalidRecipient"
   | "notPending"
   | "checkoutDisabled"
+  | "paymentConfirmed"
+  | "projectDeleting"
   | "alreadySubscribed";
 
 const BUTTON_CLASS =
@@ -39,21 +41,13 @@ const ERROR_BY_CODE: Record<string, ErrorKey> = {
   invalid_recipient: "invalidRecipient",
   not_pending: "notPending",
   checkout_disabled: "checkoutDisabled",
+  payment_confirmed: "paymentConfirmed",
+  project_deleting: "projectDeleting",
   already_subscribed: "alreadySubscribed",
 };
 
 const RETURN_POLL_INTERVAL_MS = 3000;
 const RETURN_POLL_MAX_ATTEMPTS = 10;
-
-const returnedFromCheckout = (): boolean => {
-  try {
-    return (
-      new URLSearchParams(window.location.search).get("billing") === "transfer"
-    );
-  } catch {
-    return false;
-  }
-};
 
 /** 公式ホスト版の当事者(申請者・受け手)と、申請できる owner だけに表示する。 */
 export function OwnershipTransferSection({
@@ -122,13 +116,13 @@ export function OwnershipTransferSection({
 
   const reload = useCallback(() => setAttempt((value) => value + 1), []);
 
-  // 決済画面から戻っても購読の反映は遅れる。戻らなくても照合できるよう、反映まで取り直す。
+  // 購読の反映は決済の後に遅れる。戻り先や別タブに依らず、確認できるまで(確認不能も含め)取り直す。
   const awaitingPayment =
     state.status === "ready" &&
     state.transfer?.role === "recipient" &&
-    state.transfer.recipientSubscribed === false;
+    state.transfer.recipientSubscribed !== true;
   useEffect(() => {
-    if (!awaitingPayment || !returnedFromCheckout()) return;
+    if (!awaitingPayment) return;
     if (attempt >= RETURN_POLL_MAX_ATTEMPTS) return;
     const timer = window.setTimeout(reload, RETURN_POLL_INTERVAL_MS);
     return () => window.clearTimeout(timer);
@@ -258,21 +252,25 @@ export function OwnershipTransferSection({
                 }).format(new Date(state.transfer.expiresAt)),
               })}
             </p>
-            <button
-              type="button"
-              className={BUTTON_CLASS}
-              disabled={busy}
-              onClick={() =>
-                void send(
-                  state.transfer?.role === "requester" ? "/cancel" : "/decline",
-                  { transferId: state.transfer?.id },
-                )
-              }
-            >
-              {state.transfer.role === "requester"
-                ? t("ownershipTransferSection.requester.cancel")
-                : t("ownershipTransferSection.recipient.decline")}
-            </button>
+            {state.transfer.recipientSubscribed ? null : (
+              <button
+                type="button"
+                className={BUTTON_CLASS}
+                disabled={busy}
+                onClick={() =>
+                  void send(
+                    state.transfer?.role === "requester"
+                      ? "/cancel"
+                      : "/decline",
+                    { transferId: state.transfer?.id },
+                  )
+                }
+              >
+                {state.transfer.role === "requester"
+                  ? t("ownershipTransferSection.requester.cancel")
+                  : t("ownershipTransferSection.recipient.decline")}
+              </button>
+            )}
           </div>
         ) : (
           <div className="space-y-3">

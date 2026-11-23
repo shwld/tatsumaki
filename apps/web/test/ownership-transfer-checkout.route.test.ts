@@ -248,6 +248,24 @@ describe("ownership transfer checkout", () => {
     expect(createCheckoutSession).not.toHaveBeenCalled();
   });
 
+  it("does not open a Checkout for a project whose deletion was requested", async () => {
+    const { call, createCheckoutSession } = setup();
+    const { projectId, transferId } = await seedTransfer(call);
+    await env.DB.prepare(
+      "insert into project_deletion_requests (project_id, requested_by_user_id) values (?, ?)",
+    )
+      .bind(projectId, "owner")
+      .run();
+
+    const response = await call("bob", projectId, "POST", "/checkout", {
+      transferId,
+    });
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: "project_deleting" });
+    expect(createCheckoutSession).not.toHaveBeenCalled();
+  });
+
   it("refuses to start once the request has been cancelled", async () => {
     const { call, createCheckoutSession } = setup();
     const { projectId, transferId } = await seedTransfer(call);
@@ -311,6 +329,7 @@ describe("ownership transfer checkout", () => {
     });
 
     expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: "payment_confirmed" });
     expect(expireTransferCheckout).not.toHaveBeenCalled();
     const view = await call("owner", projectId, "GET");
     expect(await view.json()).toMatchObject({ transfer: { id: transferId } });
