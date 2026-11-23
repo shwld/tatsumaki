@@ -24,7 +24,7 @@ export const ownershipTransferSectionJa = {
       subscribe: "購読して引き継ぐ",
       paid: "購読を確認しました。所有権の切り替えを待っています。",
       otherSubscription:
-        "このプロジェクトに、以前の申請のお支払いなどによるあなたの購読が残っているため、まだ購読できません。その購読の返金と解約が完了すると、購読して引き継げるようになります。引き継がない場合は辞退できます。",
+        "このプロジェクトに、以前の申請のお支払いなどによるあなたの購読が残っているため、まだ購読できません。その購読の解約(返金の対象であれば返金も)が完了すると、購読して引き継げるようになります。引き継がない場合は辞退できます。",
       decline: "辞退する",
     },
     processing: {
@@ -92,7 +92,7 @@ export const ownershipTransferSectionEn = {
       subscribe: "Subscribe and take over",
       paid: "Your subscription is confirmed. Waiting for the ownership switch.",
       otherSubscription:
-        "You cannot subscribe yet because you still have a subscription to this project, such as one paid for an earlier request. Once it has been refunded and canceled, you can subscribe and take over. You can decline if you do not want to.",
+        "You cannot subscribe yet because you still have a subscription to this project, such as one paid for an earlier request. Once it has been canceled (and refunded, if a refund applies), you can subscribe and take over. You can decline if you do not want to.",
       decline: "Decline",
     },
     processing: {
