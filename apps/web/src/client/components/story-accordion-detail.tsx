@@ -932,7 +932,16 @@ function StoryAccordionDetailComponent({
       </div>
 
       {resolvedStory.type === "release" ? (
-        <div className="flex min-w-0 items-center gap-2 text-xs">
+        <div
+          className="flex min-w-0 items-center gap-2 text-xs"
+          onBlur={(event) => {
+            if (
+              event.currentTarget.contains(event.relatedTarget as Node | null)
+            )
+              return;
+            commitReleaseDate();
+          }}
+        >
           <label
             htmlFor={`story-release-date-${story.id}`}
             className="shrink-0 font-medium text-gray-500 dark:text-slate-300"
@@ -946,7 +955,6 @@ function StoryAccordionDetailComponent({
             value={releaseDateDraft}
             disabled={locked}
             onChange={(event) => setReleaseDateDraft(event.target.value)}
-            onBlur={commitReleaseDate}
             onKeyDown={(event) => {
               if (event.key === "Enter") commitReleaseDate();
             }}
