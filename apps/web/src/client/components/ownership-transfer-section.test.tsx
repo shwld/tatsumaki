@@ -290,7 +290,7 @@ describe("OwnershipTransferSection", () => {
       {
         ...pendingTransfer("recipient"),
         recipientSubscribed: false,
-        checkoutAvailable: true,
+        checkout: "available",
       },
       "control-plane",
       {
@@ -330,7 +330,7 @@ describe("OwnershipTransferSection", () => {
       {
         ...pendingTransfer("recipient"),
         recipientSubscribed: false,
-        checkoutAvailable: true,
+        checkout: "available",
       },
       "control-plane",
       {
@@ -370,7 +370,7 @@ describe("OwnershipTransferSection", () => {
           transfer: {
             ...pendingTransfer("recipient"),
             recipientSubscribed: subscribed,
-            checkoutAvailable: true,
+            checkout: "available",
           },
         });
       });
@@ -390,13 +390,30 @@ describe("OwnershipTransferSection", () => {
     routes({
       ...pendingTransfer("recipient"),
       recipientSubscribed: false,
-      checkoutAvailable: false,
+      checkout: "disabled",
     });
     renderSection(false);
 
     await screen.findByRole("button", { name: "辞退する" });
+    expect(screen.getByText(/3,850 円/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "購読して引き継ぐ" })).toBe(
       null,
     );
+  });
+
+  it("tells the recipient to wait while their subscription for another request is refunded", async () => {
+    routes({
+      ...pendingTransfer("recipient"),
+      recipientSubscribed: false,
+      checkout: "otherSubscription",
+    });
+    renderSection(false);
+
+    expect(await screen.findByText(/その購読が解約されると/)).toBeTruthy();
+    expect(screen.queryByText(/3,850 円/)).toBe(null);
+    expect(screen.queryByRole("button", { name: "購読して引き継ぐ" })).toBe(
+      null,
+    );
+    expect(screen.getByRole("button", { name: "辞退する" })).toBeTruthy();
   });
 });

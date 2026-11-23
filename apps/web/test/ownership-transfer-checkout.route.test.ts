@@ -297,8 +297,8 @@ describe("ownership transfer checkout", () => {
     expect(createCheckoutSession).not.toHaveBeenCalled();
     expect(
       ((await view.json()) as { transfer: Record<string, unknown> }).transfer
-        .checkoutAvailable,
-    ).toBe(false);
+        .checkout,
+    ).toBe("disabled");
   });
 
   it("refuses to start once the request has been cancelled", async () => {
@@ -441,10 +441,11 @@ describe("ownership transfer checkout", () => {
     const recipient = await call("bob", projectId, "GET");
     const requester = await call("owner", projectId, "GET");
 
-    expect(
-      ((await recipient.json()) as { transfer: Record<string, unknown> })
-        .transfer.recipientSubscribed,
-    ).toBe(true);
+    const recipientView = (
+      (await recipient.json()) as { transfer: Record<string, unknown> }
+    ).transfer;
+    expect(recipientView.recipientSubscribed).toBe(true);
+    expect(recipientView).not.toHaveProperty("checkout");
     expect(
       ((await requester.json()) as { transfer: Record<string, unknown> })
         .transfer,
@@ -461,7 +462,10 @@ describe("ownership transfer checkout", () => {
     expect(
       ((await recipient.json()) as { transfer: Record<string, unknown> })
         .transfer,
-    ).toMatchObject({ recipientSubscribed: false, checkoutAvailable: false });
+    ).toMatchObject({
+      recipientSubscribed: false,
+      checkout: "otherSubscription",
+    });
   });
 
   it("does not mistake the current owner's live subscription for the recipient's", async () => {
@@ -472,7 +476,7 @@ describe("ownership transfer checkout", () => {
 
     expect(
       ((await recipient.json()) as { transfer: Record<string, unknown> })
-        .transfer.recipientSubscribed,
-    ).toBe(false);
+        .transfer,
+    ).toMatchObject({ recipientSubscribed: false, checkout: "available" });
   });
 });
