@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { PageTitle } from "./page-title";
 import { OnboardingScreen } from "../screens/onboarding-screen";
 import type { OnboardingState } from "../types/onboarding";
 
@@ -41,10 +42,12 @@ export function OnboardingGate({ children }: { children: ReactNode }) {
   if (gate.kind === "ready") return <>{children}</>;
   if (gate.kind === "onboarding") {
     return (
-      <OnboardingScreen
-        state={gate.state}
-        onCompleted={() => setGate({ kind: "ready" })}
-      />
+      <PageTitle titleKey="onboardingScreen.title">
+        <OnboardingScreen
+          state={gate.state}
+          onCompleted={() => setGate({ kind: "ready" })}
+        />
+      </PageTitle>
     );
   }
   if (gate.kind === "error") {

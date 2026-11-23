@@ -18,6 +18,7 @@ import {
   projectSubscriptionSectionEn,
   projectSubscriptionSectionJa,
 } from "../components/project-subscription-section.i18n";
+import { pageTitleEn, pageTitleJa } from "../components/page-title.i18n";
 import { layoutEn, layoutJa } from "../components/layout.i18n";
 import {
   permissionDeniedEn,
@@ -137,6 +138,7 @@ i18n.use(initReactI18next).init({
     ja: {
       common: {
         ...layoutJa,
+        ...pageTitleJa,
         ...billingStatusSectionJa,
         ...projectSubscriptionSectionJa,
         ...ownershipTransferSectionJa,
@@ -175,6 +177,7 @@ i18n.use(initReactI18next).init({
     en: {
       common: {
         ...layoutEn,
+        ...pageTitleEn,
         ...billingStatusSectionEn,
         ...projectSubscriptionSectionEn,
         ...ownershipTransferSectionEn,

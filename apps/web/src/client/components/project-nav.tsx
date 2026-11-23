@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Menu } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { Link, useLocation, useMatch } from "react-router";
+import { Link, useLocation } from "react-router";
 import { useBreakpoint } from "../hooks/use-breakpoint";
 import { projectArtifactsPath } from "../lib/artifact-routes";
 import {
@@ -13,7 +13,7 @@ import {
   projectStoryMapsPath,
   projectVelocityDashboardPath,
 } from "../lib/story-routes";
-import type { ProjectsResponse } from "../types/project";
+import { useProjectName } from "../contexts/project-name-context";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,58 +21,22 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 
-const projectNameCache = new Map<string, string>();
-
-export function resetProjectNavCacheForTests(): void {
-  projectNameCache.clear();
-}
-
-function useProjectName(projectId: string, pathname: string): string | null {
-  const [name, setName] = useState<string | null>(
-    projectNameCache.get(projectId) ?? null,
-  );
-
-  useEffect(() => {
-    setName(projectNameCache.get(projectId) ?? null);
-    let ignore = false;
-    const load = async () => {
-      try {
-        const response = await fetch("/api/projects");
-        if (!response.ok) return;
-        const data = (await response.json()) as ProjectsResponse;
-        const found = Array.isArray(data.projects)
-          ? data.projects.find((item) => item.id === projectId)?.name
-          : undefined;
-        if (!ignore && found) {
-          projectNameCache.set(projectId, found);
-          setName(found);
-        }
-      } catch {
-        // 名前取得に失敗してもメニュー自体は使えるようフォールバック名を表示する
-      }
-    };
-    void load();
-    return () => {
-      ignore = true;
-    };
-  }, [projectId, pathname]);
-
-  return name;
-}
-
 export function ProjectNav() {
-  const match = useMatch("/projects/:projectId/*");
-  const isInvitationAccept = useMatch("/projects/:projectId/invitations/*");
-  const projectId = match?.params.projectId;
-  if (!projectId || projectId === "new" || isInvitationAccept) return null;
-  return <ProjectNavContent projectId={projectId} />;
+  const { projectId, name } = useProjectName();
+  if (!projectId) return null;
+  return <ProjectNavContent projectId={projectId} projectName={name} />;
 }
 
-function ProjectNavContent({ projectId }: { projectId: string }) {
+function ProjectNavContent({
+  projectId,
+  projectName,
+}: {
+  projectId: string;
+  projectName: string | null;
+}) {
   const { t } = useTranslation();
   const { pathname } = useLocation();
   const breakpoint = useBreakpoint();
-  const projectName = useProjectName(projectId, pathname);
   const [open, setOpen] = useState(false);
 
   const storiesPath = projectStoriesPath(projectId);
