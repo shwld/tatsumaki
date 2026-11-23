@@ -20,7 +20,9 @@ export const ownershipTransferSectionJa = {
     },
     recipient: {
       status: "{{name}} さんから所有権の譲渡を申請されています。",
-      next: "購読して引き継ぐ手順は、次の段階で案内します。引き継がない場合は辞退できます。",
+      next: "引き継ぐには、このプロジェクトを月額 3,850 円(税込)で購読してください。購読が完了するまで、あなたの権限は変わりません。引き継がない場合は辞退できます。",
+      subscribe: "購読して引き継ぐ",
+      paid: "購読を確認しました。所有権の切り替えを待っています。",
       decline: "辞退する",
     },
     expiresAt: "有効期限: {{date}}",
@@ -31,6 +33,11 @@ export const ownershipTransferSectionJa = {
       alreadyPending: "すでに有効な譲渡の申請があります。",
       invalidRecipient: "このメンバーには譲渡できません。",
       notPending: "申請はすでに終了しています。最新の状態を表示します。",
+      checkoutDisabled: "現在、新しい購読の受け付けを停止しています。",
+      alreadySubscribed: "すでにこのプロジェクトを購読しています。",
+      paymentConfirmed:
+        "相手の購読がすでに確認されたため、取消・辞退できません。所有権の切り替えをお待ちください。",
+      projectDeleting: "このプロジェクトは削除手続き中のため、購読できません。",
     },
   },
 } as const;
@@ -57,7 +64,9 @@ export const ownershipTransferSectionEn = {
     },
     recipient: {
       status: "{{name}} asked you to take over ownership.",
-      next: "Steps to subscribe and take over will be provided in the next stage. You can decline if you do not want to.",
+      next: "To take over, subscribe to this project for ¥3,850 per month (tax included). Your permissions stay the same until the subscription is complete. You can decline if you do not want to.",
+      subscribe: "Subscribe and take over",
+      paid: "Your subscription is confirmed. Waiting for the ownership switch.",
       decline: "Decline",
     },
     expiresAt: "Expires: {{date}}",
@@ -68,6 +77,12 @@ export const ownershipTransferSectionEn = {
       alreadyPending: "A transfer request is already pending.",
       invalidRecipient: "Ownership cannot be transferred to this member.",
       notPending: "The request has already ended. Showing the latest state.",
+      checkoutDisabled: "New subscriptions are currently paused.",
+      alreadySubscribed: "You already subscribe to this project.",
+      paymentConfirmed:
+        "The subscription has already been confirmed, so the request can no longer be cancelled or declined. Please wait for the ownership switch.",
+      projectDeleting:
+        "This project is being deleted, so it cannot be subscribed.",
     },
   },
 } as const;

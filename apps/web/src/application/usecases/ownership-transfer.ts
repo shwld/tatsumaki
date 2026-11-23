@@ -1,6 +1,7 @@
 import type { Result } from "neverthrow";
 import { err, ok } from "neverthrow";
 import { isSubscriptionEnded } from "../../domain/entities/subscription-lifecycle";
+import type { ProjectDeletionRequestRepository } from "../../domain/repositories/project-deletion-request-repository";
 import type { ProjectRepository } from "../../domain/repositories/project-repository";
 import {
   OWNERSHIP_TRANSFER_CONFLICT_ERROR,
@@ -8,6 +9,9 @@ import {
   type ProjectOwnershipTransferRepository,
 } from "../../domain/repositories/project-ownership-transfer-repository";
 import type { ProjectBillingGateway } from "../ports/project-billing-gateway";
+import type { ProjectCheckoutGateway } from "../ports/project-checkout-gateway";
+import type { TransferCheckoutExpiryGateway } from "../ports/transfer-checkout-expiry-gateway";
+import { deterministicRequestId } from "./deterministic-request-id";
 
 export const TRANSFER_NOT_FOUND_ERROR = "TRANSFER_NOT_FOUND_ERROR" as const;
 export const TRANSFER_FORBIDDEN_ERROR = "TRANSFER_FORBIDDEN_ERROR" as const;
@@ -19,6 +23,14 @@ export const TRANSFER_ALREADY_PENDING_ERROR =
   "TRANSFER_ALREADY_PENDING_ERROR" as const;
 export const TRANSFER_NOT_PENDING_ERROR = "TRANSFER_NOT_PENDING_ERROR" as const;
 export const TRANSFER_UNAVAILABLE_ERROR = "TRANSFER_UNAVAILABLE_ERROR" as const;
+export const TRANSFER_CHECKOUT_DISABLED_ERROR =
+  "TRANSFER_CHECKOUT_DISABLED_ERROR" as const;
+export const TRANSFER_PAYMENT_CONFIRMED_ERROR =
+  "TRANSFER_PAYMENT_CONFIRMED_ERROR" as const;
+export const TRANSFER_PROJECT_DELETING_ERROR =
+  "TRANSFER_PROJECT_DELETING_ERROR" as const;
+export const TRANSFER_ALREADY_SUBSCRIBED_ERROR =
+  "TRANSFER_ALREADY_SUBSCRIBED_ERROR" as const;
 
 export type OwnershipTransferError =
   | typeof TRANSFER_NOT_FOUND_ERROR
@@ -27,11 +39,17 @@ export type OwnershipTransferError =
   | typeof TRANSFER_NO_SUBSCRIPTION_ERROR
   | typeof TRANSFER_ALREADY_PENDING_ERROR
   | typeof TRANSFER_NOT_PENDING_ERROR
-  | typeof TRANSFER_UNAVAILABLE_ERROR;
+  | typeof TRANSFER_UNAVAILABLE_ERROR
+  | typeof TRANSFER_CHECKOUT_DISABLED_ERROR
+  | typeof TRANSFER_ALREADY_SUBSCRIBED_ERROR
+  | typeof TRANSFER_PAYMENT_CONFIRMED_ERROR
+  | typeof TRANSFER_PROJECT_DELETING_ERROR;
 
 type Deps = {
   projects: Pick<ProjectRepository, "findMember">;
   transfers: ProjectOwnershipTransferRepository;
+  /** 申請が終わったとき、受け手の未決済 Checkout を無効にする。 */
+  checkoutExpiry?: TransferCheckoutExpiryGateway;
 };
 
 export type OwnershipTransferView = {
@@ -40,6 +58,10 @@ export type OwnershipTransferView = {
   toUserId: string;
   expiresAt: string;
   role: "requester" | "recipient";
+  /** 受け手の画面だけ。受け手自身の購読が有効か。確認できなければ null。 */
+  recipientSubscribed?: boolean | null;
+  /** 受け手の画面だけ。購読の Checkout を開始できるか。 */
+  checkoutAvailable?: boolean;
 };
 
 const toView = (
@@ -69,6 +91,28 @@ const isStillEligible = async (
   return from.value?.role === "owner" && to.value !== null;
 };
 
+/**
+ * 申請の終了後に受け手の未決済 Checkout を無効にする。失敗しても終了は覆さない。
+ * 先に確定した決済は、申請IDを持つ購読として切替側が照合する。
+ */
+const expireRecipientCheckout = async (
+  deps: Deps,
+  transfer: OwnershipTransfer,
+): Promise<void> => {
+  if (!deps.checkoutExpiry) return;
+  try {
+    await deps.checkoutExpiry.expireTransferCheckout({
+      billingAccountId: transfer.toUserId,
+      projectId: transfer.projectId,
+      transferId: transfer.id,
+    });
+  } catch (error) {
+    console.error("Failed to expire transfer checkout", {
+      errorType: error instanceof Error ? error.name : "unknown",
+    });
+  }
+};
+
 /** 資格を失った申請を終了させ、後で資格が戻っても復活しないようにする。 */
 const voidIfIneligible = async (
   deps: Deps,
@@ -77,6 +121,7 @@ const voidIfIneligible = async (
 ): Promise<boolean> => {
   if (await isStillEligible(deps, transfer)) return false;
   await deps.transfers.close({ id: transfer.id, status: "cancelled", now });
+  await expireRecipientCheckout(deps, transfer);
   return true;
 };
 
@@ -159,7 +204,10 @@ export async function requestOwnershipTransfer(
 
 /** 当事者だけが有効な申請を見られる。第三者のメンバーには存在を明かさない。 */
 export async function getOwnershipTransfer(
-  deps: Deps,
+  deps: Deps & {
+    billing?: ProjectBillingGateway;
+    checkoutAvailable?: boolean;
+  },
   input: { userId: string; projectId: string; now: Date },
 ): Promise<Result<OwnershipTransferView | null, OwnershipTransferError>> {
   const member = await deps.projects.findMember(input.projectId, input.userId);
@@ -180,12 +228,45 @@ export async function getOwnershipTransfer(
   } catch {
     return err(TRANSFER_UNAVAILABLE_ERROR);
   }
-  return ok(toView(transfer, input.userId));
+  const view = toView(transfer, input.userId);
+  if (view.role === "recipient")
+    view.checkoutAvailable = !!deps.checkoutAvailable;
+  if (view.role === "recipient" && deps.billing) {
+    view.recipientSubscribed = await hasLiveSubscription(
+      deps.billing,
+      input.userId,
+      input.projectId,
+    );
+  }
+  return ok(view);
 }
+
+/** 権利の集約値ではなく、その利用者自身の購読だけを見る。確認できなければ null。 */
+const hasLiveSubscription = async (
+  billing: ProjectBillingGateway,
+  userId: string,
+  projectId: string,
+): Promise<boolean | null> => {
+  try {
+    const entry = (
+      await billing.listProjectBilling({
+        billingAccountId: userId,
+        projectIds: [projectId],
+      })
+    ).find((billing) => billing.projectId === projectId);
+    if (!entry) return null;
+    return (
+      entry.subscription !== null &&
+      !isSubscriptionEnded(entry.subscription.lifecycle)
+    );
+  } catch {
+    return null;
+  }
+};
 
 /** 申請者は取消、受け手は辞退。終わった申請(決済確定後を含む)は操作できない。 */
 export async function closeOwnershipTransfer(
-  deps: Deps,
+  deps: Deps & { billing?: ProjectBillingGateway },
   input: {
     userId: string;
     projectId: string;
@@ -220,11 +301,114 @@ export async function closeOwnershipTransfer(
       transfer?.toUserId === input.userId;
     return err(isParty ? TRANSFER_FORBIDDEN_ERROR : TRANSFER_NOT_PENDING_ERROR);
   }
+  // 受け手の購読が有効になった後は決済確定済みとして、取消・辞退を受け付けない。
+  if (deps.billing) {
+    const subscribed = await hasLiveSubscription(
+      deps.billing,
+      transfer.toUserId,
+      transfer.projectId,
+    );
+    // 確認できないときも閉じられる。決済が先に確定していた場合は、申請IDから後続が返金する。
+    if (subscribed) return err(TRANSFER_PAYMENT_CONFIRMED_ERROR);
+  }
   const closed = await deps.transfers.close({
     id: transfer.id,
     status: input.as === "requester" ? "cancelled" : "declined",
     now: input.now,
   });
   if (closed.isErr()) return err(TRANSFER_UNAVAILABLE_ERROR);
-  return closed.value ? ok(undefined) : err(TRANSFER_NOT_PENDING_ERROR);
+  if (!closed.value) return err(TRANSFER_NOT_PENDING_ERROR);
+  await expireRecipientCheckout(deps, transfer);
+  return ok(undefined);
+}
+
+/**
+ * 有効な申請の指定受取人だけが、同じプロジェクトを自分の決済アカウントで購読する Checkout を開ける。
+ * 現オーナーの購読は触らない。切替と旧購読の解約は後続の処理が行う。
+ */
+export async function startTransferCheckout(
+  deps: Deps & {
+    billing: ProjectBillingGateway;
+    checkout: ProjectCheckoutGateway;
+    projectNames: Pick<ProjectRepository, "findById">;
+    deletions: Pick<ProjectDeletionRequestRepository, "findById">;
+    clock: () => Date;
+  },
+  input: {
+    userId: string;
+    projectId: string;
+    transferId: string;
+    now: Date;
+    successUrl: string;
+    cancelUrl: string;
+  },
+  checkoutEnabled: boolean,
+): Promise<Result<{ url: string }, OwnershipTransferError>> {
+  const member = await deps.projects.findMember(input.projectId, input.userId);
+  if (member.isErr()) return err(TRANSFER_UNAVAILABLE_ERROR);
+  if (!member.value) return err(TRANSFER_NOT_FOUND_ERROR);
+
+  const isCurrent = async (
+    at: Date,
+  ): Promise<Result<OwnershipTransfer | null, OwnershipTransferError>> => {
+    const pending = await deps.transfers.findPending(input.projectId, at);
+    if (pending.isErr()) return err(TRANSFER_UNAVAILABLE_ERROR);
+    return ok(pending.value?.id === input.transferId ? pending.value : null);
+  };
+
+  const current = await isCurrent(input.now);
+  if (current.isErr()) return err(current.error);
+  const transfer = current.value;
+  if (!transfer) return err(TRANSFER_NOT_PENDING_ERROR);
+  if (transfer.toUserId !== input.userId) return err(TRANSFER_FORBIDDEN_ERROR);
+
+  try {
+    if (await voidIfIneligible(deps, transfer, input.now)) {
+      return err(TRANSFER_NOT_PENDING_ERROR);
+    }
+    if (!checkoutEnabled) return err(TRANSFER_CHECKOUT_DISABLED_ERROR);
+
+    // 削除要求の受付後は購読させない。Control Plane 側の閉鎖が最終防衛線。
+    const deletion = await deps.deletions.findById(input.projectId);
+    if (deletion.isErr()) return err(TRANSFER_UNAVAILABLE_ERROR);
+    if (deletion.value) return err(TRANSFER_PROJECT_DELETING_ERROR);
+
+    const subscribed = await hasLiveSubscription(
+      deps.billing,
+      input.userId,
+      input.projectId,
+    );
+    if (subscribed === null) return err(TRANSFER_UNAVAILABLE_ERROR);
+    if (subscribed) return err(TRANSFER_ALREADY_SUBSCRIBED_ERROR);
+
+    const project = await deps.projectNames.findById(input.projectId);
+    if (project.isErr() || !project.value) {
+      return err(TRANSFER_UNAVAILABLE_ERROR);
+    }
+    const session = await deps.checkout.createProjectCheckout({
+      billingAccountId: input.userId,
+      projectId: input.projectId,
+      projectName: project.value.name,
+      transferId: transfer.id,
+      // 日付を含めない。未決済のセッションが残るうちに別のキーで開き直すと、二重に決済できてしまう。
+      requestId: await deterministicRequestId(`transfer:${transfer.id}`),
+      successUrl: input.successUrl,
+      cancelUrl: input.cancelUrl,
+    });
+
+    // 作成の間に取消・辞退・失効が確定した場合、開いた Checkout を残さない。
+    const after = await isCurrent(deps.clock());
+    // 確認できない間は、開いた Checkout を残したまま URL を返さない。
+    if (after.isErr()) return err(TRANSFER_UNAVAILABLE_ERROR);
+    if (
+      !after.value ||
+      (await voidIfIneligible(deps, transfer, deps.clock()))
+    ) {
+      await expireRecipientCheckout(deps, transfer);
+      return err(TRANSFER_NOT_PENDING_ERROR);
+    }
+    return ok({ url: session.url });
+  } catch {
+    return err(TRANSFER_UNAVAILABLE_ERROR);
+  }
 }

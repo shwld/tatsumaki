@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuthError } from "../contexts/auth-error-context";
 import { useCurrentUser } from "../hooks/use-current-user";
@@ -12,6 +12,8 @@ type Transfer = {
   toUserId: string;
   expiresAt: string;
   role: "requester" | "recipient";
+  recipientSubscribed?: boolean | null;
+  checkoutAvailable?: boolean;
 };
 
 type LoadState =
@@ -25,7 +27,11 @@ type ErrorKey =
   | "noSubscription"
   | "alreadyPending"
   | "invalidRecipient"
-  | "notPending";
+  | "notPending"
+  | "checkoutDisabled"
+  | "paymentConfirmed"
+  | "projectDeleting"
+  | "alreadySubscribed";
 
 const BUTTON_CLASS =
   "inline-flex min-h-11 items-center justify-center rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-800 transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60";
@@ -35,7 +41,14 @@ const ERROR_BY_CODE: Record<string, ErrorKey> = {
   already_pending: "alreadyPending",
   invalid_recipient: "invalidRecipient",
   not_pending: "notPending",
+  checkout_disabled: "checkoutDisabled",
+  payment_confirmed: "paymentConfirmed",
+  project_deleting: "projectDeleting",
+  already_subscribed: "alreadySubscribed",
 };
+
+const RETURN_POLL_INTERVAL_MS = 3000;
+const RETURN_POLL_MAX_ATTEMPTS = 10;
 
 /** 公式ホスト版の当事者(申請者・受け手)と、申請できる owner だけに表示する。 */
 export function OwnershipTransferSection({
@@ -63,7 +76,10 @@ export function OwnershipTransferSection({
   useEffect(() => {
     let ignore = false;
     const run = async () => {
-      setState({ status: "loading" });
+      // 背景の取り直しでは表示中の内容とフォーカスを保つ。
+      setState((previous) =>
+        previous.status === "ready" ? previous : { status: "loading" },
+      );
       try {
         const entitlement = await fetch("/api/billing/entitlement");
         if (ignore) return;
@@ -72,7 +88,9 @@ export function OwnershipTransferSection({
           return;
         }
         if (!entitlement.ok) {
-          setState({ status: "error" });
+          setState((previous) =>
+            previous.status === "ready" ? previous : { status: "error" },
+          );
           return;
         }
         const mode = ((await entitlement.json()) as { mode?: string }).mode;
@@ -87,13 +105,18 @@ export function OwnershipTransferSection({
           return;
         }
         if (!response.ok) {
-          setState({ status: "error" });
+          setState((previous) =>
+            previous.status === "ready" ? previous : { status: "error" },
+          );
           return;
         }
         const data = (await response.json()) as { transfer?: Transfer | null };
         setState({ status: "ready", transfer: data.transfer ?? null });
       } catch {
-        if (!ignore) setState({ status: "error" });
+        if (!ignore)
+          setState((previous) =>
+            previous.status === "ready" ? previous : { status: "error" },
+          );
       }
     };
     void run();
@@ -103,6 +126,65 @@ export function OwnershipTransferSection({
   }, [base, notifySessionExpired, attempt]);
 
   const reload = useCallback(() => setAttempt((value) => value + 1), []);
+
+  // 購読の反映は決済の後に遅れる。戻り先や別タブに依らず、確認できるまで(確認不能も含め)取り直す。
+  const awaitingPayment =
+    state.status === "ready" &&
+    state.transfer?.role === "recipient" &&
+    state.transfer.recipientSubscribed !== true;
+  const pollsLeft = useRef(RETURN_POLL_MAX_ATTEMPTS);
+  useEffect(() => {
+    if (!awaitingPayment || pollsLeft.current <= 0) return;
+    const timer = window.setTimeout(() => {
+      pollsLeft.current -= 1;
+      reload();
+    }, RETURN_POLL_INTERVAL_MS);
+    return () => window.clearTimeout(timer);
+  }, [awaitingPayment, attempt, reload]);
+  // 別タブで決済して戻った場合や、反映が遅れて取り直しの回数を使い切った場合に、再び確認する。
+  useEffect(() => {
+    if (!awaitingPayment) return;
+    const revalidate = () => {
+      pollsLeft.current = RETURN_POLL_MAX_ATTEMPTS;
+      reload();
+    };
+    window.addEventListener("focus", revalidate);
+    window.addEventListener("pageshow", revalidate);
+    return () => {
+      window.removeEventListener("focus", revalidate);
+      window.removeEventListener("pageshow", revalidate);
+    };
+  }, [awaitingPayment, reload]);
+
+  const startCheckout = async (transferId: string): Promise<void> => {
+    setBusy(true);
+    setErrorKey(null);
+    try {
+      const response = await fetch(`${base}/checkout`, {
+        method: "POST",
+        body: JSON.stringify({ transferId }),
+        headers: { "content-type": "application/json" },
+      });
+      if (isAuthError(response.status)) {
+        notifySessionExpired();
+        return;
+      }
+      const data = (await response.json().catch(() => ({}))) as {
+        url?: string;
+        code?: string;
+      };
+      if (!response.ok || !data.url) {
+        setErrorKey(ERROR_BY_CODE[data.code ?? ""] ?? "generic");
+        if (response.status === 409) reload();
+        return;
+      }
+      window.location.assign(data.url);
+    } catch {
+      setErrorKey("generic");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const send = async (path: string, body?: unknown): Promise<void> => {
     setBusy(true);
@@ -176,8 +258,22 @@ export function OwnershipTransferSection({
             <p>
               {state.transfer.role === "requester"
                 ? t("ownershipTransferSection.requester.next")
-                : t("ownershipTransferSection.recipient.next")}
+                : state.transfer.recipientSubscribed
+                  ? t("ownershipTransferSection.recipient.paid")
+                  : t("ownershipTransferSection.recipient.next")}
             </p>
+            {state.transfer.role === "recipient" &&
+            state.transfer.recipientSubscribed === false &&
+            state.transfer.checkoutAvailable ? (
+              <button
+                type="button"
+                className={BUTTON_CLASS}
+                disabled={busy}
+                onClick={() => void startCheckout(state.transfer?.id ?? "")}
+              >
+                {t("ownershipTransferSection.recipient.subscribe")}
+              </button>
+            ) : null}
             <p>
               {t("ownershipTransferSection.expiresAt", {
                 date: new Intl.DateTimeFormat(i18n.language, {
@@ -185,21 +281,25 @@ export function OwnershipTransferSection({
                 }).format(new Date(state.transfer.expiresAt)),
               })}
             </p>
-            <button
-              type="button"
-              className={BUTTON_CLASS}
-              disabled={busy}
-              onClick={() =>
-                void send(
-                  state.transfer?.role === "requester" ? "/cancel" : "/decline",
-                  { transferId: state.transfer?.id },
-                )
-              }
-            >
-              {state.transfer.role === "requester"
-                ? t("ownershipTransferSection.requester.cancel")
-                : t("ownershipTransferSection.recipient.decline")}
-            </button>
+            {state.transfer.recipientSubscribed ? null : (
+              <button
+                type="button"
+                className={BUTTON_CLASS}
+                disabled={busy}
+                onClick={() =>
+                  void send(
+                    state.transfer?.role === "requester"
+                      ? "/cancel"
+                      : "/decline",
+                    { transferId: state.transfer?.id },
+                  )
+                }
+              >
+                {state.transfer.role === "requester"
+                  ? t("ownershipTransferSection.requester.cancel")
+                  : t("ownershipTransferSection.recipient.decline")}
+              </button>
+            )}
           </div>
         ) : (
           <div className="space-y-3">

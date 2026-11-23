@@ -5,6 +5,8 @@ export type ProjectCheckoutInput = {
   requestId: string;
   successUrl: string;
   cancelUrl: string;
+  /** 所有権譲渡の受け手の Checkout にだけ付ける。 */
+  transferId?: string;
 };
 
 export interface ProjectCheckoutGateway {
