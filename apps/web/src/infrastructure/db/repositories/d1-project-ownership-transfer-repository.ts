@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, inArray, lte, or } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, lte, or, sql } from "drizzle-orm";
 import { err, ok, type Result } from "neverthrow";
 import { ulid } from "ulid";
 import {
@@ -12,12 +12,13 @@ import {
   type OwnershipTransferStatus,
   type ProjectOwnershipTransferRepository,
 } from "../../../domain/repositories/project-ownership-transfer-repository";
+import type { ProjectMemberRole } from "../../../domain/entities/project-member";
 import { createDb, type DbClient } from "../client";
 import { projectOwnershipTransfersTable as table } from "../schema";
 
 type Row = typeof table.$inferSelect;
 
-const toTransfer = (row: Row): OwnershipTransfer => ({
+export const toTransfer = (row: Row): OwnershipTransfer => ({
   id: row.id,
   projectId: row.projectId,
   fromUserId: row.fromUserId,
@@ -41,6 +42,62 @@ const endedValues = (
   endedAt: nowIso,
   updatedAt: nowIso,
 });
+
+/**
+ * 申請者が owner でない、または受け手がメンバーでない有効な申請を cancelled にする。メンバーシップを
+ * 変える書き込みと同じバッチに入れ、資格を失った申請が後で資格が戻ったときに有効へ戻らないようにする。
+ */
+export const voidIneligibleTransfers = (
+  db: DbClient,
+  input: {
+    /**
+     * role-changed: 同じバッチのロール変更が適用された(対象が指定のロールになった)ときだけ対象にする。
+     * user-removed: 退会した利用者が当事者の申請。
+     */
+    after:
+      | {
+          kind: "role-changed";
+          projectId: string;
+          userId: string;
+          role: ProjectMemberRole;
+        }
+      | { kind: "user-removed"; userId: string };
+    now: Date;
+  },
+) => {
+  const nowIso = input.now.toISOString();
+  const after = input.after;
+  const scope =
+    after.kind === "role-changed"
+      ? and(
+          eq(table.projectId, after.projectId),
+          sql`EXISTS (SELECT 1 FROM project_members m
+                      WHERE m.project_id = ${after.projectId}
+                        AND m.user_id = ${after.userId} AND m.role = ${after.role})`,
+        )
+      : or(
+          eq(table.fromUserId, after.userId),
+          eq(table.toUserId, after.userId),
+        );
+  return db
+    .update(table)
+    .set(endedValues("cancelled", nowIso))
+    .where(
+      and(
+        scope,
+        eq(table.status, "pending"),
+        gt(table.expiresAt, nowIso),
+        sql`(NOT EXISTS (SELECT 1 FROM project_members m
+                         WHERE m.project_id = project_ownership_transfers.project_id
+                           AND m.user_id = project_ownership_transfers.from_user_id
+                           AND m.role = 'owner')
+             OR NOT EXISTS (SELECT 1 FROM project_members m
+                            WHERE m.project_id = project_ownership_transfers.project_id
+                              AND m.user_id = project_ownership_transfers.to_user_id))`,
+      ),
+    )
+    .returning();
+};
 
 const isUniqueViolation = (error: unknown): boolean => {
   for (let cause = error; cause instanceof Error; cause = cause.cause) {

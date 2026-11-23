@@ -1,5 +1,6 @@
 import type { Result } from "neverthrow";
 import type { User } from "../entities/user";
+import type { OwnershipTransfer } from "./project-ownership-transfer-repository";
 
 export type CreateUserInput = {
   id: string;
@@ -28,5 +29,11 @@ export interface UserRepository {
   update(
     input: UpdateUserInput,
   ): Promise<Result<User | null, UserRepositoryError>>;
-  delete(id: string): Promise<Result<true, UserRepositoryError>>;
+  /** voidedTransfers: 退会で当事者がいなくなり、同じトランザクションで cancelled にした譲渡申請。 */
+  delete(
+    id: string,
+    now: Date,
+  ): Promise<
+    Result<{ voidedTransfers: OwnershipTransfer[] }, UserRepositoryError>
+  >;
 }
