@@ -259,8 +259,12 @@ describe("StoryAccordionDetail", () => {
       expect(patched).toContainEqual({ releaseDate: "2027-01-15" }),
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "予定日を解除" }));
+    fireEvent.change(dateInput, { target: { value: "2027-02-01" } });
+    const clear = screen.getByRole("button", { name: "予定日を解除" });
+    expect(fireEvent.mouseDown(clear)).toBe(false);
+    fireEvent.click(clear);
     await waitFor(() => expect(patched).toContainEqual({ releaseDate: null }));
+    expect(patched).not.toContainEqual({ releaseDate: "2027-02-01" });
   });
 
   it("does not show a planned date field for other story types", () => {
