@@ -22,7 +22,9 @@ const buildApp = (userId: string) => {
   return app;
 };
 
-const setup = (options: { expireFails?: boolean } = {}) => {
+const setup = (
+  options: { expireFails?: boolean; holdExpiry?: Promise<void> } = {},
+) => {
   const listProjectBilling = vi.fn(
     async ({
       billingAccountId,
@@ -46,6 +48,7 @@ const setup = (options: { expireFails?: boolean } = {}) => {
     }),
   );
   const expireTransferCheckout = vi.fn(async (_input: unknown) => {
+    await options.holdExpiry;
     if (options.expireFails) throw new Error("stripe down");
     return { expiredSessionCount: 1 };
   });
@@ -58,13 +61,18 @@ const setup = (options: { expireFails?: boolean } = {}) => {
       expireTransferCheckout,
     },
   } as unknown as Bindings;
-  const request = (
+  const afterCommitTasks: Promise<unknown>[] = [];
+  const request = async (
     userId: string,
     path: string,
     method: string,
     body?: unknown,
-  ) =>
-    buildApp(userId).request(
+  ) => {
+    const executionCtx = {
+      waitUntil: (task: Promise<unknown>) => afterCommitTasks.push(task),
+      passThroughOnException() {},
+    } as unknown as ExecutionContext;
+    const response = await buildApp(userId).request(
       `https://tatsumaki.example${path}`,
       {
         method,
@@ -76,7 +84,11 @@ const setup = (options: { expireFails?: boolean } = {}) => {
             }),
       },
       bindings,
+      executionCtx,
     );
+    if (!options.holdExpiry) await Promise.all(afterCommitTasks);
+    return response;
+  };
   const changeRole = (
     actor: string,
     projectId: string,
@@ -86,7 +98,7 @@ const setup = (options: { expireFails?: boolean } = {}) => {
     request(actor, `/projects/${projectId}/members/${userId}`, "PATCH", {
       role,
     });
-  return { request, changeRole, expireTransferCheckout };
+  return { request, changeRole, expireTransferCheckout, afterCommitTasks };
 };
 
 const addMember = (projectId: string, userId: string, role: string) =>
@@ -198,6 +210,28 @@ describe("ownership transfer eligibility on membership changes", () => {
     expect(response.status).toBe(409);
     expect((await transferRow(projectId))?.status).toBe("pending");
     expect(expireTransferCheckout).not.toHaveBeenCalled();
+  });
+
+  it("responds without waiting for the Checkout expiry, which keeps running after the response", async () => {
+    let release = () => {};
+    const holdExpiry = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const { request, changeRole, expireTransferCheckout, afterCommitTasks } =
+      setup({ holdExpiry });
+    const { projectId, transferId } = await seedTransfer(request);
+
+    const response = await changeRole("carol", projectId, "owner", "member");
+
+    expect(response.status).toBe(200);
+    expect((await transferRow(projectId))?.status).toBe("cancelled");
+    release();
+    await Promise.all(afterCommitTasks);
+    expect(expireTransferCheckout).toHaveBeenCalledWith({
+      billingAccountId: "bob",
+      projectId,
+      transferId,
+    });
   });
 
   it("keeps the request ended even if expiring the Checkout fails", async () => {

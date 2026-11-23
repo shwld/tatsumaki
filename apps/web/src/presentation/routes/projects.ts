@@ -811,6 +811,7 @@ projectsRoute.patch("/projects/:projectId/members/:memberUserId", async (c) => {
     {
       projects: membership.repository,
       checkoutExpiry: createTransferCheckoutExpiry(c.env),
+      waitUntil: (task) => c.executionCtx.waitUntil(task),
     },
     { projectId, userId: memberUserId, role, now: new Date() },
   );

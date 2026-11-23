@@ -32,7 +32,10 @@ export async function deleteAccount(
   userRepository: UserRepository,
   projectRepository: ProjectRepository,
   input: { userId: string; confirmEmail: string; now: Date },
-  checkoutExpiry?: TransferCheckoutExpiryGateway,
+  afterCommit: {
+    checkoutExpiry?: TransferCheckoutExpiryGateway;
+    waitUntil: (task: Promise<void>) => void;
+  },
 ): Promise<Result<true, DeleteAccountError>> {
   const userResult = await userRepository.findById(input.userId);
   if (userResult.isErr()) return err(userResult.error);
@@ -70,10 +73,14 @@ export async function deleteAccount(
   //   users                         → DELETE
   const deleteResult = await userRepository.delete(input.userId, input.now);
   if (deleteResult.isErr()) return err(deleteResult.error);
-  await expireTransferCheckouts(
-    checkoutExpiry,
-    deleteResult.value.voidedTransfers,
-  );
+  if (deleteResult.value.voidedTransfers.length > 0) {
+    afterCommit.waitUntil(
+      expireTransferCheckouts(
+        afterCommit.checkoutExpiry,
+        deleteResult.value.voidedTransfers,
+      ),
+    );
+  }
 
   return ok(true);
 }

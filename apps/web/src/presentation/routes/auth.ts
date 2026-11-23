@@ -526,7 +526,10 @@ authRoute.delete("/auth/me", async (c) => {
     userRepository,
     projectRepository,
     { userId: currentUser.id, confirmEmail, now: new Date() },
-    createTransferCheckoutExpiry(c.env),
+    {
+      checkoutExpiry: createTransferCheckoutExpiry(c.env),
+      waitUntil: (task) => c.executionCtx.waitUntil(task),
+    },
   );
 
   if (result.isErr()) {
