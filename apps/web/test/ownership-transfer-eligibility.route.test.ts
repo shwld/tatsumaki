@@ -225,6 +225,7 @@ describe("ownership transfer eligibility on membership changes", () => {
 
     expect(response.status).toBe(200);
     expect((await transferRow(projectId))?.status).toBe("cancelled");
+    expect(afterCommitTasks).toHaveLength(1);
     release();
     await Promise.all(afterCommitTasks);
     expect(expireTransferCheckout).toHaveBeenCalledWith({
