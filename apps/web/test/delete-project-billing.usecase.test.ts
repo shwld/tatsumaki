@@ -82,6 +82,32 @@ describe("deleteProject with billing", () => {
     expect(await pendingRequest(project.id)).toBeNull();
   });
 
+  it("does not let a demoted user ride on a request opened by the new owner", async () => {
+    const project = await seedProject();
+    await env.DB.batch([
+      env.DB.prepare(
+        "UPDATE project_members SET role = 'member' WHERE project_id = ?1 AND user_id = 'owner'",
+      ).bind(project.id),
+      env.DB.prepare(
+        "INSERT INTO project_members (project_id, user_id, role) VALUES (?1, 'new-owner', 'owner')",
+      ).bind(project.id),
+    ]);
+    const { deps, closeProjectBilling } = setup();
+    await deps.billing.requests.open({
+      projectId: project.id,
+      requestedByUserId: "new-owner",
+    });
+
+    const result = await deleteProject(deps, {
+      projectId: project.id,
+      userId: "owner",
+      confirmProjectName: "Billing Target",
+    });
+
+    expect(result._unsafeUnwrapErr()).toBe(PROJECT_DELETE_FORBIDDEN_ERROR);
+    expect(closeProjectBilling).not.toHaveBeenCalled();
+  });
+
   it("changes neither billing nor data when the name does not match", async () => {
     const project = await seedProject();
     const { deps, closeProjectBilling, exists, pendingRequest } = setup();

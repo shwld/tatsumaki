@@ -31,7 +31,7 @@ export class D1ProjectDeletionRequestRepository
     requestedByUserId: string;
   }): Promise<Result<boolean, ProjectDeletionRequestRepositoryError>> {
     try {
-      await this.d1
+      const inserted = await this.d1
         .prepare(
           `INSERT INTO project_deletion_requests (project_id, requested_by_user_id)
            SELECT ?1, ?2
@@ -41,12 +41,18 @@ export class D1ProjectDeletionRequestRepository
         )
         .bind(input.projectId, input.requestedByUserId)
         .run();
-      const row = await this.db
-        .select()
-        .from(projectDeletionRequestsTable)
-        .where(eq(projectDeletionRequestsTable.projectId, input.projectId))
-        .get();
-      return ok(row !== undefined);
+      if (inserted.meta.changes > 0) {
+        return ok(true);
+      }
+      // 既存の要求は別の owner のものかもしれないため、行の有無ではなく要求者の現在の権限で判定する。
+      const owner = await this.d1
+        .prepare(
+          `SELECT 1 AS ok FROM project_members
+           WHERE project_id = ?1 AND user_id = ?2 AND role = 'owner'`,
+        )
+        .bind(input.projectId, input.requestedByUserId)
+        .first();
+      return ok(owner !== null);
     } catch {
       return err(PROJECT_DELETION_REQUEST_REPOSITORY_ERROR);
     }
