@@ -20,7 +20,7 @@ const mutableEnv = env as unknown as MutableEnv;
 const post = async (
   sub: string,
   body: unknown,
-  email = `${sub.replace("|", "-")}@example.com`,
+  email = `${sub.replaceAll("|", "-")}@example.com`,
 ) =>
   SELF.fetch("https://localhost/api/onboarding", {
     method: "POST",
@@ -177,7 +177,7 @@ describe("onboarding route", () => {
       vi.stubGlobal(
         "fetch",
         vi.fn((input: RequestInfo | URL, init?: RequestInit) =>
-          String(input).includes("challenges.cloudflare.com")
+          new URL(String(input)).hostname === "challenges.cloudflare.com"
             ? siteverify()
             : original(input, init),
         ),

@@ -122,7 +122,7 @@ function normalizeStoryAttachmentMimeType(raw: string): string {
 }
 
 function toContentDisposition(fileName: string, isDownload: boolean): string {
-  const escaped = fileName.replace(/"/g, '\\"');
+  const escaped = fileName.replace(/[\\"]/g, "\\$&");
   const encoded = encodeURIComponent(fileName);
   const mode = isDownload ? "attachment" : "inline";
   return `${mode}; filename="${escaped}"; filename*=UTF-8''${encoded}`;
