@@ -29,6 +29,7 @@ const routes = (
     const key = `${init?.method ?? "GET"} ${url}`;
     if (extra[key]) return extra[key]();
     if (url === "/api/billing/entitlement") return json({ mode });
+    if (url === "/api/auth/me") return json({ id: "owner" });
     if (url === "/api/projects/p1/members") return json(members);
     if (url === "/api/billing/projects/p1/ownership-transfer") {
       return json({ transfer });
@@ -71,7 +72,7 @@ describe("OwnershipTransferSection", () => {
   it("renders nothing for a non-owner without a transfer", async () => {
     routes(null);
     const { container } = renderSection(false);
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
     await waitFor(() => expect(container.textContent).toBe(""));
   });
 
@@ -109,7 +110,10 @@ describe("OwnershipTransferSection", () => {
     await waitFor(() =>
       expect(fetch).toHaveBeenCalledWith(
         "/api/billing/projects/p1/ownership-transfer/cancel",
-        expect.objectContaining({ method: "POST" }),
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ transferId: "t1" }),
+        }),
       ),
     );
   });

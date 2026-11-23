@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuthError } from "../contexts/auth-error-context";
+import { useCurrentUser } from "../hooks/use-current-user";
 import { useProjectMembers } from "../hooks/use-project-members";
 import { isAuthError } from "../lib/api-error";
 import { ProjectSection } from "./project-section";
@@ -46,7 +47,12 @@ export function OwnershipTransferSection({
 }) {
   const { t, i18n } = useTranslation();
   const { notifySessionExpired } = useAuthError();
-  const { members } = useProjectMembers(projectId);
+  const {
+    members,
+    isLoading: membersLoading,
+    requestError: membersError,
+  } = useProjectMembers(projectId);
+  const { user } = useCurrentUser();
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [attempt, setAttempt] = useState(0);
   const [recipient, setRecipient] = useState("");
@@ -138,7 +144,7 @@ export function OwnershipTransferSection({
   const nameOf = (userId: string) =>
     members.find((member) => member.userId === userId)?.displayName ??
     t("ownershipTransferSection.unknownMember");
-  const candidates = members.filter((member) => member.role !== "owner");
+  const candidates = members.filter((member) => member.userId !== user?.id);
 
   return (
     <ProjectSection title={t("ownershipTransferSection.title")}>
@@ -184,6 +190,7 @@ export function OwnershipTransferSection({
               onClick={() =>
                 void send(
                   state.transfer?.role === "requester" ? "/cancel" : "/decline",
+                  { transferId: state.transfer?.id },
                 )
               }
             >
@@ -195,7 +202,13 @@ export function OwnershipTransferSection({
         ) : (
           <div className="space-y-3">
             <p>{t("ownershipTransferSection.description")}</p>
-            {candidates.length === 0 ? (
+            {membersLoading ? (
+              <p>{t("ownershipTransferSection.loading")}</p>
+            ) : membersError ? (
+              <p role="alert" className="text-red-600">
+                {t("ownershipTransferSection.error")}
+              </p>
+            ) : candidates.length === 0 ? (
               <p>{t("ownershipTransferSection.noCandidates")}</p>
             ) : (
               <form

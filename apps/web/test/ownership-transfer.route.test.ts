@@ -53,14 +53,23 @@ const setup = (options: Options = {}) => {
           listProjectBilling,
         },
       }) as unknown as Bindings;
-  const call = (
+  const call = async (
     userId: string,
     projectId: string,
     method: "GET" | "POST",
     suffix = "",
-    body?: unknown,
-  ) =>
-    buildApp(userId).request(
+    explicitBody?: unknown,
+  ) => {
+    let body = explicitBody;
+    if (body === undefined && (suffix === "/cancel" || suffix === "/decline")) {
+      const row = await env.DB.prepare(
+        "select id from project_ownership_transfers where project_id = ? order by created_at desc limit 1",
+      )
+        .bind(projectId)
+        .first<{ id: string }>();
+      body = { transferId: row?.id ?? "none" };
+    }
+    return buildApp(userId).request(
       `https://tatsumaki.example/billing/projects/${projectId}/ownership-transfer${suffix}`,
       {
         method,
@@ -73,6 +82,7 @@ const setup = (options: Options = {}) => {
       },
       bindings,
     );
+  };
   return { call, listProjectBilling };
 };
 
@@ -238,6 +248,40 @@ describe("ownership transfer request routes", () => {
     expect(await (await call("owner", projectId, "GET")).json()).toEqual({
       transfer: null,
     });
+  });
+
+  it("refuses to close a transfer other than the one that was displayed", async () => {
+    const projectId = await createProject("owner");
+    await addMember(projectId, "bob", "member");
+    const { call } = setup();
+    await call("owner", projectId, "POST", "", { toUserId: "bob" });
+
+    const stale = await call("owner", projectId, "POST", "/cancel", {
+      transferId: "old",
+    });
+    expect(stale.status).toBe(409);
+    expect((await call("owner", projectId, "GET")).status).toBe(200);
+    expect(
+      (
+        (await (await call("owner", projectId, "GET")).json()) as {
+          transfer: unknown;
+        }
+      ).transfer,
+    ).not.toBeNull();
+  });
+
+  it("rejects cancel and decline after a party loses eligibility", async () => {
+    const projectId = await createProject("owner");
+    await addMember(projectId, "bob", "member");
+    const { call } = setup();
+    await call("owner", projectId, "POST", "", { toUserId: "bob" });
+    await env.DB.prepare(
+      "update project_members set role = 'member' where project_id = ? and user_id = 'owner'",
+    )
+      .bind(projectId)
+      .run();
+
+    expect((await call("bob", projectId, "POST", "/decline")).status).toBe(409);
   });
 
   it("expires after 7 days and then allows a new request", async () => {

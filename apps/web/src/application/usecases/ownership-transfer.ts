@@ -178,6 +178,7 @@ export async function closeOwnershipTransfer(
   input: {
     userId: string;
     projectId: string;
+    transferId: string;
     as: "requester" | "recipient";
     now: Date;
   },
@@ -189,6 +190,17 @@ export async function closeOwnershipTransfer(
   const pending = await deps.transfers.findPending(input.projectId, input.now);
   if (pending.isErr()) return err(TRANSFER_UNAVAILABLE_ERROR);
   const transfer = pending.value;
+  // 画面に表示した申請と別の申請(取消後の再申請など)を、古い画面から閉じさせない。
+  if (!transfer || transfer.id !== input.transferId) {
+    return err(TRANSFER_NOT_PENDING_ERROR);
+  }
+  try {
+    if (!(await isStillEligible(deps, transfer))) {
+      return err(TRANSFER_NOT_PENDING_ERROR);
+    }
+  } catch {
+    return err(TRANSFER_UNAVAILABLE_ERROR);
+  }
   const party =
     input.as === "requester" ? transfer?.fromUserId : transfer?.toUserId;
   if (!transfer || party !== input.userId) {

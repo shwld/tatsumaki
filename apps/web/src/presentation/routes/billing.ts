@@ -437,6 +437,16 @@ for (const [path, as] of [
   billingRoute.post(
     `/billing/projects/:projectId/ownership-transfer/${path}`,
     async (c) => {
+      const body = (await c.req.json().catch(() => null)) as {
+        transferId?: unknown;
+      } | null;
+      if (
+        !body ||
+        typeof body.transferId !== "string" ||
+        body.transferId === ""
+      ) {
+        return c.json({ error: "transferId is required" }, 400);
+      }
       const result = await closeOwnershipTransfer(
         {
           projects: new D1ProjectRepository(c.env.DB),
@@ -445,6 +455,7 @@ for (const [path, as] of [
         {
           userId: c.get("currentUser").id,
           projectId: c.req.param("projectId"),
+          transferId: body.transferId,
           as,
           now: new Date(),
         },
