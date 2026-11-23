@@ -23,6 +23,8 @@ export const ownershipTransferSectionJa = {
       next: "引き継ぐには、このプロジェクトを月額 3,850 円(税込)で購読してください。購読が完了するまで、あなたの権限は変わりません。引き継がない場合は辞退できます。",
       subscribe: "購読して引き継ぐ",
       paid: "購読を確認しました。所有権の切り替えを待っています。",
+      otherSubscription:
+        "このプロジェクトに、以前の申請のお支払いなどによるあなたの購読が残っているため、まだ購読できません。その購読の返金と解約が完了すると、購読して引き継げるようになります。引き継がない場合は辞退できます。",
       decline: "辞退する",
     },
     processing: {
@@ -89,6 +91,8 @@ export const ownershipTransferSectionEn = {
       next: "To take over, subscribe to this project for ¥3,850 per month (tax included). Your permissions stay the same until the subscription is complete. You can decline if you do not want to.",
       subscribe: "Subscribe and take over",
       paid: "Your subscription is confirmed. Waiting for the ownership switch.",
+      otherSubscription:
+        "You cannot subscribe yet because you still have a subscription to this project, such as one paid for an earlier request. Once it has been refunded and canceled, you can subscribe and take over. You can decline if you do not want to.",
       decline: "Decline",
     },
     processing: {

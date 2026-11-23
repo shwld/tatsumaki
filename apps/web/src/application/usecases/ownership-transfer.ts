@@ -74,8 +74,12 @@ export type OwnershipTransferView = {
   outcome?: "switched" | "not-switched";
   /** 受け手の画面だけ。受け手自身の購読が有効か。確認できなければ null。 */
   recipientSubscribed?: boolean | null;
-  /** 受け手の画面だけ。購読の Checkout を開始できるか。 */
-  checkoutAvailable?: boolean;
+  /**
+   * 受け手の画面で、この申請の決済が確認できていないときだけ。購読の Checkout を開始できるか、
+   * できない理由。disabled: 受け付けを停止中。otherSubscription: 別の申請の決済などで受け手自身の
+   * 有効な購読が残っていて、その返金・解約が済むまで重複として開始できない。
+   */
+  checkout?: "available" | "disabled" | "otherSubscription";
 };
 
 const toView = (
@@ -338,10 +342,15 @@ export async function getOwnershipTransfer(
     const own = deps.billing
       ? await findLiveSubscription(deps.billing, input.userId, input.projectId)
       : undefined;
-    // 別の申請の購読が残る間は、Checkout を開始しても重複として拒否されるため出さない。
-    view.checkoutAvailable = !!deps.checkoutAvailable && !own;
     if (own !== undefined) {
       view.recipientSubscribed = own === null ? null : paidFor(own, transfer);
+    }
+    if (!view.recipientSubscribed) {
+      view.checkout = !deps.checkoutAvailable
+        ? "disabled"
+        : own
+          ? "otherSubscription"
+          : "available";
     }
   }
   return ok(view);

@@ -15,7 +15,7 @@ type Transfer = {
   state: "pending" | "processing" | "completed" | "review";
   outcome?: "switched" | "not-switched";
   recipientSubscribed?: boolean | null;
-  checkoutAvailable?: boolean;
+  checkout?: "available" | "disabled" | "otherSubscription";
 };
 
 type LoadState =
@@ -285,11 +285,13 @@ export function OwnershipTransferSection({
                 ? t("ownershipTransferSection.requester.next")
                 : state.transfer.recipientSubscribed
                   ? t("ownershipTransferSection.recipient.paid")
-                  : t("ownershipTransferSection.recipient.next")}
+                  : state.transfer.checkout === "otherSubscription"
+                    ? t("ownershipTransferSection.recipient.otherSubscription")
+                    : t("ownershipTransferSection.recipient.next")}
             </p>
             {state.transfer.role === "recipient" &&
             state.transfer.recipientSubscribed === false &&
-            state.transfer.checkoutAvailable ? (
+            state.transfer.checkout === "available" ? (
               <button
                 type="button"
                 className={BUTTON_CLASS}
