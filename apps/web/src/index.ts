@@ -89,6 +89,8 @@ export type Bindings = {
   ENTITLEMENT_MODE?: string;
   PROJECT_WRITE_ENFORCEMENT?: string;
   CHECKOUT_ENABLED?: string;
+  /** 所有者の切替・旧購読の解約・返金が揃うまで、譲渡の Checkout を既定で止める。 */
+  TRANSFER_CHECKOUT_ENABLED?: string;
   TERMS_URL?: string;
   PRIVACY_URL?: string;
   TURNSTILE_SITE_KEY?: string;

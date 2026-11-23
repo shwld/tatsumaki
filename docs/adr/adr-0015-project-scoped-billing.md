@@ -153,9 +153,10 @@ Stripe Portal の購読一覧で、プロジェクトを区別できるように
 
 受け手が同じ projectId を自分の決済アカウントで購読する Checkout を実装した。ロール・プロジェクト・旧購読の切り替えと旧購読の解約・返金は後続の story #451 で扱う。
 
-- **開始できる人**: 有効な申請の指定受取人だけ(`POST /api/billing/projects/:projectId/ownership-transfer/checkout`、本文は `transferId`)。申請者・他のメンバー・別の申請IDは拒否する。`CHECKOUT_ENABLED` を尊重し、Checkout の開始だけではロール・購読は変わらない。
+- **開始できる人**: 有効な申請の指定受取人だけ(`POST /api/billing/projects/:projectId/ownership-transfer/checkout`、本文は `transferId`)。申請者・他のメンバー・別の申請IDは拒否する。`CHECKOUT_ENABLED` を尊重し、Checkout の開始だけではロール・購読は変わらない。所有者の切替と旧購読の解約・返金(#451)が揃うまで二重課金を避けるため、別の Worker 変数 `TRANSFER_CHECKOUT_ENABLED="true"` を明示するまで譲渡の Checkout は開始できない(既定は停止、`CHECKOUT_ENABLED` も必要)。#451 の公開時に有効にする。
 - **旧購読との関係**: 通常の Checkout はプロジェクトの購読が他の決済アカウントのものでも重複として拒否する。譲渡の Checkout は Control Plane の `createCheckoutSession` に `transferId` を付け、受け手自身の未終了の購読だけを重複とみなす。価格は常に通常の月額税込3,850円で、旧購読の0円 Price は使わない。
 - **照合**: 受け手の購読が有効かは、権限の集約値ではなく受け手自身の billing account の `listProjectBilling` で確認する(`recipientSubscribed`、受け手の画面にだけ返す)。決済画面から戻らなくても、設定画面が反映まで取り直す。同じ申請で開き直しても requestId は申請IDと日付から決まり、受け手の購読は1本のまま。
 - **競合の引き渡し**: Checkout セッションと購読に `transferId` を保存する。受け手の購読が有効になった後は取消・辞退を受け付けない。取消・辞退・失効が先に確定した後に決済が確定した場合は、`transferId` から取引を特定して #451 が旧購読を維持したまま解約・全額返金する。
 - **未決済の無効化**: 取消・辞退・資格喪失で申請が終わると、Control Plane の `expireTransferCheckout` が受け手の open な Checkout を expire する。失敗しても申請の終了は覆さない(失効はログに残す)。
 - **残課題**: 期限切れ(7日)による自動 expire は、決済確定の照合を #451 が行うため入れていない。Stripe の Checkout は作成から最大24時間で失効する。
+- **既知の限界**: 受け手の購読の確認は billing account 単位で、申請IDとは照合していない(別の申請で先に払われた購読を、新しい申請の決済済みと見なしうる。#454)。当事者がロール変更で資格を失った申請の即時無効化は #453。決済確定と取消・辞退の同時実行は、先に確定したほうを採り、後から確定した決済は `transferId` を手掛かりに #451 が返金する。

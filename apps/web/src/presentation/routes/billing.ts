@@ -116,6 +116,9 @@ export const isCheckoutEnabled = (bindings: Bindings): boolean =>
   bindings.ENTITLEMENT_MODE === "control-plane" &&
   bindings.CHECKOUT_ENABLED === "true";
 
+export const isTransferCheckoutEnabled = (bindings: Bindings): boolean =>
+  isCheckoutEnabled(bindings) && bindings.TRANSFER_CHECKOUT_ENABLED === "true";
+
 export const billingRoute = new Hono<Env>();
 
 billingRoute.get("/billing/entitlement", (c) => {
@@ -431,6 +434,7 @@ billingRoute.get(
         billing: new ControlPlaneProjectBillingGateway(
           c.env.CONTROL_PLANE as NonNullable<Bindings["CONTROL_PLANE"]>,
         ),
+        checkoutAvailable: isTransferCheckoutEnabled(c.env),
       },
       {
         userId: c.get("currentUser").id,
@@ -515,7 +519,7 @@ billingRoute.post(
         successUrl: `${base}?billing=transfer`,
         cancelUrl: `${base}?billing=transfer-cancel`,
       },
-      isCheckoutEnabled(c.env),
+      isTransferCheckoutEnabled(c.env),
     );
     if (result.isErr()) {
       const response = ownershipTransferErrorResponse(result.error);

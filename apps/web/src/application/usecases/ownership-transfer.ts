@@ -60,6 +60,8 @@ export type OwnershipTransferView = {
   role: "requester" | "recipient";
   /** 受け手の画面だけ。受け手自身の購読が有効か。確認できなければ null。 */
   recipientSubscribed?: boolean | null;
+  /** 受け手の画面だけ。購読の Checkout を開始できるか。 */
+  checkoutAvailable?: boolean;
 };
 
 const toView = (
@@ -202,7 +204,10 @@ export async function requestOwnershipTransfer(
 
 /** 当事者だけが有効な申請を見られる。第三者のメンバーには存在を明かさない。 */
 export async function getOwnershipTransfer(
-  deps: Deps & { billing?: ProjectBillingGateway },
+  deps: Deps & {
+    billing?: ProjectBillingGateway;
+    checkoutAvailable?: boolean;
+  },
   input: { userId: string; projectId: string; now: Date },
 ): Promise<Result<OwnershipTransferView | null, OwnershipTransferError>> {
   const member = await deps.projects.findMember(input.projectId, input.userId);
@@ -224,6 +229,8 @@ export async function getOwnershipTransfer(
     return err(TRANSFER_UNAVAILABLE_ERROR);
   }
   const view = toView(transfer, input.userId);
+  if (view.role === "recipient")
+    view.checkoutAvailable = !!deps.checkoutAvailable;
   if (view.role === "recipient" && deps.billing) {
     view.recipientSubscribed = await hasLiveSubscription(
       deps.billing,
@@ -392,7 +399,9 @@ export async function startTransferCheckout(
 
     // 作成の間に取消・辞退・失効が確定した場合、開いた Checkout を残さない。
     const after = await isCurrent(deps.clock());
-    if (after.isErr() || !after.value) {
+    // 確認できない間は、開いた Checkout を残したまま URL を返さない。
+    if (after.isErr()) return err(TRANSFER_UNAVAILABLE_ERROR);
+    if (!after.value) {
       await expireRecipientCheckout(deps, transfer);
       return err(TRANSFER_NOT_PENDING_ERROR);
     }

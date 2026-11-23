@@ -23,6 +23,7 @@ const setup = (
   options: {
     subscriptions?: Record<string, Lifecycle>;
     checkoutEnabled?: boolean;
+    transferCheckoutEnabled?: boolean;
     expireFails?: boolean;
   } = {},
 ) => {
@@ -65,6 +66,8 @@ const setup = (
     DB: env.DB,
     ENTITLEMENT_MODE: "control-plane",
     CHECKOUT_ENABLED: options.checkoutEnabled === false ? "false" : "true",
+    TRANSFER_CHECKOUT_ENABLED:
+      options.transferCheckoutEnabled === false ? "false" : "true",
     CONTROL_PLANE: {
       getProjectEntitlement: vi.fn(),
       listProjectBilling,
@@ -264,6 +267,26 @@ describe("ownership transfer checkout", () => {
     expect(response.status).toBe(409);
     expect(await response.json()).toMatchObject({ code: "project_deleting" });
     expect(createCheckoutSession).not.toHaveBeenCalled();
+  });
+
+  it("keeps the transfer Checkout closed until its own switch is on", async () => {
+    const { call, createCheckoutSession } = setup({
+      transferCheckoutEnabled: false,
+    });
+    const { projectId, transferId } = await seedTransfer(call);
+
+    const response = await call("bob", projectId, "POST", "/checkout", {
+      transferId,
+    });
+    const view = await call("bob", projectId, "GET");
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: "checkout_disabled" });
+    expect(createCheckoutSession).not.toHaveBeenCalled();
+    expect(
+      ((await view.json()) as { transfer: Record<string, unknown> }).transfer
+        .checkoutAvailable,
+    ).toBe(false);
   });
 
   it("refuses to start once the request has been cancelled", async () => {

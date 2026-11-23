@@ -154,7 +154,11 @@ describe("OwnershipTransferSection", () => {
     const assign = vi.fn();
     vi.stubGlobal("location", { ...window.location, assign, search: "" });
     routes(
-      { ...pendingTransfer("recipient"), recipientSubscribed: false },
+      {
+        ...pendingTransfer("recipient"),
+        recipientSubscribed: false,
+        checkoutAvailable: true,
+      },
       "control-plane",
       {
         "POST /api/billing/projects/p1/ownership-transfer/checkout": () =>
@@ -190,7 +194,11 @@ describe("OwnershipTransferSection", () => {
 
   it("explains when new subscriptions are paused", async () => {
     routes(
-      { ...pendingTransfer("recipient"), recipientSubscribed: false },
+      {
+        ...pendingTransfer("recipient"),
+        recipientSubscribed: false,
+        checkoutAvailable: true,
+      },
       "control-plane",
       {
         "POST /api/billing/projects/p1/ownership-transfer/checkout": () =>
@@ -229,6 +237,7 @@ describe("OwnershipTransferSection", () => {
           transfer: {
             ...pendingTransfer("recipient"),
             recipientSubscribed: subscribed,
+            checkoutAvailable: true,
           },
         });
       });
@@ -242,5 +251,19 @@ describe("OwnershipTransferSection", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("does not offer the Checkout while subscriptions for transfers are not open yet", async () => {
+    routes({
+      ...pendingTransfer("recipient"),
+      recipientSubscribed: false,
+      checkoutAvailable: false,
+    });
+    renderSection(false);
+
+    await screen.findByRole("button", { name: "辞退する" });
+    expect(screen.queryByRole("button", { name: "購読して引き継ぐ" })).toBe(
+      null,
+    );
   });
 });

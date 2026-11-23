@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuthError } from "../contexts/auth-error-context";
 import { useCurrentUser } from "../hooks/use-current-user";
@@ -13,6 +13,7 @@ type Transfer = {
   expiresAt: string;
   role: "requester" | "recipient";
   recipientSubscribed?: boolean | null;
+  checkoutAvailable?: boolean;
 };
 
 type LoadState =
@@ -121,12 +122,29 @@ export function OwnershipTransferSection({
     state.status === "ready" &&
     state.transfer?.role === "recipient" &&
     state.transfer.recipientSubscribed !== true;
+  const pollsLeft = useRef(RETURN_POLL_MAX_ATTEMPTS);
   useEffect(() => {
-    if (!awaitingPayment) return;
-    if (attempt >= RETURN_POLL_MAX_ATTEMPTS) return;
-    const timer = window.setTimeout(reload, RETURN_POLL_INTERVAL_MS);
+    if (!awaitingPayment || pollsLeft.current <= 0) return;
+    const timer = window.setTimeout(() => {
+      pollsLeft.current -= 1;
+      reload();
+    }, RETURN_POLL_INTERVAL_MS);
     return () => window.clearTimeout(timer);
   }, [awaitingPayment, attempt, reload]);
+  // 別タブで決済して戻った場合や、反映が遅れて取り直しの回数を使い切った場合に、再び確認する。
+  useEffect(() => {
+    if (!awaitingPayment) return;
+    const revalidate = () => {
+      pollsLeft.current = RETURN_POLL_MAX_ATTEMPTS;
+      reload();
+    };
+    window.addEventListener("focus", revalidate);
+    window.addEventListener("pageshow", revalidate);
+    return () => {
+      window.removeEventListener("focus", revalidate);
+      window.removeEventListener("pageshow", revalidate);
+    };
+  }, [awaitingPayment, reload]);
 
   const startCheckout = async (transferId: string): Promise<void> => {
     setBusy(true);
@@ -235,7 +253,8 @@ export function OwnershipTransferSection({
                   : t("ownershipTransferSection.recipient.next")}
             </p>
             {state.transfer.role === "recipient" &&
-            state.transfer.recipientSubscribed === false ? (
+            state.transfer.recipientSubscribed === false &&
+            state.transfer.checkoutAvailable ? (
               <button
                 type="button"
                 className={BUTTON_CLASS}
