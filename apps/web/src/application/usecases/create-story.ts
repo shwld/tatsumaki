@@ -24,6 +24,7 @@ import {
   INVALID_STORY_STATUS_ERROR,
   INVALID_STORY_TITLE_ERROR,
   INVALID_STORY_TYPE_ERROR,
+  RELEASE_DATE_REQUIRES_RELEASE_TYPE_ERROR,
   normalizeStoryDescription,
   normalizeStoryLabelIds,
   normalizeStoryPoint,
@@ -46,6 +47,7 @@ export type CreateStoryError =
   | typeof INVALID_STORY_INITIAL_STATUS_ERROR
   | typeof INVALID_STORY_TITLE_ERROR
   | typeof INVALID_STORY_TYPE_ERROR
+  | typeof RELEASE_DATE_REQUIRES_RELEASE_TYPE_ERROR
   | typeof INVALID_STORY_STATUS_ERROR
   | typeof INVALID_STORY_LABELS_ERROR
   | typeof INVALID_STORY_POINT_ERROR
@@ -88,6 +90,9 @@ export async function createStory(
   const typeResult = normalizeStoryType(input.type);
   if (typeResult.isErr()) {
     return err(typeResult.error);
+  }
+  if (typeof input.releaseDate === "string" && typeResult.value !== "release") {
+    return err(RELEASE_DATE_REQUIRES_RELEASE_TYPE_ERROR);
   }
 
   const description = normalizeStoryDescription(input.description);

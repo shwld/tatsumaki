@@ -3,6 +3,22 @@ type ParseErr = { ok: false; message: string };
 
 type ParseResult<T> = ParseOk<T> | ParseErr;
 
+export const RELEASE_DATE_INVALID_MESSAGE =
+  "releaseDate must be an existing calendar date (YYYY-MM-DD) or null";
+
+/** Absent and null are valid; a string must be a calendar date that exists, not just YYYY-MM-DD shaped. */
+export function isValidReleaseDateField(value: unknown): boolean {
+  if (value === undefined || value === null) return true;
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+  if (value.startsWith("0000")) return false;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return (
+    !Number.isNaN(parsed.getTime()) && parsed.toISOString().startsWith(value)
+  );
+}
+
 export type CreateStoryRequest = {
   title: string;
   description: string;
@@ -166,16 +182,8 @@ export function parseCreateStoryRequest(
     return { ok: false, message: "Requester must be a user ID or null" };
   }
 
-  if (
-    body.releaseDate !== undefined &&
-    body.releaseDate !== null &&
-    (typeof body.releaseDate !== "string" ||
-      !/^\d{4}-\d{2}-\d{2}$/.test(body.releaseDate))
-  ) {
-    return {
-      ok: false,
-      message: "releaseDate must be a date string (YYYY-MM-DD) or null",
-    };
+  if (!isValidReleaseDateField(body.releaseDate)) {
+    return { ok: false, message: RELEASE_DATE_INVALID_MESSAGE };
   }
 
   return {
@@ -283,16 +291,8 @@ export function parseUpdateStoryRequest(
     return { ok: false, message: "Requester must be a user ID or null" };
   }
 
-  if (
-    body.releaseDate !== undefined &&
-    body.releaseDate !== null &&
-    (typeof body.releaseDate !== "string" ||
-      !/^\d{4}-\d{2}-\d{2}$/.test(body.releaseDate))
-  ) {
-    return {
-      ok: false,
-      message: "releaseDate must be a date string (YYYY-MM-DD) or null",
-    };
+  if (!isValidReleaseDateField(body.releaseDate)) {
+    return { ok: false, message: RELEASE_DATE_INVALID_MESSAGE };
   }
 
   return {

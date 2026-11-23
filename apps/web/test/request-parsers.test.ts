@@ -10,6 +10,18 @@ import {
 } from "../src/presentation/routes/stories/request-parsers";
 
 describe("story request parsers", () => {
+  it("accepts only existing calendar dates for releaseDate", () => {
+    for (const parse of [parseCreateStoryRequest, parseUpdateStoryRequest]) {
+      const body = { title: "v1", description: "" };
+      expect(parse({ ...body, releaseDate: "2026-12-01" }).ok).toBe(true);
+      expect(parse({ ...body, releaseDate: null }).ok).toBe(true);
+      expect(parse({ ...body, releaseDate: "2026-02-30" }).ok).toBe(false);
+      expect(parse({ ...body, releaseDate: "2026-13-01" }).ok).toBe(false);
+      expect(parse({ ...body, releaseDate: "2026-1-1" }).ok).toBe(false);
+      expect(parse({ ...body, releaseDate: "0000-02-29" }).ok).toBe(false);
+    }
+  });
+
   it("parses create request with defaults", () => {
     const result = parseCreateStoryRequest({
       title: "New story",

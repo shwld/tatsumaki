@@ -56,6 +56,8 @@ pub struct StoryCreateInput {
     pub story_point: Option<i64>,
     pub placement: Option<StoryPlacement>,
     pub label_ids: Vec<String>,
+    /// Planned date (YYYY-MM-DD) of a release marker.
+    pub release_date: Option<String>,
 }
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct StoryUpdateInput {
@@ -71,6 +73,12 @@ pub struct StoryUpdateInput {
     pub label_ids: Option<Vec<String>>,
     pub add_label_ids: Vec<String>,
     pub remove_label_ids: Vec<String>,
+    pub release_date: Option<ReleaseDateUpdate>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum ReleaseDateUpdate {
+    Set(String),
+    Clear,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum StoryPointUpdate {

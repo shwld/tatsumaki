@@ -235,6 +235,9 @@ export function StoryMultiPanelScreen() {
   // Release marker creation
   const [showReleaseMarkerDialog, setShowReleaseMarkerDialog] = useState(false);
   const [creatingReleaseMarker, setCreatingReleaseMarker] = useState(false);
+  const [releaseMarkerError, setReleaseMarkerError] = useState<string | null>(
+    null,
+  );
 
   // Advanced search bar toggle
   const [showSearchBar, setShowSearchBar] = useState(false);
@@ -506,6 +509,7 @@ export function StoryMultiPanelScreen() {
     async (name: string, releaseDate: string | null) => {
       if (!projectId) return;
       setCreatingReleaseMarker(true);
+      setReleaseMarkerError(null);
       try {
         const response = await fetch(`/api/projects/${projectId}/stories`, {
           method: "POST",
@@ -528,7 +532,7 @@ export function StoryMultiPanelScreen() {
             notifySessionExpired();
             return;
           }
-          setError(await parseErrorMessage(response));
+          setReleaseMarkerError(await parseErrorMessage(response));
           return;
         }
         setShowReleaseMarkerDialog(false);
@@ -536,11 +540,13 @@ export function StoryMultiPanelScreen() {
           panels: ["Backlog"],
           refetchType: "active",
         });
+      } catch {
+        setReleaseMarkerError(t("storyMultiPanelScreen.create.requestFailed"));
       } finally {
         setCreatingReleaseMarker(false);
       }
     },
-    [projectId, notifySessionExpired, panelQueries],
+    [projectId, notifySessionExpired, panelQueries, t],
   );
 
   const allStories = useMemo(
@@ -1805,8 +1811,10 @@ export function StoryMultiPanelScreen() {
         const targetPanel = toCreateTargetPanel(panel);
         if (!projectId || !targetPanel) return null;
         const isOpen = createTargetPanel === targetPanel;
+        const canCreateReleaseMarker =
+          panel === "Backlog" || panel === "CurrentBacklogCombined";
         return (
-          <div className="relative">
+          <div className="relative flex items-center gap-2">
             <button
               type="button"
               className="text-xs font-medium text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
@@ -1815,6 +1823,16 @@ export function StoryMultiPanelScreen() {
             >
               {t("storyMultiPanelScreen.create.button")}
             </button>
+            {canCreateReleaseMarker ? (
+              <button
+                type="button"
+                className="text-xs font-medium text-purple-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-purple-300"
+                disabled={readOnly || creatingReleaseMarker}
+                onClick={() => setShowReleaseMarkerDialog(true)}
+              >
+                {t("storyMultiPanelScreen.create.releaseMarkerButton")}
+              </button>
+            ) : null}
             {isOpen ? (
               <div
                 role="dialog"
@@ -2700,10 +2718,14 @@ export function StoryMultiPanelScreen() {
       {showReleaseMarkerDialog ? (
         <ReleaseMarkerCreateDialog
           submitting={creatingReleaseMarker}
+          error={releaseMarkerError}
           onSubmit={({ name, releaseDate }) => {
             void handleCreateReleaseMarker(name, releaseDate);
           }}
-          onClose={() => setShowReleaseMarkerDialog(false)}
+          onClose={() => {
+            setShowReleaseMarkerDialog(false);
+            setReleaseMarkerError(null);
+          }}
         />
       ) : null}
       <StoryDeleteConfirmDialog

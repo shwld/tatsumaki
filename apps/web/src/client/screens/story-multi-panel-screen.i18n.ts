@@ -26,6 +26,7 @@ export const storyMultiPanelScreenJa = {
       invalidResponse: "作成レスポンスが不正です。再試行してください。",
       requestFailed: "ストーリーの作成に失敗しました。再度お試しください。",
       button: "+ ストーリーを追加",
+      releaseMarkerButton: "+ リリースマーカー",
       dialogLabel: "新規ストーリー作成",
       type: "種別",
       types: {
@@ -187,6 +188,7 @@ export const storyMultiPanelScreenEn = {
       invalidResponse: "The create response was invalid. Please try again.",
       requestFailed: "Failed to create story. Please try again.",
       button: "+ Add Story",
+      releaseMarkerButton: "+ Release marker",
       dialogLabel: "Create story",
       type: "Type",
       types: {

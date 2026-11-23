@@ -129,12 +129,14 @@ tm story unarchive --project <project-id> 95
 
 ```bash
 tm story create --project <project-id> --title "New story" --type feature --description "details"
-tm story create --project <project-id> --title "Release v1" --type release --description "release marker"
+tm story create --project <project-id> --title "Release v1" --type release --description "release marker" --release-date 2026-12-01
 tm --json story create --project <project-id> --title "New story" --type bug --description "details" --is-icebox
 tm story create --project <project-id> --title "Estimated" --type feature --description "details" --story-point 3 --after 120
 ```
 
 `--story-point` sets the estimate at creation. A position (`--to-top`, `--to-end`, `--after <story-number>`, `--before <story-number>`; at most one) places the new story among the stories outside the Icebox; it cannot be combined with `--is-icebox`.
+
+`--release-date YYYY-MM-DD` sets the planned date of a release marker; the date must exist.
 
 ## Story update
 
@@ -143,11 +145,15 @@ tm story update --project <project-id> 95 --title "Updated title"
 tm --json story update --project <project-id> 95 --description "Updated description" --type release
 tm story update --project <project-id> 95 --story-point 5
 tm story update --project <project-id> 95 --clear-story-point
+tm story update --project <project-id> 95 --release-date 2026-12-01
+tm story update --project <project-id> 95 --clear-release-date
 tm story update --project <project-id> 95 --no-icebox
 tm story update --project <project-id> 95 --icebox
 ```
 
 `--story-point` must follow the project's configured point scale.
+
+`--release-date` sets or changes the planned date of a release marker without other fields; `--clear-release-date` removes it (they cannot be combined). Omitting both keeps the saved date.
 
 `--icebox` / `--no-icebox` move a story between the Icebox and the Backlog without changing its position. Only an Unstarted story without an iteration can be moved to the Icebox; otherwise the server's reason is printed (HTTP 400).
 

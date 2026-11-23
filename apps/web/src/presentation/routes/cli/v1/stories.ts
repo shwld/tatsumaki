@@ -53,7 +53,11 @@ import {
 import { getPointScale } from "../../../../domain/entities/project";
 import { changeStoryBlocker } from "../../stories/blocker-handlers";
 import { handleStoryArchive } from "../../stories/archive-handler";
-import { LABEL_NAMES_WRITE_REMOVED_MESSAGE } from "../../stories/request-parsers";
+import {
+  isValidReleaseDateField,
+  LABEL_NAMES_WRITE_REMOVED_MESSAGE,
+  RELEASE_DATE_INVALID_MESSAGE,
+} from "../../stories/request-parsers";
 import {
   handleCliStoryUpdate,
   resolveStoryIdByNumber,
@@ -217,6 +221,9 @@ cliV1StoriesRoute.post("/:projectId/stories", async (c) => {
   ) {
     return c.json({ error: "Story point must be a number or null" }, 400);
   }
+  if (!isValidReleaseDateField(payload.releaseDate)) {
+    return c.json({ error: RELEASE_DATE_INVALID_MESSAGE }, 400);
+  }
   let placement: StoryPlacement | null = null;
   let placementTarget: StoryPlacementTarget | null = null;
   if (payload.placement !== undefined) {
@@ -270,6 +277,9 @@ cliV1StoriesRoute.post("/:projectId/stories", async (c) => {
       allowedStoryPoints,
       ...(placementTarget ? { placement: placementTarget } : {}),
       labelIds: Array.isArray(payload.labelIds) ? payload.labelIds : [],
+      ...(payload.releaseDate !== undefined
+        ? { releaseDate: payload.releaseDate }
+        : {}),
       actorUserId: membership.member.userId,
       actorName: currentUser.email ?? currentUser.id,
     },

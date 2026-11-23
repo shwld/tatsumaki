@@ -42,6 +42,7 @@ import {
   INVALID_STORY_STATUS_ERROR,
   INVALID_STORY_TITLE_ERROR,
   INVALID_STORY_TYPE_ERROR,
+  RELEASE_DATE_REQUIRES_RELEASE_TYPE_ERROR,
 } from "../../../application/usecases/story-input";
 import { PROJECT_REPOSITORY_ERROR } from "../../../domain/repositories/project-repository";
 import { NOTIFICATION_REPOSITORY_ERROR } from "../../../domain/repositories/notification-repository";
@@ -69,6 +70,13 @@ export function toCreateStoryErrorResponse(
 ): ErrorResponse {
   if (error === INVALID_STORY_TITLE_ERROR) {
     return { message: "Story title is required", status: 400 };
+  }
+
+  if (error === RELEASE_DATE_REQUIRES_RELEASE_TYPE_ERROR) {
+    return {
+      message: "releaseDate can only be set on release stories",
+      status: 400,
+    };
   }
 
   if (error === INVALID_STORY_TYPE_ERROR) {
@@ -178,6 +186,13 @@ export function toUpdateStoryErrorResponse(
 
   if (error === INVALID_STORY_TITLE_ERROR) {
     return { message: "Story title is required", status: 400 };
+  }
+
+  if (error === RELEASE_DATE_REQUIRES_RELEASE_TYPE_ERROR) {
+    return {
+      message: "releaseDate can only be set on release stories",
+      status: 400,
+    };
   }
 
   if (error === INVALID_STORY_TYPE_ERROR) {

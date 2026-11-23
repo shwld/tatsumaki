@@ -180,6 +180,15 @@ const StoryPlacementSchema = z
     description:
       "Where to put a story among the stories outside the Icebox, keeping the others' relative order.",
   });
+const ReleaseDateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .nullable()
+  .openapi({
+    description:
+      "Planned date of a release marker (YYYY-MM-DD, must exist). On update, omit to keep it and send null to clear it.",
+    example: "2026-12-01",
+  });
 const StoryCreateBodySchema = z.object({
   title: z.string(),
   type: z.enum(STORY_TYPES),
@@ -187,6 +196,7 @@ const StoryCreateBodySchema = z.object({
   isIcebox: z.boolean().optional(),
   storyPoint: z.number().int().nullable().optional(),
   labelIds: z.array(z.string()).optional(),
+  releaseDate: ReleaseDateSchema.optional(),
   placement: StoryPlacementSchema.optional(),
 });
 const StoryReorderBodySchema = z.union([
@@ -207,6 +217,7 @@ const StoryUpdateBodySchema = z.object({
   isIcebox: z.boolean().optional(),
   ownerIds: z.array(z.string()).optional(),
   status: StoryStatusEnumSchema.optional(),
+  releaseDate: ReleaseDateSchema.optional(),
   placement: StoryPlacementSchema.optional(),
 });
 const StoryCommentBodySchema = z.object({

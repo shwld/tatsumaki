@@ -5,12 +5,14 @@ type ReleaseMarkerCreateDialogProps = {
   onSubmit: (values: { name: string; releaseDate: string | null }) => void;
   onClose: () => void;
   submitting?: boolean;
+  error?: string | null;
 };
 
 export function ReleaseMarkerCreateDialog({
   onSubmit,
   onClose,
   submitting = false,
+  error = null,
 }: ReleaseMarkerCreateDialogProps) {
   const { t } = useTranslation();
   const [name, setName] = useState("");
@@ -70,6 +72,11 @@ export function ReleaseMarkerCreateDialog({
               className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
             />
           </div>
+          {error ? (
+            <p role="alert" className="text-sm text-red-600">
+              {error}
+            </p>
+          ) : null}
           <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"
