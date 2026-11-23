@@ -447,6 +447,46 @@ describe("StoryMultiPanelScreen UI contracts", () => {
     });
   });
 
+  it("keeps the board visible and shows the error in the dialog when release marker creation fails", async () => {
+    const baseFetch = createStoryMultiPanelFetchMock();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const rawUrl =
+          input instanceof Request
+            ? input.url.replace(/^https?:\/\/[^/]+/, "")
+            : String(input);
+        const parsed = new URL(rawUrl, "http://localhost");
+        if (
+          parsed.pathname === `/api/projects/${PROJECT_ID}/stories` &&
+          (init?.method ?? "GET").toUpperCase() === "POST"
+        ) {
+          return new Response(
+            JSON.stringify({ error: "releaseDate must be an existing date" }),
+            { status: 400, headers: { "content-type": "application/json" } },
+          );
+        }
+        return baseFetch(input);
+      }),
+    );
+    renderStoryMultiPanel();
+
+    expect(await screen.findByText("Backlog story")).toBeInTheDocument();
+    await userEvent.click(
+      screen.getAllByRole("button", { name: "+ リリースマーカー" })[0]!,
+    );
+    await userEvent.type(screen.getByLabelText(/名前/), "v1.0");
+    await userEvent.click(screen.getByRole("button", { name: "作成" }));
+
+    const dialog = await screen.findByRole("dialog", {
+      name: "リリースマーカーを作成",
+    });
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "releaseDate must be an existing date",
+    );
+    expect(screen.getByText("Backlog story")).toBeInTheDocument();
+  });
+
   it("does not auto-select a story after inline create", async () => {
     const baseFetch = createStoryMultiPanelFetchMock();
     vi.stubGlobal(

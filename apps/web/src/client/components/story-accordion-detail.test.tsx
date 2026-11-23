@@ -253,6 +253,8 @@ describe("StoryAccordionDetail", () => {
     const dateInput = screen.getByLabelText("リリース予定日");
     expect(dateInput).toHaveValue("2026-12-01");
     fireEvent.change(dateInput, { target: { value: "2027-01-15" } });
+    expect(patched).toEqual([]);
+    fireEvent.blur(dateInput);
     await waitFor(() =>
       expect(patched).toContainEqual({ releaseDate: "2027-01-15" }),
     );

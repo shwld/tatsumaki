@@ -18,6 +18,7 @@ describe("story request parsers", () => {
       expect(parse({ ...body, releaseDate: "2026-02-30" }).ok).toBe(false);
       expect(parse({ ...body, releaseDate: "2026-13-01" }).ok).toBe(false);
       expect(parse({ ...body, releaseDate: "2026-1-1" }).ok).toBe(false);
+      expect(parse({ ...body, releaseDate: "0000-02-29" }).ok).toBe(false);
     }
   });
 

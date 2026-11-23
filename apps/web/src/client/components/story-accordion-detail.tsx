@@ -174,6 +174,9 @@ function StoryAccordionDetailComponent({
   const locked = isPatchSaving || readOnly;
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
   const [titleDraft, setTitleDraft] = useState(story.title);
+  const [releaseDateDraft, setReleaseDateDraft] = useState(
+    story.releaseDate ?? "",
+  );
 
   const [selectedAttachmentFile, setSelectedAttachmentFile] =
     useState<File | null>(null);
@@ -224,6 +227,19 @@ function StoryAccordionDetailComponent({
     setTitleDraft(resolvedStory.title);
     setMetadataFieldErrors({});
   }, [resolvedStory.id]);
+
+  useEffect(() => {
+    setReleaseDateDraft(resolvedStory.releaseDate ?? "");
+  }, [resolvedStory.releaseDate]);
+
+  const commitReleaseDate = () => {
+    if (!releaseDateDraft) {
+      setReleaseDateDraft(resolvedStory.releaseDate ?? "");
+      return;
+    }
+    if (releaseDateDraft === resolvedStory.releaseDate) return;
+    void patchStory({ releaseDate: releaseDateDraft });
+  };
 
   // 一覧の summary は labelIds を持たないため、詳細取得後に届いた値を選択状態へ反映する。
   // 保存中に届いた値は、保存の完了後に反映する。
@@ -927,11 +943,12 @@ function StoryAccordionDetailComponent({
             id={`story-release-date-${story.id}`}
             type="date"
             className="min-w-0 rounded border border-gray-200 bg-white px-2 py-0.5 text-xs text-gray-700 focus:border-blue-300 focus:outline-none focus:ring-1 focus:ring-blue-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
-            value={resolvedStory.releaseDate ?? ""}
+            value={releaseDateDraft}
             disabled={locked}
-            onChange={(event) => {
-              const next = event.target.value;
-              if (next) void patchStory({ releaseDate: next });
+            onChange={(event) => setReleaseDateDraft(event.target.value)}
+            onBlur={commitReleaseDate}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") commitReleaseDate();
             }}
           />
           <button
