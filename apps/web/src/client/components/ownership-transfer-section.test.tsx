@@ -224,6 +224,49 @@ describe("OwnershipTransferSection", () => {
     view.unmount();
   });
 
+  it("refreshes permissions when the very first response already shows the switch", async () => {
+    routes({
+      ...pendingTransfer("recipient"),
+      state: "completed",
+      outcome: "switched",
+    });
+    const onSwitched = vi.fn();
+    render(
+      <MemoryRouter>
+        <AuthErrorProvider>
+          <OwnershipTransferSection
+            projectId="p1"
+            isOwner={false}
+            onOwnershipSwitched={onSwitched}
+          />
+        </AuthErrorProvider>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(onSwitched).toHaveBeenCalledTimes(1));
+  });
+
+  it("does not refresh permissions when the role already matches the switch", async () => {
+    routes({
+      ...pendingTransfer("recipient"),
+      state: "completed",
+      outcome: "switched",
+    });
+    const onSwitched = vi.fn();
+    render(
+      <MemoryRouter>
+        <AuthErrorProvider>
+          <OwnershipTransferSection
+            projectId="p1"
+            isOwner={true}
+            onOwnershipSwitched={onSwitched}
+          />
+        </AuthErrorProvider>
+      </MemoryRouter>,
+    );
+    await screen.findByText(/所有権の譲渡が完了しました/);
+    expect(onSwitched).not.toHaveBeenCalled();
+  });
+
   it("explains a rejected request from a non-payer", async () => {
     routes(null, "control-plane", {
       "POST /api/billing/projects/p1/ownership-transfer": () =>

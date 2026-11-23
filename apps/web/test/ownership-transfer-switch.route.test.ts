@@ -477,6 +477,57 @@ describe("ownership transfer switch", () => {
     });
   });
 
+  describe("two transfers in a row", () => {
+    it("does not switch again until the earlier switch has been settled", async () => {
+      const { call, bindings, state, settleOwnershipTransfer } = setup();
+      const { projectId } = await seedTransfer(call);
+      state.payment.recipientSubscribed = true;
+      state.settleFails = true;
+      await call("bob", projectId, "GET");
+      expect(await roleOf(projectId, "bob")).toBe("owner");
+
+      await env.DB.prepare(
+        "insert into project_ownership_transfers (id, project_id, from_user_id, to_user_id, expires_at, created_at) values (?, ?, 'bob', 'carol', ?, ?)",
+      )
+        .bind(
+          "t_second",
+          projectId,
+          new Date(Date.now() + 86_400_000).toISOString(),
+          new Date(Date.now() + 1000).toISOString(),
+        )
+        .run();
+      await call("carol", projectId, "GET");
+      expect(await roleOf(projectId, "carol")).toBe("member");
+      expect((await transferRow("t_second"))?.status).toBe("pending");
+
+      state.settleFails = false;
+      await recoverOwnershipTransfersScheduled(bindings);
+      expect(await roleOf(projectId, "carol")).toBe("owner");
+      expect(await roleOf(projectId, "bob")).toBe("member");
+      expect(settleOwnershipTransfer).toHaveBeenCalled();
+    });
+
+    it("keeps the unresolved refund notice visible after a new request is made", async () => {
+      const { call, bindings, state } = setup();
+      const { projectId, transferId } = await seedTransfer(call);
+      await call("bob", projectId, "POST", "/decline", { transferId });
+      state.settlement = {
+        status: "review",
+        reviewReason: "refund_rejected:x",
+      };
+      await recoverOwnershipTransfersScheduled(bindings);
+
+      const again = await call("owner", projectId, "POST", "", {
+        toUserId: "carol",
+      });
+      expect(again.status).toBe(201);
+      expect(await viewOf(await call("bob", projectId, "GET"))).toMatchObject({
+        state: "review",
+        outcome: "not-switched",
+      });
+    });
+  });
+
   describe("recovery job", () => {
     it("rotates the batch so a newer transfer is not starved by older ones", async () => {
       const { call, bindings, state, confirmTransferPayment } = setup();

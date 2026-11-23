@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, lte } from "drizzle-orm";
+import { and, asc, desc, eq, gt, lte, or } from "drizzle-orm";
 import { err, ok, type Result } from "neverthrow";
 import { ulid } from "ulid";
 import {
@@ -186,6 +186,55 @@ export class D1ProjectOwnershipTransferRepository
     }
   }
 
+  async findUnsettledSwitch(
+    projectId: string,
+  ): Promise<
+    Result<OwnershipTransfer | null, OwnershipTransferRepositoryError>
+  > {
+    try {
+      const row = await this.db
+        .select()
+        .from(table)
+        .where(
+          and(
+            eq(table.projectId, projectId),
+            eq(table.status, "completed"),
+            eq(table.settlementStatus, "pending"),
+          ),
+        )
+        .limit(1)
+        .get();
+      return ok(row ? toTransfer(row) : null);
+    } catch {
+      return err(OWNERSHIP_TRANSFER_REPOSITORY_ERROR);
+    }
+  }
+
+  async findLatestInvolving(
+    projectId: string,
+    userId: string,
+  ): Promise<
+    Result<OwnershipTransfer | null, OwnershipTransferRepositoryError>
+  > {
+    try {
+      const row = await this.db
+        .select()
+        .from(table)
+        .where(
+          and(
+            eq(table.projectId, projectId),
+            or(eq(table.fromUserId, userId), eq(table.toUserId, userId)),
+          ),
+        )
+        .orderBy(desc(table.createdAt), desc(table.id))
+        .limit(1)
+        .get();
+      return ok(row ? toTransfer(row) : null);
+    } catch {
+      return err(OWNERSHIP_TRANSFER_REPOSITORY_ERROR);
+    }
+  }
+
   async expireOverdue(
     now: Date,
   ): Promise<Result<void, OwnershipTransferRepositoryError>> {
@@ -261,7 +310,10 @@ export class D1ProjectOwnershipTransferRepository
                            WHERE m.project_id = project_ownership_transfers.project_id
                              AND m.user_id = project_ownership_transfers.to_user_id)
                AND NOT EXISTS (SELECT 1 FROM project_deletion_requests d
-                               WHERE d.project_id = project_ownership_transfers.project_id)`,
+                               WHERE d.project_id = project_ownership_transfers.project_id)
+               AND NOT EXISTS (SELECT 1 FROM project_ownership_transfers earlier
+                               WHERE earlier.project_id = project_ownership_transfers.project_id
+                                 AND earlier.status = 'completed' AND earlier.settlement_status = 'pending')`,
           )
           .bind(nowIso, input.id),
         this.d1

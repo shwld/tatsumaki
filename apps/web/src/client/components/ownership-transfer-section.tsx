@@ -133,26 +133,29 @@ export function OwnershipTransferSection({
   const reload = useCallback(() => setAttempt((value) => value + 1), []);
 
   const transferState = state.status === "ready" ? state.transfer : null;
-  const previousTransferState = useRef<string | null>(null);
+  const notifiedTransferId = useRef<string | null>(null);
   useEffect(() => {
-    const current = transferState?.state ?? null;
     if (
-      previousTransferState.current === "pending" &&
-      current !== null &&
-      current !== "pending" &&
-      transferState?.outcome === "switched"
+      !transferState ||
+      transferState.state === "pending" ||
+      transferState.outcome !== "switched" ||
+      notifiedTransferId.current === transferState.id
     ) {
-      onOwnershipSwitched?.();
+      return;
     }
-    previousTransferState.current = current;
-  }, [transferState, onOwnershipSwitched]);
+    const roleIsStale =
+      (transferState.role === "recipient" && !isOwner) ||
+      (transferState.role === "requester" && isOwner);
+    if (!roleIsStale) return;
+    notifiedTransferId.current = transferState.id;
+    onOwnershipSwitched?.();
+  }, [transferState, isOwner, onOwnershipSwitched]);
 
   // 購読の反映は決済の後に遅れる。戻り先や別タブに依らず、確認できるまで(確認不能も含め)取り直す。
   const awaitingPayment =
     state.status === "ready" &&
     ((state.transfer?.state === "pending" &&
-      state.transfer.role === "recipient" &&
-      state.transfer.recipientSubscribed !== true) ||
+      state.transfer.role === "recipient") ||
       state.transfer?.state === "processing");
   const pollsLeft = useRef(RETURN_POLL_MAX_ATTEMPTS);
   useEffect(() => {

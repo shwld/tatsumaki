@@ -310,7 +310,10 @@ export async function getOwnershipTransfer(
     !transfer ||
     (transfer.fromUserId !== input.userId && transfer.toUserId !== input.userId)
   ) {
-    const after = await deps.transfers.findLatest(input.projectId);
+    const after = await deps.transfers.findLatestInvolving(
+      input.projectId,
+      input.userId,
+    );
     if (after.isErr()) return err(TRANSFER_UNAVAILABLE_ERROR);
     return ok(
       after.value

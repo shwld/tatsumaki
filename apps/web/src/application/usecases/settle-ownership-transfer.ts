@@ -100,6 +100,13 @@ export async function reconcilePendingTransfer(
     const deletion = await deps.deletions.findById(transfer.projectId);
     if (deletion.isErr()) return "unavailable";
 
+    // 前の切替の旧購読をまだ解約・返金できていない間に、次の切替で受け手の購読を動かさない。
+    const earlier = await deps.transfers.findUnsettledSwitch(
+      transfer.projectId,
+    );
+    if (earlier.isErr()) return "unavailable";
+    if (earlier.value && earlier.value.id !== transfer.id) return "waiting";
+
     // 決済の確認に時間がかかるため、期限と日割りの起点は切り替える時点で測る。
     const at = new Date();
     if (payment.previousSubscriptionLive && !deletion.value) {
@@ -112,6 +119,11 @@ export async function reconcilePendingTransfer(
       const latest = await deps.transfers.findById(transfer.id);
       if (latest.isErr() || !latest.value) return "unavailable";
       if (latest.value.status === "completed") return "switched";
+      const blocked = await deps.transfers.findUnsettledSwitch(
+        transfer.projectId,
+      );
+      if (blocked.isErr()) return "unavailable";
+      if (blocked.value && blocked.value.id !== transfer.id) return "waiting";
     }
     const closed = await deps.transfers.close({
       id: transfer.id,
@@ -152,6 +164,12 @@ export async function recoverOwnershipTransfers(
 ): Promise<RecoverySummary> {
   await deps.transfers.expireOverdue(now);
 
+  const unsettled = await deps.transfers.listUnsettled(RECOVERY_BATCH);
+  const unsettledTransfers = unsettled.isOk() ? unsettled.value : [];
+  for (const transfer of unsettledTransfers) {
+    await settleTransfer(deps, transfer, now);
+    await deps.transfers.markAttempt(transfer.id, now);
+  }
   const pending = await deps.transfers.listPending(now, RECOVERY_BATCH);
   const pendingTransfers = pending.isOk() ? pending.value : [];
   for (const transfer of pendingTransfers) {
@@ -159,12 +177,6 @@ export async function recoverOwnershipTransfers(
     await deps.transfers.markAttempt(transfer.id, now);
   }
 
-  const unsettled = await deps.transfers.listUnsettled(RECOVERY_BATCH);
-  const unsettledTransfers = unsettled.isOk() ? unsettled.value : [];
-  for (const transfer of unsettledTransfers) {
-    await settleTransfer(deps, transfer, now);
-    await deps.transfers.markAttempt(transfer.id, now);
-  }
   return {
     pending: pendingTransfers.length,
     unsettled: unsettledTransfers.length,
