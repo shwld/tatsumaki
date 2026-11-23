@@ -51,6 +51,7 @@ export async function settleTransfer(
     return "pending";
   }
 
+  if (result.status === "pending") return "pending";
   if (result.status === "review") {
     console.error("Ownership transfer needs review", {
       transferId: transfer.id,

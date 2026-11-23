@@ -22,7 +22,10 @@ type Payment = {
   recipientSubscribed: boolean;
   previousSubscriptionLive: boolean;
 };
-type Settlement = { status: "settled" | "review"; reviewReason: string | null };
+type Settlement = {
+  status: "settled" | "review" | "pending";
+  reviewReason: string | null;
+};
 
 const setup = () => {
   const state = {
@@ -254,6 +257,28 @@ describe("ownership transfer switch", () => {
         settlement: "review",
         note: "refund_rejected:x",
       });
+    });
+
+    it("stays processing while a refund is in flight, and settles once Stripe finishes it", async () => {
+      const { call, state, settleOwnershipTransfer } = setup();
+      const { projectId, transferId } = await seedTransfer(call);
+      state.payment.recipientSubscribed = true;
+      state.settlement = { status: "pending", reviewReason: null };
+
+      expect(await viewOf(await call("owner", projectId, "GET"))).toMatchObject(
+        {
+          state: "processing",
+        },
+      );
+      expect((await transferRow(transferId))?.settlement).toBe("pending");
+
+      state.settlement = { status: "settled", reviewReason: null };
+      expect(await viewOf(await call("owner", projectId, "GET"))).toMatchObject(
+        {
+          state: "completed",
+        },
+      );
+      expect(settleOwnershipTransfer).toHaveBeenCalledTimes(2);
     });
 
     it("does not switch twice when the transfer is read again", async () => {

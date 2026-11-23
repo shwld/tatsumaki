@@ -6,8 +6,8 @@ export type TransferPaymentState = {
 };
 
 export type TransferSettlementResult = {
-  /** review は自動では返金できず、運営が調査する。 */
-  status: "settled" | "review";
+  /** review は自動では返金できず運営が調査する。pending は返金が確定しておらず、再確認する。 */
+  status: "settled" | "review" | "pending";
   reviewReason: string | null;
 };
 

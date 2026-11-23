@@ -8,7 +8,7 @@ const confirmSchema = z.object({
 });
 
 const settleSchema = z.object({
-  status: z.enum(["settled", "review"]),
+  status: z.enum(["settled", "review", "pending"]),
   reviewReason: z.string().nullable(),
 });
 
