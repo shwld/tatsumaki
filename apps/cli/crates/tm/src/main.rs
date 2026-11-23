@@ -11,7 +11,7 @@ mod update;
 
 use crate::application::ports::{
     StoryBlockerAction, StoryBlockerInput, StoryBlockerRelation, StoryCommentInput,
-    StoryCreateInput, StoryListFilter, StoryPlacement, StoryPointUpdate, StoryReorderInput, StoryUpdateInput,
+    ReleaseDateUpdate, StoryCreateInput, StoryListFilter, StoryPlacement, StoryPointUpdate, StoryReorderInput, StoryUpdateInput,
     TokenStore,
 };
 use adapters::{
@@ -176,6 +176,9 @@ enum StorySubcommand {
         /// Label to attach (label ID or name; repeatable)
         #[arg(long = "label", value_name = "ID_OR_NAME")]
         labels: Vec<String>,
+        /// Planned date of a release marker (YYYY-MM-DD)
+        #[arg(long, value_name = "YYYY-MM-DD")]
+        release_date: Option<String>,
         #[command(flatten)]
         placement: StoryPlacementArgs,
     },
@@ -193,6 +196,12 @@ enum StorySubcommand {
         story_point: Option<i64>,
         #[arg(long, conflicts_with = "story_point")]
         clear_story_point: bool,
+        /// Set the planned date of a release marker (YYYY-MM-DD)
+        #[arg(long, value_name = "YYYY-MM-DD", conflicts_with = "clear_release_date")]
+        release_date: Option<String>,
+        /// Clear the planned date of a release marker
+        #[arg(long, conflicts_with = "release_date")]
+        clear_release_date: bool,
         #[arg(long, conflicts_with = "no_icebox")]
         icebox: bool,
         #[arg(long, conflicts_with = "icebox")]
@@ -894,6 +903,7 @@ async fn run() -> Result<(), (CliError, i32)> {
                     is_icebox,
                     story_point,
                     labels,
+                    release_date,
                     placement,
                 } => {
                     let project = require_project(project)?;
@@ -907,6 +917,7 @@ async fn run() -> Result<(), (CliError, i32)> {
                         story_point,
                         placement: placement.into_placement(),
                         label_ids,
+                        release_date,
                     };
                     let body = service.create_story(&base_url, &project, &input).await?;
                     if cli.json {
@@ -931,6 +942,8 @@ async fn run() -> Result<(), (CliError, i32)> {
                     story_type,
                     story_point,
                     clear_story_point,
+                    release_date,
+                    clear_release_date,
                     icebox,
                     no_icebox,
                     owners,
@@ -986,6 +999,11 @@ async fn run() -> Result<(), (CliError, i32)> {
                         label_ids,
                         add_label_ids,
                         remove_label_ids,
+                        release_date: if clear_release_date {
+                            Some(ReleaseDateUpdate::Clear)
+                        } else {
+                            release_date.map(ReleaseDateUpdate::Set)
+                        },
                     };
                     let body = service
                         .update_story(&base_url, &project, story_number, &input)
@@ -1738,6 +1756,36 @@ mod tests {
             "tm", "story", "update", "--project", "p", "1", "--clear-labels", "--label", "a",
         ])
         .is_err());
+    }
+
+    #[test]
+    fn story_release_date_flags_parse_and_conflict() {
+        let parsed = Cli::try_parse_from([
+            "tm", "story", "update", "--project", "p", "1", "--release-date", "2026-12-01",
+        ])
+        .expect("release date should be accepted without other fields");
+        let Commands::Story(StoryCommand {
+            command: StorySubcommand::Update { release_date, clear_release_date, .. },
+        }) = parsed.command
+        else {
+            panic!("expected story update command");
+        };
+        assert_eq!(release_date.as_deref(), Some("2026-12-01"));
+        assert!(!clear_release_date);
+
+        assert!(Cli::try_parse_from([
+            "tm", "story", "update", "--project", "p", "1", "--clear-release-date",
+        ])
+        .is_ok());
+        assert!(Cli::try_parse_from([
+            "tm", "story", "update", "--project", "p", "1", "--release-date", "2026-12-01", "--clear-release-date",
+        ])
+        .is_err());
+        assert!(Cli::try_parse_from([
+            "tm", "story", "create", "--project", "p", "--title", "v1", "--type", "release",
+            "--description", "", "--release-date", "2026-12-01",
+        ])
+        .is_ok());
     }
 
     #[test]

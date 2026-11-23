@@ -915,6 +915,38 @@ function StoryAccordionDetailComponent({
         </select>
       </div>
 
+      {resolvedStory.type === "release" ? (
+        <div className="flex min-w-0 items-center gap-2 text-xs">
+          <label
+            htmlFor={`story-release-date-${story.id}`}
+            className="shrink-0 font-medium text-gray-500 dark:text-slate-300"
+          >
+            {t("storyAccordion.detail.releaseDate")}
+          </label>
+          <input
+            id={`story-release-date-${story.id}`}
+            type="date"
+            className="min-w-0 rounded border border-gray-200 bg-white px-2 py-0.5 text-xs text-gray-700 focus:border-blue-300 focus:outline-none focus:ring-1 focus:ring-blue-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+            value={resolvedStory.releaseDate ?? ""}
+            disabled={locked}
+            onChange={(event) => {
+              const next = event.target.value;
+              if (next) void patchStory({ releaseDate: next });
+            }}
+          />
+          <button
+            type="button"
+            className="rounded border border-gray-200 px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-slate-600 dark:text-slate-100 dark:hover:bg-slate-800"
+            disabled={locked || !resolvedStory.releaseDate}
+            onClick={() => {
+              void patchStory({ releaseDate: null });
+            }}
+          >
+            {t("storyAccordion.detail.clearReleaseDate")}
+          </button>
+        </div>
+      ) : null}
+
       <div className="flex min-w-0 items-center gap-2 text-xs">
         <span className="shrink-0 font-medium text-gray-500 dark:text-slate-300">
           {t("storyAccordion.detail.labels")}

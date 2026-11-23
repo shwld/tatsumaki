@@ -1805,8 +1805,10 @@ export function StoryMultiPanelScreen() {
         const targetPanel = toCreateTargetPanel(panel);
         if (!projectId || !targetPanel) return null;
         const isOpen = createTargetPanel === targetPanel;
+        const canCreateReleaseMarker =
+          panel === "Backlog" || panel === "CurrentBacklogCombined";
         return (
-          <div className="relative">
+          <div className="relative flex items-center gap-2">
             <button
               type="button"
               className="text-xs font-medium text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
@@ -1815,6 +1817,16 @@ export function StoryMultiPanelScreen() {
             >
               {t("storyMultiPanelScreen.create.button")}
             </button>
+            {canCreateReleaseMarker ? (
+              <button
+                type="button"
+                className="text-xs font-medium text-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={readOnly}
+                onClick={() => setShowReleaseMarkerDialog(true)}
+              >
+                {t("storyMultiPanelScreen.create.releaseMarkerButton")}
+              </button>
+            ) : null}
             {isOpen ? (
               <div
                 role="dialog"

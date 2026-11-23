@@ -187,6 +187,7 @@ export async function updateStory(
     moveToTopOnLeavingIcebox?: boolean;
     placement?: StoryPlacementTarget;
     requesterId?: string | null;
+    releaseDate?: string | null;
     allowedStoryPoints?: number[];
     actor: StoryUpdateActor;
   },
@@ -206,7 +207,8 @@ export async function updateStory(
     input.removeLabelIds !== undefined ||
     input.ownerIds !== undefined ||
     input.isIcebox !== undefined ||
-    input.requesterId !== undefined;
+    input.requesterId !== undefined ||
+    input.releaseDate !== undefined;
 
   if (!hasUpdates) {
     return err(NO_STORY_FIELDS_TO_UPDATE_ERROR);
@@ -351,6 +353,9 @@ export async function updateStory(
       : {}),
     ...(normalizedRequesterId?.isOk()
       ? { requesterId: normalizedRequesterId.value }
+      : {}),
+    ...(input.releaseDate !== undefined
+      ? { releaseDate: input.releaseDate }
       : {}),
   });
 

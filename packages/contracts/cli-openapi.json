@@ -1979,6 +1979,13 @@
                   "status": {
                     "$ref": "#/components/schemas/StoryStatus"
                   },
+                  "releaseDate": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                    "description": "Planned date of a release marker (YYYY-MM-DD, must exist). On update, omit to keep it and send null to clear it.",
+                    "example": "2026-12-01",
+                    "nullable": true
+                  },
                   "placement": {
                     "$ref": "#/components/schemas/StoryPlacement"
                   }
@@ -2153,6 +2160,13 @@
                     "items": {
                       "type": "string"
                     }
+                  },
+                  "releaseDate": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                    "description": "Planned date of a release marker (YYYY-MM-DD, must exist). On update, omit to keep it and send null to clear it.",
+                    "example": "2026-12-01",
+                    "nullable": true
                   },
                   "placement": {
                     "$ref": "#/components/schemas/StoryPlacement"

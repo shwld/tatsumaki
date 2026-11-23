@@ -1,7 +1,7 @@
 use progenitor::generate_api;
 use reqwest::StatusCode;
 
-use crate::{application::ports::{AuthGateway, CliVersionResponse, OAuthTokenResponse, ProjectGateway, ProjectGetBody, StoryBlockerAction, StoryBlockerInput, StoryCommentInput, StoryCreateInput, StoryGateway, StoryGetBody, StoryListBody, StoryListFilter, StoryPointUpdate, StoryReorderInput, StoryUpdateInput, UserGateway, VersionGateway, WhoamiResponse}, CliError};
+use crate::{application::ports::{AuthGateway, CliVersionResponse, OAuthTokenResponse, ProjectGateway, ProjectGetBody, StoryBlockerAction, StoryBlockerInput, StoryCommentInput, StoryCreateInput, StoryGateway, StoryGetBody, StoryListBody, StoryListFilter, ReleaseDateUpdate, StoryPointUpdate, StoryReorderInput, StoryUpdateInput, UserGateway, VersionGateway, WhoamiResponse}, CliError};
 use crate::infrastructure::http_client;
 use self::types::{CliVersionCompatibilityResponse, GetProjectProjectId, GetStoryByNumberProjectId, GetStoryByNumberStoryNumber, ListStoriesIterationDateScope, StoryStatus};
 
@@ -265,6 +265,9 @@ fn story_create_payload(input: &StoryCreateInput) -> serde_json::Value {
   if let Some(placement) = input.placement {
     payload["placement"] = placement.to_json();
   }
+  if let Some(release_date) = &input.release_date {
+    payload["releaseDate"] = release_date.clone().into();
+  }
   payload
 }
 
@@ -318,6 +321,15 @@ fn story_update_payload(input: &StoryUpdateInput) -> serde_json::Value {
   if !input.remove_label_ids.is_empty() {
     payload.insert("removeLabelIds".to_string(), input.remove_label_ids.clone().into());
   }
+  if let Some(release_date) = &input.release_date {
+    payload.insert(
+      "releaseDate".to_string(),
+      match release_date {
+        ReleaseDateUpdate::Set(date) => date.clone().into(),
+        ReleaseDateUpdate::Clear => serde_json::Value::Null,
+      },
+    );
+  }
   payload.into()
 }
 
@@ -359,7 +371,7 @@ impl HttpStoryGateway {
 #[cfg(test)]
 mod tests {
   use super::{story_create_payload, story_reorder_payload, story_update_payload};
-  use crate::application::ports::{StoryCreateInput, StoryGateway, StoryPlacement, StoryPointUpdate, StoryReorderInput, StoryUpdateInput};
+  use crate::application::ports::{ReleaseDateUpdate, StoryCreateInput, StoryGateway, StoryPlacement, StoryPointUpdate, StoryReorderInput, StoryUpdateInput};
 
   #[tokio::test]
   async fn archive_and_unarchive_use_the_authenticated_api() {
@@ -399,6 +411,7 @@ mod tests {
       label_ids: None,
       add_label_ids: Vec::new(),
       remove_label_ids: Vec::new(),
+      release_date: None,
     }
   }
 
@@ -518,16 +531,36 @@ mod tests {
       story_point: None,
       placement: None,
       label_ids: vec![],
+      release_date: None,
     };
     let payload = story_create_payload(&input);
     assert!(payload.get("storyPoint").is_none());
     assert!(payload.get("placement").is_none());
+    assert!(payload.get("releaseDate").is_none());
 
     input.story_point = Some(3);
     input.placement = Some(StoryPlacement::End);
     let payload = story_create_payload(&input);
     assert_eq!(payload["storyPoint"], 3);
     assert_eq!(payload["placement"], serde_json::json!({ "position": "end" }));
+
+    input.release_date = Some("2026-12-01".to_string());
+    assert_eq!(story_create_payload(&input)["releaseDate"], "2026-12-01");
+  }
+
+  #[test]
+  fn story_update_payload_sets_clears_and_omits_release_date() {
+    assert!(story_update_payload(&empty_update()).get("releaseDate").is_none());
+    let set = story_update_payload(&StoryUpdateInput {
+      release_date: Some(ReleaseDateUpdate::Set("2026-12-01".to_string())),
+      ..empty_update()
+    });
+    assert_eq!(set, serde_json::json!({ "releaseDate": "2026-12-01" }));
+    let clear = story_update_payload(&StoryUpdateInput {
+      release_date: Some(ReleaseDateUpdate::Clear),
+      ..empty_update()
+    });
+    assert_eq!(clear, serde_json::json!({ "releaseDate": null }));
   }
 
   #[test]

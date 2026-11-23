@@ -221,6 +221,59 @@ describe("StoryAccordionDetail", () => {
     );
   });
 
+  it("edits and clears the planned date of a release marker", async () => {
+    const story: Story = {
+      ...createStory(),
+      type: "release",
+      releaseDate: "2026-12-01",
+    };
+    const patched: unknown[] = [];
+    const fetchMock = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (init?.method === "PATCH") {
+          const fields = JSON.parse(String(init.body));
+          patched.push(fields);
+          return new Response(
+            JSON.stringify({ story: { ...story, ...fields } }),
+            {
+              status: 200,
+            },
+          );
+        }
+        return (
+          baselineFetchResponse(String(input)) ??
+          new Response("{}", { status: 500 })
+        );
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderDetail(undefined, [], story);
+
+    const dateInput = screen.getByLabelText("リリース予定日");
+    expect(dateInput).toHaveValue("2026-12-01");
+    fireEvent.change(dateInput, { target: { value: "2027-01-15" } });
+    await waitFor(() =>
+      expect(patched).toContainEqual({ releaseDate: "2027-01-15" }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "予定日を解除" }));
+    await waitFor(() => expect(patched).toContainEqual({ releaseDate: null }));
+  });
+
+  it("does not show a planned date field for other story types", () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async (input: RequestInfo | URL) =>
+          baselineFetchResponse(String(input)) ??
+          new Response("{}", { status: 500 }),
+      ),
+    );
+    renderDetail();
+    expect(screen.queryByLabelText("リリース予定日")).not.toBeInTheDocument();
+  });
+
   it("shows status select with selectable statuses", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);

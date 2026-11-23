@@ -394,6 +394,59 @@ describe("StoryMultiPanelScreen UI contracts", () => {
     expect(rendered).toEqual([]);
   });
 
+  it("creates a release marker with and without a planned date from the Backlog panel", async () => {
+    const baseFetch = createStoryMultiPanelFetchMock();
+    const posted: Array<Record<string, unknown>> = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const rawUrl =
+          input instanceof Request
+            ? input.url.replace(/^https?:\/\/[^/]+/, "")
+            : String(input);
+        const parsed = new URL(rawUrl, "http://localhost");
+        if (
+          parsed.pathname === `/api/projects/${PROJECT_ID}/stories` &&
+          (init?.method ?? "GET").toUpperCase() === "POST"
+        ) {
+          posted.push(JSON.parse(String(init?.body)));
+          return new Response(JSON.stringify({ story: {} }), { status: 201 });
+        }
+        return baseFetch(input);
+      }),
+    );
+    renderStoryMultiPanel();
+
+    expect(await screen.findByText("Backlog story")).toBeInTheDocument();
+    const open = () =>
+      userEvent.click(
+        screen.getAllByRole("button", { name: "+ リリースマーカー" })[0]!,
+      );
+
+    await open();
+    await userEvent.type(screen.getByLabelText(/名前/), "v1.0");
+    fireEvent.change(screen.getByLabelText("リリース予定日"), {
+      target: { value: "2026-12-01" },
+    });
+    await userEvent.click(screen.getByRole("button", { name: "作成" }));
+    await waitFor(() => expect(posted).toHaveLength(1));
+    expect(posted[0]).toMatchObject({
+      type: "release",
+      title: "v1.0",
+      releaseDate: "2026-12-01",
+    });
+
+    await open();
+    await userEvent.type(screen.getByLabelText(/名前/), "v2.0");
+    await userEvent.click(screen.getByRole("button", { name: "作成" }));
+    await waitFor(() => expect(posted).toHaveLength(2));
+    expect(posted[1]).toMatchObject({
+      type: "release",
+      title: "v2.0",
+      releaseDate: null,
+    });
+  });
+
   it("does not auto-select a story after inline create", async () => {
     const baseFetch = createStoryMultiPanelFetchMock();
     vi.stubGlobal(
