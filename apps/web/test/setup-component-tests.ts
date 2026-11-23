@@ -1,6 +1,9 @@
 import "@testing-library/jest-dom/vitest";
-import { cleanup } from "@testing-library/react";
+import { cleanup, configure } from "@testing-library/react";
 import { afterEach } from "vitest";
+
+// 既定の 1 秒では、CPU が混んだ CI で重い画面の初回描画を待ちきれず落ちる
+configure({ asyncUtilTimeout: 5_000 });
 
 function createStorage(): Storage {
   const store = new Map<string, string>();

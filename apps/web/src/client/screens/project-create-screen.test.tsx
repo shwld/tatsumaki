@@ -170,9 +170,11 @@ describe("ProjectCreateScreen", () => {
       "aria-invalid",
       "true",
     );
-    expect(document.activeElement).toBe(
-      screen.getByLabelText("プロジェクト名"),
-    );
+    await waitFor(() => {
+      expect(document.activeElement).toBe(
+        screen.getByLabelText("プロジェクト名"),
+      );
+    });
   });
 
   it("preserves input value after validation error and allows resubmission", async () => {
