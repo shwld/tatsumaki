@@ -25,6 +25,8 @@ const setup = (
     checkoutEnabled?: boolean;
     transferCheckoutEnabled?: boolean;
     expireFails?: boolean;
+    recipientLookupFails?: boolean;
+    onCheckout?: () => Promise<void>;
   } = {},
 ) => {
   const subscriptions = { owner: "live", ...options.subscriptions } as Record<
@@ -38,26 +40,32 @@ const setup = (
     }: {
       billingAccountId: string;
       projectIds: string[];
-    }) => ({
-      projects: projectIds.map((projectId) => {
-        const lifecycle = subscriptions[billingAccountId] ?? null;
-        return {
-          projectId,
-          entitlementState: "active",
-          subscription: lifecycle
-            ? {
-                lifecycle,
-                endsAt: null,
-                nextBilling: { status: "none" as const },
-              }
-            : null,
-        };
-      }),
-    }),
+    }) => {
+      if (options.recipientLookupFails && billingAccountId === "bob") {
+        throw new Error("cp down");
+      }
+      return {
+        projects: projectIds.map((projectId) => {
+          const lifecycle = subscriptions[billingAccountId] ?? null;
+          return {
+            projectId,
+            entitlementState: "active",
+            subscription: lifecycle
+              ? {
+                  lifecycle,
+                  endsAt: null,
+                  nextBilling: { status: "none" as const },
+                }
+              : null,
+          };
+        }),
+      };
+    },
   );
-  const createCheckoutSession = vi.fn(async (_input: unknown) => ({
-    url: "https://checkout.stripe.test/session",
-  }));
+  const createCheckoutSession = vi.fn(async (_input: unknown) => {
+    await options.onCheckout?.();
+    return { url: "https://checkout.stripe.test/session" };
+  });
   const expireTransferCheckout = vi.fn(async (_input: unknown) => {
     if (options.expireFails) throw new Error("stripe down");
     return { expiredSessionCount: 1 };
@@ -356,6 +364,40 @@ describe("ownership transfer checkout", () => {
     expect(expireTransferCheckout).not.toHaveBeenCalled();
     const view = await call("owner", projectId, "GET");
     expect(await view.json()).toMatchObject({ transfer: { id: transferId } });
+  });
+
+  it("lets either party close the request when the recipient's subscription cannot be checked", async () => {
+    const { call } = setup({ recipientLookupFails: true });
+    const { projectId, transferId } = await seedTransfer(call);
+
+    const response = await call("owner", projectId, "POST", "/cancel", {
+      transferId,
+    });
+
+    expect(response.status).toBe(200);
+  });
+
+  it("withholds the Checkout URL when the requester loses ownership while it is created", async () => {
+    const { call, expireTransferCheckout } = setup({
+      onCheckout: async () => {
+        await env.DB.prepare(
+          "update project_members set role = 'member' where user_id = 'owner'",
+        ).run();
+      },
+    });
+    const { projectId, transferId } = await seedTransfer(call);
+
+    const response = await call("bob", projectId, "POST", "/checkout", {
+      transferId,
+    });
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: "not_pending" });
+    expect(expireTransferCheckout).toHaveBeenCalledWith({
+      billingAccountId: "bob",
+      projectId,
+      transferId,
+    });
   });
 
   it("keeps the request closed even if expiring the Checkout fails", async () => {

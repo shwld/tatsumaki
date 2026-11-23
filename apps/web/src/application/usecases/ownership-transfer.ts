@@ -308,7 +308,7 @@ export async function closeOwnershipTransfer(
       transfer.toUserId,
       transfer.projectId,
     );
-    if (subscribed === null) return err(TRANSFER_UNAVAILABLE_ERROR);
+    // 確認できないときも閉じられる。決済が先に確定していた場合は、申請IDから後続が返金する。
     if (subscribed) return err(TRANSFER_PAYMENT_CONFIRMED_ERROR);
   }
   const closed = await deps.transfers.close({
@@ -390,9 +390,8 @@ export async function startTransferCheckout(
       projectId: input.projectId,
       projectName: project.value.name,
       transferId: transfer.id,
-      requestId: await deterministicRequestId(
-        `transfer:${transfer.id}:${input.now.toISOString().slice(0, 10)}`,
-      ),
+      // 日付を含めない。未決済のセッションが残るうちに別のキーで開き直すと、二重に決済できてしまう。
+      requestId: await deterministicRequestId(`transfer:${transfer.id}`),
       successUrl: input.successUrl,
       cancelUrl: input.cancelUrl,
     });
@@ -401,7 +400,10 @@ export async function startTransferCheckout(
     const after = await isCurrent(deps.clock());
     // 確認できない間は、開いた Checkout を残したまま URL を返さない。
     if (after.isErr()) return err(TRANSFER_UNAVAILABLE_ERROR);
-    if (!after.value) {
+    if (
+      !after.value ||
+      (await voidIfIneligible(deps, transfer, deps.clock()))
+    ) {
       await expireRecipientCheckout(deps, transfer);
       return err(TRANSFER_NOT_PENDING_ERROR);
     }

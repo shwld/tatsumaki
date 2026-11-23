@@ -76,7 +76,10 @@ export function OwnershipTransferSection({
   useEffect(() => {
     let ignore = false;
     const run = async () => {
-      setState({ status: "loading" });
+      // 背景の取り直しでは表示中の内容とフォーカスを保つ。
+      setState((previous) =>
+        previous.status === "ready" ? previous : { status: "loading" },
+      );
       try {
         const entitlement = await fetch("/api/billing/entitlement");
         if (ignore) return;
@@ -85,7 +88,9 @@ export function OwnershipTransferSection({
           return;
         }
         if (!entitlement.ok) {
-          setState({ status: "error" });
+          setState((previous) =>
+            previous.status === "ready" ? previous : { status: "error" },
+          );
           return;
         }
         const mode = ((await entitlement.json()) as { mode?: string }).mode;
@@ -100,13 +105,18 @@ export function OwnershipTransferSection({
           return;
         }
         if (!response.ok) {
-          setState({ status: "error" });
+          setState((previous) =>
+            previous.status === "ready" ? previous : { status: "error" },
+          );
           return;
         }
         const data = (await response.json()) as { transfer?: Transfer | null };
         setState({ status: "ready", transfer: data.transfer ?? null });
       } catch {
-        if (!ignore) setState({ status: "error" });
+        if (!ignore)
+          setState((previous) =>
+            previous.status === "ready" ? previous : { status: "error" },
+          );
       }
     };
     void run();
