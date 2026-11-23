@@ -694,7 +694,11 @@ export function ProjectSettingsScreen() {
         ) : null}
 
         {projectId ? (
-          <OwnershipTransferSection projectId={projectId} isOwner={isOwner} />
+          <OwnershipTransferSection
+            key={projectId}
+            projectId={projectId}
+            isOwner={isOwner}
+          />
         ) : null}
 
         {project && projectId && isOwner ? (

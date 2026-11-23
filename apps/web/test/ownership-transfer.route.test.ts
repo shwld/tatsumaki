@@ -282,6 +282,14 @@ describe("ownership transfer request routes", () => {
       .run();
 
     expect((await call("bob", projectId, "POST", "/decline")).status).toBe(409);
+    await env.DB.prepare(
+      "update project_members set role = 'owner' where project_id = ? and user_id = 'owner'",
+    )
+      .bind(projectId)
+      .run();
+    expect(await (await call("owner", projectId, "GET")).json()).toEqual({
+      transfer: null,
+    });
   });
 
   it("expires after 7 days and then allows a new request", async () => {

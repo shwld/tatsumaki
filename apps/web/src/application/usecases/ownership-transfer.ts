@@ -69,6 +69,17 @@ const isStillEligible = async (
   return from.value?.role === "owner" && to.value !== null;
 };
 
+/** 資格を失った申請を終了させ、後で資格が戻っても復活しないようにする。 */
+const voidIfIneligible = async (
+  deps: Deps,
+  transfer: OwnershipTransfer,
+  now: Date,
+): Promise<boolean> => {
+  if (await isStillEligible(deps, transfer)) return false;
+  await deps.transfers.close({ id: transfer.id, status: "cancelled", now });
+  return true;
+};
+
 /** 現在の購読の支払者かつ owner の本人だけが、同じプロジェクトの既存メンバーへ申請できる。 */
 export async function requestOwnershipTransfer(
   deps: Deps & { billing: ProjectBillingGateway },
@@ -121,15 +132,11 @@ export async function requestOwnershipTransfer(
         input.now,
       );
       if (existing.isErr()) return err(TRANSFER_UNAVAILABLE_ERROR);
-      if (existing.value && (await isStillEligible(deps, existing.value))) {
+      if (
+        existing.value &&
+        !(await voidIfIneligible(deps, existing.value, input.now))
+      ) {
         return err(TRANSFER_ALREADY_PENDING_ERROR);
-      }
-      if (existing.value) {
-        await deps.transfers.close({
-          id: existing.value.id,
-          status: "cancelled",
-          now: input.now,
-        });
       }
       created = await create();
     }
@@ -139,6 +146,10 @@ export async function requestOwnershipTransfer(
           ? TRANSFER_ALREADY_PENDING_ERROR
           : TRANSFER_UNAVAILABLE_ERROR,
       );
+    }
+    // 課金確認の間に当事者が資格を失った場合、成功を返さない。
+    if (await voidIfIneligible(deps, created.value, input.now)) {
+      return err(TRANSFER_FORBIDDEN_ERROR);
     }
     return ok(toView(created.value, input.userId));
   } catch {
@@ -165,7 +176,7 @@ export async function getOwnershipTransfer(
     return ok(null);
   }
   try {
-    if (!(await isStillEligible(deps, transfer))) return ok(null);
+    if (await voidIfIneligible(deps, transfer, input.now)) return ok(null);
   } catch {
     return err(TRANSFER_UNAVAILABLE_ERROR);
   }
@@ -195,7 +206,7 @@ export async function closeOwnershipTransfer(
     return err(TRANSFER_NOT_PENDING_ERROR);
   }
   try {
-    if (!(await isStillEligible(deps, transfer))) {
+    if (await voidIfIneligible(deps, transfer, input.now)) {
       return err(TRANSFER_NOT_PENDING_ERROR);
     }
   } catch {
