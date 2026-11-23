@@ -25,14 +25,20 @@ type Options = {
 
 const setup = (options: Options = {}) => {
   const listProjectBilling = vi.fn(
-    async ({ projectIds }: { projectIds: string[] }) => {
+    async ({
+      billingAccountId,
+      projectIds,
+    }: {
+      billingAccountId: string;
+      projectIds: string[];
+    }) => {
       if (options.listFails) throw new Error("cp down");
       return {
         projects: projectIds.map((projectId) => ({
           projectId,
           entitlementState: "active",
           subscription:
-            options.lifecycle === null
+            billingAccountId !== "owner" || options.lifecycle === null
               ? null
               : {
                   lifecycle: options.lifecycle ?? "live",

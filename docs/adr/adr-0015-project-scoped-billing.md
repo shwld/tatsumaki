@@ -141,10 +141,21 @@ Stripe Portal の購読一覧で、プロジェクトを区別できるように
 
 ## Amendment 2026-11-23 (story #449)
 
-所有権譲渡の申請を実装した。受け手の承認・Checkout・オーナー切り替えは後続の story #450 で扱う。
+所有権譲渡の申請を実装した。受け手の Checkout は story #450、オーナー切り替えは後続で扱う。
 
 - **申請できる人**: 対象プロジェクトの owner で、かつ現在有効な旧購読の支払者本人(`listProjectBilling` が自分の billing account でそのプロジェクトの未終了の購読を返す)だけ。購読が無い・終了済み、または確認できないときは拒否する。受け手は同じプロジェクトの既存メンバーで、自分自身は指定できない。
 - **申請の性質**: `project_ownership_transfers` に projectId・双方の userId・状態・失効時刻を保存する。申請だけでは、ロールも購読も変わらない。プロジェクトごとに有効な申請は 1 件(`status = 'pending'` の部分ユニークインデックスで同時申請も排除する)。
 - **失効と終了**: 申請から 7 日で失効する。申請者は取消、受け手は辞退でき、終了した申請への操作は 409 で拒否する。申請者が owner でなくなった、または受け手がメンバーでなくなった申請は無効として扱い、新しい申請を妨げない。決済確定後の取消・辞退の拒否は、申請を確定済みにする #450 の状態遷移で実現する(有効な申請だけが操作できる)。
 - **可視性**: 申請は当事者(申請者・受け手)だけが参照できる。第三者のメンバーには申請の有無を返さない。
 - **経路**: `/api/billing/projects/:projectId/ownership-transfer`(GET・POST)と `.../cancel`・`.../decline`。停止中の書き込みゲートの外に置く。公式ホスト版(`ENTITLEMENT_MODE=control-plane`)専用で、セルフホストは従来のロール操作を維持する。
+
+## Amendment 2026-11-23 (story #450)
+
+受け手が同じ projectId を自分の決済アカウントで購読する Checkout を実装した。ロール・プロジェクト・旧購読の切り替えと旧購読の解約・返金は後続の story #451 で扱う。
+
+- **開始できる人**: 有効な申請の指定受取人だけ(`POST /api/billing/projects/:projectId/ownership-transfer/checkout`、本文は `transferId`)。申請者・他のメンバー・別の申請IDは拒否する。`CHECKOUT_ENABLED` を尊重し、Checkout の開始だけではロール・購読は変わらない。
+- **旧購読との関係**: 通常の Checkout はプロジェクトの購読が他の決済アカウントのものでも重複として拒否する。譲渡の Checkout は Control Plane の `createCheckoutSession` に `transferId` を付け、受け手自身の未終了の購読だけを重複とみなす。価格は常に通常の月額税込3,850円で、旧購読の0円 Price は使わない。
+- **照合**: 受け手の購読が有効かは、権限の集約値ではなく受け手自身の billing account の `listProjectBilling` で確認する(`recipientSubscribed`、受け手の画面にだけ返す)。決済画面から戻らなくても、設定画面が反映まで取り直す。同じ申請で開き直しても requestId は申請IDと日付から決まり、受け手の購読は1本のまま。
+- **競合の引き渡し**: Checkout セッションと購読に `transferId` を保存する。受け手の購読が有効になった後は取消・辞退を受け付けない。取消・辞退・失効が先に確定した後に決済が確定した場合は、`transferId` から取引を特定して #451 が旧購読を維持したまま解約・全額返金する。
+- **未決済の無効化**: 取消・辞退・資格喪失で申請が終わると、Control Plane の `expireTransferCheckout` が受け手の open な Checkout を expire する。失敗しても申請の終了は覆さない(失効はログに残す)。
+- **残課題**: 期限切れ(7日)による自動 expire は、決済確定の照合を #451 が行うため入れていない。Stripe の Checkout は作成から最大24時間で失効する。

@@ -149,4 +149,61 @@ describe("OwnershipTransferSection", () => {
       expect.stringContaining("支払者ではない"),
     );
   });
+
+  it("lets the recipient start the Checkout for the pending request", async () => {
+    const assign = vi.fn();
+    vi.stubGlobal("location", { ...window.location, assign, search: "" });
+    routes(
+      { ...pendingTransfer("recipient"), recipientSubscribed: false },
+      "control-plane",
+      {
+        "POST /api/billing/projects/p1/ownership-transfer/checkout": () =>
+          json({ url: "https://checkout.stripe.test/s" }, 201),
+      },
+    );
+    renderSection(false);
+
+    expect(await screen.findByText(/3,850 円/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "購読して引き継ぐ" }));
+
+    await waitFor(() =>
+      expect(assign).toHaveBeenCalledWith("https://checkout.stripe.test/s"),
+    );
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/billing/projects/p1/ownership-transfer/checkout",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ transferId: "t1" }),
+      }),
+    );
+  });
+
+  it("does not offer the Checkout again once the recipient's subscription is confirmed", async () => {
+    routes({ ...pendingTransfer("recipient"), recipientSubscribed: true });
+    renderSection(false);
+
+    expect(await screen.findByText(/購読を確認しました/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "購読して引き継ぐ" })).toBe(
+      null,
+    );
+  });
+
+  it("explains when new subscriptions are paused", async () => {
+    routes(
+      { ...pendingTransfer("recipient"), recipientSubscribed: false },
+      "control-plane",
+      {
+        "POST /api/billing/projects/p1/ownership-transfer/checkout": () =>
+          json({ code: "checkout_disabled" }, 409),
+      },
+    );
+    renderSection(false);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "購読して引き継ぐ" }),
+    );
+    expect(await screen.findByRole("alert")).toHaveProperty(
+      "textContent",
+      expect.stringContaining("停止"),
+    );
+  });
 });

@@ -28,7 +28,10 @@ import {
   closeOwnershipTransfer,
   getOwnershipTransfer,
   requestOwnershipTransfer,
+  startTransferCheckout,
   TRANSFER_ALREADY_PENDING_ERROR,
+  TRANSFER_ALREADY_SUBSCRIBED_ERROR,
+  TRANSFER_CHECKOUT_DISABLED_ERROR,
   TRANSFER_FORBIDDEN_ERROR,
   TRANSFER_INVALID_RECIPIENT_ERROR,
   TRANSFER_NO_SUBSCRIPTION_ERROR,
@@ -36,6 +39,7 @@ import {
   TRANSFER_NOT_PENDING_ERROR,
   type OwnershipTransferError,
 } from "../../application/usecases/ownership-transfer";
+import { ControlPlaneTransferCheckoutExpiryGateway } from "../../infrastructure/entitlements/control-plane-transfer-checkout-expiry-gateway";
 import { D1ProjectOwnershipTransferRepository } from "../../infrastructure/db/repositories/d1-project-ownership-transfer-repository";
 import {
   PAYMENT_METHOD_FORBIDDEN_ERROR,
@@ -356,6 +360,22 @@ const ownershipTransferErrorResponse = (error: OwnershipTransferError) => {
         body: { error: "No pending transfer", code: "not_pending" },
         status: 409 as const,
       };
+    case TRANSFER_CHECKOUT_DISABLED_ERROR:
+      return {
+        body: {
+          error: "Checkout is not available",
+          code: "checkout_disabled",
+        },
+        status: 409 as const,
+      };
+    case TRANSFER_ALREADY_SUBSCRIBED_ERROR:
+      return {
+        body: {
+          error: "You already subscribe to this project",
+          code: "already_subscribed",
+        },
+        status: 409 as const,
+      };
     default:
       console.error("Ownership transfer unavailable", { reason: error });
       return {
@@ -364,6 +384,18 @@ const ownershipTransferErrorResponse = (error: OwnershipTransferError) => {
       };
   }
 };
+
+const transferDeps = (bindings: Bindings) => ({
+  projects: new D1ProjectRepository(bindings.DB),
+  transfers: new D1ProjectOwnershipTransferRepository(bindings.DB),
+  ...(bindings.CONTROL_PLANE
+    ? {
+        checkoutExpiry: new ControlPlaneTransferCheckoutExpiryGateway(
+          bindings.CONTROL_PLANE,
+        ),
+      }
+    : {}),
+});
 
 // セルフホストは従来のロール操作を維持するため、課金付き譲渡は公式ホスト版だけ。
 billingRoute.use(
@@ -380,8 +412,10 @@ billingRoute.get(
   async (c) => {
     const result = await getOwnershipTransfer(
       {
-        projects: new D1ProjectRepository(c.env.DB),
-        transfers: new D1ProjectOwnershipTransferRepository(c.env.DB),
+        ...transferDeps(c.env),
+        billing: new ControlPlaneProjectBillingGateway(
+          c.env.CONTROL_PLANE as NonNullable<Bindings["CONTROL_PLANE"]>,
+        ),
       },
       {
         userId: c.get("currentUser").id,
@@ -411,8 +445,7 @@ billingRoute.post(
     }
     const result = await requestOwnershipTransfer(
       {
-        projects: new D1ProjectRepository(c.env.DB),
-        transfers: new D1ProjectOwnershipTransferRepository(c.env.DB),
+        ...transferDeps(c.env),
         billing: new ControlPlaneProjectBillingGateway(controlPlane),
       },
       {
@@ -427,6 +460,51 @@ billingRoute.post(
       return c.json(response.body, response.status);
     }
     return c.json({ transfer: result.value }, 201);
+  },
+);
+
+billingRoute.post(
+  "/billing/projects/:projectId/ownership-transfer/checkout",
+  async (c) => {
+    const controlPlane = c.env.CONTROL_PLANE;
+    if (!controlPlane)
+      return c.json({ error: "Billing is not available" }, 409);
+    const body = (await c.req.json().catch(() => null)) as {
+      transferId?: unknown;
+    } | null;
+    if (
+      !body ||
+      typeof body.transferId !== "string" ||
+      body.transferId === ""
+    ) {
+      return c.json({ error: "transferId is required" }, 400);
+    }
+    const projectId = c.req.param("projectId");
+    const base = `${new URL(c.req.url).origin}/projects/${encodeURIComponent(projectId)}/settings`;
+    const projects = new D1ProjectRepository(c.env.DB);
+    const result = await startTransferCheckout(
+      {
+        ...transferDeps(c.env),
+        projects,
+        projectNames: projects,
+        billing: new ControlPlaneProjectBillingGateway(controlPlane),
+        checkout: new ControlPlaneCheckoutGateway(controlPlane),
+      },
+      {
+        userId: c.get("currentUser").id,
+        projectId,
+        transferId: body.transferId,
+        now: new Date(),
+        successUrl: `${base}?billing=transfer`,
+        cancelUrl: `${base}?billing=transfer-cancel`,
+      },
+      isCheckoutEnabled(c.env),
+    );
+    if (result.isErr()) {
+      const response = ownershipTransferErrorResponse(result.error);
+      return c.json(response.body, response.status);
+    }
+    return c.json({ url: result.value.url }, 201);
   },
 );
 
@@ -449,8 +527,10 @@ for (const [path, as] of [
       }
       const result = await closeOwnershipTransfer(
         {
-          projects: new D1ProjectRepository(c.env.DB),
-          transfers: new D1ProjectOwnershipTransferRepository(c.env.DB),
+          ...transferDeps(c.env),
+          billing: new ControlPlaneProjectBillingGateway(
+            c.env.CONTROL_PLANE as NonNullable<Bindings["CONTROL_PLANE"]>,
+          ),
         },
         {
           userId: c.get("currentUser").id,

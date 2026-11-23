@@ -11,6 +11,12 @@ export interface ControlPlaneRpc {
     requestId: string;
     successUrl: string;
     cancelUrl: string;
+    transferId?: string;
+  }): Promise<unknown>;
+  expireTransferCheckout(input: {
+    billingAccountId: string;
+    projectId: string;
+    transferId: string;
   }): Promise<unknown>;
   syncProjectDisplayNames(input: {
     billingAccountId: string;
