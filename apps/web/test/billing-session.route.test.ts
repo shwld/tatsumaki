@@ -34,6 +34,8 @@ describe("billing portal route", () => {
           createPaymentMethodUpdateSession: vi.fn(),
           closeProjectBilling: vi.fn(),
           expireTransferCheckout: vi.fn(),
+          confirmTransferPayment: vi.fn(),
+          settleOwnershipTransfer: vi.fn(),
           syncProjectDisplayNames: vi.fn(),
           createPortalSession,
         },
@@ -60,6 +62,8 @@ describe("billing portal route", () => {
           createPaymentMethodUpdateSession: vi.fn(),
           closeProjectBilling: vi.fn(),
           expireTransferCheckout: vi.fn(),
+          confirmTransferPayment: vi.fn(),
+          settleOwnershipTransfer: vi.fn(),
           syncProjectDisplayNames: vi.fn(),
           createPortalSession: vi.fn(async () => {
             throw new Error("CUSTOMER_NOT_FOUND");
@@ -84,6 +88,8 @@ describe("billing portal route", () => {
           createPaymentMethodUpdateSession: vi.fn(),
           closeProjectBilling: vi.fn(),
           expireTransferCheckout: vi.fn(),
+          confirmTransferPayment: vi.fn(),
+          settleOwnershipTransfer: vi.fn(),
           syncProjectDisplayNames: vi.fn(),
           createPortalSession: vi.fn(async () => ({
             url: "http://payments.example/p",
@@ -110,6 +116,8 @@ describe("billing portal route", () => {
           createPaymentMethodUpdateSession: vi.fn(),
           closeProjectBilling: vi.fn(),
           expireTransferCheckout: vi.fn(),
+          confirmTransferPayment: vi.fn(),
+          settleOwnershipTransfer: vi.fn(),
           syncProjectDisplayNames: vi.fn(),
           createPortalSession: vi.fn(async () => ({
             url: "https://billing.stripe.com/p/session/ok",
@@ -131,6 +139,8 @@ describe("billing portal route", () => {
           createPaymentMethodUpdateSession: vi.fn(),
           closeProjectBilling: vi.fn(),
           expireTransferCheckout: vi.fn(),
+          confirmTransferPayment: vi.fn(),
+          settleOwnershipTransfer: vi.fn(),
           syncProjectDisplayNames: vi.fn(),
           createPortalSession: vi.fn(async () => ({
             url: "https://evil.example/secret-token",

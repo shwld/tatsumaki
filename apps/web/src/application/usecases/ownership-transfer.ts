@@ -12,6 +12,10 @@ import type { ProjectBillingGateway } from "../ports/project-billing-gateway";
 import type { ProjectCheckoutGateway } from "../ports/project-checkout-gateway";
 import type { TransferCheckoutExpiryGateway } from "../ports/transfer-checkout-expiry-gateway";
 import { deterministicRequestId } from "./deterministic-request-id";
+import {
+  advanceOwnershipTransfer,
+  type SettleDeps,
+} from "./settle-ownership-transfer";
 
 export const TRANSFER_NOT_FOUND_ERROR = "TRANSFER_NOT_FOUND_ERROR" as const;
 export const TRANSFER_FORBIDDEN_ERROR = "TRANSFER_FORBIDDEN_ERROR" as const;
@@ -58,6 +62,13 @@ export type OwnershipTransferView = {
   toUserId: string;
   expiresAt: string;
   role: "requester" | "recipient";
+  /**
+   * pending: 受け手の購読を待っている。processing: 所有者を切り替え済みで、旧購読の解約と返金を
+   * 処理中。completed: 解約・返金まで完了。review: 自動では返金できず運営が調査する。
+   */
+  state: "pending" | "processing" | "completed" | "review";
+  /** pending 以外の状態で、所有者を切り替えたか。切り替えなかった譲渡では受け手の返金だけを扱う。 */
+  outcome?: "switched" | "not-switched";
   /** 受け手の画面だけ。受け手自身の購読が有効か。確認できなければ null。 */
   recipientSubscribed?: boolean | null;
   /** 受け手の画面だけ。購読の Checkout を開始できるか。 */
@@ -73,7 +84,49 @@ const toView = (
   toUserId: transfer.toUserId,
   expiresAt: transfer.expiresAt,
   role: transfer.fromUserId === userId ? "requester" : "recipient",
+  state: "pending",
 });
+
+const COMPLETED_VISIBLE_MS = 7 * 86_400_000;
+
+const toCompletedView = (
+  transfer: OwnershipTransfer,
+  userId: string,
+  now: Date,
+): OwnershipTransferView | null => {
+  const isParty =
+    transfer.fromUserId === userId || transfer.toUserId === userId;
+  if (!isParty) return null;
+  if (transfer.status === "completed") {
+    const state =
+      transfer.settlementStatus === "review"
+        ? "review"
+        : transfer.settlementStatus === "pending"
+          ? "processing"
+          : "completed";
+    const endedAt = transfer.endedAt ? new Date(transfer.endedAt).getTime() : 0;
+    if (
+      state === "completed" &&
+      now.getTime() - endedAt >= COMPLETED_VISIBLE_MS
+    ) {
+      return null;
+    }
+    return { ...toView(transfer, userId), state, outcome: "switched" };
+  }
+  // 譲渡が成立しなかった場合に見せるのは、返金を自動では処理できなかった受け手だけ。
+  if (
+    transfer.settlementOutcome === "not-switched" &&
+    transfer.settlementStatus === "review" &&
+    transfer.toUserId === userId
+  ) {
+    return {
+      ...toView(transfer, userId),
+      state: "review",
+      outcome: "not-switched",
+    };
+  }
+  return null;
+};
 
 /**
  * 申請後に申請者が owner でなくなった、または受け手がメンバーでなくなった申請は、
@@ -207,6 +260,7 @@ export async function getOwnershipTransfer(
   deps: Deps & {
     billing?: ProjectBillingGateway;
     checkoutAvailable?: boolean;
+    settlement?: Pick<SettleDeps, "settlement" | "deletions">;
   },
   input: { userId: string; projectId: string; now: Date },
 ): Promise<Result<OwnershipTransferView | null, OwnershipTransferError>> {
@@ -216,17 +270,56 @@ export async function getOwnershipTransfer(
 
   const pending = await deps.transfers.findPending(input.projectId, input.now);
   if (pending.isErr()) return err(TRANSFER_UNAVAILABLE_ERROR);
-  const transfer = pending.value;
+  let transfer = pending.value;
+  if (
+    transfer &&
+    (transfer.fromUserId === input.userId || transfer.toUserId === input.userId)
+  ) {
+    try {
+      if (await voidIfIneligible(deps, transfer, input.now)) transfer = null;
+    } catch {
+      return err(TRANSFER_UNAVAILABLE_ERROR);
+    }
+  }
+
+  // 画面の取り直しが切替と精算の進行役を兼ねる。
+  const latest = await deps.transfers.findLatest(input.projectId);
+  if (latest.isOk() && latest.value && deps.settlement) {
+    const involved =
+      latest.value.fromUserId === input.userId ||
+      latest.value.toUserId === input.userId;
+    if (
+      involved &&
+      (latest.value.status === "pending" ||
+        latest.value.settlementStatus === "pending")
+    ) {
+      await advanceOwnershipTransfer(
+        { transfers: deps.transfers, ...deps.settlement },
+        latest.value,
+        input.now,
+      );
+      const refreshed = await deps.transfers.findPending(
+        input.projectId,
+        input.now,
+      );
+      transfer = refreshed.isOk() ? refreshed.value : transfer;
+    }
+  }
+
   if (
     !transfer ||
     (transfer.fromUserId !== input.userId && transfer.toUserId !== input.userId)
   ) {
-    return ok(null);
-  }
-  try {
-    if (await voidIfIneligible(deps, transfer, input.now)) return ok(null);
-  } catch {
-    return err(TRANSFER_UNAVAILABLE_ERROR);
+    const after = await deps.transfers.findNoticeFor(
+      input.projectId,
+      input.userId,
+    );
+    if (after.isErr()) return err(TRANSFER_UNAVAILABLE_ERROR);
+    return ok(
+      after.value
+        ? toCompletedView(after.value, input.userId, input.now)
+        : null,
+    );
   }
   const view = toView(transfer, input.userId);
   if (view.role === "recipient")

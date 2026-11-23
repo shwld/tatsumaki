@@ -41,6 +41,7 @@ import {
   TRANSFER_PROJECT_DELETING_ERROR,
   type OwnershipTransferError,
 } from "../../application/usecases/ownership-transfer";
+import { ControlPlaneOwnershipTransferSettlementGateway } from "../../infrastructure/entitlements/control-plane-ownership-transfer-settlement-gateway";
 import { ControlPlaneTransferCheckoutExpiryGateway } from "../../infrastructure/entitlements/control-plane-transfer-checkout-expiry-gateway";
 import { D1ProjectOwnershipTransferRepository } from "../../infrastructure/db/repositories/d1-project-ownership-transfer-repository";
 import {
@@ -403,6 +404,16 @@ const ownershipTransferErrorResponse = (error: OwnershipTransferError) => {
   }
 };
 
+export const createTransferSettlement = (bindings: Bindings) =>
+  bindings.ENTITLEMENT_MODE === "control-plane" && bindings.CONTROL_PLANE
+    ? {
+        settlement: new ControlPlaneOwnershipTransferSettlementGateway(
+          bindings.CONTROL_PLANE,
+        ),
+        deletions: new D1ProjectDeletionRequestRepository(bindings.DB),
+      }
+    : undefined;
+
 const transferDeps = (bindings: Bindings) => ({
   projects: new D1ProjectRepository(bindings.DB),
   transfers: new D1ProjectOwnershipTransferRepository(bindings.DB),
@@ -428,6 +439,7 @@ billingRoute.use(
 billingRoute.get(
   "/billing/projects/:projectId/ownership-transfer",
   async (c) => {
+    const settlement = createTransferSettlement(c.env);
     const result = await getOwnershipTransfer(
       {
         ...transferDeps(c.env),
@@ -435,6 +447,7 @@ billingRoute.get(
           c.env.CONTROL_PLANE as NonNullable<Bindings["CONTROL_PLANE"]>,
         ),
         checkoutAvailable: isTransferCheckoutEnabled(c.env),
+        ...(settlement ? { settlement } : {}),
       },
       {
         userId: c.get("currentUser").id,

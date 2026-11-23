@@ -6,6 +6,7 @@ import {
 import { Hono, type Context } from "hono";
 import { recordBurndownSnapshotsAllActiveIterations } from "./application/usecases/burndown-chart";
 import { cleanupArtifactsScheduled } from "./presentation/scheduled/cleanup-artifacts";
+import { recoverOwnershipTransfersScheduled } from "./presentation/scheduled/recover-ownership-transfers";
 import { recoverProjectDeletionsScheduled } from "./presentation/scheduled/recover-project-deletions";
 import { recoverProjectCreationsScheduled } from "./presentation/scheduled/recover-project-creations";
 import { ensureIterationsForAllProjects } from "./presentation/scheduled/ensure-iterations";
@@ -358,6 +359,7 @@ export default {
     ctx.waitUntil(cleanupArtifactsScheduled(env));
     ctx.waitUntil(recoverProjectCreationsScheduled(env));
     ctx.waitUntil(recoverProjectDeletionsScheduled(env));
+    ctx.waitUntil(recoverOwnershipTransfersScheduled(env));
   },
 };
 
