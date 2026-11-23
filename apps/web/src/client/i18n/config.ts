@@ -11,6 +11,10 @@ import {
   billingStatusSectionJa,
 } from "../components/billing-status-section.i18n";
 import {
+  ownershipTransferSectionEn,
+  ownershipTransferSectionJa,
+} from "../components/ownership-transfer-section.i18n";
+import {
   projectSubscriptionSectionEn,
   projectSubscriptionSectionJa,
 } from "../components/project-subscription-section.i18n";
@@ -135,6 +139,7 @@ i18n.use(initReactI18next).init({
         ...layoutJa,
         ...billingStatusSectionJa,
         ...projectSubscriptionSectionJa,
+        ...ownershipTransferSectionJa,
         ...projectBillingBannerJa,
         ...permissionDeniedJa,
         ...errorRetryJa,
@@ -172,6 +177,7 @@ i18n.use(initReactI18next).init({
         ...layoutEn,
         ...billingStatusSectionEn,
         ...projectSubscriptionSectionEn,
+        ...ownershipTransferSectionEn,
         ...projectBillingBannerEn,
         ...permissionDeniedEn,
         ...errorRetryEn,

@@ -35,3 +35,4 @@ export {
 } from "./story-maps";
 export { projectCreationRequestsTable } from "./project-creation-requests";
 export { projectDeletionRequestsTable } from "./project-deletion-requests";
+export { projectOwnershipTransfersTable } from "./project-ownership-transfers";

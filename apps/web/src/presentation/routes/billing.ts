@@ -25,6 +25,19 @@ import {
   startProjectSubscriptionCancel,
 } from "../../application/usecases/start-project-subscription-cancel";
 import {
+  closeOwnershipTransfer,
+  getOwnershipTransfer,
+  requestOwnershipTransfer,
+  TRANSFER_ALREADY_PENDING_ERROR,
+  TRANSFER_FORBIDDEN_ERROR,
+  TRANSFER_INVALID_RECIPIENT_ERROR,
+  TRANSFER_NO_SUBSCRIPTION_ERROR,
+  TRANSFER_NOT_FOUND_ERROR,
+  TRANSFER_NOT_PENDING_ERROR,
+  type OwnershipTransferError,
+} from "../../application/usecases/ownership-transfer";
+import { D1ProjectOwnershipTransferRepository } from "../../infrastructure/db/repositories/d1-project-ownership-transfer-repository";
+import {
   PAYMENT_METHOD_FORBIDDEN_ERROR,
   PAYMENT_METHOD_NO_SUBSCRIPTION_ERROR,
   PAYMENT_METHOD_NOT_FOUND_ERROR,
@@ -307,3 +320,140 @@ billingRoute.post("/billing/projects/:projectId/payment-method", async (c) => {
       );
   }
 });
+
+const ownershipTransferErrorResponse = (error: OwnershipTransferError) => {
+  switch (error) {
+    case TRANSFER_NOT_FOUND_ERROR:
+      return { body: { error: "Project not found" }, status: 404 as const };
+    case TRANSFER_FORBIDDEN_ERROR:
+      return {
+        body: { error: "Not allowed for this transfer" },
+        status: 403 as const,
+      };
+    case TRANSFER_INVALID_RECIPIENT_ERROR:
+      return {
+        body: {
+          error: "Recipient must be another member of the project",
+          code: "invalid_recipient",
+        },
+        status: 422 as const,
+      };
+    case TRANSFER_NO_SUBSCRIPTION_ERROR:
+      return {
+        body: { error: "No active subscription", code: "no_subscription" },
+        status: 409 as const,
+      };
+    case TRANSFER_ALREADY_PENDING_ERROR:
+      return {
+        body: {
+          error: "A transfer is already pending",
+          code: "already_pending",
+        },
+        status: 409 as const,
+      };
+    case TRANSFER_NOT_PENDING_ERROR:
+      return {
+        body: { error: "No pending transfer", code: "not_pending" },
+        status: 409 as const,
+      };
+    default:
+      console.error("Ownership transfer unavailable", { reason: error });
+      return {
+        body: { error: "Ownership transfer is temporarily unavailable" },
+        status: 503 as const,
+      };
+  }
+};
+
+// セルフホストは従来のロール操作を維持するため、課金付き譲渡は公式ホスト版だけ。
+billingRoute.use(
+  "/billing/projects/:projectId/ownership-transfer/*",
+  async (c, next) => {
+    if (c.env.ENTITLEMENT_MODE !== "control-plane" || !c.env.CONTROL_PLANE) {
+      return c.json({ error: "Billing is not available" }, 409);
+    }
+    await next();
+  },
+);
+billingRoute.get(
+  "/billing/projects/:projectId/ownership-transfer",
+  async (c) => {
+    const result = await getOwnershipTransfer(
+      {
+        projects: new D1ProjectRepository(c.env.DB),
+        transfers: new D1ProjectOwnershipTransferRepository(c.env.DB),
+      },
+      {
+        userId: c.get("currentUser").id,
+        projectId: c.req.param("projectId"),
+        now: new Date(),
+      },
+    );
+    if (result.isErr()) {
+      const { body, status } = ownershipTransferErrorResponse(result.error);
+      return c.json(body, status);
+    }
+    return c.json({ transfer: result.value });
+  },
+);
+
+billingRoute.post(
+  "/billing/projects/:projectId/ownership-transfer",
+  async (c) => {
+    const controlPlane = c.env.CONTROL_PLANE;
+    if (!controlPlane)
+      return c.json({ error: "Billing is not available" }, 409);
+    const body = (await c.req.json().catch(() => null)) as {
+      toUserId?: unknown;
+    } | null;
+    if (!body || typeof body.toUserId !== "string" || body.toUserId === "") {
+      return c.json({ error: "toUserId is required" }, 400);
+    }
+    const result = await requestOwnershipTransfer(
+      {
+        projects: new D1ProjectRepository(c.env.DB),
+        transfers: new D1ProjectOwnershipTransferRepository(c.env.DB),
+        billing: new ControlPlaneProjectBillingGateway(controlPlane),
+      },
+      {
+        userId: c.get("currentUser").id,
+        projectId: c.req.param("projectId"),
+        toUserId: body.toUserId,
+        now: new Date(),
+      },
+    );
+    if (result.isErr()) {
+      const response = ownershipTransferErrorResponse(result.error);
+      return c.json(response.body, response.status);
+    }
+    return c.json({ transfer: result.value }, 201);
+  },
+);
+
+for (const [path, as] of [
+  ["cancel", "requester"],
+  ["decline", "recipient"],
+] as const) {
+  billingRoute.post(
+    `/billing/projects/:projectId/ownership-transfer/${path}`,
+    async (c) => {
+      const result = await closeOwnershipTransfer(
+        {
+          projects: new D1ProjectRepository(c.env.DB),
+          transfers: new D1ProjectOwnershipTransferRepository(c.env.DB),
+        },
+        {
+          userId: c.get("currentUser").id,
+          projectId: c.req.param("projectId"),
+          as,
+          now: new Date(),
+        },
+      );
+      if (result.isErr()) {
+        const response = ownershipTransferErrorResponse(result.error);
+        return c.json(response.body, response.status);
+      }
+      return c.json({ ok: true });
+    },
+  );
+}
