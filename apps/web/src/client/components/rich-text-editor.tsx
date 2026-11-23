@@ -103,10 +103,6 @@ function isSafeImageSrc(url: string): boolean {
   if (!trimmed || trimmed.length > 2048 || trimmed !== url) {
     return false;
   }
-  const lower = trimmed.toLowerCase();
-  if (lower.startsWith("javascript:") || lower.startsWith("data:")) {
-    return false;
-  }
   try {
     if (trimmed.startsWith("/")) {
       return trimmed.startsWith("/api/");
