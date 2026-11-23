@@ -28,6 +28,33 @@ const defaultBillingResponse = {
   projectCreation: "checkout",
 };
 
+const defaultAccount = {
+  id: "github|test-user",
+  displayName: "tester",
+  email: "tester@example.com",
+};
+
+type FetchRoutes = Record<string, () => Response>;
+
+const stubFetchRoutes = (overrides: FetchRoutes = {}) => {
+  const routes: FetchRoutes = {
+    "GET /api/auth/me": () => buildJsonResponse(defaultAccount),
+    "GET /api/auth/me/notification-settings": () =>
+      buildJsonResponse(defaultNotificationSettings),
+    "GET /api/billing/entitlement": () =>
+      buildJsonResponse(defaultBillingResponse),
+    ...overrides,
+  };
+  const fetchMock = vi.mocked(fetch);
+  fetchMock.mockImplementation(async (input, init) => {
+    const key = `${init?.method ?? "GET"} ${String(input)}`;
+    const route = routes[key];
+    if (!route) throw new Error(`Unmocked fetch: ${key}`);
+    return route();
+  });
+  return fetchMock;
+};
+
 describe("AccountScreen", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn());
@@ -38,25 +65,14 @@ describe("AccountScreen", () => {
   });
 
   it("loads account data and saves updates", async () => {
-    const fetchMock = vi.mocked(fetch);
-    fetchMock
-      .mockResolvedValueOnce(
+    const fetchMock = stubFetchRoutes({
+      "PATCH /api/auth/me": () =>
         buildJsonResponse({
-          id: "github|test-user",
-          displayName: "tester",
-          email: "tester@example.com",
-        }),
-      )
-      .mockResolvedValueOnce(buildJsonResponse(defaultNotificationSettings))
-      .mockResolvedValueOnce(buildJsonResponse(defaultBillingResponse))
-      .mockResolvedValueOnce(buildJsonResponse({ projects: [] }))
-      .mockResolvedValueOnce(
-        buildJsonResponse({
-          id: "github|test-user",
+          ...defaultAccount,
           displayName: "Test User",
           email: "new@example.com",
         }),
-      );
+    });
 
     render(
       <MemoryRouter initialEntries={["/account"]}>
@@ -98,19 +114,8 @@ describe("AccountScreen", () => {
   });
 
   it("shows validation errors returned by the API", async () => {
-    const fetchMock = vi.mocked(fetch);
-    fetchMock
-      .mockResolvedValueOnce(
-        buildJsonResponse({
-          id: "github|test-user",
-          displayName: "tester",
-          email: "tester@example.com",
-        }),
-      )
-      .mockResolvedValueOnce(buildJsonResponse(defaultNotificationSettings))
-      .mockResolvedValueOnce(buildJsonResponse(defaultBillingResponse))
-      .mockResolvedValueOnce(buildJsonResponse({ projects: [] }))
-      .mockResolvedValueOnce(
+    stubFetchRoutes({
+      "PATCH /api/auth/me": () =>
         buildJsonResponse(
           {
             error: "入力内容を修正してください",
@@ -120,7 +125,7 @@ describe("AccountScreen", () => {
           },
           400,
         ),
-      );
+    });
 
     render(
       <MemoryRouter initialEntries={["/account"]}>
@@ -149,18 +154,7 @@ describe("AccountScreen", () => {
   });
 
   it("shows Cloudflare Access password reset and re-auth links", async () => {
-    const fetchMock = vi.mocked(fetch);
-    fetchMock.mockResolvedValueOnce(
-      buildJsonResponse({
-        id: "github|test-user",
-        displayName: "tester",
-        email: "tester@example.com",
-      }),
-    );
-    fetchMock.mockResolvedValueOnce(
-      buildJsonResponse(defaultNotificationSettings),
-    );
-    fetchMock.mockResolvedValueOnce(buildJsonResponse(defaultBillingResponse));
+    stubFetchRoutes();
 
     render(
       <MemoryRouter initialEntries={["/account"]}>
@@ -185,19 +179,8 @@ describe("AccountScreen", () => {
   });
 
   it("loads and saves notification settings", async () => {
-    const fetchMock = vi.mocked(fetch);
-    fetchMock
-      .mockResolvedValueOnce(
-        buildJsonResponse({
-          id: "github|test-user",
-          displayName: "tester",
-          email: "tester@example.com",
-        }),
-      )
-      .mockResolvedValueOnce(buildJsonResponse(defaultNotificationSettings))
-      .mockResolvedValueOnce(buildJsonResponse(defaultBillingResponse))
-      .mockResolvedValueOnce(buildJsonResponse({ projects: [] }))
-      .mockResolvedValueOnce(
+    const fetchMock = stubFetchRoutes({
+      "PATCH /api/auth/me/notification-settings": () =>
         buildJsonResponse({
           ...defaultNotificationSettings,
           emailEnabled: false,
@@ -206,7 +189,7 @@ describe("AccountScreen", () => {
           notifyOnComment: true,
           notifyOnEstimate: false,
         }),
-      );
+    });
 
     render(
       <MemoryRouter initialEntries={["/account"]}>
@@ -248,17 +231,9 @@ describe("AccountScreen", () => {
     });
   });
   const renderWithEntitlement = (entitlementResponse: Response) => {
-    const fetchMock = vi.mocked(fetch);
-    fetchMock
-      .mockResolvedValueOnce(
-        buildJsonResponse({
-          id: "github|test-user",
-          displayName: "tester",
-          email: "tester@example.com",
-        }),
-      )
-      .mockResolvedValueOnce(buildJsonResponse(defaultNotificationSettings))
-      .mockResolvedValueOnce(entitlementResponse);
+    stubFetchRoutes({
+      "GET /api/billing/entitlement": () => entitlementResponse,
+    });
 
     render(
       <MemoryRouter initialEntries={["/account"]}>
