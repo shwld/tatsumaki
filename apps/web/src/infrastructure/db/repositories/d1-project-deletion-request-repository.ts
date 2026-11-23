@@ -44,11 +44,12 @@ export class D1ProjectDeletionRequestRepository
       if (inserted.meta.changes > 0) {
         return ok(true);
       }
-      // 既存の要求は別の owner のものかもしれないため、行の有無ではなく要求者の現在の権限で判定する。
+      // 既存の要求は別の owner のものかもしれないため、行の有無ではなく要求者の現在の権限と要求の保存を 1 文で確認する。
       const owner = await this.d1
         .prepare(
-          `SELECT 1 AS ok FROM project_members
-           WHERE project_id = ?1 AND user_id = ?2 AND role = 'owner'`,
+          `SELECT 1 AS ok FROM project_members m
+           JOIN project_deletion_requests d ON d.project_id = m.project_id
+           WHERE m.project_id = ?1 AND m.user_id = ?2 AND m.role = 'owner'`,
         )
         .bind(input.projectId, input.requestedByUserId)
         .first();
