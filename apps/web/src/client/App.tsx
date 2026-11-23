@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Navigate, Route, Routes, useNavigate } from "react-router";
 
 import { Layout } from "./components/layout";
+import { PageTitle } from "./components/page-title";
 import { OnboardingGate } from "./components/onboarding-gate";
 import { AuthErrorProvider } from "./contexts/auth-error-context";
 import { ProjectBillingScope } from "./contexts/project-billing-context";
@@ -60,7 +61,14 @@ function NotFoundScreen() {
 export function App() {
   return (
     <Routes>
-      <Route path="/login" element={<LoginScreen />} />
+      <Route
+        path="/login"
+        element={
+          <PageTitle titleKey="loginScreen.login">
+            <LoginScreen />
+          </PageTitle>
+        }
+      />
       <Route
         path="*"
         element={
@@ -73,86 +81,187 @@ export function App() {
                     <Routes>
                       <Route
                         path="/invite"
-                        element={<SingleUseInvitationAcceptScreen />}
+                        element={
+                          <PageTitle titleKey="pageTitle.projectInvitation">
+                            <SingleUseInvitationAcceptScreen />
+                          </PageTitle>
+                        }
                       />
                       <Route
                         path="/projects/new"
-                        element={<ProjectCreateScreen />}
+                        element={
+                          <PageTitle titleKey="projectCreateScreen.title">
+                            <ProjectCreateScreen />
+                          </PageTitle>
+                        }
                       />
                       <Route
                         path="/projects/new/complete"
-                        element={<ProjectCreateCompleteScreen />}
+                        element={
+                          <PageTitle titleKey="projectCreateCompleteScreen.title">
+                            <ProjectCreateCompleteScreen />
+                          </PageTitle>
+                        }
                       />
-                      <Route path="/projects" element={<ProjectListScreen />} />
+                      <Route
+                        path="/projects"
+                        element={
+                          <PageTitle titleKey="projectListScreen.title">
+                            <ProjectListScreen />
+                          </PageTitle>
+                        }
+                      />
                       <Route
                         path="/projects/:projectId/members"
-                        element={<ProjectMembersScreen />}
+                        element={
+                          <PageTitle titleKey="projectMembersScreen.title">
+                            <ProjectMembersScreen />
+                          </PageTitle>
+                        }
                       />
                       <Route
                         path="/projects/:projectId/members/invitations"
-                        element={<ProjectInvitationsScreen />}
+                        element={
+                          <PageTitle titleKey="projectInvitationsScreen.title">
+                            <ProjectInvitationsScreen />
+                          </PageTitle>
+                        }
                       />
                       <Route
                         path="/projects/:projectId/labels"
-                        element={<ProjectLabelsScreen />}
+                        element={
+                          <PageTitle titleKey="projectLabelsScreen.title">
+                            <ProjectLabelsScreen />
+                          </PageTitle>
+                        }
                       />
                       <Route
                         path="/projects/:projectId/epics"
-                        element={<ProjectEpicsScreen />}
+                        element={
+                          <PageTitle titleKey="projectEpicsScreen.title">
+                            <ProjectEpicsScreen />
+                          </PageTitle>
+                        }
                       />
                       <Route
                         path="/projects/:projectId/epics/:labelId"
-                        element={<ProjectEpicDetailScreen />}
+                        element={
+                          <PageTitle titleKey="pageTitle.epicDetail">
+                            <ProjectEpicDetailScreen />
+                          </PageTitle>
+                        }
                       />
                       <Route
                         path="/projects/:projectId/story-maps"
-                        element={<ProjectStoryMapsScreen />}
+                        element={
+                          <PageTitle titleKey="projectStoryMapsScreen.title">
+                            <ProjectStoryMapsScreen />
+                          </PageTitle>
+                        }
                       />
                       <Route
                         path="/projects/:projectId/story-maps/:mapId"
-                        element={<StoryMapEditScreen />}
+                        element={
+                          <PageTitle titleKey="projectStoryMapsScreen.title">
+                            <StoryMapEditScreen />
+                          </PageTitle>
+                        }
                       />
                       <Route
                         path="/projects/:projectId/story-maps/:mapId/edit"
-                        element={<StoryMapMetaEditScreen />}
+                        element={
+                          <PageTitle titleKey="pageTitle.storyMapEdit">
+                            <StoryMapMetaEditScreen />
+                          </PageTitle>
+                        }
                       />
                       <Route
                         path="/projects/:projectId/invitations/:invitationId/accept"
-                        element={<ProjectInvitationAcceptScreen />}
+                        element={
+                          <PageTitle titleKey="pageTitle.projectInvitation">
+                            <ProjectInvitationAcceptScreen />
+                          </PageTitle>
+                        }
                       />
                       <Route
                         path="/projects/:projectId/settings"
-                        element={<ProjectSettingsScreen />}
+                        element={
+                          <PageTitle titleKey="projectSettingsScreen.title">
+                            <ProjectSettingsScreen />
+                          </PageTitle>
+                        }
                       />
                       <Route
                         path="/projects/:projectId/api-keys"
-                        element={<ProjectApiKeysScreen />}
+                        element={
+                          <PageTitle titleKey="pageTitle.apiKeys">
+                            <ProjectApiKeysScreen />
+                          </PageTitle>
+                        }
                       />
                       <Route
                         path="/projects/:projectId/velocity"
-                        element={<ProjectVelocityScreen />}
+                        element={
+                          <PageTitle titleKey="projectVelocityScreen.title">
+                            <ProjectVelocityScreen />
+                          </PageTitle>
+                        }
                       />{" "}
                       <Route
                         path="/projects/:projectId/history"
-                        element={<ProjectHistoryScreen />}
+                        element={
+                          <PageTitle titleKey="projectHistoryScreen.title">
+                            <ProjectHistoryScreen />
+                          </PageTitle>
+                        }
                       />
                       <Route
                         path="/projects/:projectId/artifacts"
-                        element={<ArtifactListScreen />}
+                        element={
+                          <PageTitle titleKey="artifactScreens.list.title">
+                            <ArtifactListScreen />
+                          </PageTitle>
+                        }
                       />
                       <Route
                         path="/projects/:projectId/artifacts/:artifactId"
-                        element={<ArtifactDetailScreen />}
+                        element={
+                          <PageTitle titleKey="pageTitle.artifactDetail">
+                            <ArtifactDetailScreen />
+                          </PageTitle>
+                        }
                       />
                       <Route
                         path="/projects/:projectId/artifacts/:artifactId/versions/:version"
-                        element={<ArtifactDetailScreen />}
+                        element={
+                          <PageTitle titleKey="pageTitle.artifactDetail">
+                            <ArtifactDetailScreen />
+                          </PageTitle>
+                        }
                       />
-                      <Route path="/account" element={<AccountScreen />} />
-                      <Route path="/install" element={<InstallScreen />} />
+                      <Route
+                        path="/account"
+                        element={
+                          <PageTitle titleKey="layout.menu.account">
+                            <AccountScreen />
+                          </PageTitle>
+                        }
+                      />
+                      <Route
+                        path="/install"
+                        element={
+                          <PageTitle titleKey="installScreen.title">
+                            <InstallScreen />
+                          </PageTitle>
+                        }
+                      />
                       <Route
                         path="/projects/:projectId"
-                        element={<StoryMultiPanelScreen />}
+                        element={
+                          <PageTitle titleKey="projectNav.stories">
+                            <StoryMultiPanelScreen />
+                          </PageTitle>
+                        }
                       />
                       <Route
                         path="/projects/:projectId/stories"
@@ -160,11 +269,19 @@ export function App() {
                       />
                       <Route
                         path="/projects/:projectId/stories/:storyNumber"
-                        element={<StoryDetailScreen />}
+                        element={
+                          <PageTitle titleKey="pageTitle.storyDetail">
+                            <StoryDetailScreen />
+                          </PageTitle>
+                        }
                       />
                       <Route
                         path="/projects/:projectId/planning-poker"
-                        element={<NotFoundScreen />}
+                        element={
+                          <PageTitle titleKey="pageTitle.notFound">
+                            <NotFoundScreen />
+                          </PageTitle>
+                        }
                       />
                       <Route
                         path="/projects/:projectId/stories/new"
@@ -172,7 +289,11 @@ export function App() {
                       />
                       <Route
                         path="/projects/:projectId/stories/:storyNumber/edit"
-                        element={<StoryEditScreen />}
+                        element={
+                          <PageTitle titleKey="storyEditScreen.title">
+                            <StoryEditScreen />
+                          </PageTitle>
+                        }
                       />
                       {/* Legacy redirects — single-line for lint-screenshot-coverage */}
                       <Route

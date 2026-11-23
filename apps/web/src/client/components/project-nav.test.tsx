@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { Link, MemoryRouter } from "react-router";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { Layout } from "./layout";
-import { resetProjectNavCacheForTests } from "./project-nav";
+import { resetProjectNameCacheForTests } from "../contexts/project-name-context";
 
 function setWidth(width: number) {
   Object.defineProperty(window, "innerWidth", {
@@ -32,7 +32,7 @@ function setup(path: string) {
 }
 
 beforeEach(() => {
-  resetProjectNavCacheForTests();
+  resetProjectNameCacheForTests();
   setWidth(1280);
 });
 afterEach(() => vi.restoreAllMocks());

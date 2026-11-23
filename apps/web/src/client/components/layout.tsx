@@ -3,6 +3,7 @@ import { Bell, Tornado } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "react-router";
 import { HeaderToolbarContext } from "./header-toolbar";
+import { ProjectNameScope } from "../contexts/project-name-context";
 import { ProjectNav } from "./project-nav";
 import { useScrollHeader } from "../hooks/use-scroll-header";
 import type { Notification } from "../types/notification";
@@ -82,6 +83,14 @@ function resolveNotificationPath(notification: Notification): string | null {
 }
 
 export function Layout({ children }: LayoutProps) {
+  return (
+    <ProjectNameScope>
+      <LayoutContent>{children}</LayoutContent>
+    </ProjectNameScope>
+  );
+}
+
+function LayoutContent({ children }: LayoutProps) {
   const { t, i18n } = useTranslation();
   const { pathname } = useLocation();
   const [toolbarHost, setToolbarHost] = useState<HTMLDivElement | null>(null);

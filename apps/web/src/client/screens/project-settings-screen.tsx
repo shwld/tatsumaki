@@ -7,6 +7,7 @@ import { ProjectSection } from "../components/project-section";
 import { OwnershipTransferSection } from "../components/ownership-transfer-section";
 import { ProjectSubscriptionSection } from "../components/project-subscription-section";
 import { useAuthError } from "../contexts/auth-error-context";
+import { useProjectName } from "../contexts/project-name-context";
 import { useToast } from "../contexts/toast-context";
 import { isAuthError } from "../lib/api-error";
 import {
@@ -35,6 +36,7 @@ export function ProjectSettingsScreen() {
   const navigate = useNavigate();
   const { notifySessionExpired } = useAuthError();
   const { showToast } = useToast();
+  const { refresh: refreshProjectName } = useProjectName();
   const [project, setProject] = useState<Project | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -137,6 +139,9 @@ export function ProjectSettingsScreen() {
 
         const data = (await response.json()) as { project?: Project };
         if (data.project) {
+          if (data.project.name !== project?.name) {
+            refreshProjectName();
+          }
           setProject(data.project);
         }
         showToast("success", t("projectSettingsScreen.toast.projectUpdated"));
@@ -153,6 +158,8 @@ export function ProjectSettingsScreen() {
       descriptionInput,
       isPublicInput,
       timezoneInput,
+      project?.name,
+      refreshProjectName,
       notifySessionExpired,
       showToast,
       t,
