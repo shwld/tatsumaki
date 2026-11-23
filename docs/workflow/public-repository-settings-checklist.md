@@ -6,7 +6,7 @@
 
 - `main` に branch protection または ruleset を設定する
 - Pull Request review を必須にする
-- Required status checks に `CI / check`, release 関連 check, `Scorecard / OpenSSF Scorecard` を追加する
+- Required status checks に `CI / check`, release 関連 check を追加する（Scorecard は PR で動かないため含めない）
 - Conversation resolution を必須にする
 - Force push と branch deletion を許可しない
 - 管理者 bypass を許可する場合も、通常運用では Pull Request を使う
@@ -16,7 +16,7 @@
 - Private vulnerability reporting を有効化する
 - Dependabot alerts と Dependabot security updates を有効化する
 - Secret scanning と push protection を有効化する
-- Code scanning alerts に OpenSSF Scorecard SARIF が届くことを確認する
+- Scorecard workflow（週次と main push）の SARIF が Code scanning alerts に届くことを確認する
 
 ## Repository Presentation
 
