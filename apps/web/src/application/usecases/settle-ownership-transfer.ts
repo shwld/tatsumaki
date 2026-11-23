@@ -100,8 +100,13 @@ export async function reconcilePendingTransfer(
     const deletion = await deps.deletions.findById(transfer.projectId);
     if (deletion.isErr()) return "unavailable";
 
+    // 決済の確認に時間がかかるため、期限と日割りの起点は切り替える時点で測る。
+    const at = new Date();
     if (payment.previousSubscriptionLive && !deletion.value) {
-      const completed = await deps.transfers.complete({ id: transfer.id, now });
+      const completed = await deps.transfers.complete({
+        id: transfer.id,
+        now: at,
+      });
       if (completed.isErr()) return "unavailable";
       if (completed.value) return "switched";
       const latest = await deps.transfers.findById(transfer.id);
@@ -111,7 +116,7 @@ export async function reconcilePendingTransfer(
     const closed = await deps.transfers.close({
       id: transfer.id,
       status: "cancelled",
-      now,
+      now: at,
     });
     return closed.isOk() ? "not-switched" : "unavailable";
   } catch {
@@ -151,12 +156,14 @@ export async function recoverOwnershipTransfers(
   const pendingTransfers = pending.isOk() ? pending.value : [];
   for (const transfer of pendingTransfers) {
     await advanceOwnershipTransfer(deps, transfer, now);
+    await deps.transfers.markAttempt(transfer.id, now);
   }
 
   const unsettled = await deps.transfers.listUnsettled(RECOVERY_BATCH);
   const unsettledTransfers = unsettled.isOk() ? unsettled.value : [];
   for (const transfer of unsettledTransfers) {
     await settleTransfer(deps, transfer, now);
+    await deps.transfers.markAttempt(transfer.id, now);
   }
   return {
     pending: pendingTransfers.length,

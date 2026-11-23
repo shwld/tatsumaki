@@ -80,12 +80,12 @@ export interface ProjectOwnershipTransferRepository {
   expireOverdue(
     now: Date,
   ): Promise<Result<void, OwnershipTransferRepositoryError>>;
-  /** 期限内の有効な申請を、古い順に最大 limit 件返す。 */
+  /** 期限内の有効な申請を、確認が古い順に最大 limit 件返す。 */
   listPending(
     now: Date,
     limit: number,
   ): Promise<Result<OwnershipTransfer[], OwnershipTransferRepositoryError>>;
-  /** 精算が済んでいない申請を、古い順に最大 limit 件返す。 */
+  /** 精算が済んでいない申請を、確認が古い順に最大 limit 件返す。 */
   listUnsettled(
     limit: number,
   ): Promise<Result<OwnershipTransfer[], OwnershipTransferRepositoryError>>;
@@ -98,6 +98,11 @@ export interface ProjectOwnershipTransferRepository {
     id: string;
     now: Date;
   }): Promise<Result<boolean, OwnershipTransferRepositoryError>>;
+  /** 定期ジョブが確認した印を付け、次の確認を他の申請に譲る。 */
+  markAttempt(
+    id: string,
+    now: Date,
+  ): Promise<Result<void, OwnershipTransferRepositoryError>>;
   /** 精算の結果を記録する。 */
   markSettlement(input: {
     id: string;

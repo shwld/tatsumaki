@@ -67,6 +67,8 @@ export type OwnershipTransferView = {
    * 処理中。completed: 解約・返金まで完了。review: 自動では返金できず運営が調査する。
    */
   state: "pending" | "processing" | "completed" | "review";
+  /** pending 以外の状態で、所有者を切り替えたか。切り替えなかった譲渡では受け手の返金だけを扱う。 */
+  outcome?: "switched" | "not-switched";
   /** 受け手の画面だけ。受け手自身の購読が有効か。確認できなければ null。 */
   recipientSubscribed?: boolean | null;
   /** 受け手の画面だけ。購読の Checkout を開始できるか。 */
@@ -92,26 +94,38 @@ const toCompletedView = (
   userId: string,
   now: Date,
 ): OwnershipTransferView | null => {
-  if (
-    transfer.status !== "completed" ||
-    (transfer.fromUserId !== userId && transfer.toUserId !== userId)
-  ) {
-    return null;
+  const isParty =
+    transfer.fromUserId === userId || transfer.toUserId === userId;
+  if (!isParty) return null;
+  if (transfer.status === "completed") {
+    const state =
+      transfer.settlementStatus === "review"
+        ? "review"
+        : transfer.settlementStatus === "pending"
+          ? "processing"
+          : "completed";
+    const endedAt = transfer.endedAt ? new Date(transfer.endedAt).getTime() : 0;
+    if (
+      state === "completed" &&
+      now.getTime() - endedAt >= COMPLETED_VISIBLE_MS
+    ) {
+      return null;
+    }
+    return { ...toView(transfer, userId), state, outcome: "switched" };
   }
-  const state =
-    transfer.settlementStatus === "review"
-      ? "review"
-      : transfer.settlementStatus === "pending"
-        ? "processing"
-        : "completed";
-  const endedAt = transfer.endedAt ? new Date(transfer.endedAt).getTime() : 0;
+  // 譲渡が成立しなかった場合に見せるのは、返金を自動では処理できなかった受け手だけ。
   if (
-    state === "completed" &&
-    now.getTime() - endedAt >= COMPLETED_VISIBLE_MS
+    transfer.settlementOutcome === "not-switched" &&
+    transfer.settlementStatus === "review" &&
+    transfer.toUserId === userId
   ) {
-    return null;
+    return {
+      ...toView(transfer, userId),
+      state: "review",
+      outcome: "not-switched",
+    };
   }
-  return { ...toView(transfer, userId), state };
+  return null;
 };
 
 /**

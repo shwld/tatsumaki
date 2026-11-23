@@ -13,6 +13,7 @@ type Transfer = {
   expiresAt: string;
   role: "requester" | "recipient";
   state: "pending" | "processing" | "completed" | "review";
+  outcome?: "switched" | "not-switched";
   recipientSubscribed?: boolean | null;
   checkoutAvailable?: boolean;
 };
@@ -55,9 +56,12 @@ const RETURN_POLL_MAX_ATTEMPTS = 10;
 export function OwnershipTransferSection({
   projectId,
   isOwner,
+  onOwnershipSwitched,
 }: {
   projectId: string;
   isOwner: boolean;
+  /** 所有者が切り替わったことをこの画面で初めて確認したとき。権限に依存する表示を取り直させる。 */
+  onOwnershipSwitched?: () => void;
 }) {
   const { t, i18n } = useTranslation();
   const { notifySessionExpired } = useAuthError();
@@ -127,6 +131,21 @@ export function OwnershipTransferSection({
   }, [base, notifySessionExpired, attempt]);
 
   const reload = useCallback(() => setAttempt((value) => value + 1), []);
+
+  const transferState = state.status === "ready" ? state.transfer : null;
+  const previousTransferState = useRef<string | null>(null);
+  useEffect(() => {
+    const current = transferState?.state ?? null;
+    if (
+      previousTransferState.current === "pending" &&
+      current !== null &&
+      current !== "pending" &&
+      transferState?.outcome === "switched"
+    ) {
+      onOwnershipSwitched?.();
+    }
+    previousTransferState.current = current;
+  }, [transferState, onOwnershipSwitched]);
 
   // 購読の反映は決済の後に遅れる。戻り先や別タブに依らず、確認できるまで(確認不能も含め)取り直す。
   const awaitingPayment =
@@ -247,22 +266,7 @@ export function OwnershipTransferSection({
               {t("ownershipTransferSection.retry")}
             </button>
           </div>
-        ) : state.transfer && state.transfer.state !== "pending" ? (
-          <div className="space-y-2">
-            <p className="font-semibold text-gray-900">
-              {t(
-                `ownershipTransferSection.${state.transfer.state}.${state.transfer.role}`,
-                {
-                  name: nameOf(
-                    state.transfer.role === "requester"
-                      ? state.transfer.toUserId
-                      : state.transfer.fromUserId,
-                  ),
-                },
-              )}
-            </p>
-          </div>
-        ) : state.transfer ? (
+        ) : state.transfer && state.transfer.state === "pending" ? (
           <div className="space-y-2">
             <p className="font-semibold text-gray-900">
               {state.transfer.role === "requester"
@@ -321,8 +325,30 @@ export function OwnershipTransferSection({
           </div>
         ) : (
           <div className="space-y-3">
-            <p>{t("ownershipTransferSection.description")}</p>
-            {membersLoading ? (
+            {state.transfer ? (
+              <div className="space-y-2">
+                <p className="font-semibold text-gray-900">
+                  {t(
+                    `ownershipTransferSection.${
+                      state.transfer.outcome === "not-switched"
+                        ? "refundReview"
+                        : state.transfer.state
+                    }.${state.transfer.role}`,
+                    {
+                      name: nameOf(
+                        state.transfer.role === "requester"
+                          ? state.transfer.toUserId
+                          : state.transfer.fromUserId,
+                      ),
+                    },
+                  )}
+                </p>
+              </div>
+            ) : null}
+            {state.transfer && !isOwner ? null : (
+              <p>{t("ownershipTransferSection.description")}</p>
+            )}
+            {state.transfer && !isOwner ? null : membersLoading ? (
               <p>{t("ownershipTransferSection.loading")}</p>
             ) : membersError ? (
               <p role="alert" className="text-red-600">

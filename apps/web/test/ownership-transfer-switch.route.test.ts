@@ -457,7 +457,63 @@ describe("ownership transfer switch", () => {
     });
   });
 
+  describe("a transfer that did not switch but left a refund to review", () => {
+    it("tells only the recipient who paid", async () => {
+      const { call, bindings, state } = setup();
+      const { projectId, transferId } = await seedTransfer(call);
+      await call("bob", projectId, "POST", "/decline", { transferId });
+      state.settlement = {
+        status: "review",
+        reviewReason: "refund_rejected:x",
+      };
+      await recoverOwnershipTransfersScheduled(bindings);
+
+      expect(await viewOf(await call("bob", projectId, "GET"))).toMatchObject({
+        state: "review",
+        outcome: "not-switched",
+        role: "recipient",
+      });
+      expect(await viewOf(await call("owner", projectId, "GET"))).toBeNull();
+    });
+  });
+
   describe("recovery job", () => {
+    it("rotates the batch so a newer transfer is not starved by older ones", async () => {
+      const { call, bindings, state, confirmTransferPayment } = setup();
+      const first = await seedTransfer(call);
+      const second = await seedTransfer(call);
+      void first;
+      state.payment.recipientSubscribed = false;
+
+      await recoverOwnershipTransfersScheduled(bindings);
+      const rows = await env.DB.prepare(
+        "select id, updated_at as touched from project_ownership_transfers order by id",
+      ).all<{ id: string; touched: string }>();
+      expect(rows.results).toHaveLength(2);
+      expect(confirmTransferPayment).toHaveBeenCalledTimes(2);
+      expect(second.projectId).not.toBe(first.projectId);
+    });
+
+    it("keeps an unsettled refund recoverable after the project is deleted", async () => {
+      const { call, bindings, state, settleOwnershipTransfer } = setup();
+      const { projectId, transferId } = await seedTransfer(call);
+      await call("bob", projectId, "POST", "/decline", { transferId });
+      await env.DB.prepare("delete from projects where id = ?")
+        .bind(projectId)
+        .run();
+
+      state.settlement = {
+        status: "review",
+        reviewReason: "refund_rejected:x",
+      };
+      await recoverOwnershipTransfersScheduled(bindings);
+
+      expect(await transferRow(transferId)).toMatchObject({
+        settlement: "review",
+      });
+      expect(settleOwnershipTransfer).toHaveBeenCalled();
+    });
+
     it("completes a paid transfer nobody has opened", async () => {
       const { call, bindings, state } = setup();
       const { projectId, transferId } = await seedTransfer(call);

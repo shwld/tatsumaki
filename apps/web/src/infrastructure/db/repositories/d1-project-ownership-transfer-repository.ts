@@ -215,7 +215,7 @@ export class D1ProjectOwnershipTransferRepository
             gt(table.expiresAt, now.toISOString()),
           ),
         )
-        .orderBy(asc(table.createdAt))
+        .orderBy(asc(table.updatedAt), asc(table.id))
         .limit(limit)
         .all();
       return ok(rows.map(toTransfer));
@@ -232,7 +232,7 @@ export class D1ProjectOwnershipTransferRepository
         .select()
         .from(table)
         .where(eq(table.settlementStatus, "pending"))
-        .orderBy(asc(table.endedAt))
+        .orderBy(asc(table.updatedAt), asc(table.id))
         .limit(limit)
         .all();
       return ok(rows.map(toTransfer));
@@ -259,7 +259,9 @@ export class D1ProjectOwnershipTransferRepository
                              AND m.user_id = project_ownership_transfers.from_user_id AND m.role = 'owner')
                AND EXISTS (SELECT 1 FROM project_members m
                            WHERE m.project_id = project_ownership_transfers.project_id
-                             AND m.user_id = project_ownership_transfers.to_user_id)`,
+                             AND m.user_id = project_ownership_transfers.to_user_id)
+               AND NOT EXISTS (SELECT 1 FROM project_deletion_requests d
+                               WHERE d.project_id = project_ownership_transfers.project_id)`,
           )
           .bind(nowIso, input.id),
         this.d1
@@ -280,6 +282,21 @@ export class D1ProjectOwnershipTransferRepository
           .bind(input.id, nowIso),
       ]);
       return ok((completed?.meta.changes ?? 0) > 0);
+    } catch {
+      return err(OWNERSHIP_TRANSFER_REPOSITORY_ERROR);
+    }
+  }
+
+  async markAttempt(
+    id: string,
+    now: Date,
+  ): Promise<Result<void, OwnershipTransferRepositoryError>> {
+    try {
+      await this.db
+        .update(table)
+        .set({ updatedAt: now.toISOString() })
+        .where(eq(table.id, id));
+      return ok(undefined);
     } catch {
       return err(OWNERSHIP_TRANSFER_REPOSITORY_ERROR);
     }

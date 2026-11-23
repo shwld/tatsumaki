@@ -151,6 +151,79 @@ describe("OwnershipTransferSection", () => {
     expect(screen.queryByRole("button", { name: "辞退する" })).toBeNull();
   });
 
+  it("tells the recipient their payment was not refunded when the transfer did not go through", async () => {
+    routes({
+      ...pendingTransfer("recipient"),
+      state: "review",
+      outcome: "not-switched",
+    });
+    renderSection(false);
+    expect(
+      await screen.findByText(/返金を自動では処理できませんでした/),
+    ).toBeTruthy();
+    expect(screen.queryByText(/所有権を .* に移しました/)).toBeNull();
+  });
+
+  it("lets the new owner start another transfer after one completed", async () => {
+    routes({
+      ...pendingTransfer("recipient"),
+      state: "completed",
+      outcome: "switched",
+    });
+    renderSection(true);
+    expect(await screen.findByText(/所有権の譲渡が完了しました/)).toBeTruthy();
+    expect(await screen.findByLabelText("譲渡先のメンバー")).toBeTruthy();
+  });
+
+  it("does not offer a new transfer to a member who is no longer the owner", async () => {
+    routes({
+      ...pendingTransfer("requester"),
+      state: "completed",
+      outcome: "switched",
+    });
+    renderSection(false);
+    expect(await screen.findByText(/譲渡しました/)).toBeTruthy();
+    expect(screen.queryByLabelText("譲渡先のメンバー")).toBeNull();
+  });
+
+  it("asks the page to refresh permissions when it first sees the ownership switch", async () => {
+    let current: unknown = {
+      ...pendingTransfer("recipient"),
+      recipientSubscribed: false,
+    };
+    vi.mocked(fetch).mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === "/api/billing/entitlement")
+        return json({ mode: "control-plane" });
+      if (url === "/api/auth/me") return json({ id: "bob" });
+      if (url === "/api/projects/p1/members") return json(members);
+      return json({ transfer: current });
+    });
+    const onSwitched = vi.fn();
+    const view = render(
+      <MemoryRouter>
+        <AuthErrorProvider>
+          <OwnershipTransferSection
+            projectId="p1"
+            isOwner={false}
+            onOwnershipSwitched={onSwitched}
+          />
+        </AuthErrorProvider>
+      </MemoryRouter>,
+    );
+    await screen.findByText(/月額 3,850 円/);
+    expect(onSwitched).not.toHaveBeenCalled();
+
+    current = {
+      ...pendingTransfer("recipient"),
+      state: "processing",
+      outcome: "switched",
+    };
+    fireEvent(window, new Event("focus"));
+    await waitFor(() => expect(onSwitched).toHaveBeenCalledTimes(1));
+    view.unmount();
+  });
+
   it("explains a rejected request from a non-payer", async () => {
     routes(null, "control-plane", {
       "POST /api/billing/projects/p1/ownership-transfer": () =>

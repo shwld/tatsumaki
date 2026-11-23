@@ -43,6 +43,10 @@ export const ownershipTransferSectionJa = {
       recipient:
         "所有権の譲渡は完了しましたが、{{name}} さんの購読の返金を自動では処理できませんでした。運営が確認しています。",
     },
+    refundReview: {
+      recipient:
+        "所有権の譲渡は成立しませんでしたが、お支払いの返金を自動では処理できませんでした。運営が確認しています。",
+    },
     expiresAt: "有効期限: {{date}}",
     errors: {
       generic: "操作できませんでした。時間をおいてもう一度お試しください。",
@@ -104,6 +108,10 @@ export const ownershipTransferSectionEn = {
         "Ownership moved to {{name}}, but we could not process your refund automatically. Our team is looking into it.",
       recipient:
         "The ownership transfer is complete, but we could not process {{name}}'s refund automatically. Our team is looking into it.",
+    },
+    refundReview: {
+      recipient:
+        "The ownership transfer did not go through, but we could not refund your payment automatically. Our team is looking into it.",
     },
     expiresAt: "Expires: {{date}}",
     errors: {

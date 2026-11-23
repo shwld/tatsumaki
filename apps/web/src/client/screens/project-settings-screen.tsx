@@ -39,6 +39,7 @@ export function ProjectSettingsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [roleRefresh, setRoleRefresh] = useState(0);
 
   const [nameInput, setNameInput] = useState("");
   const [descriptionInput, setDescriptionInput] = useState("");
@@ -93,7 +94,7 @@ export function ProjectSettingsScreen() {
     };
 
     fetchProject();
-  }, [projectId, notifySessionExpired]);
+  }, [projectId, notifySessionExpired, roleRefresh]);
 
   const handleGeneralSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
@@ -698,6 +699,7 @@ export function ProjectSettingsScreen() {
             key={projectId}
             projectId={projectId}
             isOwner={isOwner}
+            onOwnershipSwitched={() => setRoleRefresh((value) => value + 1)}
           />
         ) : null}
 
