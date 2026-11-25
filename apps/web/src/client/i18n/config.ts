@@ -29,10 +29,6 @@ import {
   projectCreateFormJa,
 } from "../components/project-create-form.i18n";
 import {
-  releaseMarkerCreateDialogEn,
-  releaseMarkerCreateDialogJa,
-} from "../components/release-marker-create-dialog.i18n";
-import {
   storyDeleteConfirmDialogEn,
   storyDeleteConfirmDialogJa,
 } from "../components/story-delete-confirm-dialog.i18n";
@@ -163,7 +159,6 @@ i18n.use(initReactI18next).init({
         ...storyMultiPanelScreenJa,
         ...storyEditScreenJa,
         ...storyDeleteConfirmDialogJa,
-        ...releaseMarkerCreateDialogJa,
         ...epicCreateDialogJa,
         ...storyPanelJa,
         ...storyAccordionJa,
@@ -202,7 +197,6 @@ i18n.use(initReactI18next).init({
         ...storyMultiPanelScreenEn,
         ...storyEditScreenEn,
         ...storyDeleteConfirmDialogEn,
-        ...releaseMarkerCreateDialogEn,
         ...epicCreateDialogEn,
         ...storyPanelEn,
         ...storyAccordionEn,

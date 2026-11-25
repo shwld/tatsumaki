@@ -42,7 +42,6 @@ import {
 } from "../components/saved-searches";
 import { ShortcutHelpDialog } from "../components/shortcut-help-dialog";
 import { StoryDeleteConfirmDialog } from "../components/story-delete-confirm-dialog";
-import { ReleaseMarkerCreateDialog } from "../components/release-marker-create-dialog";
 import { StoryAccordionDetail } from "../components/story-accordion-detail";
 import { StoryAccordionSubHeader } from "../components/story-accordion-sub-header";
 import { PlanningPokerPanel } from "../components/planning-poker-panel";
@@ -111,16 +110,14 @@ import {
   type StoryType,
 } from "../types/story";
 
-/** Inline create excludes release (release markers use a separate dialog). */
-const INLINE_CREATABLE_STORY_TYPES = STORY_TYPES.filter(
-  (t): t is Exclude<StoryType, "release"> => t !== "release",
-);
+const NON_RELEASE_STORY_TYPES = STORY_TYPES.filter((t) => t !== "release");
 
 type InlineCreateError =
   | {
       type: "translation";
       key:
         | "storyMultiPanelScreen.create.requiredTitle"
+        | "storyMultiPanelScreen.create.requiredReleaseName"
         | "storyMultiPanelScreen.create.currentUnavailable"
         | "storyMultiPanelScreen.create.invalidResponse"
         | "storyMultiPanelScreen.create.requestFailed";
@@ -232,13 +229,6 @@ export function StoryMultiPanelScreen() {
   );
   const [deletingStoryId, setDeletingStoryId] = useState<string | null>(null);
 
-  // Release marker creation
-  const [showReleaseMarkerDialog, setShowReleaseMarkerDialog] = useState(false);
-  const [creatingReleaseMarker, setCreatingReleaseMarker] = useState(false);
-  const [releaseMarkerError, setReleaseMarkerError] = useState<string | null>(
-    null,
-  );
-
   // Advanced search bar toggle
   const [showSearchBar, setShowSearchBar] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -252,9 +242,11 @@ export function StoryMultiPanelScreen() {
   const [createTargetPanel, setCreateTargetPanel] =
     useState<CreateTargetPanel | null>(null);
   const [createTitle, setCreateTitle] = useState("");
-  const [createStoryType, setCreateStoryType] =
-    useState<Exclude<StoryType, "release">>("feature");
+  const [createStoryType, setCreateStoryType] = useState<StoryType>("feature");
+  const [createReleaseDate, setCreateReleaseDate] = useState("");
   const [createSubmitting, setCreateSubmitting] = useState(false);
+  const createSubmittingRef = useRef(false);
+  const createFormRef = useRef<HTMLFormElement>(null);
   const [createError, setCreateError] = useState<InlineCreateError | null>(
     null,
   );
@@ -504,50 +496,6 @@ export function StoryMultiPanelScreen() {
     setError,
     showToast,
   });
-
-  const handleCreateReleaseMarker = useCallback(
-    async (name: string, releaseDate: string | null) => {
-      if (!projectId) return;
-      setCreatingReleaseMarker(true);
-      setReleaseMarkerError(null);
-      try {
-        const response = await fetch(`/api/projects/${projectId}/stories`, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            title: name,
-            description: "",
-            type: "release",
-            status: "Unstarted",
-            storyPoint: null,
-            labelIds: [],
-            isIcebox: false,
-            ownerIds: [],
-            requesterId: null,
-            releaseDate,
-          }),
-        });
-        if (!response.ok) {
-          if (isAuthError(response.status)) {
-            notifySessionExpired();
-            return;
-          }
-          setReleaseMarkerError(await parseErrorMessage(response));
-          return;
-        }
-        setShowReleaseMarkerDialog(false);
-        void panelQueries.invalidatePanels({
-          panels: ["Backlog"],
-          refetchType: "active",
-        });
-      } catch {
-        setReleaseMarkerError(t("storyMultiPanelScreen.create.requestFailed"));
-      } finally {
-        setCreatingReleaseMarker(false);
-      }
-    },
-    [projectId, notifySessionExpired, panelQueries, t],
-  );
 
   const allStories = useMemo(
     () => [
@@ -1485,90 +1433,111 @@ export function StoryMultiPanelScreen() {
     setCreateError(null);
     setCreateTitle("");
     setCreateStoryType("feature");
+    setCreateReleaseDate("");
     setCreateSubmitting(false);
   }, []);
 
-  const submitInlineStory = useCallback(async () => {
-    if (readOnly || !projectId || !createTargetPanel) return;
-    const title = createTitle.trim();
-    if (!title) {
-      setCreateError({
-        type: "translation",
-        key: "storyMultiPanelScreen.create.requiredTitle",
-      });
-      return;
-    }
-    if (createTargetPanel === "Current" && !currentIteration?.id) {
-      setCreateError({
-        type: "translation",
-        key: "storyMultiPanelScreen.create.currentUnavailable",
-      });
-      return;
-    }
-    setCreateSubmitting(true);
-    setCreateError(null);
-    try {
-      const response = await fetch(projectStoriesApiPath(projectId), {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          title,
-          panel: toCreatePayloadPanel(createTargetPanel),
-          status: "Unstarted",
-          type: createStoryType,
-        }),
-      });
-      if (!response.ok) {
-        if (isAuthError(response.status)) {
-          notifySessionExpired();
-          return;
-        }
-        setCreateError({
-          type: "message",
-          message: await parseErrorMessage(response),
-        });
-        return;
-      }
-      const payload = (await response.json()) as { story?: Story };
-      const createdStory = payload.story;
-      if (!createdStory) {
+  const submitInlineStory = useCallback(
+    async (storyType: StoryType) => {
+      if (readOnly || !projectId || !createTargetPanel) return;
+      if (createSubmittingRef.current) return;
+      const isRelease = storyType === "release";
+      const title = createTitle.trim();
+      if (!title) {
         setCreateError({
           type: "translation",
-          key: "storyMultiPanelScreen.create.invalidResponse",
+          key: isRelease
+            ? "storyMultiPanelScreen.create.requiredReleaseName"
+            : "storyMultiPanelScreen.create.requiredTitle",
         });
         return;
       }
-      panelQueries.applyStoryUpdate(createdStory);
-      setExpandedStoryIds((current) => new Set(current).add(createdStory.id));
-      setActiveStoryId(createdStory.id);
-      showToast(
-        "success",
-        t("storyMultiPanelScreen.toast.storyCreated", {
-          title: createdStory.title,
-        }),
-      );
-      closeCreateForm();
-    } catch {
-      setCreateError({
-        type: "translation",
-        key: "storyMultiPanelScreen.create.requestFailed",
-      });
-    } finally {
-      setCreateSubmitting(false);
-    }
-  }, [
-    closeCreateForm,
-    createTargetPanel,
-    createStoryType,
-    createTitle,
-    currentIteration?.id,
-    notifySessionExpired,
-    panelQueries,
-    projectId,
-    readOnly,
-    showToast,
-    t,
-  ]);
+      // Release marker は Backlog にだけ置くので、結合表示の Add Story が Current 宛てでも Backlog に作る。
+      const targetPanel = isRelease ? "Backlog" : createTargetPanel;
+      if (targetPanel === "Current" && !currentIteration?.id) {
+        setCreateError({
+          type: "translation",
+          key: "storyMultiPanelScreen.create.currentUnavailable",
+        });
+        return;
+      }
+      createSubmittingRef.current = true;
+      setCreateSubmitting(true);
+      setCreateError(null);
+      try {
+        const response = await fetch(projectStoriesApiPath(projectId), {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            title,
+            panel: toCreatePayloadPanel(targetPanel),
+            status: "Unstarted",
+            type: storyType,
+            ...(isRelease ? { releaseDate: createReleaseDate || null } : {}),
+          }),
+        });
+        if (!response.ok) {
+          if (isAuthError(response.status)) {
+            notifySessionExpired();
+            return;
+          }
+          setCreateError({
+            type: "message",
+            message: await parseErrorMessage(response),
+          });
+          return;
+        }
+        if (isRelease) {
+          void panelQueries.invalidatePanels({
+            panels: ["Backlog"],
+            refetchType: "active",
+          });
+          closeCreateForm();
+          return;
+        }
+        const payload = (await response.json()) as { story?: Story };
+        const createdStory = payload.story;
+        if (!createdStory) {
+          setCreateError({
+            type: "translation",
+            key: "storyMultiPanelScreen.create.invalidResponse",
+          });
+          return;
+        }
+        panelQueries.applyStoryUpdate(createdStory);
+        setExpandedStoryIds((current) => new Set(current).add(createdStory.id));
+        setActiveStoryId(createdStory.id);
+        showToast(
+          "success",
+          t("storyMultiPanelScreen.toast.storyCreated", {
+            title: createdStory.title,
+          }),
+        );
+        closeCreateForm();
+      } catch {
+        setCreateError({
+          type: "translation",
+          key: "storyMultiPanelScreen.create.requestFailed",
+        });
+      } finally {
+        createSubmittingRef.current = false;
+        setCreateSubmitting(false);
+      }
+    },
+    [
+      closeCreateForm,
+      createTargetPanel,
+      createReleaseDate,
+      createTitle,
+      currentIteration?.id,
+      notifySessionExpired,
+      panelQueries,
+      projectId,
+      readOnly,
+      showToast,
+      t,
+    ],
+  );
 
   const keyboardShortcuts = useMemo<KeyboardShortcut[]>(() => {
     const shortcuts: KeyboardShortcut[] = [
@@ -1586,7 +1555,7 @@ export function StoryMultiPanelScreen() {
         allowInInput: true,
         action: () => {
           setShowShortcutHelp(false);
-          if (createTargetPanel !== null) {
+          if (createTargetPanel !== null && !createSubmittingRef.current) {
             closeCreateForm();
           }
         },
@@ -1811,8 +1780,14 @@ export function StoryMultiPanelScreen() {
         const targetPanel = toCreateTargetPanel(panel);
         if (!projectId || !targetPanel) return null;
         const isOpen = createTargetPanel === targetPanel;
-        const canCreateReleaseMarker =
+        const canCreateRelease =
           panel === "Backlog" || panel === "CurrentBacklogCombined";
+        const selectedType =
+          createStoryType === "release" && !canCreateRelease
+            ? "feature"
+            : createStoryType;
+        const isRelease = selectedType === "release";
+        const errorId = `create-story-error-${targetPanel}`;
         return (
           <div className="relative flex items-center gap-2">
             <button
@@ -1823,16 +1798,6 @@ export function StoryMultiPanelScreen() {
             >
               {t("storyMultiPanelScreen.create.button")}
             </button>
-            {canCreateReleaseMarker ? (
-              <button
-                type="button"
-                className="text-xs font-medium text-purple-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-purple-300"
-                disabled={readOnly || creatingReleaseMarker}
-                onClick={() => setShowReleaseMarkerDialog(true)}
-              >
-                {t("storyMultiPanelScreen.create.releaseMarkerButton")}
-              </button>
-            ) : null}
             {isOpen ? (
               <div
                 role="dialog"
@@ -1840,10 +1805,11 @@ export function StoryMultiPanelScreen() {
                 className="absolute right-0 top-full z-30 mt-1 w-72 rounded-md border border-gray-200 bg-white p-2 shadow-lg"
               >
                 <form
+                  ref={createFormRef}
                   className="flex flex-col gap-2"
                   onSubmit={(event) => {
                     event.preventDefault();
-                    void submitInlineStory();
+                    void submitInlineStory(selectedType);
                   }}
                 >
                   <div className="flex flex-col gap-1">
@@ -1856,16 +1822,17 @@ export function StoryMultiPanelScreen() {
                     <select
                       id={`create-story-type-${targetPanel}`}
                       className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-900"
-                      value={createStoryType}
+                      value={selectedType}
                       disabled={createSubmitting}
                       onChange={(event) => {
-                        setCreateStoryType(
-                          event.target.value as Exclude<StoryType, "release">,
-                        );
+                        setCreateStoryType(event.target.value as StoryType);
                         if (createError) setCreateError(null);
                       }}
                     >
-                      {INLINE_CREATABLE_STORY_TYPES.map((storyType) => (
+                      {(canCreateRelease
+                        ? STORY_TYPES
+                        : NON_RELEASE_STORY_TYPES
+                      ).map((storyType) => (
                         <option key={storyType} value={storyType}>
                           {t(`storyMultiPanelScreen.create.types.${storyType}`)}
                         </option>
@@ -1876,21 +1843,52 @@ export function StoryMultiPanelScreen() {
                     className="sr-only"
                     htmlFor={`create-story-${targetPanel}`}
                   >
-                    {t("storyMultiPanelScreen.create.title")}
+                    {t(
+                      isRelease
+                        ? "storyMultiPanelScreen.create.releaseName"
+                        : "storyMultiPanelScreen.create.title",
+                    )}
                   </label>
                   <AutoGrowSingleLineTextarea
                     id={`create-story-${targetPanel}`}
                     rows={1}
                     className="w-full resize-none rounded border border-gray-300 px-2 py-1 text-xs"
-                    placeholder={t("storyMultiPanelScreen.create.placeholder")}
+                    placeholder={t(
+                      isRelease
+                        ? "storyMultiPanelScreen.create.releaseNamePlaceholder"
+                        : "storyMultiPanelScreen.create.placeholder",
+                    )}
+                    aria-describedby={createError ? errorId : undefined}
                     value={createTitle}
                     autoFocus
                     onChange={(value) => {
                       setCreateTitle(value);
                       if (createError) setCreateError(null);
                     }}
-                    onEnterKey={() => void submitInlineStory()}
+                    onEnterKey={() => createFormRef.current?.requestSubmit()}
                   />
+                  {isRelease ? (
+                    <div className="flex flex-col gap-1">
+                      <label
+                        htmlFor={`create-release-date-${targetPanel}`}
+                        className="text-xs font-medium text-gray-700"
+                      >
+                        {t("storyMultiPanelScreen.create.releaseDate")}
+                      </label>
+                      <input
+                        id={`create-release-date-${targetPanel}`}
+                        type="date"
+                        className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-900"
+                        aria-describedby={createError ? errorId : undefined}
+                        value={createReleaseDate}
+                        disabled={createSubmitting}
+                        onChange={(event) => {
+                          setCreateReleaseDate(event.target.value);
+                          if (createError) setCreateError(null);
+                        }}
+                      />
+                    </div>
+                  ) : null}
                   <div className="flex items-center justify-end gap-1">
                     <button
                       type="button"
@@ -1911,7 +1909,11 @@ export function StoryMultiPanelScreen() {
                     </button>
                   </div>
                   {createError ? (
-                    <span role="alert" className="text-xs text-red-600">
+                    <span
+                      id={errorId}
+                      role="alert"
+                      className="text-xs text-red-600"
+                    >
                       {createError.type === "translation"
                         ? t(createError.key)
                         : createError.message}
@@ -2715,19 +2717,6 @@ export function StoryMultiPanelScreen() {
         ) : null}
       </div>
 
-      {showReleaseMarkerDialog ? (
-        <ReleaseMarkerCreateDialog
-          submitting={creatingReleaseMarker}
-          error={releaseMarkerError}
-          onSubmit={({ name, releaseDate }) => {
-            void handleCreateReleaseMarker(name, releaseDate);
-          }}
-          onClose={() => {
-            setShowReleaseMarkerDialog(false);
-            setReleaseMarkerError(null);
-          }}
-        />
-      ) : null}
       <StoryDeleteConfirmDialog
         isOpen={pendingDeleteStory !== null}
         storyTitle={pendingDeleteStory?.title ?? ""}
