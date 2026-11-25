@@ -1421,7 +1421,7 @@ export function StoryMultiPanelScreen() {
 
   const openCreateForm = useCallback(
     (panel: CreateTargetPanel) => {
-      if (readOnly) return;
+      if (readOnly || createSubmittingRef.current) return;
       setCreateTargetPanel((current) => (current === panel ? current : panel));
       setCreateError(null);
     },
@@ -1793,7 +1793,7 @@ export function StoryMultiPanelScreen() {
             <button
               type="button"
               className="text-xs font-medium text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={readOnly}
+              disabled={readOnly || createSubmitting}
               onClick={() => openCreateForm(targetPanel)}
             >
               {t("storyMultiPanelScreen.create.button")}

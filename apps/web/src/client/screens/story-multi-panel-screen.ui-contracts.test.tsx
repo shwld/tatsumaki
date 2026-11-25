@@ -589,8 +589,16 @@ describe("StoryMultiPanelScreen UI contracts", () => {
     expect(screen.getByRole("button", { name: "作成中..." })).toBeDisabled();
     expect(screen.getByRole("button", { name: "キャンセル" })).toBeDisabled();
     await userEvent.keyboard("{Escape}");
+    const currentAddStory = within(
+      screen.getByTestId("panel-Current"),
+    ).getByRole("button", { name: "+ ストーリーを追加" });
+    expect(currentAddStory).toBeDisabled();
+    await userEvent.click(screen.getByTestId("panel-Backlog"));
+    await userEvent.keyboard("c");
     expect(
-      screen.getByRole("dialog", { name: "新規ストーリー作成" }),
+      within(screen.getByTestId("panel-Backlog")).getByRole("dialog", {
+        name: "新規ストーリー作成",
+      }),
     ).toBeInTheDocument();
 
     await act(async () => {
