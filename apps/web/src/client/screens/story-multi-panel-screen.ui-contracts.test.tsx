@@ -394,12 +394,14 @@ describe("StoryMultiPanelScreen UI contracts", () => {
     expect(rendered).toEqual([]);
   });
 
-  it("creates a release marker with and without a planned date from the Backlog panel", async () => {
+  const stubStoryCreate = (
+    respond: () => Response | Promise<Response> = () =>
+      new Response(JSON.stringify({ story: {} }), { status: 201 }),
+  ) => {
     const baseFetch = createStoryMultiPanelFetchMock();
     const posted: Array<Record<string, unknown>> = [];
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+    const fetchMock = vi.fn(
+      async (input: string | URL | Request, init?: RequestInit) => {
         const rawUrl =
           input instanceof Request
             ? input.url.replace(/^https?:\/\/[^/]+/, "")
@@ -410,35 +412,71 @@ describe("StoryMultiPanelScreen UI contracts", () => {
           (init?.method ?? "GET").toUpperCase() === "POST"
         ) {
           posted.push(JSON.parse(String(init?.body)));
-          return new Response(JSON.stringify({ story: {} }), { status: 201 });
+          return respond();
         }
         return baseFetch(input);
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    return { posted, fetchMock };
+  };
+
+  const openAddStory = async (panel: string) => {
+    expect(await screen.findByText("Backlog story")).toBeInTheDocument();
+    await userEvent.click(
+      within(screen.getByTestId(`panel-${panel}`)).getByRole("button", {
+        name: "+ ストーリーを追加",
       }),
     );
-    renderStoryMultiPanel();
+  };
 
-    expect(await screen.findByText("Backlog story")).toBeInTheDocument();
-    const open = () =>
-      userEvent.click(
-        screen.getAllByRole("button", { name: "+ リリースマーカー" })[0]!,
-      );
+  const selectType = (type: string) =>
+    userEvent.selectOptions(screen.getByLabelText("種別"), type);
 
-    await open();
-    await userEvent.type(screen.getByLabelText(/名前/), "v1.0");
+  const setReleaseDate = (value: string) =>
     fireEvent.change(screen.getByLabelText("リリース予定日"), {
-      target: { value: "2026-12-01" },
+      target: { value },
     });
+
+  it("creates a release marker with and without a planned date from Add Story", async () => {
+    const { posted, fetchMock } = stubStoryCreate();
+    renderStoryMultiPanel();
+    await openAddStory("Backlog");
+    const backlogRequests = () =>
+      fetchMock.mock.calls.filter(([input]) =>
+        String(input).includes("iterationDateScope=future"),
+      ).length;
+    const requestsBefore = backlogRequests();
+
+    await selectType("release");
+    await userEvent.type(screen.getByLabelText("新規リリース名"), "v1.0");
+    setReleaseDate("2026-12-01");
     await userEvent.click(screen.getByRole("button", { name: "作成" }));
     await waitFor(() => expect(posted).toHaveLength(1));
-    expect(posted[0]).toMatchObject({
-      type: "release",
+    expect(posted[0]).toEqual({
       title: "v1.0",
+      panel: "backlog",
+      status: "Unstarted",
+      type: "release",
       releaseDate: "2026-12-01",
     });
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "新規ストーリー作成" }),
+      ).not.toBeInTheDocument(),
+    );
+    await waitFor(() =>
+      expect(backlogRequests()).toBeGreaterThan(requestsBefore),
+    );
 
-    await open();
-    await userEvent.type(screen.getByLabelText(/名前/), "v2.0");
-    await userEvent.click(screen.getByRole("button", { name: "作成" }));
+    await openAddStory("Backlog");
+    expect(screen.getByLabelText("種別")).toHaveValue("feature");
+    await selectType("release");
+    expect(screen.getByLabelText("リリース予定日")).toHaveValue("");
+    await userEvent.type(
+      screen.getByLabelText("新規リリース名"),
+      "v2.0{Enter}",
+    );
     await waitFor(() => expect(posted).toHaveLength(2));
     expect(posted[1]).toMatchObject({
       type: "release",
@@ -447,43 +485,134 @@ describe("StoryMultiPanelScreen UI contracts", () => {
     });
   });
 
-  it("keeps the board visible and shows the error in the dialog when release marker creation fails", async () => {
-    const baseFetch = createStoryMultiPanelFetchMock();
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
-        const rawUrl =
-          input instanceof Request
-            ? input.url.replace(/^https?:\/\/[^/]+/, "")
-            : String(input);
-        const parsed = new URL(rawUrl, "http://localhost");
-        if (
-          parsed.pathname === `/api/projects/${PROJECT_ID}/stories` &&
-          (init?.method ?? "GET").toUpperCase() === "POST"
-        ) {
-          return new Response(
-            JSON.stringify({ error: "releaseDate must be an existing date" }),
-            { status: 400, headers: { "content-type": "application/json" } },
-          );
-        }
-        return baseFetch(input);
-      }),
+  it("sends a release from the combined panel to Backlog", async () => {
+    localStorage.setItem(
+      "tatsumaki:current-backlog-view-mode:user-1",
+      JSON.stringify({ mode: "combined" }),
     );
+    const { posted } = stubStoryCreate();
     renderStoryMultiPanel();
+    await openAddStory("CurrentBacklogCombined");
 
-    expect(await screen.findByText("Backlog story")).toBeInTheDocument();
-    await userEvent.click(
-      screen.getAllByRole("button", { name: "+ リリースマーカー" })[0]!,
-    );
-    await userEvent.type(screen.getByLabelText(/名前/), "v1.0");
+    await selectType("release");
+    await userEvent.type(screen.getByLabelText("新規リリース名"), "v1.0");
     await userEvent.click(screen.getByRole("button", { name: "作成" }));
 
-    const dialog = await screen.findByRole("dialog", {
-      name: "リリースマーカーを作成",
+    await waitFor(() => expect(posted).toHaveLength(1));
+    expect(posted[0]).toMatchObject({ type: "release", panel: "backlog" });
+  });
+
+  it("keeps the name across type changes and omits the release date for other types", async () => {
+    const { posted } = stubStoryCreate();
+    renderStoryMultiPanel();
+    expect(
+      screen.queryByRole("button", { name: "+ リリースマーカー" }),
+    ).not.toBeInTheDocument();
+    await openAddStory("Backlog");
+
+    await userEvent.type(screen.getByLabelText("新規ストーリータイトル"), "v1");
+    expect(screen.queryByLabelText("リリース予定日")).not.toBeInTheDocument();
+    await selectType("release");
+    expect(screen.getByLabelText("新規リリース名")).toHaveValue("v1");
+    setReleaseDate("2026-12-01");
+    await selectType("bug");
+    expect(screen.getByLabelText("新規ストーリータイトル")).toHaveValue("v1");
+    expect(screen.queryByLabelText("リリース予定日")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "作成" }));
+
+    await waitFor(() => expect(posted).toHaveLength(1));
+    expect(posted[0]).toEqual({
+      title: "v1",
+      panel: "backlog",
+      status: "Unstarted",
+      type: "bug",
     });
-    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+  });
+
+  it("offers release only on the Backlog form", async () => {
+    const { posted } = stubStoryCreate();
+    renderStoryMultiPanel();
+    await openAddStory("Backlog");
+    await selectType("release");
+    await userEvent.type(screen.getByLabelText("新規リリース名"), "v1");
+
+    await openAddStory("Current");
+
+    expect(screen.getByLabelText("種別")).toHaveValue("feature");
+    expect(
+      screen.queryByRole("option", { name: "リリース" }),
+    ).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "作成" }));
+    await waitFor(() => expect(posted).toHaveLength(1));
+    expect(posted[0]).toEqual({
+      title: "v1",
+      panel: "current",
+      status: "Unstarted",
+      type: "feature",
+    });
+  });
+
+  it("requires a release name and discards the draft on cancel", async () => {
+    const { posted } = stubStoryCreate();
+    renderStoryMultiPanel();
+    await openAddStory("Backlog");
+    await selectType("release");
+    await userEvent.click(screen.getByRole("button", { name: "作成" }));
+
+    expect(screen.getByRole("alert")).toHaveTextContent("名前は必須です");
+    expect(screen.getByLabelText("新規リリース名")).toHaveAccessibleDescription(
+      "名前は必須です",
+    );
+    setReleaseDate("2026-12-01");
+    await userEvent.click(screen.getByRole("button", { name: "キャンセル" }));
+    await openAddStory("Backlog");
+    await selectType("release");
+    expect(screen.getByLabelText("リリース予定日")).toHaveValue("");
+    expect(posted).toHaveLength(0);
+  });
+
+  it("submits a release once and stays open while saving, then shows the save error", async () => {
+    let resolve!: (response: Response) => void;
+    const { posted } = stubStoryCreate(
+      () =>
+        new Promise<Response>((done) => {
+          resolve = done;
+        }),
+    );
+    renderStoryMultiPanel();
+    await openAddStory("Backlog");
+    await selectType("release");
+    const name = screen.getByLabelText("新規リリース名");
+    await userEvent.type(name, "v1.0{Enter}{Enter}");
+
+    expect(posted).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "作成中..." })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "キャンセル" })).toBeDisabled();
+    await userEvent.keyboard("{Escape}");
+    const currentAddStory = within(
+      screen.getByTestId("panel-Current"),
+    ).getByRole("button", { name: "+ ストーリーを追加" });
+    expect(currentAddStory).toBeDisabled();
+    await userEvent.click(screen.getByTestId("panel-Backlog"));
+    await userEvent.keyboard("c");
+    expect(
+      within(screen.getByTestId("panel-Backlog")).getByRole("dialog", {
+        name: "新規ストーリー作成",
+      }),
+    ).toBeInTheDocument();
+
+    await act(async () => {
+      resolve(
+        new Response(
+          JSON.stringify({ error: "releaseDate must be an existing date" }),
+          { status: 400, headers: { "content-type": "application/json" } },
+        ),
+      );
+    });
+    expect(await screen.findByRole("alert")).toHaveTextContent(
       "releaseDate must be an existing date",
     );
+    expect(name).toHaveValue("v1.0");
     expect(screen.getByText("Backlog story")).toBeInTheDocument();
   });
 
