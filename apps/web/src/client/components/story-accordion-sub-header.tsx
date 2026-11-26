@@ -1,5 +1,5 @@
 import { memo, useCallback } from "react";
-import { useProjectReadOnly } from "../contexts/project-billing-context";
+import { useProjectReadOnly } from "../contexts/project-usage-context";
 import { useTranslation } from "react-i18next";
 import { Archive, Dice5, Trash2, UserCircle, Users } from "lucide-react";
 import { useToast } from "../contexts/toast-context";

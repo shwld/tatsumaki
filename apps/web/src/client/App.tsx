@@ -5,7 +5,7 @@ import { Layout } from "./components/layout";
 import { PageTitle } from "./components/page-title";
 import { OnboardingGate } from "./components/onboarding-gate";
 import { AuthErrorProvider } from "./contexts/auth-error-context";
-import { ProjectBillingScope } from "./contexts/project-billing-context";
+import { ProjectUsageScope } from "./contexts/project-usage-context";
 import { ToastProvider } from "./contexts/toast-context";
 import { popReturnTo } from "./lib/api-error";
 import { LoginScreen } from "./screens/login-screen";
@@ -77,7 +77,7 @@ export function App() {
               <ReturnToRedirect />
               <OnboardingGate>
                 <Layout>
-                  <ProjectBillingScope>
+                  <ProjectUsageScope>
                     <Routes>
                       <Route
                         path="/invite"
@@ -325,7 +325,7 @@ export function App() {
                         element={<Navigate to="/projects" replace />}
                       />
                     </Routes>
-                  </ProjectBillingScope>
+                  </ProjectUsageScope>
                 </Layout>
               </OnboardingGate>
             </ToastProvider>

@@ -7,17 +7,13 @@ import {
 } from "../components/epic-create-dialog.i18n";
 import { errorRetryEn, errorRetryJa } from "../components/error-retry.i18n";
 import {
-  billingStatusSectionEn,
-  billingStatusSectionJa,
-} from "../components/billing-status-section.i18n";
+  projectUsageEn,
+  projectUsageJa,
+} from "../components/project-usage.i18n";
 import {
   ownershipTransferSectionEn,
   ownershipTransferSectionJa,
 } from "../components/ownership-transfer-section.i18n";
-import {
-  projectSubscriptionSectionEn,
-  projectSubscriptionSectionJa,
-} from "../components/project-subscription-section.i18n";
 import { pageTitleEn, pageTitleJa } from "../components/page-title.i18n";
 import { layoutEn, layoutJa } from "../components/layout.i18n";
 import {
@@ -41,10 +37,6 @@ import {
   projectListItemEn,
   projectListItemJa,
 } from "../components/project-list-item.i18n";
-import {
-  projectBillingBannerEn,
-  projectBillingBannerJa,
-} from "../components/project-billing-banner.i18n";
 import { projectNavEn, projectNavJa } from "../components/project-nav.i18n";
 import {
   artifactScreensEn,
@@ -135,10 +127,8 @@ i18n.use(initReactI18next).init({
       common: {
         ...layoutJa,
         ...pageTitleJa,
-        ...billingStatusSectionJa,
-        ...projectSubscriptionSectionJa,
+        ...projectUsageJa,
         ...ownershipTransferSectionJa,
-        ...projectBillingBannerJa,
         ...permissionDeniedJa,
         ...errorRetryJa,
         ...actorLabelJa,
@@ -173,10 +163,8 @@ i18n.use(initReactI18next).init({
       common: {
         ...layoutEn,
         ...pageTitleEn,
-        ...billingStatusSectionEn,
-        ...projectSubscriptionSectionEn,
+        ...projectUsageEn,
         ...ownershipTransferSectionEn,
-        ...projectBillingBannerEn,
         ...permissionDeniedEn,
         ...errorRetryEn,
         ...actorLabelEn,

@@ -10,32 +10,60 @@ import {
 } from "react";
 import { useMatch } from "react-router";
 import { useAuthError } from "./auth-error-context";
-import { ProjectBillingBanner } from "../components/project-billing-banner";
+import { ProjectUsageBanner } from "../components/project-usage-banner";
+import type {
+  ProjectAccessState,
+  ProjectUsageDeadlineReason,
+} from "../../domain/entities/project-usage";
 
-export type ProjectBillingState =
+export type ProjectUsageViewState =
   | "loading"
-  | "active"
-  | "grace"
-  | "suspended"
+  | "available"
+  | "limited"
+  | "read_only"
   | "unknown";
 
-export type ProjectBilling = {
+export type ProjectUsageView = {
   projectId: string;
-  state: ProjectBillingState;
+  state: ProjectUsageViewState;
   role: "owner" | "member" | "viewer" | null;
-  validUntil: string | null;
+  deadline: { until: string; untilReason: ProjectUsageDeadlineReason } | null;
   refresh: () => void;
 };
 
 const POLL_INTERVAL_MS = 60_000;
 
-const ProjectBillingContext = createContext<ProjectBilling | null>(null);
+const ProjectUsageContext = createContext<ProjectUsageView | null>(null);
 
-type Loaded = Omit<ProjectBilling, "refresh" | "projectId">;
+type Loaded = Omit<ProjectUsageView, "refresh" | "projectId">;
 
-// ADR-0015: a state that cannot be read is never treated as active.
+const UNKNOWN: Loaded = { state: "unknown", role: null, deadline: null };
+
+const toLoaded = (data: {
+  access?: Partial<ProjectAccessState>;
+  role?: ProjectUsageView["role"];
+}): Loaded => {
+  const access = data.access as ProjectAccessState | undefined;
+  const role = data.role ?? null;
+  switch (access?.kind) {
+    case "limited":
+      return {
+        state: "limited",
+        role,
+        deadline: { until: access.until, untilReason: access.untilReason },
+      };
+    case "available":
+    case "read_only":
+    case "unknown":
+      return { state: access.kind, role, deadline: null };
+    default:
+      return UNKNOWN;
+  }
+};
+
+// ADR-0016: a state that cannot be read is never treated as available.
 // Writes stay off and viewing continues.
-export function ProjectBillingScope({ children }: { children: ReactNode }) {
+export function ProjectUsageScope({ children }: { children: ReactNode }) {
   const match = useMatch("/projects/:projectId/*");
   const rawProjectId = match?.params.projectId;
   const projectId = rawProjectId === "new" ? undefined : rawProjectId;
@@ -54,25 +82,15 @@ export function ProjectBillingScope({ children }: { children: ReactNode }) {
     let applied = 0;
     const run = async () => {
       const seq = ++issued;
-      let value: Loaded = { state: "unknown", role: null, validUntil: null };
+      let value: Loaded = UNKNOWN;
       try {
         const response = await fetch(
-          `/api/projects/${encodeURIComponent(projectId)}/billing-state`,
+          `/api/projects/${encodeURIComponent(projectId)}/usage`,
         );
         if (response.ok) {
-          const data = (await response.json()) as Partial<Loaded>;
-          if (
-            data.state === "active" ||
-            data.state === "grace" ||
-            data.state === "suspended" ||
-            data.state === "unknown"
-          ) {
-            value = {
-              state: data.state,
-              role: data.role ?? null,
-              validUntil: data.validUntil ?? null,
-            };
-          }
+          value = toLoaded(
+            (await response.json()) as Parameters<typeof toLoaded>[0],
+          );
         } else if (response.status === 401) {
           notifySessionExpired();
         }
@@ -100,33 +118,33 @@ export function ProjectBillingScope({ children }: { children: ReactNode }) {
 
   const current =
     loaded && loaded.projectId === projectId ? loaded.value : null;
-  const value = useMemo<ProjectBilling | null>(() => {
+  const value = useMemo<ProjectUsageView | null>(() => {
     if (!projectId) return null;
     const base: Loaded = current ?? {
       state: "loading",
       role: null,
-      validUntil: null,
+      deadline: null,
     };
     return { ...base, projectId, refresh };
   }, [projectId, current, refresh]);
 
   return (
-    <ProjectBillingContext.Provider value={value}>
-      {value ? <ProjectBillingBanner billing={value} /> : null}
+    <ProjectUsageContext.Provider value={value}>
+      {value ? <ProjectUsageBanner usage={value} /> : null}
       {children}
-    </ProjectBillingContext.Provider>
+    </ProjectUsageContext.Provider>
   );
 }
 
-export function useProjectBilling(): ProjectBilling | null {
-  return useContext(ProjectBillingContext);
+export function useProjectUsage(): ProjectUsageView | null {
+  return useContext(ProjectUsageContext);
 }
 
 export function useProjectReadOnly(): boolean {
-  const billing = useProjectBilling();
+  const usage = useProjectUsage();
   return (
-    billing?.state === "loading" ||
-    billing?.state === "suspended" ||
-    billing?.state === "unknown"
+    usage?.state === "loading" ||
+    usage?.state === "read_only" ||
+    usage?.state === "unknown"
   );
 }

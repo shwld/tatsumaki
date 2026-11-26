@@ -246,18 +246,15 @@ describe("AccountScreen", () => {
     );
   };
 
-  it("shows per-project billing guidance with a payment management button", async () => {
+  it("shows the usage of owned projects on a hosted deployment", async () => {
     renderWithEntitlement(buildJsonResponse(defaultBillingResponse));
 
     expect(
-      await screen.findByText(/プロジェクトごとに月額の購読/),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "支払いを管理" }),
+      await screen.findByTestId("owned-project-usage"),
     ).toBeInTheDocument();
   });
 
-  it("shows no payment button when self-hosted", async () => {
+  it("shows no operation when self-hosted", async () => {
     renderWithEntitlement(
       buildJsonResponse({ mode: "self-hosted", checkoutEnabled: false }),
     );
@@ -266,7 +263,7 @@ describe("AccountScreen", () => {
       await screen.findByText("このサービスには利用上限がありません。"),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "支払いを管理" }),
+      screen.queryByRole("button", { name: "アカウント全体の管理" }),
     ).not.toBeInTheDocument();
   });
 
@@ -279,7 +276,7 @@ describe("AccountScreen", () => {
     );
 
     expect(
-      await screen.findByText(/お支払い情報を一時的に取得できません/),
+      await screen.findByText(/利用状態を一時的に取得できません/),
     ).toBeInTheDocument();
     expect(screen.getByDisplayValue("tester")).toBeInTheDocument();
   });
@@ -289,7 +286,7 @@ describe("AccountScreen", () => {
 
     expect(await screen.findByRole("alert")).toBeInTheDocument();
     expect(
-      screen.queryByText(/お支払い情報を一時的に取得できません/),
+      screen.queryByText(/利用状態を一時的に取得できません/),
     ).not.toBeInTheDocument();
   });
 });

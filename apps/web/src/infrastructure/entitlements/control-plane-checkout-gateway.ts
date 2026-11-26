@@ -1,8 +1,6 @@
 import type { ProjectCheckoutGateway } from "../../application/ports/project-checkout-gateway";
-import {
-  parseSessionResponse,
-  type ControlPlaneRpc,
-} from "./control-plane-entitlement-provider";
+import type { ControlPlaneRpc } from "./control-plane-entitlement-provider";
+import { parseSessionResponse } from "./session-response";
 
 export class ControlPlaneCheckoutGateway implements ProjectCheckoutGateway {
   constructor(

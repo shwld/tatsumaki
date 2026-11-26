@@ -6,20 +6,13 @@ import { resetDatabase } from "./helpers/db";
 import { D1ProjectRepository } from "../src/infrastructure/db/repositories/d1-project-repository";
 import { invitationLinksRoute } from "../src/presentation/routes/invitation-links";
 import { projectsRoute } from "../src/presentation/routes/projects";
+import { projectUsage } from "./helpers/project-usage";
 
 const JOINER = { id: "github|joiner", email: "joiner@example.com" };
 
 let projectId = "";
 let ownerId = "";
 let token = "";
-
-const entitlement = (state: string) => ({
-  projectId,
-  state,
-  validUntil: null,
-  revision: 1,
-  cache: { maxAgeSeconds: 60, staleIfErrorSeconds: 300 },
-});
 
 const app = new Hono<any>();
 app.use("*", async (c, next) => {
@@ -30,13 +23,13 @@ app.route("/api", invitationLinksRoute);
 app.route("/api", projectsRoute);
 
 const bindings = (
-  getProjectEntitlement: () => Promise<unknown>,
+  getProjectUsage: () => Promise<unknown>,
   overrides: Record<string, unknown> = {},
 ) => ({
   DB: testEnv.DB,
   ENTITLEMENT_MODE: "control-plane",
   PROJECT_WRITE_ENFORCEMENT: "true",
-  CONTROL_PLANE: { getProjectEntitlement },
+  CONTROL_PLANE: { getProjectUsage },
   ...overrides,
 });
 
@@ -125,13 +118,17 @@ const methods = [
 describe.each(methods)("%s accept billing gate", (_name, accept) => {
   it("rejects a suspended project and leaves state untouched, then joins after resume", async () => {
     const before = await pendingCount();
-    const res = await accept(bindings(async () => entitlement("suspended")));
+    const res = await accept(
+      bindings(async () => projectUsage("read_only", { projectId })),
+    );
     expect(res.status).toBe(403);
     expect(await res.json()).toMatchObject({ code: "PROJECT_SUSPENDED" });
     expect(await memberCount()).toBe(1);
     expect(await pendingCount()).toBe(before);
 
-    const resumed = await accept(bindings(async () => entitlement("active")));
+    const resumed = await accept(
+      bindings(async () => projectUsage("available", { projectId })),
+    );
     expect(resumed.status).toBe(200);
     expect(await memberCount()).toBe(2);
   });
@@ -151,13 +148,17 @@ describe.each(methods)("%s accept billing gate", (_name, accept) => {
 
   it("allows active projects and non-enforcing deployments", async () => {
     expect(
-      (await accept(bindings(async () => entitlement("active")))).status,
+      (
+        await accept(
+          bindings(async () => projectUsage("available", { projectId })),
+        )
+      ).status,
     ).toBe(200);
   });
 
   it("allows when enforcement is off", async () => {
     const res = await accept(
-      bindings(async () => entitlement("suspended"), {
+      bindings(async () => projectUsage("read_only", { projectId }), {
         PROJECT_WRITE_ENFORCEMENT: "false",
       }),
     );
@@ -172,7 +173,7 @@ describe("accept keeps existing errors", () => {
     const res = await acceptLink(
       bindings(async () => {
         called += 1;
-        return entitlement("suspended");
+        return projectUsage("read_only", { projectId });
       }),
     );
     expect(res.status).toBe(410);

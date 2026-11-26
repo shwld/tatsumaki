@@ -5,7 +5,7 @@ import { Link, useNavigate, useParams } from "react-router";
 import { ProjectPage } from "../components/project-page";
 import { ProjectSection } from "../components/project-section";
 import { OwnershipTransferSection } from "../components/ownership-transfer-section";
-import { ProjectSubscriptionSection } from "../components/project-subscription-section";
+import { ProjectUsageSection } from "../components/project-usage-section";
 import { useAuthError } from "../contexts/auth-error-context";
 import { useProjectName } from "../contexts/project-name-context";
 import { useToast } from "../contexts/toast-context";
@@ -698,7 +698,7 @@ export function ProjectSettingsScreen() {
         ) : null}
 
         {projectId && isOwner ? (
-          <ProjectSubscriptionSection projectId={projectId} />
+          <ProjectUsageSection projectId={projectId} />
         ) : null}
 
         {projectId ? (

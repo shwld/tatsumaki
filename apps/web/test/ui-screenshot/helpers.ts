@@ -106,19 +106,19 @@ export const mockAuthMe = async (page: Page) => {
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
+        mode: "self-hosted",
         entitlement: { limits: { maxOwnedProjects: null } },
       }),
     });
   });
 
-  await page.route("**/api/projects/*/billing-state", async (route) => {
+  await page.route("**/api/projects/*/usage", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
-        state: "active",
+        access: { kind: "available" },
         role: "owner",
-        validUntil: null,
       }),
     });
   });

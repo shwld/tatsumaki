@@ -6,27 +6,13 @@ import type {
 import { SUBSCRIPTION_LIFECYCLES } from "../../domain/entities/subscription-lifecycle";
 import type { ControlPlaneRpc } from "./control-plane-entitlement-provider";
 
-const nextBillingSchema = z.discriminatedUnion("status", [
-  z.object({
-    status: z.literal("scheduled"),
-    date: z.iso.datetime(),
-    amount: z.number().int().nonnegative(),
-    currency: z.string().regex(/^[a-z]{3}$/),
-  }),
-  z.object({ status: z.literal("none") }),
-  z.object({ status: z.literal("unavailable") }),
-]);
-
 const responseSchema = z.object({
   projects: z.array(
     z.object({
       projectId: z.string().min(1),
-      entitlementState: z.enum(["active", "grace", "suspended"]),
       subscription: z
         .object({
           lifecycle: z.enum(SUBSCRIPTION_LIFECYCLES),
-          endsAt: z.iso.datetime().nullable(),
-          nextBilling: nextBillingSchema,
           transferId: z.string().min(1).nullable(),
         })
         .nullable(),

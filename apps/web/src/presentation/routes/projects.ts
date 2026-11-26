@@ -865,20 +865,21 @@ projectsRoute.get("/projects/:projectId", async (c) => {
   });
 });
 
-projectsRoute.get("/projects/:projectId/billing-state", async (c) => {
+projectsRoute.get("/projects/:projectId/usage", async (c) => {
   const projectId = c.req.param("projectId");
   const membership = await requireProjectMembership(c, projectId);
   if (!membership.ok) {
     return membership.response;
   }
   const role = membership.member.role;
-  const state = await getProjectAccessState(c.env, projectId);
-  // Payment details (grace deadline) are for owners only; members just see the state.
+  const access = await getProjectAccessState(c.env, projectId);
+  // The deadline is for owners only; members see whether the project is usable.
   return c.json({
-    state: state.kind,
     role,
-    validUntil:
-      state.kind === "grace" && role === "owner" ? state.validUntil : null,
+    access:
+      access.kind === "limited" && role !== "owner"
+        ? { kind: "available" }
+        : access,
   });
 });
 

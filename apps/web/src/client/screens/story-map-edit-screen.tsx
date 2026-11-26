@@ -1,5 +1,5 @@
 import { Info } from "lucide-react";
-import { useProjectReadOnly } from "../contexts/project-billing-context";
+import { useProjectReadOnly } from "../contexts/project-usage-context";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router";

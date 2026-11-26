@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { useProjectReadOnly } from "../contexts/project-billing-context";
+import { useProjectReadOnly } from "../contexts/project-usage-context";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router";
 

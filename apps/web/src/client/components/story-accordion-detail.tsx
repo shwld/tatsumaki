@@ -56,7 +56,7 @@ import { RichTextEditor } from "./rich-text-editor";
 import { StoryAccordionAttachmentsSection } from "./story-accordion-attachments-section";
 import { StoryAccordionBlockersSection } from "./story-accordion-blockers-section";
 import type { ProjectMemberProfile } from "../types/project";
-import { useProjectReadOnly } from "../contexts/project-billing-context";
+import { useProjectReadOnly } from "../contexts/project-usage-context";
 import { ActorLabel } from "./actor-label";
 
 function sameStringArray(a: string[], b: string[]) {
