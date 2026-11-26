@@ -31,9 +31,12 @@ describe("billing entitlement route", () => {
     });
   });
 
-  it("rejects portal and checkout-based creation when no Control Plane is bound", async () => {
+  it("rejects operations and checkout-based creation when no Control Plane is bound", async () => {
     const headers = await createAuthHeaders({ sub: "github|self-hosted-user" });
-    for (const path of ["billing/portal", "project-creation-requests"]) {
+    for (const path of [
+      "billing/account-operations/manage",
+      "project-creation-requests",
+    ]) {
       const response = await SELF.fetch(`https://localhost/api/${path}`, {
         method: "POST",
         headers: { ...headers, "content-type": "application/json" },

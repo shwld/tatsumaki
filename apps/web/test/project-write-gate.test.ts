@@ -4,14 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createAuthHeaders, setupAccessBindings } from "./helpers/access-jwt";
 import { resetDatabase } from "./helpers/db";
 import { requireProjectWritable } from "../src/presentation/middleware/project-write-gate";
-
-const entitlement = (state: string) => ({
-  projectId,
-  state,
-  validUntil: null,
-  revision: 1,
-  cache: { maxAgeSeconds: 60, staleIfErrorSeconds: 300 },
-});
+import { projectUsage } from "./helpers/project-usage";
 
 let projectId = "";
 let userId = "";
@@ -37,6 +30,9 @@ beforeEach(async () => {
   userId = row!.user_id;
 });
 
+const usage = (kind: Parameters<typeof projectUsage>[0]) =>
+  projectUsage(kind, { projectId });
+
 const buildApp = () => {
   const app = new Hono<any>();
   app.use("*", async (c, next) => {
@@ -49,13 +45,13 @@ const buildApp = () => {
 };
 
 const bindings = (
-  getProjectEntitlement: () => Promise<unknown>,
+  getProjectUsage: () => Promise<unknown>,
   overrides: Record<string, unknown> = {},
 ) => ({
   DB: testEnv.DB,
   ENTITLEMENT_MODE: "control-plane",
   PROJECT_WRITE_ENFORCEMENT: "true",
-  CONTROL_PLANE: { getProjectEntitlement },
+  CONTROL_PLANE: { getProjectUsage },
   ...overrides,
 });
 
@@ -63,10 +59,10 @@ const call = (method: string, path: string, env: Record<string, unknown>) =>
   buildApp().request(path.replace("p1", projectId), { method }, env);
 
 describe("requireProjectWritable", () => {
-  it("lets billing recovery and ownership-transfer routes through a suspended project", async () => {
-    const env = bindings(async () => entitlement("suspended"));
+  it("lets operation and ownership-transfer routes through a view-only project", async () => {
+    const env = bindings(async () => usage("read_only"));
     for (const path of [
-      "/api/billing/projects/p1/resume",
+      "/api/billing/projects/p1/operations/resume",
       "/api/billing/projects/p1/ownership-transfer",
       "/api/billing/projects/p1/ownership-transfer/cancel",
       "/api/billing/projects/p1/ownership-transfer/decline",
@@ -76,8 +72,8 @@ describe("requireProjectWritable", () => {
     }
   });
 
-  it("rejects every write method on a suspended project with a machine-readable code", async () => {
-    const env = bindings(async () => entitlement("suspended"));
+  it("rejects every write method on a view-only project with a machine-readable code", async () => {
+    const env = bindings(async () => usage("read_only"));
     for (const method of ["POST", "PUT", "PATCH", "DELETE"]) {
       const response = await call(method, "/api/projects/p1/stories/1", env);
       expect(response.status).toBe(403);
@@ -88,7 +84,7 @@ describe("requireProjectWritable", () => {
   });
 
   it("covers the programmatic, CLI and api-key mounts", async () => {
-    const env = bindings(async () => entitlement("suspended"));
+    const env = bindings(async () => usage("read_only"));
     for (const path of [
       "/programmatic-api/v1/projects/p1/stories",
       "/api-key/v1/projects/p1/artifact-uploads",
@@ -100,19 +96,23 @@ describe("requireProjectWritable", () => {
   });
 
   it("keeps reads open for every member", async () => {
-    const env = bindings(async () => entitlement("suspended"));
+    const env = bindings(async () => usage("read_only"));
     expect((await call("GET", "/api/projects/p1/stories", env)).status).toBe(
       200,
     );
   });
 
-  it("lets the owner delete a suspended project", async () => {
-    const env = bindings(async () => entitlement("suspended"));
+  it("lets the owner delete a view-only project", async () => {
+    const env = bindings(async () => usage("read_only"));
     expect((await call("DELETE", "/api/projects/p1", env)).status).toBe(200);
   });
 
-  it.each(["active", "grace"])("allows writes while %s", async (state) => {
-    const env = bindings(async () => entitlement(state));
+  it.each([
+    "available",
+    "ending",
+    "action_required",
+  ] as const)("allows writes while %s", async (kind) => {
+    const env = bindings(async () => usage(kind));
     expect((await call("POST", "/api/projects/p1/stories", env)).status).toBe(
       200,
     );
@@ -134,33 +134,33 @@ describe("requireProjectWritable", () => {
 
   it("does not reveal a project's state to non-members", async () => {
     userId = "someone-else";
-    const env = bindings(async () => entitlement("suspended"));
+    const env = bindings(async () => usage("read_only"));
     expect((await call("POST", "/api/projects/p1/stories", env)).status).toBe(
       200,
     );
   });
 
   it("does nothing when enforcement is off or the deployment is self-hosted", async () => {
-    const getProjectEntitlement = vi.fn(async () => entitlement("suspended"));
+    const getProjectUsage = vi.fn(async () => usage("read_only"));
     for (const overrides of [
       { PROJECT_WRITE_ENFORCEMENT: undefined },
       { ENTITLEMENT_MODE: undefined },
     ]) {
-      const env = bindings(getProjectEntitlement, overrides);
+      const env = bindings(getProjectUsage, overrides);
       expect((await call("POST", "/api/projects/p1/stories", env)).status).toBe(
         200,
       );
     }
-    expect(getProjectEntitlement).not.toHaveBeenCalled();
+    expect(getProjectUsage).not.toHaveBeenCalled();
   });
 
   it("ignores writes that name no project, such as creation", async () => {
-    const env = bindings(async () => entitlement("suspended"));
+    const env = bindings(async () => usage("read_only"));
     expect((await call("POST", "/api/projects", env)).status).toBe(200);
   });
 
-  it("keeps artifact preview token issuance open on a suspended project", async () => {
-    const env = bindings(async () => entitlement("suspended"));
+  it("keeps artifact preview token issuance open on a view-only project", async () => {
+    const env = bindings(async () => usage("read_only"));
     const response = await call(
       "POST",
       "/api/projects/p1/artifacts/a1/versions/3/preview-token",
@@ -170,7 +170,7 @@ describe("requireProjectWritable", () => {
   });
 
   it("leaves other projects to the route when an api key is bound elsewhere", async () => {
-    const env = bindings(async () => entitlement("suspended"));
+    const env = bindings(async () => usage("read_only"));
     const app = new Hono<any>();
     app.use("*", async (c, next) => {
       c.set("currentUser", { id: userId });

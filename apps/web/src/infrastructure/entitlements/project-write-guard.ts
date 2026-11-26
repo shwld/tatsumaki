@@ -1,12 +1,10 @@
 import {
-  ProjectEntitlementCache,
-  type ProjectAccessState,
+  ProjectUsageCache,
   type ProjectWriteDecision,
-} from "../../application/services/project-entitlement-cache";
-import {
-  ControlPlaneEntitlementProvider,
-  type ControlPlaneRpc,
-} from "./control-plane-entitlement-provider";
+} from "../../application/services/project-usage-cache";
+import type { ProjectAccessState } from "../../domain/entities/project-usage";
+import type { ControlPlaneRpc } from "./control-plane-entitlement-provider";
+import { ControlPlaneUsageProvider } from "./control-plane-usage-provider";
 
 export type ProjectWriteGuardBindings = {
   ENTITLEMENT_MODE?: string;
@@ -27,14 +25,12 @@ export const isProjectWriteEnforced = (
   bindings.ENTITLEMENT_MODE === "control-plane" &&
   bindings.PROJECT_WRITE_ENFORCEMENT === "true";
 
-const caches = new WeakMap<object, ProjectEntitlementCache>();
+const caches = new WeakMap<object, ProjectUsageCache>();
 
-const cacheFor = (controlPlane: ControlPlaneRpc): ProjectEntitlementCache => {
+const cacheFor = (controlPlane: ControlPlaneRpc): ProjectUsageCache => {
   let cache = caches.get(controlPlane);
   if (!cache) {
-    cache = new ProjectEntitlementCache(
-      new ControlPlaneEntitlementProvider(controlPlane),
-    );
+    cache = new ProjectUsageCache(new ControlPlaneUsageProvider(controlPlane));
     caches.set(controlPlane, cache);
   }
   return cache;
@@ -43,7 +39,7 @@ const cacheFor = (controlPlane: ControlPlaneRpc): ProjectEntitlementCache => {
 export const toProjectWriteDenial = (
   decision: ProjectWriteDecision,
 ): ProjectWriteDenial | null => {
-  if (decision.kind === "suspended") {
+  if (decision.kind === "read_only") {
     return {
       status: 403,
       body: {
@@ -56,7 +52,7 @@ export const toProjectWriteDenial = (
     return {
       status: 503,
       body: {
-        error: "Project billing state is unavailable. Try again later.",
+        error: "The project usage state is unavailable. Try again later.",
         code: ENTITLEMENT_UNAVAILABLE_CODE,
       },
     };
@@ -74,17 +70,17 @@ export const decideProjectWrite = async (
   return cacheFor(bindings.CONTROL_PLANE).decideWrite(projectId);
 };
 
-/** Billing state for display. Not enforcing (self-hosted etc.) is always active. */
+/** Usage state for display. Not enforcing (self-hosted etc.) is always available. */
 export const getProjectAccessState = async (
   bindings: ProjectWriteGuardBindings,
   projectId: string,
 ): Promise<ProjectAccessState> => {
-  if (!isProjectWriteEnforced(bindings)) return { kind: "active" };
+  if (!isProjectWriteEnforced(bindings)) return { kind: "available" };
   if (!bindings.CONTROL_PLANE) return { kind: "unknown" };
   return cacheFor(bindings.CONTROL_PLANE).accessState(projectId);
 };
 
-export const invalidateProjectEntitlement = (
+export const invalidateProjectUsage = (
   bindings: ProjectWriteGuardBindings,
   projectId?: string,
 ): void => {
@@ -100,7 +96,7 @@ export type ProjectExportDenial =
 
 /**
  * Every project export path asks this (ADR-0015): owners only, in every state,
- * and nobody while suspended. Role is checked first so billing state is never
+ * and nobody while view only. Role is checked first so usage state is never
  * revealed to non-owners. Enforcement follows the same switch as writes.
  */
 export const decideProjectExport = async (

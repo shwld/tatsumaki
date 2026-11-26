@@ -1,29 +1,17 @@
 import { Hono } from "hono";
 import type { EntitlementProvider } from "../../application/ports/entitlement-provider";
+import { ControlPlaneEntitlementProvider } from "../../infrastructure/entitlements/control-plane-entitlement-provider";
+import { listOwnedProjectUsage } from "../../application/usecases/list-owned-project-usage";
 import {
-  ControlPlaneEntitlementProvider,
-  parseSessionResponse,
-} from "../../infrastructure/entitlements/control-plane-entitlement-provider";
-import {
-  BILLING_GATEWAY_ERROR,
-  listOwnedProjectBilling,
-} from "../../application/usecases/list-owned-project-billing";
-import {
-  RESUME_CHECKOUT_DISABLED_ERROR,
-  RESUME_FORBIDDEN_ERROR,
-  RESUME_NOT_FOUND_ERROR,
-  RESUME_NOT_SUSPENDED_ERROR,
-  RESUME_PAYMENT_ACTION_REQUIRED_ERROR,
-  RESUME_PROJECT_DELETING_ERROR,
-  resumeProjectSubscription,
-} from "../../application/usecases/resume-project-subscription";
-import {
-  CANCEL_ALREADY_SCHEDULED_ERROR,
-  CANCEL_FORBIDDEN_ERROR,
-  CANCEL_NO_SUBSCRIPTION_ERROR,
-  CANCEL_NOT_FOUND_ERROR,
-  startProjectSubscriptionCancel,
-} from "../../application/usecases/start-project-subscription-cancel";
+  OPERATION_FORBIDDEN_ERROR,
+  OPERATION_NOT_FOUND_ERROR,
+  OPERATION_NOT_OFFERED_ERROR,
+  OPERATION_PROJECT_DELETING_ERROR,
+  startProjectOperation,
+} from "../../application/usecases/start-project-operation";
+import { isProjectOperation } from "../../domain/entities/project-operation";
+import { ControlPlaneOperationsGateway } from "../../infrastructure/entitlements/control-plane-operations-gateway";
+import { getProjectAccessState } from "../../infrastructure/entitlements/project-write-guard";
 import {
   closeOwnershipTransfer,
   getOwnershipTransfer,
@@ -44,14 +32,6 @@ import {
 import { ControlPlaneOwnershipTransferSettlementGateway } from "../../infrastructure/entitlements/control-plane-ownership-transfer-settlement-gateway";
 import { ControlPlaneTransferCheckoutExpiryGateway } from "../../infrastructure/entitlements/control-plane-transfer-checkout-expiry-gateway";
 import { D1ProjectOwnershipTransferRepository } from "../../infrastructure/db/repositories/d1-project-ownership-transfer-repository";
-import {
-  PAYMENT_METHOD_FORBIDDEN_ERROR,
-  PAYMENT_METHOD_NO_SUBSCRIPTION_ERROR,
-  PAYMENT_METHOD_NOT_FOUND_ERROR,
-  startPaymentMethodUpdate,
-} from "../../application/usecases/start-payment-method-update";
-import { ControlPlanePaymentMethodGateway } from "../../infrastructure/entitlements/control-plane-payment-method-gateway";
-import { ControlPlaneSubscriptionCancelGateway } from "../../infrastructure/entitlements/control-plane-subscription-cancel-gateway";
 import type { ProjectBillingCloseGateway } from "../../application/ports/project-billing-close-gateway";
 import type { ProjectDisplayNameGateway } from "../../application/ports/project-display-name-gateway";
 import { ControlPlaneProjectDisplayNameGateway } from "../../infrastructure/entitlements/control-plane-project-display-name-gateway";
@@ -136,200 +116,121 @@ billingRoute.get("/billing/entitlement", (c) => {
   });
 });
 
-billingRoute.get("/billing/subscriptions", async (c) => {
+billingRoute.get("/billing/operations", async (c) => {
   if (c.env.ENTITLEMENT_MODE !== "control-plane" || !c.env.CONTROL_PLANE) {
-    return c.json({ error: "Billing is not available" }, 409);
+    return c.json({ error: "Operations are not available" }, 409);
   }
-  const result = await listOwnedProjectBilling(
-    new D1ProjectRepository(c.env.DB),
-    new ControlPlaneProjectBillingGateway(c.env.CONTROL_PLANE),
-    c.get("currentUser").id,
-    createProjectDisplayNameGateway(c.env),
+  const displayNames = createProjectDisplayNameGateway(c.env);
+  const result = await listOwnedProjectUsage(
+    {
+      projects: new D1ProjectRepository(c.env.DB),
+      operations: new ControlPlaneOperationsGateway(c.env.CONTROL_PLANE),
+      accessState: (projectId) => getProjectAccessState(c.env, projectId),
+      ...(displayNames ? { displayNames } : {}),
+    },
+    {
+      userId: c.get("currentUser").id,
+      locale: c.req.query("locale") === "en" ? "en" : "ja",
+      checkoutEnabled: isCheckoutEnabled(c.env),
+    },
   );
   if (result.isErr()) {
-    if (result.error === BILLING_GATEWAY_ERROR) {
-      console.error("Failed to list project billing");
-      return c.json({ error: "Billing is temporarily unavailable" }, 503);
-    }
     return c.json({ error: "Failed to load projects" }, 500);
   }
-  return c.json({ projects: result.value });
+  return c.json(result.value);
 });
 
-billingRoute.post("/billing/portal", async (c) => {
+billingRoute.post("/billing/account-operations/manage", async (c) => {
   if (c.env.ENTITLEMENT_MODE !== "control-plane" || !c.env.CONTROL_PLANE) {
-    return c.json({ error: "Billing portal is not available" }, 409);
+    return c.json({ error: "Operations are not available" }, 409);
   }
-  const currentUser = c.get("currentUser");
   const origin = new URL(c.req.url).origin;
 
   try {
-    const session = parseSessionResponse(
-      await c.env.CONTROL_PLANE.createPortalSession({
-        billingAccountId: currentUser.id,
-        returnUrl: `${origin}/account`,
-      }),
-    );
-    return c.json({ url: session.url });
+    const session = await new ControlPlaneOperationsGateway(
+      c.env.CONTROL_PLANE,
+    ).startAccountOperation({
+      accountId: c.get("currentUser").id,
+      operation: "manage",
+      returnUrl: `${origin}/account?operation=manage`,
+    });
+    return c.json({ url: session.url }, 201);
   } catch (error) {
-    console.error("Failed to create portal session", {
+    console.error("Failed to start account operation", {
       errorType: error instanceof Error ? error.name : "unknown",
     });
-    return c.json({ error: "Billing portal is temporarily unavailable" }, 503);
+    return c.json({ error: "The operation is temporarily unavailable" }, 503);
   }
 });
 
-// /projects/:projectId 配下に置くと停止中の書き込みゲートに止められるため、別パスにする。
-billingRoute.post("/billing/projects/:projectId/resume", async (c) => {
-  if (c.env.ENTITLEMENT_MODE !== "control-plane" || !c.env.CONTROL_PLANE) {
-    return c.json({ error: "Billing is not available" }, 409);
-  }
-  const projectId = c.req.param("projectId");
-  const origin = new URL(c.req.url).origin;
-  const base = `${origin}/projects/${encodeURIComponent(projectId)}`;
+// /projects/:projectId 配下に置くと閲覧のみの書き込みゲートに止められるため、別パスにする。
+billingRoute.post(
+  "/billing/projects/:projectId/operations/:operation",
+  async (c) => {
+    if (c.env.ENTITLEMENT_MODE !== "control-plane" || !c.env.CONTROL_PLANE) {
+      return c.json({ error: "Operations are not available" }, 409);
+    }
+    const operation = c.req.param("operation");
+    if (!isProjectOperation(operation)) {
+      return c.json({ error: "Unknown operation" }, 404);
+    }
+    const projectId = c.req.param("projectId");
+    const origin = new URL(c.req.url).origin;
+    const projectUrl = `${origin}/projects/${encodeURIComponent(projectId)}`;
+    const returnBase =
+      c.req.query("from") === "settings"
+        ? `${projectUrl}/settings`
+        : `${origin}/account`;
 
-  const result = await resumeProjectSubscription(
-    {
-      projects: new D1ProjectRepository(c.env.DB),
-      deletions: new D1ProjectDeletionRequestRepository(c.env.DB),
-      entitlements: createEntitlementProvider(c.env),
-      billing: new ControlPlaneProjectBillingGateway(c.env.CONTROL_PLANE),
-      checkout: new ControlPlaneCheckoutGateway(c.env.CONTROL_PLANE),
-    },
-    {
-      userId: c.get("currentUser").id,
-      projectId,
-      now: new Date(),
-      successUrl: `${base}?billing=resume`,
-      cancelUrl: `${base}?billing=resume-cancel`,
-    },
-    isCheckoutEnabled(c.env),
-  );
+    const result = await startProjectOperation(
+      {
+        projects: new D1ProjectRepository(c.env.DB),
+        deletions: new D1ProjectDeletionRequestRepository(c.env.DB),
+        operations: new ControlPlaneOperationsGateway(c.env.CONTROL_PLANE),
+      },
+      {
+        userId: c.get("currentUser").id,
+        projectId,
+        operation,
+        now: new Date(),
+        returnUrl: `${returnBase}?operation=${operation}`,
+        successUrl: `${projectUrl}?operation=resume`,
+        cancelUrl: `${projectUrl}?operation=resume-cancel`,
+      },
+      isCheckoutEnabled(c.env),
+    );
 
-  if (result.isOk()) return c.json({ url: result.value.url }, 201);
-  switch (result.error) {
-    case RESUME_NOT_FOUND_ERROR:
-      return c.json({ error: "Project not found" }, 404);
-    case RESUME_FORBIDDEN_ERROR:
-      return c.json({ error: "Only the owner can resume" }, 403);
-    case RESUME_NOT_SUSPENDED_ERROR:
-      return c.json(
-        { error: "Project is not suspended", code: "not_suspended" },
-        409,
-      );
-    case RESUME_PAYMENT_ACTION_REQUIRED_ERROR:
-      return c.json(
-        { error: "Payment needs attention", code: "payment_action_required" },
-        409,
-      );
-    case RESUME_PROJECT_DELETING_ERROR:
-      return c.json(
-        { error: "Project is being deleted", code: "project_deleting" },
-        409,
-      );
-    case RESUME_CHECKOUT_DISABLED_ERROR:
-      return c.json(
-        { error: "Checkout is not available", code: "checkout_disabled" },
-        409,
-      );
-    default:
-      console.error("Failed to start project resume", { reason: result.error });
-      return c.json({ error: "Resume is temporarily unavailable" }, 503);
-  }
-});
-
-billingRoute.post("/billing/projects/:projectId/cancel", async (c) => {
-  if (c.env.ENTITLEMENT_MODE !== "control-plane" || !c.env.CONTROL_PLANE) {
-    return c.json({ error: "Billing is not available" }, 409);
-  }
-  const projectId = c.req.param("projectId");
-  const origin = new URL(c.req.url).origin;
-  const returnPath =
-    c.req.query("from") === "settings"
-      ? `/projects/${encodeURIComponent(projectId)}/settings`
-      : "/account";
-
-  const result = await startProjectSubscriptionCancel(
-    {
-      projects: new D1ProjectRepository(c.env.DB),
-      billing: new ControlPlaneProjectBillingGateway(c.env.CONTROL_PLANE),
-      cancel: new ControlPlaneSubscriptionCancelGateway(c.env.CONTROL_PLANE),
-    },
-    {
-      userId: c.get("currentUser").id,
-      projectId,
-      returnUrl: `${origin}${returnPath}?billing=cancel`,
-    },
-  );
-
-  if (result.isOk()) return c.json({ url: result.value.url }, 201);
-  switch (result.error) {
-    case CANCEL_NOT_FOUND_ERROR:
-      return c.json({ error: "Project not found" }, 404);
-    case CANCEL_FORBIDDEN_ERROR:
-      return c.json({ error: "Only the owner can cancel" }, 403);
-    case CANCEL_NO_SUBSCRIPTION_ERROR:
-      return c.json(
-        { error: "No active subscription", code: "no_subscription" },
-        409,
-      );
-    case CANCEL_ALREADY_SCHEDULED_ERROR:
-      return c.json(
-        {
-          error: "Cancellation is already scheduled",
-          code: "already_scheduled",
-        },
-        409,
-      );
-    default:
-      console.error("Failed to start subscription cancellation", {
-        reason: result.error,
-      });
-      return c.json({ error: "Cancellation is temporarily unavailable" }, 503);
-  }
-});
-
-billingRoute.post("/billing/projects/:projectId/payment-method", async (c) => {
-  if (c.env.ENTITLEMENT_MODE !== "control-plane" || !c.env.CONTROL_PLANE) {
-    return c.json({ error: "Billing is not available" }, 409);
-  }
-  const projectId = c.req.param("projectId");
-  const origin = new URL(c.req.url).origin;
-
-  const result = await startPaymentMethodUpdate(
-    {
-      projects: new D1ProjectRepository(c.env.DB),
-      billing: new ControlPlaneProjectBillingGateway(c.env.CONTROL_PLANE),
-      paymentMethod: new ControlPlanePaymentMethodGateway(c.env.CONTROL_PLANE),
-    },
-    {
-      userId: c.get("currentUser").id,
-      projectId,
-      returnUrl: `${origin}/projects/${encodeURIComponent(projectId)}/settings?billing=payment-method`,
-    },
-  );
-
-  if (result.isOk()) return c.json({ url: result.value.url }, 201);
-  switch (result.error) {
-    case PAYMENT_METHOD_NOT_FOUND_ERROR:
-      return c.json({ error: "Project not found" }, 404);
-    case PAYMENT_METHOD_FORBIDDEN_ERROR:
-      return c.json({ error: "Only the owner can manage payment" }, 403);
-    case PAYMENT_METHOD_NO_SUBSCRIPTION_ERROR:
-      return c.json(
-        { error: "No active subscription", code: "no_subscription" },
-        409,
-      );
-    default:
-      console.error("Failed to start payment method update", {
-        reason: result.error,
-      });
-      return c.json(
-        { error: "Payment update is temporarily unavailable" },
-        503,
-      );
-  }
-});
+    if (result.isOk()) return c.json({ url: result.value.url }, 201);
+    switch (result.error) {
+      case OPERATION_NOT_FOUND_ERROR:
+        return c.json({ error: "Project not found" }, 404);
+      case OPERATION_FORBIDDEN_ERROR:
+        return c.json({ error: "Only the owner can do this" }, 403);
+      case OPERATION_NOT_OFFERED_ERROR:
+        return c.json(
+          {
+            error: "The operation is not available",
+            code: "operation_not_offered",
+          },
+          409,
+        );
+      case OPERATION_PROJECT_DELETING_ERROR:
+        return c.json(
+          { error: "Project is being deleted", code: "project_deleting" },
+          409,
+        );
+      default:
+        console.error("Failed to start project operation", {
+          operation,
+          reason: result.error,
+        });
+        return c.json(
+          { error: "The operation is temporarily unavailable" },
+          503,
+        );
+    }
+  },
+);
 
 const ownershipTransferErrorResponse = (error: OwnershipTransferError) => {
   switch (error) {

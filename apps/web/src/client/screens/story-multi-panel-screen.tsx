@@ -19,7 +19,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams, useSearchParams } from "react-router";
-import { useProjectReadOnly } from "../contexts/project-billing-context";
+import { useProjectReadOnly } from "../contexts/project-usage-context";
 
 import { ErrorRetry } from "../components/error-retry";
 import {

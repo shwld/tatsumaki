@@ -1,19 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { requireProjectAccess } from "../src/presentation/routes/mcp/project-access";
 import { createProjectRepositoryMock } from "./helpers/project-repository";
+import { projectUsage } from "./helpers/project-usage";
 
-const entitlement = (state: string) => ({
-  projectId: "p1",
-  state,
-  validUntil: null,
-  revision: 1,
-  cache: { maxAgeSeconds: 60, staleIfErrorSeconds: 300 },
-});
-
-const guard = (getProjectEntitlement: () => Promise<unknown>) => ({
+const guard = (getProjectUsage: () => Promise<unknown>) => ({
   ENTITLEMENT_MODE: "control-plane",
   PROJECT_WRITE_ENFORCEMENT: "true",
-  CONTROL_PLANE: { getProjectEntitlement } as never,
+  CONTROL_PLANE: { getProjectUsage } as never,
 });
 
 const repository = createProjectRepositoryMock();
@@ -24,12 +17,12 @@ describe("requireProjectAccess write guard", () => {
     expect(result.ok).toBe(true);
   });
 
-  it("refuses a write tool on a suspended project", async () => {
+  it("refuses a write tool on a view-only project", async () => {
     const result = await requireProjectAccess(
       repository,
       "p1",
       "u1",
-      guard(async () => entitlement("suspended")),
+      guard(async () => projectUsage("read_only")),
     );
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -38,7 +31,7 @@ describe("requireProjectAccess write guard", () => {
     }
   });
 
-  it("refuses a write tool when the billing state is unknown", async () => {
+  it("refuses a write tool when the usage state is unknown", async () => {
     const result = await requireProjectAccess(
       repository,
       "p1",
@@ -55,12 +48,12 @@ describe("requireProjectAccess write guard", () => {
     }
   });
 
-  it("allows a write tool on an active project", async () => {
+  it("allows a write tool on an available project", async () => {
     const result = await requireProjectAccess(
       repository,
       "p1",
       "u1",
-      guard(async () => entitlement("active")),
+      guard(async () => projectUsage()),
     );
     expect(result.ok).toBe(true);
   });

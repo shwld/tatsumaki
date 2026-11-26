@@ -349,7 +349,7 @@ export class StoryMapDO {
     }
 
     const writable = await decideProjectWrite(this.env, attachment.projectId);
-    if (writable.kind === "suspended") return reject("suspended");
+    if (writable.kind === "read_only") return reject("suspended");
     if (writable.kind === "unavailable")
       return reject("entitlement_unavailable");
 

@@ -1,34 +1,22 @@
 import { describe, expect, it } from "vitest";
 import { decideProjectExport } from "../src/infrastructure/entitlements/project-write-guard";
+import { projectUsage } from "./helpers/project-usage";
 
 const projectId = "p1";
-const entitlement = (state: string, validUntil: string | null = null) => ({
-  projectId,
-  state,
-  validUntil,
-  revision: 1,
-  cache: { maxAgeSeconds: 60, staleIfErrorSeconds: 300 },
-});
-
-const bindings = (getProjectEntitlement: () => Promise<unknown>) => ({
+const bindings = (getProjectUsage: () => Promise<unknown>) => ({
   ENTITLEMENT_MODE: "control-plane",
   PROJECT_WRITE_ENFORCEMENT: "true",
-  CONTROL_PLANE: { getProjectEntitlement } as never,
+  CONTROL_PLANE: { getProjectUsage } as never,
 });
 
 const roles = ["owner", "member", "viewer"] as const;
 
 describe("decideProjectExport", () => {
-  for (const state of ["active", "grace"]) {
+  for (const kind of ["available", "ending", "action_required"] as const) {
     for (const role of roles) {
-      it(`${role} x ${state}`, async () => {
+      it(`${role} x ${kind}`, async () => {
         const denial = await decideProjectExport(
-          bindings(async () =>
-            entitlement(
-              state,
-              state === "grace" ? "2999-01-01T00:00:00Z" : null,
-            ),
-          ),
+          bindings(async () => projectUsage(kind)),
           projectId,
           role,
         );
@@ -39,9 +27,9 @@ describe("decideProjectExport", () => {
   }
 
   for (const role of roles) {
-    it(`${role} x suspended is denied`, async () => {
+    it(`${role} x view only is denied`, async () => {
       const denial = await decideProjectExport(
-        bindings(async () => entitlement("suspended")),
+        bindings(async () => projectUsage("read_only")),
         projectId,
         role,
       );
@@ -52,9 +40,11 @@ describe("decideProjectExport", () => {
     });
   }
 
-  it("owner with expired grace is denied", async () => {
+  it("owner past the deadline is denied", async () => {
     const denial = await decideProjectExport(
-      bindings(async () => entitlement("grace", "2000-01-01T00:00:00Z")),
+      bindings(async () =>
+        projectUsage("action_required", { until: "2000-01-01T00:00:00Z" }),
+      ),
       projectId,
       "owner",
     );
@@ -78,7 +68,7 @@ describe("decideProjectExport", () => {
     const denial = await decideProjectExport(
       bindings(async () => {
         called = true;
-        return entitlement("active");
+        return projectUsage();
       }),
       projectId,
       "viewer",
@@ -96,29 +86,30 @@ describe("decideProjectExport", () => {
 });
 
 describe("getProjectAccessState", () => {
-  it("reports active, grace, suspended, and expired grace as suspended", async () => {
+  it("reports available, limited, view only, and a passed deadline as view only", async () => {
     const { getProjectAccessState } = await import(
       "../src/infrastructure/entitlements/project-write-guard"
     );
-    const state = (e: unknown) =>
+    const state = (usage: unknown) =>
       getProjectAccessState(
-        bindings(async () => e),
+        bindings(async () => usage),
         projectId,
       );
-    expect(await state(entitlement("active"))).toEqual({ kind: "active" });
-    expect(await state(entitlement("grace", "2999-01-01T00:00:00Z"))).toEqual({
-      kind: "grace",
-      validUntil: "2999-01-01T00:00:00Z",
+    expect(await state(projectUsage())).toEqual({ kind: "available" });
+    expect(await state(projectUsage("ending"))).toEqual({
+      kind: "limited",
+      until: "2999-01-01T00:00:00Z",
+      untilReason: "ending",
     });
-    expect(await state(entitlement("suspended"))).toEqual({
-      kind: "suspended",
+    expect(await state(projectUsage("read_only"))).toEqual({
+      kind: "read_only",
     });
-    expect(await state(entitlement("grace", "2000-01-01T00:00:00Z"))).toEqual({
-      kind: "suspended",
-    });
+    expect(
+      await state(projectUsage("ending", { until: "2000-01-01T00:00:00Z" })),
+    ).toEqual({ kind: "read_only" });
   });
 
-  it("is unknown when the Control Plane fails, and active when not enforcing", async () => {
+  it("is unknown when the provider fails, and available when not enforcing", async () => {
     const { getProjectAccessState } = await import(
       "../src/infrastructure/entitlements/project-write-guard"
     );
@@ -131,7 +122,7 @@ describe("getProjectAccessState", () => {
       ),
     ).toEqual({ kind: "unknown" });
     expect(await getProjectAccessState({}, projectId)).toEqual({
-      kind: "active",
+      kind: "available",
     });
   });
 });

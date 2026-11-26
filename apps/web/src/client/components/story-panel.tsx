@@ -35,7 +35,7 @@ import {
   calculateTotalPoints,
   groupStoriesByIteration,
 } from "../lib/story-panel-grouping";
-import { useProjectReadOnly } from "../contexts/project-billing-context";
+import { useProjectReadOnly } from "../contexts/project-usage-context";
 import { useToast } from "../contexts/toast-context";
 import { useStoryDragState } from "../contexts/story-drag-context";
 import { useStoryPatch } from "../hooks/use-story-patch";

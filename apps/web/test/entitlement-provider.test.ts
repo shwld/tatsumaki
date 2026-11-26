@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { ControlPlaneEntitlementProvider } from "../src/infrastructure/entitlements/control-plane-entitlement-provider";
+import { ControlPlaneUsageProvider } from "../src/infrastructure/entitlements/control-plane-usage-provider";
 import { UnlimitedEntitlementProvider } from "../src/infrastructure/entitlements/unlimited-entitlement-provider";
 import { createEntitlementProvider } from "../src/presentation/routes/billing";
+import { projectUsage } from "./helpers/project-usage";
 
 const bindings = {
   DB: {} as D1Database,
@@ -68,6 +70,32 @@ describe("ControlPlaneEntitlementProvider", () => {
   });
 });
 
+describe("ControlPlaneUsageProvider", () => {
+  const read = (answer: unknown) =>
+    new ControlPlaneUsageProvider({
+      getProjectUsage: vi.fn(async () => answer),
+    }).getProjectUsage("p1");
+
+  it.each([
+    "available",
+    "ending",
+    "action_required",
+    "read_only",
+  ] as const)("accepts an %s answer", async (kind) => {
+    await expect(read(projectUsage(kind))).resolves.toEqual(projectUsage(kind));
+  });
+
+  it.each([
+    ["a deadline without a reason", { until: "2999-01-01T00:00:00Z" }],
+    ["a reason without a deadline", { untilReason: "ending" }],
+    ["an unknown reason", { until: "2999-01-01T00:00:00Z", untilReason: "x" }],
+    ["a missing permission", { allowed: undefined }],
+    ["a different project", { projectId: "other" }],
+  ])("rejects %s", async (_name, overrides) => {
+    await expect(read(projectUsage("available", overrides))).rejects.toThrow();
+  });
+});
+
 describe("UnlimitedEntitlementProvider", () => {
   it("keeps every project active for self-hosting", async () => {
     await expect(
@@ -92,14 +120,15 @@ describe("createEntitlementProvider", () => {
           getProjectEntitlement: vi.fn(),
           createCheckoutSession: vi.fn(),
           listProjectBilling: vi.fn(),
-          createSubscriptionCancelSession: vi.fn(),
-          createPaymentMethodUpdateSession: vi.fn(),
+          getProjectUsage: vi.fn(),
+          listProjectOperations: vi.fn(),
+          startProjectOperation: vi.fn(),
+          startAccountOperation: vi.fn(),
           closeProjectBilling: vi.fn(),
           expireTransferCheckout: vi.fn(),
           confirmTransferPayment: vi.fn(),
           settleOwnershipTransfer: vi.fn(),
           syncProjectDisplayNames: vi.fn(),
-          createPortalSession: vi.fn(),
         },
       }),
     ).toBeInstanceOf(ControlPlaneEntitlementProvider);

@@ -1,9 +1,22 @@
 import { z } from "zod";
 import type { EntitlementProvider } from "../../application/ports/entitlement-provider";
+import type { StartProjectOperationInput } from "../../application/ports/project-operations-gateway";
 import type { ProjectEntitlement } from "../../domain/entities/entitlement";
 
 export interface ControlPlaneRpc {
   getProjectEntitlement(input: { projectId: string }): Promise<unknown>;
+  getProjectUsage(input: { projectId: string }): Promise<unknown>;
+  listProjectOperations(input: {
+    accountId: string;
+    projectIds: string[];
+    locale: "ja" | "en";
+  }): Promise<unknown>;
+  startProjectOperation(input: StartProjectOperationInput): Promise<unknown>;
+  startAccountOperation(input: {
+    accountId: string;
+    operation: "manage";
+    returnUrl: string;
+  }): Promise<unknown>;
   createCheckoutSession(input: {
     billingAccountId: string;
     projectId: string;
@@ -40,28 +53,8 @@ export interface ControlPlaneRpc {
     billingAccountId: string;
     projectIds: string[];
   }): Promise<unknown>;
-  createPortalSession(input: {
-    billingAccountId: string;
-    returnUrl: string;
-  }): Promise<unknown>;
-  createSubscriptionCancelSession(input: {
-    billingAccountId: string;
-    projectId: string;
-    returnUrl: string;
-  }): Promise<unknown>;
-  createPaymentMethodUpdateSession(input: {
-    billingAccountId: string;
-    returnUrl: string;
-  }): Promise<unknown>;
   closeProjectBilling(input: { projectId: string }): Promise<unknown>;
 }
-
-const sessionSchema = z.object({
-  url: z.url().refine((value) => new URL(value).protocol === "https:"),
-});
-
-export const parseSessionResponse = (response: unknown): { url: string } =>
-  sessionSchema.parse(response);
 
 const entitlementSchema = z.object({
   projectId: z.string().min(1),

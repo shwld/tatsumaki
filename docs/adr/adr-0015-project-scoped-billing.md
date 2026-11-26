@@ -6,7 +6,7 @@
 - **deciders**: shwld
 - **date**: 2026-11-14
 - **supersedes**: ADR-0011 の一部(Plans and limits と Consequences の一部。範囲は ADR-0011 の Amendment(story #414)に記録)
-- **superseded_by**:
+- **superseded_by**: ADR-0016(本体と権利の提供者の境界に関する部分。範囲は Amendment(story #476)に記録)
 - **enforcement**: manual
 
 ## Context
@@ -205,3 +205,12 @@ Stripe Portal の購読一覧で、プロジェクトを区別できるように
 - **利用者向けの文面**: 支払いが確認できれば編集を再開できる。古い未払いが残る場合があるので、再開を「全額の精算」とは書かない。
 - 根拠: [Stripe: Subscription invoices](https://docs.stripe.com/billing/invoices/subscription)、[Stripe: Subscription statuses](https://docs.stripe.com/billing/subscriptions/overview)
 
+## Amendment 2026-11-26 (story #476)
+
+本体と権利の提供者の境界は [ADR-0016](adr-0016-entitlement-provider-boundary.md) に置き換える。次の記述は ADR-0016 を正とする。
+
+- 「プロジェクトの状態」の状態の語彙と画面の表示。本体は利用の可否と期限を受け取り、決済の状態を知らない。
+- 次回請求の表示と、再開・解約・支払い方法の更新の本体側の入口。
+- 「Control Plane 障害時」の利用状態の扱い。
+
+作成、譲渡、削除、改名の記述は、それぞれの経路を移すまで有効とする。

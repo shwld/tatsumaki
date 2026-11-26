@@ -1,22 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import { ProjectEntitlementCache } from "../src/application/services/project-entitlement-cache";
-import type { ProjectEntitlement } from "../src/domain/entities/entitlement";
+import { ProjectUsageCache } from "../src/application/services/project-usage-cache";
+import type { ProjectUsage } from "../src/domain/entities/project-usage";
+import { projectUsage } from "./helpers/project-usage";
 
-const entitlement = (
-  overrides: Partial<ProjectEntitlement> = {},
-): ProjectEntitlement => ({
-  projectId: "p1",
-  state: "active",
-  validUntil: null,
-  revision: 1,
-  cache: { maxAgeSeconds: 60, staleIfErrorSeconds: 300 },
-  ...overrides,
-});
+const usage = (...args: Parameters<typeof projectUsage>) =>
+  projectUsage(...args) as ProjectUsage;
 
-const setup = (
-  responses: Array<ProjectEntitlement | Error>,
-  startMs = 1_000_000,
-) => {
+const setup = (responses: Array<ProjectUsage | Error>, startMs = 1_000_000) => {
   let nowMs = startMs;
   const queue = [...responses];
   const get = vi.fn(async (projectId: string) => {
@@ -24,10 +14,7 @@ const setup = (
     if (next instanceof Error) throw next;
     return { ...next, projectId };
   });
-  const cache = new ProjectEntitlementCache(
-    { getProjectEntitlement: get },
-    () => nowMs,
-  );
+  const cache = new ProjectUsageCache({ getProjectUsage: get }, () => nowMs);
   return {
     cache,
     get,
@@ -37,9 +24,9 @@ const setup = (
   };
 };
 
-describe("ProjectEntitlementCache", () => {
-  it("allows active and reuses the answer until maxAgeSeconds", async () => {
-    const { cache, get, advance } = setup([entitlement()]);
+describe("ProjectUsageCache", () => {
+  it("allows an available project and reuses the answer until maxAgeSeconds", async () => {
+    const { cache, get, advance } = setup([usage()]);
     expect(await cache.decideWrite("p1")).toEqual({ kind: "allow" });
     advance(59);
     await cache.decideWrite("p1");
@@ -49,33 +36,31 @@ describe("ProjectEntitlementCache", () => {
     expect(get).toHaveBeenCalledTimes(2);
   });
 
-  it("denies suspended", async () => {
-    const { cache } = setup([entitlement({ state: "suspended" })]);
-    expect(await cache.decideWrite("p1")).toEqual({ kind: "suspended" });
+  it("denies a view-only project", async () => {
+    const { cache } = setup([usage("read_only")]);
+    expect(await cache.decideWrite("p1")).toEqual({ kind: "read_only" });
   });
 
-  it("denies a grace project once validUntil has passed, even from cache", async () => {
-    const validUntil = new Date(1_000_000 + 30_000).toISOString();
-    const { cache, get, advance } = setup([
-      entitlement({ state: "grace", validUntil }),
-    ]);
+  it("denies a project once its deadline has passed, even from cache", async () => {
+    const until = new Date(1_000_000 + 30_000).toISOString();
+    const { cache, get, advance } = setup([usage("ending", { until })]);
     expect(await cache.decideWrite("p1")).toEqual({ kind: "allow" });
     advance(29);
     expect(await cache.decideWrite("p1")).toEqual({ kind: "allow" });
     advance(1);
-    expect(await cache.decideWrite("p1")).toEqual({ kind: "suspended" });
+    expect(await cache.decideWrite("p1")).toEqual({ kind: "read_only" });
     expect(get).toHaveBeenCalledTimes(1);
   });
 
   it("keeps projects separate", async () => {
-    const { cache, get } = setup([entitlement()]);
+    const { cache, get } = setup([usage()]);
     await cache.decideWrite("p1");
     await cache.decideWrite("p2");
     expect(get).toHaveBeenCalledTimes(2);
   });
 
   it("shares one fetch between concurrent callers", async () => {
-    const { cache, get } = setup([entitlement()]);
+    const { cache, get } = setup([usage()]);
     await Promise.all([cache.decideWrite("p1"), cache.decideWrite("p1")]);
     expect(get).toHaveBeenCalledTimes(1);
   });
@@ -86,7 +71,7 @@ describe("ProjectEntitlementCache", () => {
   });
 
   it("serves a stale answer for staleIfErrorSeconds after expiry, then fails closed", async () => {
-    const { cache, advance } = setup([entitlement(), new Error("down")]);
+    const { cache, advance } = setup([usage(), new Error("down")]);
     expect(await cache.decideWrite("p1")).toEqual({ kind: "allow" });
     advance(60 + 299);
     expect(await cache.decideWrite("p1")).toEqual({ kind: "allow" });
@@ -96,26 +81,26 @@ describe("ProjectEntitlementCache", () => {
 
   it("applies a newer answer immediately once the cache expires", async () => {
     const { cache, advance } = setup([
-      entitlement(),
-      entitlement({ state: "suspended", revision: 2 }),
+      usage(),
+      usage("read_only", { revision: 2 }),
     ]);
     expect(await cache.decideWrite("p1")).toEqual({ kind: "allow" });
     advance(60);
-    expect(await cache.decideWrite("p1")).toEqual({ kind: "suspended" });
+    expect(await cache.decideWrite("p1")).toEqual({ kind: "read_only" });
   });
 
   it("does not move back to an older revision", async () => {
     const { cache, advance } = setup([
-      entitlement({ state: "suspended", revision: 5 }),
-      entitlement({ state: "active", revision: 4 }),
+      usage("read_only", { revision: 5 }),
+      usage("available", { revision: 4 }),
     ]);
-    expect(await cache.decideWrite("p1")).toEqual({ kind: "suspended" });
+    expect(await cache.decideWrite("p1")).toEqual({ kind: "read_only" });
     advance(60);
-    expect(await cache.decideWrite("p1")).toEqual({ kind: "suspended" });
+    expect(await cache.decideWrite("p1")).toEqual({ kind: "read_only" });
   });
 
   it("refetches after invalidate", async () => {
-    const { cache, get } = setup([entitlement()]);
+    const { cache, get } = setup([usage()]);
     await cache.decideWrite("p1");
     cache.invalidate("p1");
     await cache.decideWrite("p1");
@@ -123,20 +108,20 @@ describe("ProjectEntitlementCache", () => {
   });
 
   it("rejects an answer for a different project", async () => {
-    const cache = new ProjectEntitlementCache({
-      getProjectEntitlement: async () => entitlement({ projectId: "other" }),
+    const cache = new ProjectUsageCache({
+      getProjectUsage: async () => usage("available", { projectId: "other" }),
     });
     expect(await cache.decideWrite("p1")).toEqual({ kind: "unavailable" });
   });
 });
 
-describe("ProjectEntitlementCache revision watermark", () => {
-  it("does not reopen a suspended project through an older revision after expiry", async () => {
+describe("ProjectUsageCache revision watermark", () => {
+  it("does not reopen a view-only project through an older revision after expiry", async () => {
     const { cache, advance } = setup([
-      entitlement({ state: "suspended", revision: 5 }),
-      entitlement({ state: "active", revision: 4 }),
+      usage("read_only", { revision: 5 }),
+      usage("available", { revision: 4 }),
     ]);
-    expect(await cache.decideWrite("p1")).toEqual({ kind: "suspended" });
+    expect(await cache.decideWrite("p1")).toEqual({ kind: "read_only" });
     advance(60 + 300);
     expect(await cache.decideWrite("p1")).toEqual({ kind: "unavailable" });
     expect(await cache.decideWrite("p1")).toEqual({ kind: "unavailable" });
