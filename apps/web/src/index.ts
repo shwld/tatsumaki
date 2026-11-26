@@ -8,6 +8,7 @@ import { recordBurndownSnapshotsAllActiveIterations } from "./application/usecas
 import { cleanupArtifactsScheduled } from "./presentation/scheduled/cleanup-artifacts";
 import { recoverOwnershipTransfersScheduled } from "./presentation/scheduled/recover-ownership-transfers";
 import { recoverProjectDeletionsScheduled } from "./presentation/scheduled/recover-project-deletions";
+import { sweepUnreferencedObjectsScheduled } from "./presentation/scheduled/sweep-unreferenced-objects";
 import { recoverProjectCreationsScheduled } from "./presentation/scheduled/recover-project-creations";
 import { ensureIterationsForAllProjects } from "./presentation/scheduled/ensure-iterations";
 import { healthRoute } from "./presentation/routes/health";
@@ -357,6 +358,7 @@ export default {
     );
     // Independent of the iteration work above: neither can fail the other.
     ctx.waitUntil(cleanupArtifactsScheduled(env));
+    ctx.waitUntil(sweepUnreferencedObjectsScheduled(env));
     ctx.waitUntil(recoverProjectCreationsScheduled(env));
     ctx.waitUntil(recoverProjectDeletionsScheduled(env));
     ctx.waitUntil(recoverOwnershipTransfersScheduled(env));

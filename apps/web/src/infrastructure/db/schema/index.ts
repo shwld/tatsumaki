@@ -36,3 +36,4 @@ export {
 export { projectCreationRequestsTable } from "./project-creation-requests";
 export { projectDeletionRequestsTable } from "./project-deletion-requests";
 export { projectOwnershipTransfersTable } from "./project-ownership-transfers";
+export { objectSweepCursorsTable } from "./object-sweep-cursors";

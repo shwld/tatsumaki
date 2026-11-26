@@ -216,7 +216,11 @@ authRoute.get("/auth/me/avatar", async (c) => {
   const currentUser = c.get("currentUser");
   const objectStore = createUserAvatarObjectStore(c.env.USER_AVATARS);
 
-  const result = await getUserAvatarContent(objectStore, currentUser.id);
+  const result = await getUserAvatarContent(
+    new D1UserRepository(c.env.DB),
+    objectStore,
+    currentUser.id,
+  );
 
   if (result.isErr()) {
     if (result.error === GET_AVATAR_NOT_FOUND) {
@@ -242,7 +246,11 @@ authRoute.get("/auth/users/:userId/avatar", async (c) => {
   const userId = c.req.param("userId");
   const objectStore = createUserAvatarObjectStore(c.env.USER_AVATARS);
 
-  const result = await getUserAvatarContent(objectStore, userId);
+  const result = await getUserAvatarContent(
+    new D1UserRepository(c.env.DB),
+    objectStore,
+    userId,
+  );
 
   if (result.isErr()) {
     if (result.error === GET_AVATAR_NOT_FOUND) {

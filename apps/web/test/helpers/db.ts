@@ -27,6 +27,7 @@ import {
 import { projectCreationRequestsTable } from "../../src/infrastructure/db/schema/project-creation-requests";
 import { projectDeletionRequestsTable } from "../../src/infrastructure/db/schema/project-deletion-requests";
 import { projectOwnershipTransfersTable } from "../../src/infrastructure/db/schema/project-ownership-transfers";
+import { objectSweepCursorsTable } from "../../src/infrastructure/db/schema/object-sweep-cursors";
 import { usersTable } from "../../src/infrastructure/db/schema/users";
 
 /**
@@ -39,6 +40,7 @@ import { usersTable } from "../../src/infrastructure/db/schema/users";
  */
 export async function resetDatabase(db: D1Database): Promise<void> {
   const client = createDb(db);
+  await client.delete(objectSweepCursorsTable);
   await client.delete(projectCreationRequestsTable);
   await client.delete(projectDeletionRequestsTable);
   await client.delete(projectOwnershipTransfersTable);
