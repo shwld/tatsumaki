@@ -1,4 +1,6 @@
 import { err, ok, type Result } from "neverthrow";
+import type { UserRepository } from "../../domain/repositories/user-repository";
+import { deriveUserAvatarKey } from "../../domain/users/user-avatar-key";
 import type {
   StoredUserAvatarObject,
   UserAvatarObjectStore,
@@ -13,14 +15,21 @@ export type GetUserAvatarContentError =
   | typeof USER_AVATAR_DOWNLOAD_ERROR;
 
 export async function getUserAvatarContent(
+  repository: UserRepository,
   objectStore: UserAvatarObjectStore,
   userId: string,
 ): Promise<Result<StoredUserAvatarObject, GetUserAvatarContentError>> {
-  const fileKey = `user-avatars/${userId}`;
-
   let object: StoredUserAvatarObject | null;
   try {
-    object = await objectStore.get(fileKey);
+    const user = await repository.findById(userId);
+    if (user.isErr()) {
+      return err(USER_AVATAR_DOWNLOAD_ERROR);
+    }
+    // The object outlives a deleted account until the next sweep.
+    if (!user.value?.avatarUrl) {
+      return err(USER_AVATAR_NOT_FOUND_ERROR);
+    }
+    object = await objectStore.get(deriveUserAvatarKey(userId));
   } catch {
     return err(USER_AVATAR_DOWNLOAD_ERROR);
   }

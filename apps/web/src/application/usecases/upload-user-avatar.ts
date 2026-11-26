@@ -4,6 +4,7 @@ import type {
   UserRepository,
   UserRepositoryError,
 } from "../../domain/repositories/user-repository";
+import { deriveUserAvatarKey } from "../../domain/users/user-avatar-key";
 import type { UserAvatarObjectStore } from "../ports/user-avatar-object-store";
 
 export const USER_AVATAR_UPLOAD_ERROR = "USER_AVATAR_UPLOAD_ERROR" as const;
@@ -24,7 +25,7 @@ export async function uploadUserAvatar(
     fileBody: ReadableStream<Uint8Array>;
   },
 ): Promise<Result<User, UploadUserAvatarError>> {
-  const fileKey = `user-avatars/${input.userId}`;
+  const fileKey = deriveUserAvatarKey(input.userId);
   const avatarUrl = `/api/auth/users/${input.userId}/avatar`;
 
   try {

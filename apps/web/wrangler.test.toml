@@ -21,6 +21,14 @@ binding = "OAUTH_KV"
 id = "<unique-ID-for-your-oauth-kv>"
 
 [[r2_buckets]]
+binding = "STORY_ATTACHMENTS"
+bucket_name = "tatsumaki-story-attachments-test"
+
+[[r2_buckets]]
+binding = "USER_AVATARS"
+bucket_name = "tatsumaki-user-avatars-test"
+
+[[r2_buckets]]
 binding = "ARTIFACTS"
 bucket_name = "tatsumaki-artifacts-test"
 

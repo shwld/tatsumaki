@@ -4,6 +4,7 @@ import type {
   ArtifactObjectStore,
   StoredArtifactObject,
 } from "../../application/ports/artifact-object-store";
+import { deleteManyFromR2 } from "./r2-delete-many";
 
 export class R2ArtifactObjectStore implements ArtifactObjectStore {
   constructor(private readonly bucket: R2Bucket) {}
@@ -45,10 +46,7 @@ export class R2ArtifactObjectStore implements ArtifactObjectStore {
   }
 
   async deleteMany(keys: string[]): Promise<void> {
-    // R2 accepts at most 1000 keys per delete call.
-    for (let index = 0; index < keys.length; index += 1000) {
-      await this.bucket.delete(keys.slice(index, index + 1000));
-    }
+    await deleteManyFromR2(this.bucket, keys);
   }
 
   async listPrefixes(options: {
