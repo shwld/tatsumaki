@@ -193,3 +193,15 @@ Stripe Portal の購読一覧で、プロジェクトを区別できるように
 - **即時失効は最善努力**: 取消・辞退・資格喪失(ロール変更・アカウント削除)で申請を終える操作は、即時失効をリクエスト内またはリクエストの後処理(`waitUntil`)で1回だけ試し、失敗・中断しても再試行しない。期限切れで終わる場合は試さない。これとは別に、Checkout の作成中に申請が終わった場合は、作成した側がその Checkout を失効させる。
 - **精算による保証**: いずれの終了経路も、申請を終える書き込みで `settlement_outcome = 'not-switched'` / `settlement_status = 'pending'` を記録する。毎時の定期ジョブ(`recoverOwnershipTransfers`)が精算待ちを拾い、Control Plane の `settleOwnershipTransfer` は `not-switched` の精算で最初に受け手の open な Checkout を `expireTransferCheckoutSessions` で失効させる。精算は確認期間(25 時間)が過ぎるまで毎時繰り返す。web のテスト(`ownership-transfer-checkout-expiry-recovery.route.test.ts`)は、各終了経路で即時失効が失敗しても毎時の scheduled ハンドラが `not-switched` の精算を依頼することを確かめ、Control Plane のテストは `not-switched` の精算が受け手の Checkout を失効させることを確かめる。
 - **許容する遅延**: 即時失効が行われなくても、通常は次の定期ジョブ(約1時間以内)で失効する。これは定期ジョブの間隔による目安で、厳密な上限ではない。1回に扱う件数(50件)を超える精算待ちがある場合や、Control Plane・Stripe が失敗した場合は、次回以降の定期ジョブに持ち越す。その間に支払われた決済は、同じ精算が申請IDで特定して全額返金する。新たな outbox や定期ジョブの間隔の変更は行わない。
+
+## Amendment 2026-11-26 (story #468)
+
+支払い失敗の猶予期限の起点を決めた。判定は Control Plane が行い、詳細は同リポジトリの ADR-0002 の Amendment 2026-11-26 に置く。
+
+- **背景**: 期限を購読の請求期間の末日から数えていた。Stripe は更新の決済前に期間を次へ進めるため、猶予が約 1 か月延び、`past_due` のまま残る設定では停止しなかった(test mode の test clock で確認)。
+- **起点**: 最後に支払われたか回収不能(`uncollectible`)にした請求書より後で、最も古い未払い(`open`)の請求書が確定した時刻。そこから 7 日間が `grace`。更新の支払いでは、確定は更新日の約 1 時間後(Stripe への webhook 応答が失敗すると遅れる)。再試行や次の請求日を迎えても延びない。
+- **起点が無い場合**: `past_due` でも `suspended`。期間末解約を予約した購読の `grace` は、期間末を超えない。
+- **前提**: この起点が成り立つための決済事業者側の設定は、Control Plane の運用手順に置く。
+- **利用者向けの文面**: 支払いが確認できれば編集を再開できる。古い未払いが残る場合があるので、再開を「全額の精算」とは書かない。
+- 根拠: [Stripe: Subscription invoices](https://docs.stripe.com/billing/invoices/subscription)、[Stripe: Subscription statuses](https://docs.stripe.com/billing/subscriptions/overview)
+
