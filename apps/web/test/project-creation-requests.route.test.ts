@@ -26,6 +26,7 @@ type Fake = {
   fail: boolean;
   checkoutFail: boolean;
   entitlementProjectId: string | null;
+  creationDenied: boolean;
 };
 
 const setup = () => {
@@ -34,6 +35,7 @@ const setup = () => {
     fail: false,
     checkoutFail: false,
     entitlementProjectId: null,
+    creationDenied: false,
   };
   const createCheckoutSession = vi.fn(async () => {
     if (fake.checkoutFail) throw new Error("down");
@@ -51,12 +53,28 @@ const setup = () => {
       };
     },
   );
+  const getCreationEligibility = vi.fn(
+    async ({ projectId }: { projectId: string }) => {
+      if (fake.fail) throw new Error("down");
+      const id = fake.entitlementProjectId ?? projectId;
+      if (fake.creationDenied) return { projectId: id, status: "denied" };
+      return fake.state === "active"
+        ? { projectId: id, status: "allowed" }
+        : {
+            projectId: id,
+            status: "pending",
+            deadline: "2099-01-01T00:00:00.000Z",
+          };
+    },
+  );
   const bindings = {
     DB: env.DB,
     ENTITLEMENT_MODE: "control-plane",
     CHECKOUT_ENABLED: "true",
     CONTROL_PLANE: {
       getProjectEntitlement,
+      getCreationEligibility,
+      startCreationAcquisition: createCheckoutSession,
       createCheckoutSession,
       listProjectBilling: vi.fn(),
       createPortalSession: vi.fn(),
@@ -105,11 +123,11 @@ describe("project creation requests", () => {
       url: string;
     };
     expect(body).toMatchObject({
-      kind: "checkout",
+      kind: "redirect",
       url: "https://checkout.stripe.com/c/pay/cs_test",
     });
     expect(createCheckoutSession).toHaveBeenCalledWith({
-      billingAccountId: "user-1",
+      accountId: "user-1",
       projectId: body.projectId,
       projectName: expect.any(String),
       requestId: expect.stringMatching(/^[0-9a-f-]{36}$/),
@@ -139,16 +157,15 @@ describe("project creation requests", () => {
     expect(calls[1][0].requestId).toBe(calls[0][0].requestId);
   });
 
-  it("does not start checkout when the flag is off", async () => {
-    const { post, createCheckoutSession } = setup();
-    const response = await post(
-      "user-1",
-      "/project-creation-requests",
-      { name: "Alpha", idempotencyKey: "key-12345678" },
-      { CHECKOUT_ENABLED: "false" },
-    );
-    expect(response.status).toBe(409);
-    expect(createCheckoutSession).not.toHaveBeenCalled();
+  it("reports when the provider does not offer acquisition", async () => {
+    const { post, fake, createCheckoutSession } = setup();
+    fake.checkoutFail = true;
+    const response = await post("user-1", "/project-creation-requests", {
+      name: "Alpha",
+      idempotencyKey: "key-12345678",
+    });
+    expect(response.status).toBe(503);
+    expect(createCheckoutSession).toHaveBeenCalledOnce();
   });
 
   it("rejects an empty name and a malformed idempotency key", async () => {
@@ -200,14 +217,16 @@ describe("project creation requests", () => {
     expect(createCheckoutSession).not.toHaveBeenCalled();
   });
 
-  it("refuses a new checkout while a payment needs attention", async () => {
-    const { post, fake } = setup();
+  it("leaves the acquisition decision to the provider", async () => {
+    const { post, fake, createCheckoutSession } = setup();
     fake.state = "grace";
+    fake.checkoutFail = true;
     const response = await post("user-1", "/project-creation-requests", {
       name: "A",
       idempotencyKey: "key-12345678",
     });
-    expect(response.status).toBe(409);
+    expect(response.status).toBe(503);
+    expect(createCheckoutSession).toHaveBeenCalledOnce();
   });
 
   describe("completion", () => {
@@ -234,9 +253,79 @@ describe("project creation requests", () => {
           {},
         );
         expect(response.status).toBe(202);
-        expect(await response.json()).toEqual({ status: "pending", state });
+        expect(await response.json()).toEqual({ status: "pending" });
       }
       expect(await countProjects()).toBe(0);
+    });
+
+    it("does not create a project when the provider denies creation", async () => {
+      const ctx = setup();
+      const projectId = await open(ctx);
+      ctx.fake.creationDenied = true;
+      const response = await ctx.post(
+        "user-1",
+        `/project-creation-requests/${projectId}/complete`,
+        {},
+      );
+      expect(response.status).toBe(409);
+      expect(await response.json()).toEqual({ status: "denied" });
+      expect(await countProjects()).toBe(0);
+    });
+
+    it("does not revive a denied request after a stale retry or materialization", async () => {
+      const ctx = setup();
+      const projectId = await open(ctx);
+      const repository = new D1ProjectCreationRequestRepository(env.DB);
+      const found = await repository.findById(projectId);
+      if (found.isErr() || !found.value) throw new Error("missing request");
+      expect(
+        (
+          await repository.markFailed(projectId, "2026-11-18T12:00:00.000Z")
+        )._unsafeUnwrap(),
+      ).toBe(true);
+      await repository.recordAttempt({
+        projectId,
+        attemptCount: 1,
+        materializeFailureCount: 0,
+        nextAttemptAt: null,
+        lastError: null,
+        stalledReason: null,
+      });
+      expect((await repository.materialize(found.value)).isErr()).toBe(true);
+      const outcomes = (await repository.listUnnotified(10))._unsafeUnwrap();
+      expect(outcomes).toEqual([
+        {
+          projectId,
+          accountId: "user-1",
+          outcome: "failed",
+          occurredAt: "2026-11-18T12:00:00.000Z",
+        },
+      ]);
+      expect(await countProjects()).toBe(0);
+    });
+
+    it("commits exactly one outcome when completion races with denial", async () => {
+      const ctx = setup();
+      const projectId = await open(ctx);
+      const repository = new D1ProjectCreationRequestRepository(env.DB);
+      const found = await repository.findById(projectId);
+      if (found.isErr() || !found.value) throw new Error("missing request");
+      const [created, failed] = await Promise.all([
+        repository.materialize(found.value),
+        repository.markFailed(projectId, "2026-11-18T12:00:00.000Z"),
+      ]);
+      expect(failed.isOk()).toBe(true);
+      const outcomes = (await repository.listUnnotified(10))._unsafeUnwrap();
+      expect(outcomes).toHaveLength(1);
+      if (outcomes[0].outcome === "created") {
+        expect(created.isOk()).toBe(true);
+        expect(await countProjects()).toBe(1);
+        expect(failed._unsafeUnwrap()).toBe(false);
+      } else {
+        expect(created.isErr()).toBe(true);
+        expect(await countProjects()).toBe(0);
+        expect(failed._unsafeUnwrap()).toBe(true);
+      }
     });
 
     it("creates the project with the pre-issued id and owner exactly once", async () => {
@@ -423,7 +512,7 @@ describe("project creation requests", () => {
       expect(await countProjects()).toBe(0);
     });
 
-    it("does not complete when checkout is disabled", async () => {
+    it("completes an existing request when new checkout is disabled", async () => {
       const ctx = setup();
       const projectId = await open(ctx);
       ctx.fake.state = "active";
@@ -433,8 +522,8 @@ describe("project creation requests", () => {
         {},
         { CHECKOUT_ENABLED: "false" },
       );
-      expect(response.status).toBe(409);
-      expect(await countProjects()).toBe(0);
+      expect(response.status).toBe(200);
+      expect(await countProjects()).toBe(1);
     });
   });
 

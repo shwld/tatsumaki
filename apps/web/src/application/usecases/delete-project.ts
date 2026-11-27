@@ -5,14 +5,14 @@ import {
   type ProjectRepository,
   type ProjectRepositoryError,
 } from "../../domain/repositories/project-repository";
-import type { ProjectBillingCloseGateway } from "../ports/project-billing-close-gateway";
+import type { ProjectDeletionNotificationGateway } from "../ports/project-deletion-notification-gateway";
 
 export const PROJECT_NOT_FOUND_ERROR = "PROJECT_NOT_FOUND_ERROR" as const;
 export const PROJECT_DELETE_FORBIDDEN_ERROR =
   "PROJECT_DELETE_FORBIDDEN_ERROR" as const;
 export const PROJECT_NAME_CONFIRMATION_MISMATCH_ERROR =
   "PROJECT_NAME_CONFIRMATION_MISMATCH_ERROR" as const;
-// 削除要求は保持済みだが未完了(課金の終了未確認、または本体削除の失敗)。定期復旧が完了させる。
+// 削除要求は保持済みだが未完了(通知の未確認、または本体削除の失敗)。定期復旧が完了させる。
 export const PROJECT_DELETE_PENDING_ERROR =
   "PROJECT_DELETE_PENDING_ERROR" as const;
 
@@ -23,12 +23,11 @@ export type DeleteProjectError =
   | typeof PROJECT_DELETE_PENDING_ERROR
   | ProjectRepositoryError;
 
-// 公式ホスト版のみ billing を渡す。セルフホストは課金 RPC なしで従来どおり削除する。
 export type DeleteProjectDeps = {
   repository: ProjectRepository;
-  billing?: {
+  notifications?: {
     requests: ProjectDeletionRequestRepository;
-    gateway: ProjectBillingCloseGateway;
+    gateway: ProjectDeletionNotificationGateway;
   };
 };
 
@@ -36,34 +35,43 @@ const failureMessage = (error: unknown): string =>
   (error instanceof Error ? error.name : "unknown").slice(0, 200);
 
 /**
- * 課金の終了と DB 削除は 1 つのトランザクションにできないため、先に削除要求を永続化し、
- * 課金終了(冪等)→ 本体削除 → 要求の完了印の順に進める。どこで途切れても要求が残り、
+ * 提供者への通知と DB 削除は 1 つのトランザクションにできないため、先に削除要求を永続化し、
+ * 本体削除 → 結果通知 → 要求の完了印の順に進める。どこで途切れても要求が残り、
  * 再実行または定期復旧で同じ結果に収束する。
  */
-async function closeBillingAndDelete(
+async function deleteAndNotify(
   repository: ProjectRepository,
-  billing: NonNullable<DeleteProjectDeps["billing"]>,
+  notifications: NonNullable<DeleteProjectDeps["notifications"]>,
   projectId: string,
 ): Promise<Result<boolean, DeleteProjectError>> {
-  try {
-    await billing.gateway.closeProjectBilling({ projectId });
-  } catch (error) {
-    await billing.requests.recordFailure(projectId, failureMessage(error));
-    return err(PROJECT_DELETE_PENDING_ERROR);
-  }
-
   let deleteResult: Awaited<ReturnType<ProjectRepository["delete"]>>;
   try {
     deleteResult = await repository.delete(projectId);
   } catch (error) {
-    await billing.requests.recordFailure(projectId, failureMessage(error));
+    await notifications.requests.recordFailure(
+      projectId,
+      failureMessage(error),
+    );
     return err(PROJECT_DELETE_PENDING_ERROR);
   }
   if (deleteResult.isErr()) {
-    await billing.requests.recordFailure(projectId, "project_delete_failed");
+    await notifications.requests.recordFailure(
+      projectId,
+      "project_delete_failed",
+    );
     return err(PROJECT_DELETE_PENDING_ERROR);
   }
-  const completed = await billing.requests.complete(projectId);
+  try {
+    await notifications.gateway.recordProjectDeleted({ projectId });
+  } catch (error) {
+    await notifications.requests.recordFailure(
+      projectId,
+      failureMessage(error),
+    );
+    return err(PROJECT_DELETE_PENDING_ERROR);
+  }
+
+  const completed = await notifications.requests.complete(projectId);
   if (completed.isErr()) {
     // 本体は削除済み。残った要求は復旧ジョブが完了させる。
     console.error("Failed to complete project deletion request", { projectId });
@@ -90,8 +98,8 @@ export async function deleteProject(
   }
 
   let deleted: Result<boolean, DeleteProjectError>;
-  if (deps.billing) {
-    const opened = await deps.billing.requests.open({
+  if (deps.notifications) {
+    const opened = await deps.notifications.requests.open({
       projectId: input.projectId,
       requestedByUserId: input.userId,
     });
@@ -107,9 +115,9 @@ export async function deleteProject(
       }
       return err(PROJECT_DELETE_FORBIDDEN_ERROR);
     }
-    deleted = await closeBillingAndDelete(
+    deleted = await deleteAndNotify(
       deps.repository,
-      deps.billing,
+      deps.notifications,
       input.projectId,
     );
   } else {
@@ -134,11 +142,11 @@ export type RecoverProjectDeletionsSummary = {
 };
 
 /**
- * Never throws。オーナーが確認名つきで受け付けた削除要求を、課金が確認できるまで再試行する。
+ * Never throws。オーナーが確認名つきで受け付けた削除要求を、提供者に受理されるまで再試行する。
  * 本体が既に無い要求は完了印だけ付ける。
  */
 export async function recoverProjectDeletions(
-  deps: Required<Pick<DeleteProjectDeps, "billing">> &
+  deps: Required<Pick<DeleteProjectDeps, "notifications">> &
     Pick<DeleteProjectDeps, "repository">,
   input: { limit?: number } = {},
 ): Promise<RecoverProjectDeletionsSummary> {
@@ -147,7 +155,7 @@ export async function recoverProjectDeletions(
     completed: 0,
     stillPending: 0,
   };
-  const listed = await deps.billing.requests.listPending(
+  const listed = await deps.notifications.requests.listPending(
     input.limit ?? DELETION_RECOVERY_BATCH_SIZE,
   );
   if (listed.isErr()) {
@@ -157,9 +165,9 @@ export async function recoverProjectDeletions(
   for (const request of listed.value) {
     summary.examined += 1;
     try {
-      const result = await closeBillingAndDelete(
+      const result = await deleteAndNotify(
         deps.repository,
-        deps.billing,
+        deps.notifications,
         request.projectId,
       );
       if (result.isErr()) {

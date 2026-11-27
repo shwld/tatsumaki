@@ -18,7 +18,7 @@ import { projectCreationRequestsTable } from "../schema";
 import { D1ProjectRepository } from "./d1-project-repository";
 
 // 完了済みの要求で再作成しない(作成後に削除されたプロジェクトを古い呼び出しが復活させないため)。
-const PENDING_REQUEST = `SELECT 1 FROM project_creation_requests WHERE project_id = ? AND status = 'pending'`;
+const PENDING_REQUEST = `SELECT 1 FROM project_creation_requests WHERE project_id = ? AND status = 'pending' AND stalled_reason IS NULL`;
 
 type Row = typeof projectCreationRequestsTable.$inferSelect;
 
@@ -31,7 +31,6 @@ const toRequest = (row: Row): ProjectCreationRequest => ({
   status: row.status as ProjectCreationRequestStatus,
   attemptCount: row.attemptCount,
   materializeFailureCount: row.materializeFailureCount,
-  paymentEvidence: row.paymentEvidence === 1,
   stalledReason: row.stalledReason as ProjectCreationStalledReason | null,
   createdAt: row.createdAt,
 });
@@ -43,6 +42,79 @@ export class D1ProjectCreationRequestRepository
 
   constructor(private readonly d1: D1Database) {
     this.db = createDb(d1);
+  }
+
+  async markFailed(projectId: string, now: string) {
+    try {
+      const result = await this.d1
+        .prepare(`UPDATE project_creation_requests
+        SET stalled_reason = 'abandoned', outcome_notified = 0, outcome_at = ?, updated_at = ?
+        WHERE project_id = ? AND status = 'pending' AND stalled_reason IS NULL`)
+        .bind(now, now, projectId)
+        .run();
+      return ok((result.meta.changes ?? 0) > 0);
+    } catch {
+      return err(PROJECT_CREATION_REQUEST_REPOSITORY_ERROR);
+    }
+  }
+
+  async listUnnotified(limit: number) {
+    try {
+      const result = await this.d1
+        .prepare(`SELECT project_id, purchaser_user_id, status, outcome_at
+        FROM project_creation_requests WHERE outcome_notified = 0 AND outcome_at IS NOT NULL
+        ORDER BY updated_at, project_id LIMIT ?`)
+        .bind(limit)
+        .all<{
+          project_id: string;
+          purchaser_user_id: string;
+          status: string;
+          outcome_at: string;
+        }>();
+      return ok(
+        result.results.map((row) => ({
+          projectId: row.project_id,
+          accountId: row.purchaser_user_id,
+          outcome:
+            row.status === "created"
+              ? ("created" as const)
+              : ("failed" as const),
+          occurredAt: row.outcome_at.includes("T")
+            ? new Date(row.outcome_at).toISOString()
+            : new Date(`${row.outcome_at.replace(" ", "T")}Z`).toISOString(),
+        })),
+      );
+    } catch {
+      return err(PROJECT_CREATION_REQUEST_REPOSITORY_ERROR);
+    }
+  }
+
+  async markNotificationAttempt(projectId: string) {
+    try {
+      await this.d1
+        .prepare(
+          "UPDATE project_creation_requests SET updated_at = ? WHERE project_id = ? AND outcome_notified = 0",
+        )
+        .bind(new Date().toISOString(), projectId)
+        .run();
+      return ok(undefined);
+    } catch {
+      return err(PROJECT_CREATION_REQUEST_REPOSITORY_ERROR);
+    }
+  }
+
+  async markNotified(projectId: string) {
+    try {
+      await this.d1
+        .prepare(
+          "UPDATE project_creation_requests SET outcome_notified = 1 WHERE project_id = ?",
+        )
+        .bind(projectId)
+        .run();
+      return ok(undefined);
+    } catch {
+      return err(PROJECT_CREATION_REQUEST_REPOSITORY_ERROR);
+    }
   }
 
   async open(
@@ -120,8 +192,8 @@ export class D1ProjectCreationRequestRepository
         this.d1
           .prepare(
             `UPDATE project_creation_requests
-             SET status = 'created', updated_at = CURRENT_TIMESTAMP
-             WHERE project_id = ?`,
+             SET status = 'created', outcome_notified = 0, outcome_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+             WHERE project_id = ? AND status = 'pending' AND stalled_reason IS NULL`,
           )
           .bind(request.projectId),
       ]);
@@ -175,7 +247,6 @@ export class D1ProjectCreationRequestRepository
         .set({
           attemptCount: input.attemptCount,
           materializeFailureCount: input.materializeFailureCount,
-          paymentEvidence: input.paymentEvidence ? 1 : 0,
           nextAttemptAt: input.nextAttemptAt,
           lastError: input.lastError,
           stalledReason: input.stalledReason,
@@ -185,6 +256,7 @@ export class D1ProjectCreationRequestRepository
           and(
             eq(projectCreationRequestsTable.projectId, input.projectId),
             eq(projectCreationRequestsTable.status, "pending"),
+            isNull(projectCreationRequestsTable.stalledReason),
           ),
         );
       return ok(undefined);

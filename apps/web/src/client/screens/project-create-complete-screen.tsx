@@ -8,7 +8,7 @@ import { isAuthError } from "../lib/api-error";
 const POLL_INTERVAL_MS = 2000;
 const POLL_MAX_ATTEMPTS = 15;
 
-type Phase = "waiting" | "delayed" | "grace" | "error" | "notFound";
+type Phase = "waiting" | "delayed" | "denied" | "error" | "notFound";
 
 export function ProjectCreateCompleteScreen() {
   const { t } = useTranslation();
@@ -33,6 +33,10 @@ export function ProjectCreateCompleteScreen() {
           setPhase("notFound");
           return;
         }
+        if (response.status === 409) {
+          setPhase("denied");
+          return;
+        }
         if (!response.ok) {
           if (isAuthError(response.status)) {
             notifySessionExpired();
@@ -43,7 +47,6 @@ export function ProjectCreateCompleteScreen() {
         }
         const data = (await response.json()) as {
           status?: "created" | "pending";
-          state?: string;
           project?: { id: string };
         };
         if (data.status === "created" && data.project) {
@@ -51,7 +54,7 @@ export function ProjectCreateCompleteScreen() {
           return;
         }
         if (attempt + 1 >= POLL_MAX_ATTEMPTS) {
-          setPhase(data.state === "grace" ? "grace" : "delayed");
+          setPhase("delayed");
           return;
         }
         timerRef.current = setTimeout(
@@ -96,7 +99,7 @@ export function ProjectCreateCompleteScreen() {
             {t("projectCreateCompleteScreen.closeNotice")}
           </p>
         ) : null}
-        {phase === "delayed" || phase === "grace" || phase === "error" ? (
+        {phase === "delayed" || phase === "error" ? (
           <button
             type="button"
             className="inline-flex min-h-11 items-center justify-center rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800"

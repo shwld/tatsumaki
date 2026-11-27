@@ -2,11 +2,13 @@ import { err, ok, type Result } from "neverthrow";
 import { ulid } from "ulid";
 import { INVALID_PROJECT_NAME_ERROR } from "./create-project";
 import type { Project } from "../../domain/entities/project";
-import type { ProjectEntitlementState } from "../../domain/entities/entitlement";
 import type { ProjectCreationRequestRepository } from "../../domain/repositories/project-creation-request-repository";
 import type { ProjectRepository } from "../../domain/repositories/project-repository";
-import type { EntitlementProvider } from "../ports/entitlement-provider";
-import type { ProjectCheckoutGateway } from "../ports/project-checkout-gateway";
+import type { ProjectCreationAcquisition } from "../ports/project-creation-acquisition";
+import type {
+  ProjectCreationEligibilityGateway,
+  ProjectCreationOutcomeGateway,
+} from "../ports/project-creation-eligibility";
 
 export const PROJECT_CREATION_REQUEST_NOT_FOUND_ERROR =
   "PROJECT_CREATION_REQUEST_NOT_FOUND_ERROR" as const;
@@ -14,8 +16,6 @@ export const PROJECT_CREATION_ENTITLEMENT_UNAVAILABLE_ERROR =
   "PROJECT_CREATION_ENTITLEMENT_UNAVAILABLE_ERROR" as const;
 export const PROJECT_CREATION_CHECKOUT_UNAVAILABLE_ERROR =
   "PROJECT_CREATION_CHECKOUT_UNAVAILABLE_ERROR" as const;
-export const PROJECT_CREATION_PAYMENT_PENDING_ERROR =
-  "PROJECT_CREATION_PAYMENT_PENDING_ERROR" as const;
 export const PROJECT_CREATION_FAILED_ERROR =
   "PROJECT_CREATION_FAILED_ERROR" as const;
 
@@ -23,17 +23,16 @@ export type StartProjectCreationError =
   | typeof INVALID_PROJECT_NAME_ERROR
   | typeof PROJECT_CREATION_ENTITLEMENT_UNAVAILABLE_ERROR
   | typeof PROJECT_CREATION_CHECKOUT_UNAVAILABLE_ERROR
-  | typeof PROJECT_CREATION_PAYMENT_PENDING_ERROR
   | typeof PROJECT_CREATION_FAILED_ERROR;
 
 export type StartProjectCreationResult =
-  | { kind: "checkout"; projectId: string; url: string }
+  | { kind: "redirect"; projectId: string; url: string }
   | { kind: "ready"; projectId: string };
 
 type StartDeps = {
   requests: ProjectCreationRequestRepository;
-  entitlements: EntitlementProvider;
-  checkout: ProjectCheckoutGateway;
+  eligibility: ProjectCreationEligibilityGateway;
+  acquisition: ProjectCreationAcquisition;
 };
 
 export async function startProjectCreation(
@@ -65,24 +64,30 @@ export async function startProjectCreation(
   if (request.status === "created") {
     return ok({ kind: "ready", projectId: request.projectId });
   }
+  if (request.stalledReason !== null) return err(PROJECT_CREATION_FAILED_ERROR);
 
-  let state: ProjectEntitlementState;
+  let eligibility: Awaited<
+    ReturnType<ProjectCreationEligibilityGateway["getEligibility"]>
+  >;
   try {
-    state = (await deps.entitlements.getProjectEntitlement(request.projectId))
-      .state;
+    eligibility = await deps.eligibility.getEligibility({
+      projectId: request.projectId,
+      accountId: request.purchaserUserId,
+      requestedAt: requestedAt(request.createdAt),
+    });
   } catch {
     return err(PROJECT_CREATION_ENTITLEMENT_UNAVAILABLE_ERROR);
   }
-  if (state === "active") {
+  if (eligibility.status === "allowed")
     return ok({ kind: "ready", projectId: request.projectId });
-  }
-  if (state === "grace") {
-    return err(PROJECT_CREATION_PAYMENT_PENDING_ERROR);
+  if (eligibility.status === "denied") {
+    await deps.requests.markFailed(request.projectId, new Date().toISOString());
+    return err(PROJECT_CREATION_FAILED_ERROR);
   }
 
   try {
-    const session = await deps.checkout.createProjectCheckout({
-      billingAccountId: input.userId,
+    const session = await deps.acquisition.start({
+      accountId: input.userId,
       projectId: request.projectId,
       projectName: request.name,
       requestId: request.checkoutRequestId,
@@ -90,7 +95,7 @@ export async function startProjectCreation(
       cancelUrl: input.cancelUrl,
     });
     return ok({
-      kind: "checkout",
+      kind: "redirect",
       projectId: request.projectId,
       url: session.url,
     });
@@ -106,13 +111,14 @@ export type CompleteProjectCreationError =
 
 export type CompleteProjectCreationResult =
   | { status: "created"; project: Project }
-  | { status: "pending"; state: ProjectEntitlementState };
+  | { status: "pending" }
+  | { status: "denied" };
 
 export async function completeProjectCreation(
   deps: {
     requests: ProjectCreationRequestRepository;
     projects: Pick<ProjectRepository, "findById" | "findMember">;
-    entitlements: EntitlementProvider;
+    eligibility: ProjectCreationEligibilityGateway;
   },
   input: { userId: string; projectId: string },
 ): Promise<
@@ -144,16 +150,32 @@ export async function completeProjectCreation(
     });
   }
 
-  let state: ProjectEntitlementState;
+  if (request.stalledReason !== null) return ok({ status: "denied" });
+
+  let eligibility: Awaited<
+    ReturnType<ProjectCreationEligibilityGateway["getEligibility"]>
+  >;
   try {
-    state = (await deps.entitlements.getProjectEntitlement(request.projectId))
-      .state;
+    eligibility = await deps.eligibility.getEligibility({
+      projectId: request.projectId,
+      accountId: request.purchaserUserId,
+      requestedAt: new Date(
+        `${request.createdAt.replace(" ", "T")}Z`,
+      ).toISOString(),
+    });
   } catch {
     return err(PROJECT_CREATION_ENTITLEMENT_UNAVAILABLE_ERROR);
   }
-  if (state !== "active") {
-    return ok({ status: "pending", state });
+  if (eligibility.status === "denied") {
+    const failed = await deps.requests.markFailed(
+      request.projectId,
+      new Date().toISOString(),
+    );
+    if (failed.isErr() || !failed.value)
+      return err(PROJECT_CREATION_FAILED_ERROR);
+    return ok({ status: "denied" });
   }
+  if (eligibility.status === "pending") return ok({ status: "pending" });
 
   const materialized = await deps.requests.materialize(request);
   if (materialized.isErr()) {
@@ -165,11 +187,7 @@ export async function completeProjectCreation(
 export const RECOVERY_BATCH_SIZE = 20;
 export const RECOVERY_BASE_DELAY_MS = 5 * 60 * 1000;
 export const RECOVERY_MAX_DELAY_MS = 6 * 60 * 60 * 1000;
-// Checkout セッションの有効期限(24h)を十分に超えても支払われない要求は放棄とみなす。
-export const RECOVERY_ABANDON_AFTER_MS = 3 * 24 * 60 * 60 * 1000;
 export const RECOVERY_MAX_MATERIALIZE_FAILURES = 10;
-// 権利を確認できないまま放置しない上限。超えたら支払い済みの可能性として調査対象にする。
-export const RECOVERY_MAX_UNVERIFIED_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 export type RecoverProjectCreationsSummary = {
   examined: number;
@@ -177,26 +195,17 @@ export type RecoverProjectCreationsSummary = {
   waiting: number;
   retryScheduled: number;
   abandoned: number;
-  needsInvestigation: number;
 };
 
-const parseSqliteTimestamp = (value: string): number =>
-  new Date(`${value.replace(" ", "T")}Z`).getTime();
+const requestedAt = (value: string): string =>
+  new Date(
+    value.includes("T") ? value : `${value.replace(" ", "T")}Z`,
+  ).toISOString();
 
-const backoffDelayMs = (attemptCount: number): number =>
-  Math.min(
-    RECOVERY_BASE_DELAY_MS * 2 ** Math.max(0, attemptCount - 1),
-    RECOVERY_MAX_DELAY_MS,
-  );
-
-/**
- * Never throws. 成功画面の complete と同じ冪等な materialize を使うため、並行・再実行でも本体は 1 つ。
- * 返金の実行は自動化しない(needsInvestigation を運用者が調べる)。
- */
 export async function recoverProjectCreations(
   deps: {
     requests: ProjectCreationRequestRepository;
-    entitlements: EntitlementProvider;
+    eligibility: ProjectCreationEligibilityGateway;
   },
   input: { now: Date; limit?: number },
 ): Promise<RecoverProjectCreationsSummary> {
@@ -206,140 +215,112 @@ export async function recoverProjectCreations(
     waiting: 0,
     retryScheduled: 0,
     abandoned: 0,
-    needsInvestigation: 0,
   };
-  const nowMs = input.now.getTime();
   const listed = await deps.requests.listRecoverable(
     input.now.toISOString(),
     input.limit ?? RECOVERY_BATCH_SIZE,
   );
-  if (listed.isErr()) {
+  if (listed.isErr())
     throw new Error("Failed to list recoverable project creation requests");
-  }
-
   for (const request of listed.value) {
-    summary.examined += 1;
+    summary.examined++;
     const attemptCount = request.attemptCount + 1;
-    const ageMs = nowMs - parseSqliteTimestamp(request.createdAt);
-    let paymentEvidence = request.paymentEvidence;
-    const retryAt = () => new Date(nowMs + backoffDelayMs(attemptCount));
-
-    const settle = async (
-      outcome: Pick<
-        Parameters<ProjectCreationRequestRepository["recordAttempt"]>[0],
-        "stalledReason" | "lastError"
-      > & { retry: boolean; materializeFailureCount?: number },
+    const delay = Math.min(
+      RECOVERY_BASE_DELAY_MS * 2 ** Math.max(0, attemptCount - 1),
+      RECOVERY_MAX_DELAY_MS,
+    );
+    const retry = async (
+      lastError: string,
+      materializeFailureCount = request.materializeFailureCount,
     ) => {
       const recorded = await deps.requests.recordAttempt({
         projectId: request.projectId,
         attemptCount,
-        materializeFailureCount:
-          outcome.materializeFailureCount ?? request.materializeFailureCount,
-        paymentEvidence,
-        nextAttemptAt: outcome.retry ? retryAt().toISOString() : null,
-        lastError: outcome.lastError,
-        stalledReason: outcome.stalledReason,
-      });
-      if (recorded.isErr()) {
-        console.error("Failed to record project creation attempt", {
-          projectId: request.projectId,
-        });
-      }
-    };
-
-    let state: ProjectEntitlementState;
-    try {
-      state = (await deps.entitlements.getProjectEntitlement(request.projectId))
-        .state;
-    } catch {
-      if (ageMs > RECOVERY_MAX_UNVERIFIED_AGE_MS) {
-        summary.needsInvestigation += 1;
-        console.error("billing.creation.needs_investigation", {
-          projectId: request.projectId,
-          purchaserUserId: request.purchaserUserId,
-          reason: "entitlement_unconfirmed",
-          attemptCount,
-        });
-        await settle({
-          retry: false,
-          stalledReason: "entitlement_unconfirmed",
-          lastError: "entitlement_unavailable",
-        });
-      } else {
-        summary.retryScheduled += 1;
-        await settle({
-          retry: true,
-          stalledReason: null,
-          lastError: "entitlement_unavailable",
-        });
-      }
-      continue;
-    }
-
-    if (state !== "active") {
-      if (state === "grace") paymentEvidence = true;
-      const hasPaymentEvidence = paymentEvidence;
-      if (!hasPaymentEvidence && ageMs > RECOVERY_ABANDON_AFTER_MS) {
-        summary.abandoned += 1;
-        await settle({
-          retry: false,
-          stalledReason: "abandoned",
-          lastError: `entitlement_${state}`,
-        });
-      } else if (hasPaymentEvidence && ageMs > RECOVERY_MAX_UNVERIFIED_AGE_MS) {
-        summary.needsInvestigation += 1;
-        console.error("billing.creation.needs_investigation", {
-          projectId: request.projectId,
-          purchaserUserId: request.purchaserUserId,
-          reason: "entitlement_unconfirmed",
-          attemptCount,
-        });
-        await settle({
-          retry: false,
-          stalledReason: "entitlement_unconfirmed",
-          lastError: `entitlement_${state}`,
-        });
-      } else {
-        summary.waiting += 1;
-        await settle({
-          retry: true,
-          stalledReason: null,
-          lastError: `entitlement_${state}`,
-        });
-      }
-      continue;
-    }
-
-    const materialized = await deps.requests.materialize(request);
-    if (materialized.isOk()) {
-      summary.created += 1;
-      continue;
-    }
-    paymentEvidence = true;
-    const materializeFailures = request.materializeFailureCount + 1;
-    if (materializeFailures >= RECOVERY_MAX_MATERIALIZE_FAILURES) {
-      summary.needsInvestigation += 1;
-      console.error("billing.creation.needs_investigation", {
-        projectId: request.projectId,
-        purchaserUserId: request.purchaserUserId,
-        reason: "creation_failed",
-        attemptCount,
-      });
-      await settle({
-        retry: false,
-        stalledReason: "creation_failed",
-        lastError: "materialize_failed",
-        materializeFailureCount: materializeFailures,
-      });
-    } else {
-      summary.retryScheduled += 1;
-      await settle({
-        retry: true,
+        materializeFailureCount,
         stalledReason: null,
-        lastError: "materialize_failed",
-        materializeFailureCount: materializeFailures,
+        lastError,
+        nextAttemptAt: new Date(input.now.getTime() + delay).toISOString(),
       });
+      if (recorded.isErr())
+        throw new Error("Failed to record project creation attempt");
+    };
+    try {
+      const eligibility = await deps.eligibility.getEligibility({
+        projectId: request.projectId,
+        accountId: request.purchaserUserId,
+        requestedAt: requestedAt(request.createdAt),
+      });
+      if (eligibility.status === "denied") {
+        const failed = await deps.requests.markFailed(
+          request.projectId,
+          input.now.toISOString(),
+        );
+        if (failed.isErr())
+          throw new Error("Failed to record creation outcome");
+        if (failed.value) summary.abandoned++;
+        continue;
+      }
+      if (eligibility.status === "pending") {
+        await retry("pending");
+        summary.waiting++;
+        continue;
+      }
+      const result = await deps.requests.materialize(request);
+      if (result.isOk()) {
+        summary.created++;
+        continue;
+      }
+      const failures = request.materializeFailureCount + 1;
+      if (failures >= RECOVERY_MAX_MATERIALIZE_FAILURES) {
+        const failed = await deps.requests.markFailed(
+          request.projectId,
+          input.now.toISOString(),
+        );
+        if (failed.isErr())
+          throw new Error("Failed to record creation outcome");
+        if (failed.value) summary.abandoned++;
+      } else {
+        await retry("materialize_failed", failures);
+        summary.retryScheduled++;
+      }
+    } catch (error) {
+      console.error("Project creation recovery attempt failed", {
+        projectId: request.projectId,
+        errorType: error instanceof Error ? error.name : "unknown",
+      });
+      try {
+        await retry("provider_unavailable");
+      } catch {
+        /* The request remains recoverable. */
+      }
+      summary.retryScheduled++;
     }
   }
   return summary;
+}
+
+export async function notifyProjectCreationOutcomes(
+  deps: {
+    requests: ProjectCreationRequestRepository;
+    outcomes: ProjectCreationOutcomeGateway;
+  },
+  limit = 20,
+): Promise<void> {
+  const listed = await deps.requests.listUnnotified(limit);
+  if (listed.isErr())
+    throw new Error("Failed to list project creation outcomes");
+  for (const outcome of listed.value) {
+    try {
+      await deps.outcomes.recordOutcome(outcome);
+      const marked = await deps.requests.markNotified(outcome.projectId);
+      if (marked.isErr())
+        throw new Error("Failed to mark creation outcome notified");
+    } catch (error) {
+      console.error("Project creation outcome notification failed", {
+        projectId: outcome.projectId,
+        errorType: error instanceof Error ? error.name : "unknown",
+      });
+      await deps.requests.markNotificationAttempt(outcome.projectId);
+    }
+  }
 }

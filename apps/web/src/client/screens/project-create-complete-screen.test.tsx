@@ -50,16 +50,21 @@ describe("ProjectCreateCompleteScreen", () => {
     );
   });
 
-  it("shows a waiting message while the payment is not yet reflected", async () => {
-    vi.mocked(fetch).mockResolvedValue(
-      json({ status: "pending", state: "suspended" }, 202),
-    );
+  it("shows a waiting message while creation is pending", async () => {
+    vi.mocked(fetch).mockResolvedValue(json({ status: "pending" }, 202));
     renderScreen();
 
     expect((await screen.findByRole("status")).textContent).toContain(
-      "反映を確認しています",
+      "作成できるか確認しています",
     );
     expect(screen.queryByText("opened")).toBeNull();
+  });
+
+  it("shows a final message when creation is denied", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(json({ status: "denied" }, 409));
+    renderScreen();
+    expect(await screen.findByText(/この作成依頼は終了しました/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "もう一度確認" })).toBeNull();
   });
 
   it("offers a retry when the server fails", async () => {

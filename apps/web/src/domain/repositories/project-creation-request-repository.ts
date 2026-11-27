@@ -23,13 +23,35 @@ export type RecordCreationAttemptInput = {
   projectId: string;
   attemptCount: number;
   materializeFailureCount: number;
-  paymentEvidence: boolean;
   nextAttemptAt: string | null;
   lastError: string | null;
   stalledReason: ProjectCreationStalledReason | null;
 };
 
+export type ProjectCreationOutcome = {
+  projectId: string;
+  accountId: string;
+  outcome: "created" | "failed";
+  occurredAt: string;
+};
+
 export interface ProjectCreationRequestRepository {
+  markFailed(
+    projectId: string,
+    now: string,
+  ): Promise<Result<boolean, ProjectCreationRequestRepositoryError>>;
+  listUnnotified(
+    limit: number,
+  ): Promise<
+    Result<ProjectCreationOutcome[], ProjectCreationRequestRepositoryError>
+  >;
+  markNotificationAttempt(
+    projectId: string,
+  ): Promise<Result<void, ProjectCreationRequestRepositoryError>>;
+  markNotified(
+    projectId: string,
+  ): Promise<Result<void, ProjectCreationRequestRepositoryError>>;
+
   // 同じ (purchaserUserId, idempotencyKey) は最初の要求をそのまま返す。
   open(
     input: OpenProjectCreationRequestInput,

@@ -4,23 +4,22 @@ import {
   completeProjectCreation,
   PROJECT_CREATION_CHECKOUT_UNAVAILABLE_ERROR,
   PROJECT_CREATION_ENTITLEMENT_UNAVAILABLE_ERROR,
-  PROJECT_CREATION_PAYMENT_PENDING_ERROR,
   PROJECT_CREATION_REQUEST_NOT_FOUND_ERROR,
   startProjectCreation,
 } from "../../application/usecases/project-creation-request";
 import { D1ProjectCreationRequestRepository } from "../../infrastructure/db/repositories/d1-project-creation-request-repository";
 import { D1ProjectRepository } from "../../infrastructure/db/repositories/d1-project-repository";
-import { ControlPlaneCheckoutGateway } from "../../infrastructure/entitlements/control-plane-checkout-gateway";
+import { ControlPlaneCreationAcquisition } from "../../infrastructure/entitlements/control-plane-creation-acquisition";
+import { ControlPlaneCreationEligibility } from "../../infrastructure/entitlements/control-plane-creation-eligibility";
 import type { Env } from "../../index";
-import { createEntitlementProvider, isCheckoutEnabled } from "./billing";
 
 const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
 
 export const projectCreationRequestsRoute = new Hono<Env>();
 
 projectCreationRequestsRoute.post("/project-creation-requests", async (c) => {
-  if (!isCheckoutEnabled(c.env) || !c.env.CONTROL_PLANE) {
-    return c.json({ error: "Checkout is not available" }, 409);
+  if (c.env.ENTITLEMENT_MODE !== "control-plane" || !c.env.CONTROL_PLANE) {
+    return c.json({ error: "Creation is not available" }, 409);
   }
 
   let body: { name?: unknown; idempotencyKey?: unknown };
@@ -43,8 +42,8 @@ projectCreationRequestsRoute.post("/project-creation-requests", async (c) => {
   const result = await startProjectCreation(
     {
       requests: new D1ProjectCreationRequestRepository(c.env.DB),
-      entitlements: createEntitlementProvider(c.env),
-      checkout: new ControlPlaneCheckoutGateway(c.env.CONTROL_PLANE),
+      eligibility: new ControlPlaneCreationEligibility(c.env.CONTROL_PLANE),
+      acquisition: new ControlPlaneCreationAcquisition(c.env.CONTROL_PLANE),
     },
     {
       userId: c.get("currentUser").id,
@@ -62,14 +61,6 @@ projectCreationRequestsRoute.post("/project-creation-requests", async (c) => {
   switch (result.error) {
     case INVALID_PROJECT_NAME_ERROR:
       return c.json({ error: "Project name is required" }, 400);
-    case PROJECT_CREATION_PAYMENT_PENDING_ERROR:
-      return c.json(
-        {
-          error: "A payment for this project needs attention.",
-          code: "payment_pending",
-        },
-        409,
-      );
     case PROJECT_CREATION_ENTITLEMENT_UNAVAILABLE_ERROR:
     case PROJECT_CREATION_CHECKOUT_UNAVAILABLE_ERROR:
       console.error("Project creation checkout unavailable", {
@@ -84,14 +75,14 @@ projectCreationRequestsRoute.post("/project-creation-requests", async (c) => {
 projectCreationRequestsRoute.post(
   "/project-creation-requests/:projectId/complete",
   async (c) => {
-    if (!isCheckoutEnabled(c.env)) {
-      return c.json({ error: "Checkout is not available" }, 409);
+    if (c.env.ENTITLEMENT_MODE !== "control-plane" || !c.env.CONTROL_PLANE) {
+      return c.json({ error: "Creation is not available" }, 409);
     }
     const result = await completeProjectCreation(
       {
         requests: new D1ProjectCreationRequestRepository(c.env.DB),
         projects: new D1ProjectRepository(c.env.DB),
-        entitlements: createEntitlementProvider(c.env),
+        eligibility: new ControlPlaneCreationEligibility(c.env.CONTROL_PLANE),
       },
       {
         userId: c.get("currentUser").id,
@@ -103,7 +94,10 @@ projectCreationRequestsRoute.post(
       if (result.value.status === "created") {
         return c.json({ status: "created", project: result.value.project });
       }
-      return c.json({ status: "pending", state: result.value.state }, 202);
+      if (result.value.status === "denied") {
+        return c.json({ status: "denied" }, 409);
+      }
+      return c.json({ status: "pending" }, 202);
     }
     switch (result.error) {
       case PROJECT_CREATION_REQUEST_NOT_FOUND_ERROR:

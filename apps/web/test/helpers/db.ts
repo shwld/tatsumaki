@@ -39,6 +39,7 @@ import { usersTable } from "../../src/infrastructure/db/schema/users";
  * Delete order respects foreign key constraints (children before parents).
  */
 export async function resetDatabase(db: D1Database): Promise<void> {
+  await db.prepare("DELETE FROM project_name_notifications").run();
   const client = createDb(db);
   await client.delete(objectSweepCursorsTable);
   await client.delete(projectCreationRequestsTable);

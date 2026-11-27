@@ -5,7 +5,6 @@ import type {
   ProjectOperationsList,
   ProjectOperationsLocale,
 } from "../ports/project-operations-gateway";
-import type { ProjectDisplayNameGateway } from "../ports/project-display-name-gateway";
 import type { ProjectAccessState } from "../../domain/entities/project-usage";
 import type {
   AccountOperation,
@@ -36,7 +35,6 @@ export async function listOwnedProjectUsage(
     projects: Pick<ProjectRepository, "listByMember">;
     operations: ProjectOperationsGateway;
     accessState: (projectId: string) => Promise<ProjectAccessState>;
-    displayNames?: ProjectDisplayNameGateway;
   },
   input: {
     userId: string;
@@ -62,18 +60,6 @@ export async function listOwnedProjectUsage(
   } catch {
     console.error("Failed to list project operations");
     list = null;
-  }
-
-  // 名前変更時の同期失敗と、表示名導入前の権利を、一覧を開くたびに直す。失敗しても一覧は返す。
-  if (deps.displayNames && owned.length > 0) {
-    try {
-      await deps.displayNames.syncProjectDisplayNames({
-        billingAccountId: input.userId,
-        projects: owned.map(({ id, name }) => ({ projectId: id, name })),
-      });
-    } catch {
-      console.error("Failed to sync project display names");
-    }
   }
 
   const byProject = new Map(

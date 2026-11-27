@@ -18,28 +18,20 @@ import {
   requestOwnershipTransfer,
   startTransferCheckout,
   TRANSFER_ALREADY_PENDING_ERROR,
-  TRANSFER_ALREADY_SUBSCRIBED_ERROR,
   TRANSFER_CHECKOUT_DISABLED_ERROR,
   TRANSFER_FORBIDDEN_ERROR,
   TRANSFER_INVALID_RECIPIENT_ERROR,
-  TRANSFER_NO_SUBSCRIPTION_ERROR,
   TRANSFER_NOT_FOUND_ERROR,
   TRANSFER_NOT_PENDING_ERROR,
-  TRANSFER_PAYMENT_CONFIRMED_ERROR,
   TRANSFER_PROJECT_DELETING_ERROR,
   type OwnershipTransferError,
 } from "../../application/usecases/ownership-transfer";
-import { ControlPlaneOwnershipTransferSettlementGateway } from "../../infrastructure/entitlements/control-plane-ownership-transfer-settlement-gateway";
-import { ControlPlaneTransferCheckoutExpiryGateway } from "../../infrastructure/entitlements/control-plane-transfer-checkout-expiry-gateway";
+import { ControlPlaneOwnershipTransferProvider } from "../../infrastructure/entitlements/control-plane-ownership-transfer-provider";
 import { D1ProjectOwnershipTransferRepository } from "../../infrastructure/db/repositories/d1-project-ownership-transfer-repository";
-import type { ProjectBillingCloseGateway } from "../../application/ports/project-billing-close-gateway";
-import type { ProjectDisplayNameGateway } from "../../application/ports/project-display-name-gateway";
-import { ControlPlaneProjectDisplayNameGateway } from "../../infrastructure/entitlements/control-plane-project-display-name-gateway";
-import { ControlPlaneProjectBillingCloseGateway } from "../../infrastructure/entitlements/control-plane-project-billing-close-gateway";
-import { ControlPlaneCheckoutGateway } from "../../infrastructure/entitlements/control-plane-checkout-gateway";
+import type { ProjectDeletionNotificationGateway } from "../../application/ports/project-deletion-notification-gateway";
+import { ControlPlaneProjectDeletionNotificationGateway } from "../../infrastructure/entitlements/control-plane-project-deletion-notification-gateway";
 import { D1ProjectDeletionRequestRepository } from "../../infrastructure/db/repositories/d1-project-deletion-request-repository";
 import { D1ProjectRepository } from "../../infrastructure/db/repositories/d1-project-repository";
-import { ControlPlaneProjectBillingGateway } from "../../infrastructure/entitlements/control-plane-project-billing-gateway";
 import { UnlimitedEntitlementProvider } from "../../infrastructure/entitlements/unlimited-entitlement-provider";
 import type { Bindings, Env } from "../../index";
 
@@ -63,28 +55,23 @@ export const createEntitlementProvider = (
 };
 
 /** セルフホストは課金 RPC を呼ばないため undefined。 */
-export const createProjectBillingCloseGateway = (
+export const createProjectDeletionNotificationGateway = (
   bindings: Bindings,
-): ProjectBillingCloseGateway | undefined => {
+): ProjectDeletionNotificationGateway | undefined => {
   if (bindings.ENTITLEMENT_MODE !== "control-plane") return undefined;
   if (!bindings.CONTROL_PLANE) {
     throw new Error(
       "CONTROL_PLANE binding is required in control-plane entitlement mode",
     );
   }
-  return new ControlPlaneProjectBillingCloseGateway(bindings.CONTROL_PLANE);
+  return new ControlPlaneProjectDeletionNotificationGateway(
+    bindings.CONTROL_PLANE,
+  );
 };
 
 /** セルフホストは課金 RPC を呼ばないため undefined。 */
-export const createProjectDisplayNameGateway = (
-  bindings: Bindings,
-): ProjectDisplayNameGateway | undefined =>
-  bindings.ENTITLEMENT_MODE === "control-plane" && bindings.CONTROL_PLANE
-    ? new ControlPlaneProjectDisplayNameGateway(bindings.CONTROL_PLANE)
-    : undefined;
-
-export const createDeleteProjectBilling = (bindings: Bindings) => {
-  const gateway = createProjectBillingCloseGateway(bindings);
+export const createProjectDeletionNotifications = (bindings: Bindings) => {
+  const gateway = createProjectDeletionNotificationGateway(bindings);
   return gateway
     ? {
         requests: new D1ProjectDeletionRequestRepository(bindings.DB),
@@ -120,13 +107,11 @@ billingRoute.get("/billing/operations", async (c) => {
   if (c.env.ENTITLEMENT_MODE !== "control-plane" || !c.env.CONTROL_PLANE) {
     return c.json({ error: "Operations are not available" }, 409);
   }
-  const displayNames = createProjectDisplayNameGateway(c.env);
   const result = await listOwnedProjectUsage(
     {
       projects: new D1ProjectRepository(c.env.DB),
       operations: new ControlPlaneOperationsGateway(c.env.CONTROL_PLANE),
       accessState: (projectId) => getProjectAccessState(c.env, projectId),
-      ...(displayNames ? { displayNames } : {}),
     },
     {
       userId: c.get("currentUser").id,
@@ -249,11 +234,6 @@ const ownershipTransferErrorResponse = (error: OwnershipTransferError) => {
         },
         status: 422 as const,
       };
-    case TRANSFER_NO_SUBSCRIPTION_ERROR:
-      return {
-        body: { error: "No active subscription", code: "no_subscription" },
-        status: 409 as const,
-      };
     case TRANSFER_ALREADY_PENDING_ERROR:
       return {
         body: {
@@ -265,14 +245,6 @@ const ownershipTransferErrorResponse = (error: OwnershipTransferError) => {
     case TRANSFER_NOT_PENDING_ERROR:
       return {
         body: { error: "No pending transfer", code: "not_pending" },
-        status: 409 as const,
-      };
-    case TRANSFER_PAYMENT_CONFIRMED_ERROR:
-      return {
-        body: {
-          error: "The recipient's payment is already confirmed",
-          code: "payment_confirmed",
-        },
         status: 409 as const,
       };
     case TRANSFER_PROJECT_DELETING_ERROR:
@@ -288,14 +260,6 @@ const ownershipTransferErrorResponse = (error: OwnershipTransferError) => {
         },
         status: 409 as const,
       };
-    case TRANSFER_ALREADY_SUBSCRIBED_ERROR:
-      return {
-        body: {
-          error: "You already subscribe to this project",
-          code: "already_subscribed",
-        },
-        status: 409 as const,
-      };
     default:
       console.error("Ownership transfer unavailable", { reason: error });
       return {
@@ -305,29 +269,20 @@ const ownershipTransferErrorResponse = (error: OwnershipTransferError) => {
   }
 };
 
-export const createTransferSettlement = (bindings: Bindings) =>
+export const createTransferServices = (bindings: Bindings) =>
   bindings.ENTITLEMENT_MODE === "control-plane" && bindings.CONTROL_PLANE
     ? {
-        settlement: new ControlPlaneOwnershipTransferSettlementGateway(
+        provider: new ControlPlaneOwnershipTransferProvider(
           bindings.CONTROL_PLANE,
         ),
         deletions: new D1ProjectDeletionRequestRepository(bindings.DB),
       }
     : undefined;
 
-export const createTransferCheckoutExpiry = (bindings: Bindings) =>
-  bindings.CONTROL_PLANE
-    ? new ControlPlaneTransferCheckoutExpiryGateway(bindings.CONTROL_PLANE)
-    : undefined;
-
-const transferDeps = (bindings: Bindings) => {
-  const checkoutExpiry = createTransferCheckoutExpiry(bindings);
-  return {
-    projects: new D1ProjectRepository(bindings.DB),
-    transfers: new D1ProjectOwnershipTransferRepository(bindings.DB),
-    ...(checkoutExpiry ? { checkoutExpiry } : {}),
-  };
-};
+const transferDeps = (bindings: Bindings) => ({
+  projects: new D1ProjectRepository(bindings.DB),
+  transfers: new D1ProjectOwnershipTransferRepository(bindings.DB),
+});
 
 // セルフホストは従来のロール操作を維持するため、課金付き譲渡は公式ホスト版だけ。
 billingRoute.use(
@@ -342,15 +297,14 @@ billingRoute.use(
 billingRoute.get(
   "/billing/projects/:projectId/ownership-transfer",
   async (c) => {
-    const settlement = createTransferSettlement(c.env);
+    const services = createTransferServices(c.env);
+    if (!services)
+      return c.json({ error: "Operations are not available" }, 409);
     const result = await getOwnershipTransfer(
       {
         ...transferDeps(c.env),
-        billing: new ControlPlaneProjectBillingGateway(
-          c.env.CONTROL_PLANE as NonNullable<Bindings["CONTROL_PLANE"]>,
-        ),
-        checkoutAvailable: isTransferCheckoutEnabled(c.env),
-        ...(settlement ? { settlement } : {}),
+        ...services,
+        acquisitionAvailable: isTransferCheckoutEnabled(c.env),
       },
       {
         userId: c.get("currentUser").id,
@@ -381,7 +335,6 @@ billingRoute.post(
     const result = await requestOwnershipTransfer(
       {
         ...transferDeps(c.env),
-        billing: new ControlPlaneProjectBillingGateway(controlPlane),
       },
       {
         userId: c.get("currentUser").id,
@@ -424,8 +377,7 @@ billingRoute.post(
         projectNames: projects,
         deletions: new D1ProjectDeletionRequestRepository(c.env.DB),
         clock: () => new Date(),
-        billing: new ControlPlaneProjectBillingGateway(controlPlane),
-        checkout: new ControlPlaneCheckoutGateway(controlPlane),
+        provider: new ControlPlaneOwnershipTransferProvider(controlPlane),
       },
       {
         userId: c.get("currentUser").id,
@@ -465,9 +417,6 @@ for (const [path, as] of [
       const result = await closeOwnershipTransfer(
         {
           ...transferDeps(c.env),
-          billing: new ControlPlaneProjectBillingGateway(
-            c.env.CONTROL_PLANE as NonNullable<Bindings["CONTROL_PLANE"]>,
-          ),
         },
         {
           userId: c.get("currentUser").id,
