@@ -46,7 +46,7 @@ export function ProjectOperationControls({
               })}
               onClick={() =>
                 void start(
-                  `/api/billing/projects/${encodeURIComponent(project.projectId)}/operations/${operation}?from=${from}`,
+                  `/api/usage/projects/${encodeURIComponent(project.projectId)}/operations/${operation}?from=${from}`,
                 )
               }
             >

@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { INVALID_PROJECT_NAME_ERROR } from "../../application/usecases/create-project";
 import {
   completeProjectCreation,
-  PROJECT_CREATION_CHECKOUT_UNAVAILABLE_ERROR,
+  PROJECT_CREATION_ACQUISITION_UNAVAILABLE_ERROR,
   PROJECT_CREATION_ENTITLEMENT_UNAVAILABLE_ERROR,
   PROJECT_CREATION_REQUEST_NOT_FOUND_ERROR,
   startProjectCreation,
@@ -10,7 +10,6 @@ import {
 import { D1ProjectCreationRequestRepository } from "../../infrastructure/db/repositories/d1-project-creation-request-repository";
 import { D1ProjectRepository } from "../../infrastructure/db/repositories/d1-project-repository";
 import { ControlPlaneCreationAcquisition } from "../../infrastructure/entitlements/control-plane-creation-acquisition";
-import { isCheckoutEnabled } from "./billing";
 import { ControlPlaneCreationEligibility } from "../../infrastructure/entitlements/control-plane-creation-eligibility";
 import type { Env } from "../../index";
 
@@ -19,7 +18,7 @@ const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
 export const projectCreationRequestsRoute = new Hono<Env>();
 
 projectCreationRequestsRoute.post("/project-creation-requests", async (c) => {
-  if (!isCheckoutEnabled(c.env) || !c.env.CONTROL_PLANE) {
+  if (c.env.ENTITLEMENT_MODE !== "control-plane" || !c.env.CONTROL_PLANE) {
     return c.json({ error: "Creation is not available" }, 409);
   }
 
@@ -52,7 +51,7 @@ projectCreationRequestsRoute.post("/project-creation-requests", async (c) => {
       idempotencyKey: body.idempotencyKey,
       successUrl: (projectId) =>
         `${origin}/projects/new/complete?request=${encodeURIComponent(projectId)}`,
-      cancelUrl: `${origin}/projects/new?checkout=cancel`,
+      cancelUrl: `${origin}/projects/new?acquisition=cancel`,
     },
   );
 
@@ -63,11 +62,11 @@ projectCreationRequestsRoute.post("/project-creation-requests", async (c) => {
     case INVALID_PROJECT_NAME_ERROR:
       return c.json({ error: "Project name is required" }, 400);
     case PROJECT_CREATION_ENTITLEMENT_UNAVAILABLE_ERROR:
-    case PROJECT_CREATION_CHECKOUT_UNAVAILABLE_ERROR:
-      console.error("Project creation checkout unavailable", {
+    case PROJECT_CREATION_ACQUISITION_UNAVAILABLE_ERROR:
+      console.error("Project creation acquisition unavailable", {
         reason: result.error,
       });
-      return c.json({ error: "Checkout is temporarily unavailable" }, 503);
+      return c.json({ error: "Creation is temporarily unavailable" }, 503);
     default:
       return c.json({ error: "Failed to start project creation" }, 500);
   }

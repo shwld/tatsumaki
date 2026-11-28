@@ -58,7 +58,7 @@ export function OwnedProjectUsage() {
               className={OPERATION_BUTTON_CLASS}
               disabled={account.pending}
               onClick={() =>
-                void account.start("/api/billing/account-operations/manage")
+                void account.start("/api/usage/account-operations/manage")
               }
             >
               {t("projectUsage.accountManage")}

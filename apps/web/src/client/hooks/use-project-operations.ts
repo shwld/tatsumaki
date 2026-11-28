@@ -32,9 +32,7 @@ export function useProjectOperations(enabled = true): {
         current.status === "ready" ? current : { status: "loading" },
       );
       try {
-        const response = await fetch(
-          `/api/billing/operations?locale=${locale}`,
-        );
+        const response = await fetch(`/api/usage/operations?locale=${locale}`);
         if (ignore) return;
         if (!response.ok) {
           if (isAuthError(response.status)) {

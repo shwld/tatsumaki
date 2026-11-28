@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ControlPlaneEntitlementProvider } from "../src/infrastructure/entitlements/control-plane-entitlement-provider";
 import { ControlPlaneUsageProvider } from "../src/infrastructure/entitlements/control-plane-usage-provider";
 import { UnlimitedEntitlementProvider } from "../src/infrastructure/entitlements/unlimited-entitlement-provider";
-import { createEntitlementProvider } from "../src/presentation/routes/billing";
+import { createEntitlementProvider } from "../src/presentation/routes/usage";
 import { projectUsage } from "./helpers/project-usage";
 
 const bindings = {

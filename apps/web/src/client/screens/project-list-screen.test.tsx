@@ -21,13 +21,7 @@ describe("ProjectListScreen", () => {
   });
 
   it("shows empty state and navigates to create screen in one click", async () => {
-    vi.mocked(fetch).mockImplementation(async (input) =>
-      String(input) === "/api/billing/entitlement"
-        ? buildJsonResponse({
-            projectCreation: "direct",
-          })
-        : buildJsonResponse({ projects: [] }),
-    );
+    vi.mocked(fetch).mockResolvedValue(buildJsonResponse({ projects: [] }));
 
     render(
       <MemoryRouter initialEntries={["/projects"]}>
@@ -91,12 +85,7 @@ describe("ProjectListScreen", () => {
           403,
         ),
       )
-      .mockResolvedValueOnce(buildJsonResponse({ projects: [] }))
-      .mockResolvedValueOnce(
-        buildJsonResponse({
-          projectCreation: "direct",
-        }),
-      );
+      .mockResolvedValueOnce(buildJsonResponse({ projects: [] }));
 
     render(
       <MemoryRouter initialEntries={["/projects"]}>
@@ -135,7 +124,7 @@ describe("ProjectListScreen", () => {
         screen.getByText("プロジェクトがまだありません"),
       ).toBeInTheDocument();
     });
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("shows retry button on 500 error and recovers after retry", async () => {
@@ -147,11 +136,6 @@ describe("ProjectListScreen", () => {
       .mockResolvedValueOnce(
         buildJsonResponse({
           projects: [{ id: "p1", name: "My Project", sprintDurationDays: 14 }],
-        }),
-      )
-      .mockResolvedValueOnce(
-        buildJsonResponse({
-          projectCreation: "direct",
         }),
       );
 
@@ -177,7 +161,7 @@ describe("ProjectListScreen", () => {
     await waitFor(() => {
       expect(screen.getByText("My Project")).toBeInTheDocument();
     });
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
   });
 
   it("shows retry button on network error and recovers after retry", async () => {
@@ -187,11 +171,6 @@ describe("ProjectListScreen", () => {
       .mockResolvedValueOnce(
         buildJsonResponse({
           projects: [{ id: "p1", name: "My Project", sprintDurationDays: 14 }],
-        }),
-      )
-      .mockResolvedValueOnce(
-        buildJsonResponse({
-          projectCreation: "direct",
         }),
       );
 
@@ -217,6 +196,6 @@ describe("ProjectListScreen", () => {
     await waitFor(() => {
       expect(screen.getByText("My Project")).toBeInTheDocument();
     });
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
   });
 });

@@ -15,10 +15,6 @@ export function ProjectListScreen() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [projectsLoaded, setProjectsLoaded] = useState(false);
-  const [creation, setCreation] = useState<"allowed" | "denied" | "unknown">(
-    "unknown",
-  );
   const [forbidden, setForbidden] = useState<string | null>(null);
   const retryRequestRef = useRef<null | (() => Promise<void>)>(null);
 
@@ -51,7 +47,6 @@ export function ProjectListScreen() {
             ? (data.projects as Project[])
             : [];
           setProjects(list);
-          setProjectsLoaded(true);
         }
       } catch {
         if (!ignore) {
@@ -70,27 +65,6 @@ export function ProjectListScreen() {
       ignore = true;
     };
   }, []);
-
-  useEffect(() => {
-    if (!projectsLoaded) return;
-    let ignore = false;
-    fetch("/api/billing/entitlement")
-      .then(async (response) => {
-        if (!response.ok) return;
-        const data = (await response.json()) as {
-          projectCreation?: "direct" | "checkout" | "disabled";
-        };
-        if (!ignore) {
-          setCreation(
-            data.projectCreation === "disabled" ? "denied" : "allowed",
-          );
-        }
-      })
-      .catch(() => undefined);
-    return () => {
-      ignore = true;
-    };
-  }, [projectsLoaded]);
 
   if (forbidden) {
     return (
@@ -115,21 +89,18 @@ export function ProjectListScreen() {
           <h1 className="text-2xl font-bold text-gray-900">
             {t("projectListScreen.title")}
           </h1>
-          {creation !== "allowed" ? null : (
-            <Link
-              className="text-sm font-medium text-blue-700"
-              to="/projects/new"
-            >
-              + {t("projectListScreen.newProject")}
-            </Link>
-          )}
+          <Link
+            className="text-sm font-medium text-blue-700"
+            to="/projects/new"
+          >
+            + {t("projectListScreen.newProject")}
+          </Link>
         </div>
         <ProjectListContent
           projects={projects}
           isLoading={isLoading}
           error={error}
           onRetry={retryRequestRef.current ?? undefined}
-          creation={creation}
         />
       </div>
     </main>

@@ -17,7 +17,7 @@ export function useUsageMode(): UsageMode {
     let ignore = false;
     const run = async () => {
       try {
-        const response = await fetch("/api/billing/entitlement");
+        const response = await fetch("/api/usage/mode");
         if (ignore) return;
         if (!response.ok) {
           if (isAuthError(response.status)) {

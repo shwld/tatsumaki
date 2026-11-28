@@ -19,8 +19,6 @@ export const TRANSFER_ALREADY_PENDING_ERROR =
   "TRANSFER_ALREADY_PENDING_ERROR" as const;
 export const TRANSFER_NOT_PENDING_ERROR = "TRANSFER_NOT_PENDING_ERROR" as const;
 export const TRANSFER_UNAVAILABLE_ERROR = "TRANSFER_UNAVAILABLE_ERROR" as const;
-export const TRANSFER_CHECKOUT_DISABLED_ERROR =
-  "TRANSFER_CHECKOUT_DISABLED_ERROR" as const;
 export const TRANSFER_PROJECT_DELETING_ERROR =
   "TRANSFER_PROJECT_DELETING_ERROR" as const;
 
@@ -31,7 +29,6 @@ export type OwnershipTransferError =
   | typeof TRANSFER_ALREADY_PENDING_ERROR
   | typeof TRANSFER_NOT_PENDING_ERROR
   | typeof TRANSFER_UNAVAILABLE_ERROR
-  | typeof TRANSFER_CHECKOUT_DISABLED_ERROR
   | typeof TRANSFER_PROJECT_DELETING_ERROR;
 
 type Deps = {
@@ -164,7 +161,6 @@ export async function requestOwnershipTransfer(
 export async function getOwnershipTransfer(
   deps: Deps & {
     provider: OwnershipTransferProvider;
-    acquisitionAvailable?: boolean;
     deletions: Pick<ProjectDeletionRequestRepository, "findById">;
   },
   input: { userId: string; projectId: string; now: Date },
@@ -221,7 +217,7 @@ export async function getOwnershipTransfer(
   }
   const view = toView(transfer, input.userId);
   if (view.role === "recipient" && progress === "waiting") {
-    view.acquisition = deps.acquisitionAvailable ? "available" : "disabled";
+    view.acquisition = "available";
   }
   return ok(view);
 }
@@ -273,7 +269,7 @@ export async function closeOwnershipTransfer(
   return ok(undefined);
 }
 
-export async function startTransferCheckout(
+export async function startTransferAcquisition(
   deps: Deps & {
     provider: OwnershipTransferProvider;
     projectNames: Pick<ProjectRepository, "findById">;
@@ -288,7 +284,6 @@ export async function startTransferCheckout(
     successUrl: string;
     cancelUrl: string;
   },
-  enabled: boolean,
 ): Promise<Result<{ url: string }, OwnershipTransferError>> {
   const member = await deps.projects.findMember(input.projectId, input.userId);
   if (member.isErr()) return err(TRANSFER_UNAVAILABLE_ERROR);
@@ -302,7 +297,6 @@ export async function startTransferCheckout(
   try {
     if (await voidIfIneligible(deps, transfer, input.now))
       return err(TRANSFER_NOT_PENDING_ERROR);
-    if (!enabled) return err(TRANSFER_CHECKOUT_DISABLED_ERROR);
     const earlier = await deps.transfers.hasUnnotifiedSwitch(input.projectId);
     if (earlier.isErr() || earlier.value)
       return err(TRANSFER_UNAVAILABLE_ERROR);

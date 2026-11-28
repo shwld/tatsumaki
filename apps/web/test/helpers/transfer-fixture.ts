@@ -4,7 +4,7 @@ import { vi } from "vitest";
 import { D1ProjectRepository } from "../../src/infrastructure/db/repositories/d1-project-repository";
 import type { Bindings, Env } from "../../src/index";
 import type { CurrentUser } from "../../src/presentation/middleware/access-auth";
-import { billingRoute } from "../../src/presentation/routes/billing";
+import { usageRoute } from "../../src/presentation/routes/usage";
 
 export function setupTransfer() {
   const state: {
@@ -24,7 +24,7 @@ export function setupTransfer() {
   const startOwnershipAcquisition = vi.fn(async (_input: unknown) => {
     if (state.unavailable) throw new Error("down");
     await state.onStart?.();
-    return { url: "https://checkout.stripe.test/session" };
+    return { url: "https://provider.example/session" };
   });
   const recordOwnershipTransferOutcome = vi.fn(async (_input: unknown) => {
     if (state.deliveryUnavailable) throw new Error("down");
@@ -32,8 +32,6 @@ export function setupTransfer() {
   const bindings = {
     DB: env.DB,
     ENTITLEMENT_MODE: "control-plane",
-    CHECKOUT_ENABLED: "true",
-    TRANSFER_CHECKOUT_ENABLED: "true",
     CONTROL_PLANE: {
       getOwnershipEligibility,
       startOwnershipAcquisition,
@@ -53,9 +51,9 @@ export function setupTransfer() {
       c.set("currentUser", { id: userId } as CurrentUser);
       await next();
     });
-    app.route("/", billingRoute);
+    app.route("/", usageRoute);
     return app.request(
-      `https://tatsumaki.example/billing/projects/${projectId}/ownership-transfer${suffix}`,
+      `https://tatsumaki.example/usage/projects/${projectId}/ownership-transfer${suffix}`,
       {
         method,
         ...(body === undefined

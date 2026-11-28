@@ -15,22 +15,25 @@ describe("ownership acquisition", () => {
     const { projectId, transferId } = await seedTransfer(ctx.call);
     for (const userId of ["owner", "carol"])
       expect(
-        (await ctx.call(userId, projectId, "POST", "/checkout", { transferId }))
-          .status,
+        (
+          await ctx.call(userId, projectId, "POST", "/acquisition", {
+            transferId,
+          })
+        ).status,
       ).toBe(403);
     expect(
       (
-        await ctx.call("unknown", projectId, "POST", "/checkout", {
+        await ctx.call("unknown", projectId, "POST", "/acquisition", {
           transferId,
         })
       ).status,
     ).toBe(404);
     expect(
-      (await ctx.call("bob", projectId, "POST", "/checkout", { transferId }))
+      (await ctx.call("bob", projectId, "POST", "/acquisition", { transferId }))
         .status,
     ).toBe(201);
     expect(
-      (await ctx.call("bob", projectId, "POST", "/checkout", { transferId }))
+      (await ctx.call("bob", projectId, "POST", "/acquisition", { transferId }))
         .status,
     ).toBe(201);
     expect(ctx.startOwnershipAcquisition).toHaveBeenCalledTimes(2);
@@ -48,31 +51,19 @@ describe("ownership acquisition", () => {
     );
     expect(await roleOf(projectId, "owner")).toBe("owner");
   });
-  it("rejects stale identifiers, ended requests and disabled acquisition", async () => {
+  it("rejects stale identifiers, and ended requests", async () => {
     const ctx = setupTransfer();
     const { projectId, transferId } = await seedTransfer(ctx.call);
     expect(
       (
-        await ctx.call("bob", projectId, "POST", "/checkout", {
+        await ctx.call("bob", projectId, "POST", "/acquisition", {
           transferId: "other",
         })
       ).status,
     ).toBe(409);
-    expect(
-      (
-        await ctx.call(
-          "bob",
-          projectId,
-          "POST",
-          "/checkout",
-          { transferId },
-          { TRANSFER_CHECKOUT_ENABLED: "false" },
-        )
-      ).status,
-    ).toBe(409);
     await ctx.call("owner", projectId, "POST", "/cancel", { transferId });
     expect(
-      (await ctx.call("bob", projectId, "POST", "/checkout", { transferId }))
+      (await ctx.call("bob", projectId, "POST", "/acquisition", { transferId }))
         .status,
     ).toBe(409);
     expect(ctx.startOwnershipAcquisition).not.toHaveBeenCalled();
@@ -84,7 +75,7 @@ describe("ownership acquisition", () => {
       await ctx.call("owner", projectId, "POST", "/cancel", { transferId });
     };
     expect(
-      (await ctx.call("bob", projectId, "POST", "/checkout", { transferId }))
+      (await ctx.call("bob", projectId, "POST", "/acquisition", { transferId }))
         .status,
     ).toBe(409);
     await recoverOwnershipTransfersScheduled(ctx.bindings);
@@ -108,7 +99,7 @@ describe("ownership acquisition", () => {
     expect(response.status).toBe(201);
     expect(
       (
-        await ctx.call("carol", projectId, "POST", "/checkout", {
+        await ctx.call("carol", projectId, "POST", "/acquisition", {
           transferId: transfer.id,
         })
       ).status,
@@ -125,7 +116,7 @@ describe("ownership acquisition", () => {
       .bind(projectId)
       .run();
     expect(
-      (await ctx.call("bob", projectId, "POST", "/checkout", { transferId }))
+      (await ctx.call("bob", projectId, "POST", "/acquisition", { transferId }))
         .status,
     ).toBe(409);
     await env.DB.prepare(
@@ -135,7 +126,7 @@ describe("ownership acquisition", () => {
       .run();
     ctx.state.unavailable = true;
     expect(
-      (await ctx.call("bob", projectId, "POST", "/checkout", { transferId }))
+      (await ctx.call("bob", projectId, "POST", "/acquisition", { transferId }))
         .status,
     ).toBe(503);
   });

@@ -1,7 +1,7 @@
 import { recoverOwnershipTransfers } from "../../application/usecases/advance-ownership-transfer";
 import { D1ProjectOwnershipTransferRepository } from "../../infrastructure/db/repositories/d1-project-ownership-transfer-repository";
 import type { Bindings } from "../../index";
-import { createTransferServices } from "../routes/billing";
+import { createTransferServices } from "../routes/usage";
 
 /** Never throws: a recovery failure must not affect other scheduled work. */
 export async function recoverOwnershipTransfersScheduled(

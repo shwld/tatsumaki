@@ -118,7 +118,7 @@
 
 ## Amendment 2026-11-18 (story #433)
 
-停止状態の強制を実装した。経路の一覧は [billing-write-gate.md](../billing-write-gate.md)。
+停止状態の強制を実装した。経路の一覧は [project-write-gate.md](../project-write-gate.md)。
 
 - **強制のスイッチ**: `ENTITLEMENT_MODE=control-plane` かつ `PROJECT_WRITE_ENFORCEMENT=true` のときだけ書き込みを判定する。未設定なら従来どおり何も拒否しない。公開準備(既存プロジェクトの扱いと法務表示)が済むまで本番では設定せず、staging で先に有効にして確認する。セルフホストは設定しても影響を受けない。
 - **キャッシュ**: プロジェクトごとに、Control Plane の応答の `maxAgeSeconds` の間だけ使う。取得に失敗したときだけ `staleIfErrorSeconds` の間、古い値を使う。期限の起点は応答を受け取った時刻。本体側に独立した TTL は持たない。現行の Control Plane の値(`ENTITLEMENT_CACHE_TTL_SECONDS=60`、`ENTITLEMENT_STALE_IF_ERROR_SECONDS=300`)では、停止が書き込みに反映されるまでの最大遅延は、Control Plane が正常なら 60 秒、障害中は 360 秒(60 + 300)。ただし、キャッシュは Worker の isolate ごとなので、状態の変化に気づく時刻は isolate ごとに最大 60 秒ずれる。

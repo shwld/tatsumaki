@@ -36,11 +36,7 @@ export async function listOwnedProjectUsage(
     operations: ProjectOperationsGateway;
     accessState: (projectId: string) => Promise<ProjectAccessState>;
   },
-  input: {
-    userId: string;
-    locale: ProjectOperationsLocale;
-    checkoutEnabled: boolean;
-  },
+  input: { userId: string; locale: ProjectOperationsLocale },
 ): Promise<Result<OwnedProjectUsageList, typeof PROJECT_REPOSITORY_ERROR>> {
   const projects = await deps.projects.listByMember(input.userId);
   if (projects.isErr()) {
@@ -74,9 +70,7 @@ export async function listOwnedProjectUsage(
         projectId: project.id,
         projectName: project.name,
         access: await deps.accessState(project.id),
-        operations: (entry?.operations ?? []).filter(
-          (operation) => operation !== "resume" || input.checkoutEnabled,
-        ),
+        operations: entry?.operations ?? [],
         notice: entry?.notice ?? null,
       };
     }),

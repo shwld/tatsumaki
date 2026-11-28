@@ -8,8 +8,6 @@ import { deterministicRequestId } from "./deterministic-request-id";
 
 export const OPERATION_NOT_FOUND_ERROR = "OPERATION_NOT_FOUND_ERROR" as const;
 export const OPERATION_FORBIDDEN_ERROR = "OPERATION_FORBIDDEN_ERROR" as const;
-export const OPERATION_NOT_OFFERED_ERROR =
-  "OPERATION_NOT_OFFERED_ERROR" as const;
 export const OPERATION_PROJECT_DELETING_ERROR =
   "OPERATION_PROJECT_DELETING_ERROR" as const;
 export const OPERATION_UNAVAILABLE_ERROR =
@@ -18,7 +16,6 @@ export const OPERATION_UNAVAILABLE_ERROR =
 export type StartProjectOperationError =
   | typeof OPERATION_NOT_FOUND_ERROR
   | typeof OPERATION_FORBIDDEN_ERROR
-  | typeof OPERATION_NOT_OFFERED_ERROR
   | typeof OPERATION_PROJECT_DELETING_ERROR
   | typeof OPERATION_UNAVAILABLE_ERROR;
 
@@ -41,7 +38,6 @@ export async function startProjectOperation(
     successUrl: string;
     cancelUrl: string;
   },
-  checkoutEnabled: boolean,
 ): Promise<Result<{ url: string }, StartProjectOperationError>> {
   const member = await deps.projects.findMember(input.projectId, input.userId);
   if (member.isErr()) return err(OPERATION_UNAVAILABLE_ERROR);
@@ -60,7 +56,6 @@ export async function startProjectOperation(
       );
     }
 
-    if (!checkoutEnabled) return err(OPERATION_NOT_OFFERED_ERROR);
     // 削除要求の受付後は再開させない。提供者側の閉鎖が最終防衛線。
     const deletion = await deps.deletions.findById(input.projectId);
     if (deletion.isErr()) return err(OPERATION_UNAVAILABLE_ERROR);

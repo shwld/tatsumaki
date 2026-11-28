@@ -12,10 +12,10 @@ import type { ProjectCreationEligibilityGateway } from "../src/application/ports
 const now = new Date("2026-11-18T12:00:00.000Z");
 const request = {
   projectId: "p1",
-  purchaserUserId: "u1",
+  requesterUserId: "u1",
   name: "Project",
   idempotencyKey: "key-12345678",
-  checkoutRequestId: "c1",
+  acquisitionRequestId: "c1",
   status: "pending" as const,
   attemptCount: 0,
   materializeFailureCount: 0,

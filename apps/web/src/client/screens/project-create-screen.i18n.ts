@@ -4,7 +4,7 @@ export const projectCreateScreenJa = {
       nameRequired: "プロジェクト名は必須です",
     },
     requestError: "プロジェクトの作成に失敗しました",
-    checkoutCancelled:
+    acquisitionCancelled:
       "手続きはキャンセルされました。プロジェクトはまだ作成されていません。",
     permission: {
       nextAction: "プロジェクトOwnerに招待を依頼してください。",
@@ -24,7 +24,7 @@ export const projectCreateScreenEn = {
       nameRequired: "Project name is required",
     },
     requestError: "Failed to create project",
-    checkoutCancelled:
+    acquisitionCancelled:
       "The action was cancelled. No project has been created yet.",
     permission: {
       nextAction: "Ask a project owner to invite you.",

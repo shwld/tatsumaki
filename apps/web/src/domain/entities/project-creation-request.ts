@@ -7,10 +7,10 @@ export type ProjectCreationStalledReason =
 
 export type ProjectCreationRequest = {
   projectId: string;
-  purchaserUserId: string;
+  requesterUserId: string;
   name: string;
   idempotencyKey: string;
-  checkoutRequestId: string;
+  acquisitionRequestId: string;
   status: ProjectCreationRequestStatus;
   attemptCount: number;
   materializeFailureCount: number;

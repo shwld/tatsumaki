@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { D1ProjectRepository } from "../src/infrastructure/db/repositories/d1-project-repository";
 import type { Bindings, Env } from "../src/index";
 import type { CurrentUser } from "../src/presentation/middleware/access-auth";
-import { billingRoute } from "../src/presentation/routes/billing";
+import { usageRoute } from "../src/presentation/routes/usage";
 import { resetDatabase } from "./helpers/db";
 import { projectUsage, type UsageKind } from "./helpers/project-usage";
 
@@ -15,7 +15,7 @@ const buildApp = (userId: string) => {
     c.set("currentUser", { id: userId } as CurrentUser);
     await next();
   });
-  app.route("/", billingRoute);
+  app.route("/", usageRoute);
   return app;
 };
 
@@ -59,7 +59,6 @@ const setup = (options: Options = {}) => {
     DB: env.DB,
     ENTITLEMENT_MODE: "control-plane",
     PROJECT_WRITE_ENFORCEMENT: "true",
-    CHECKOUT_ENABLED: "true",
     CONTROL_PLANE: controlPlane,
     ...options.overrides,
   } as unknown as Bindings;
@@ -72,14 +71,14 @@ const setup = (options: Options = {}) => {
   return {
     controlPlane,
     list: (userId: string, query = "") =>
-      request(userId, `/billing/operations${query}`, "GET"),
+      request(userId, `/usage/operations${query}`, "GET"),
     start: (userId: string, projectId: string, operation: string, query = "") =>
       request(
         userId,
-        `/billing/projects/${projectId}/operations/${operation}${query}`,
+        `/usage/projects/${projectId}/operations/${operation}${query}`,
       ),
     startAccount: (userId: string) =>
-      request(userId, "/billing/account-operations/manage"),
+      request(userId, "/usage/account-operations/manage"),
   };
 };
 
@@ -145,18 +144,6 @@ describe("owned project operations", () => {
       operationsAvailable: true,
       accountOperations: ["manage"],
       projects: [],
-    });
-  });
-
-  it("hides resume while checkout is disabled", async () => {
-    await createProject("user-1");
-    const { list } = setup({
-      list: offer(["resume"]),
-      usage: "read_only",
-      overrides: { CHECKOUT_ENABLED: "false" },
-    });
-    expect(await (await list("user-1")).json()).toMatchObject({
-      projects: [{ access: { kind: "read_only" }, operations: [] }],
     });
   });
 
@@ -269,20 +256,6 @@ describe("starting a project operation", () => {
     expect(ids).toHaveLength(2);
     expect(ids[0]).toBe(ids[1]);
     expect(z.uuid().safeParse(ids[0]).success).toBe(true);
-  });
-
-  it("refuses to resume while checkout is disabled", async () => {
-    const projectId = await createProject("owner");
-    const { start, controlPlane } = setup({
-      overrides: { CHECKOUT_ENABLED: "false" },
-    });
-    const response = await start("owner", projectId, "resume");
-    expect(response.status).toBe(409);
-    expect(await response.json()).toMatchObject({
-      code: "operation_not_offered",
-    });
-    expect(controlPlane.startProjectOperation).not.toHaveBeenCalled();
-    expect((await start("owner", projectId, "manage")).status).toBe(201);
   });
 
   it("refuses to resume a project whose deletion was accepted", async () => {

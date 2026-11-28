@@ -39,7 +39,7 @@
 - `DELETE /projects/:projectId`(オーナーの削除)。ルート側でオーナーを確認する。
 - `POST /projects`、`/project-creation-requests`(作成。権利が得られた後に別経路で行う)。
 - `POST /invitation-links/accept`(パスにプロジェクト ID がない参加。メンバーを増やすのは編集にあたらないが、必要になれば受諾時に判定する)。
-- `/auth/me/**`(個人設定)、`POST /billing/account-operations/manage`、`POST /billing/projects/:projectId/operations/:operation`、onboarding。
+- `/auth/me/**`(個人設定)、`POST /usage/account-operations/manage`、`POST /usage/projects/:projectId/operations/:operation`、onboarding。
 - メンバー本人の脱退: 現在そのルートは存在しない。追加するときはこの一覧に加え、ゲートから除外する。
 - 読み取り(GET/HEAD/OPTIONS、および MCP の読み取り tool)。
 
@@ -78,20 +78,12 @@
 
 | 経路 | 内容 |
 | --- | --- |
-| `GET /billing/operations?locale=` | 所有プロジェクトの利用状態、使える操作、案内。操作を取得できないときは `operationsAvailable: false` で状態だけを返し、画面はボタンを出さない |
-| `POST /billing/projects/:projectId/operations/:operation` | オーナーを確認し、操作の移動先(HTTPS)を返す。非オーナー 403、非メンバー 404、提供者の拒否・障害 503 |
-| `POST /billing/account-operations/manage` | 利用者自身の管理画面の移動先を返す |
+| `GET /usage/operations?locale=` | 所有プロジェクトの利用状態、使える操作、案内。操作を取得できないときは `operationsAvailable: false` で状態だけを返し、画面はボタンを出さない |
+| `POST /usage/projects/:projectId/operations/:operation` | オーナーを確認し、操作の移動先(HTTPS)を返す。非オーナー 403、非メンバー 404、提供者の拒否・障害 503 |
+| `POST /usage/account-operations/manage` | 利用者自身の管理画面の移動先を返す |
 
-- 操作できる対象かは Control Plane が呼び出し元の購読から判定し直す。移動先はログに出さない。
-- `resume` は `CHECKOUT_ENABLED=true` のときだけ一覧に出し、受け付ける。削除要求の受付後は 409 `project_deleting`。`requestId` は projectId と UTC 日付から決める。
+- 操作できる対象かは Control Plane が呼び出し元の権利から判定し直す。移動先はログに出さない。
+- 利用の再開(`resume`)の可否は提供者の一覧に従う。削除要求の受付後は 409 `project_deleting`。`requestId` は projectId と UTC 日付から決める。
 - `resume` の戻り先は `/projects/:projectId?operation=resume`(キャンセルは `resume-cancel`)。戻り URL だけでは権利を与えず、バナーが利用状態を再取得して利用できるまで読み取り専用のまま待つ(5 秒間隔で最大 2 分、その後は再読み込みを案内)。
-- 一覧を開くたびに購読の表示名を同期する([runbook](billing-subscription-display-name-runbook.md))。
 
-## 支払い管理画面の設定(story #441)
-
-`manage` が開く Stripe Portal で使えるのは支払い方法の更新と請求履歴・領収書の閲覧で、プラン・数量の変更は Stripe の Portal 設定で無効にする。本体にカード入力や請求書発行は実装しない。
-
-- test mode の設定と確認: Portal 設定で「支払い方法の更新」「請求履歴」を有効、「サブスクリプションの更新・数量変更」を無効にし、test card で更新と請求書閲覧を確認する。
-- 税込 Price・Stripe Tax・適格請求書登録番号は公開準備 #417 の担当で、確認済みとして扱わない。
-
-`/billing/projects/:projectId/**`(利用者の操作・所有権の譲渡申請・受け手の Checkout)は `/projects/:id` 配下ではないため、ゲートは対象外にする。利用不可でも利用の再開と申請の取消・辞退ができる。
+`/usage/projects/:projectId/**`(利用者の操作・所有権の譲渡申請・受け手の権利の取得)は `/projects/:id` 配下ではないため、ゲートは対象外にする。利用不可でも利用の再開と申請の取消・辞退ができる。

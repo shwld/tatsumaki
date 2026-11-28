@@ -22,10 +22,8 @@
 - `docs/desktop-app.md` | [link](desktop-app.md) | 責務: Desktop アプリの実行/設計方針 | Load when: desktop 実装・運用を変更するとき | 更新責任: Desktop 機能の実装者
 - `docs/local-cloudflare-access-setup.md` | [link](local-cloudflare-access-setup.md) | 責務: ローカル Cloudflare Access 設定 | Load when: Access 連携や tunnel を扱うとき | 更新責任: Web 運用担当
 - `docs/hosted-access-rollout.md` | [link](hosted-access-rollout.md) | 責務: 公式ホスト版の Access 自由登録構成・バイパス確認・ロールバック | Load when: 本番の Access ポリシーや Turnstile 設定を変更するとき | 更新責任: Web 運用担当
-- `docs/billing-creation-recovery-runbook.md` | [link](billing-creation-recovery-runbook.md) | 責務: 決済後のプロジェクト作成の自動復旧と要調査の手順 | Load when: 購読作成の復旧処理や要調査の要求を扱うとき | 更新責任: Web 運用担当
-- `docs/billing-project-deletion-runbook.md` | [link](billing-project-deletion-runbook.md) | 責務: プロジェクト削除時の購読解約と未完了の削除要求の復旧手順 | Load when: 削除に伴う課金終了の失敗や残留を扱うとき | 更新責任: Web 運用担当
-- `docs/billing-subscription-display-name-runbook.md` | [link](billing-subscription-display-name-runbook.md) | 責務: Stripe 購読の表示名(プロジェクト名)の同期・移行手順 | Load when: Portal の購読名が古い、表示名の移行を行うとき | 更新責任: Web 運用担当
-- `docs/billing-write-gate.md` | [link](billing-write-gate.md) | 責務: 利用不可のプロジェクトの書き込み拒否の有効化手順・適用経路・利用者の操作の経路 | Load when: 書き込み経路を追加する、または利用制限や操作の経路を調べるとき | 更新責任: Web 運用担当
+- `docs/project-recovery-runbook.md` | [link](project-recovery-runbook.md) | 責務: 公式ホスト版の未完了の作成・削除要求の調査手順 | Load when: 作成の復旧や削除の再試行を扱うとき | 更新責任: Web 運用担当
+- `docs/project-write-gate.md` | [link](project-write-gate.md) | 責務: 利用不可のプロジェクトの書き込み拒否の有効化手順・適用経路・利用者の操作の経路 | Load when: 書き込み経路を追加する、または利用制限や操作の経路を調べるとき | 更新責任: Web 運用担当
 - `docs/pivotal-tracker-ui-specification.ja.md` | [link](pivotal-tracker-ui-specification.ja.md) | 責務: PivotalTracker 準拠 UI 仕様 | Load when: story UI/UX を変更するとき | 更新責任: Product/UI オーナー
 - `docs/stored-object-cleanup.md` | [link](stored-object-cleanup.md) | 責務: 削除後の R2 オブジェクト回収・保存期間・運用上の注意 | Load when: R2 に保存するデータや削除経路を変更するとき、保存期間を文書に書くとき | 更新責任: Web 運用担当 | 最終更新日: 2026-11-26
 - `docs/story-delete-and-timeline-entries.md` | [link](story-delete-and-timeline-entries.md) | 責務: story 削除時の timeline 挙動 | Load when: story 削除や timeline を変更するとき | 更新責任: Web ドメイン実装者

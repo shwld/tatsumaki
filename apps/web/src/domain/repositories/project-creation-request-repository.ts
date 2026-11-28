@@ -13,8 +13,8 @@ export type ProjectCreationRequestRepositoryError =
 
 export type OpenProjectCreationRequestInput = {
   projectId: string;
-  checkoutRequestId: string;
-  purchaserUserId: string;
+  acquisitionRequestId: string;
+  requesterUserId: string;
   name: string;
   idempotencyKey: string;
 };
@@ -52,7 +52,7 @@ export interface ProjectCreationRequestRepository {
     projectId: string,
   ): Promise<Result<void, ProjectCreationRequestRepositoryError>>;
 
-  // 同じ (purchaserUserId, idempotencyKey) は最初の要求をそのまま返す。
+  // 同じ (requesterUserId, idempotencyKey) は最初の要求をそのまま返す。
   open(
     input: OpenProjectCreationRequestInput,
   ): Promise<

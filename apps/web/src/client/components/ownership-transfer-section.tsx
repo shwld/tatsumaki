@@ -13,7 +13,7 @@ type Transfer = {
   expiresAt: string;
   role: "requester" | "recipient";
   state: "pending" | "completed";
-  acquisition?: "available" | "disabled";
+  acquisition?: "available";
 };
 
 type LoadState =
@@ -27,7 +27,6 @@ type ErrorKey =
   | "alreadyPending"
   | "invalidRecipient"
   | "notPending"
-  | "checkoutDisabled"
   | "projectDeleting";
 
 const BUTTON_CLASS =
@@ -37,7 +36,6 @@ const ERROR_BY_CODE: Record<string, ErrorKey> = {
   already_pending: "alreadyPending",
   invalid_recipient: "invalidRecipient",
   not_pending: "notPending",
-  checkout_disabled: "checkoutDisabled",
   project_deleting: "projectDeleting",
 };
 
@@ -68,7 +66,7 @@ export function OwnershipTransferSection({
   const [recipient, setRecipient] = useState("");
   const [busy, setBusy] = useState(false);
   const [errorKey, setErrorKey] = useState<ErrorKey | null>(null);
-  const base = `/api/billing/projects/${encodeURIComponent(projectId)}/ownership-transfer`;
+  const base = `/api/usage/projects/${encodeURIComponent(projectId)}/ownership-transfer`;
 
   useEffect(() => {
     let ignore = false;
@@ -78,7 +76,7 @@ export function OwnershipTransferSection({
         previous.status === "ready" ? previous : { status: "loading" },
       );
       try {
-        const entitlement = await fetch("/api/billing/entitlement");
+        const entitlement = await fetch("/api/usage/mode");
         if (ignore) return;
         if (isAuthError(entitlement.status)) {
           notifySessionExpired();
@@ -171,11 +169,11 @@ export function OwnershipTransferSection({
     };
   }, [awaitingTransfer, reload]);
 
-  const startCheckout = async (transferId: string): Promise<void> => {
+  const startAcquisition = async (transferId: string): Promise<void> => {
     setBusy(true);
     setErrorKey(null);
     try {
-      const response = await fetch(`${base}/checkout`, {
+      const response = await fetch(`${base}/acquisition`, {
         method: "POST",
         body: JSON.stringify({ transferId }),
         headers: { "content-type": "application/json" },
@@ -283,9 +281,9 @@ export function OwnershipTransferSection({
                 type="button"
                 className={BUTTON_CLASS}
                 disabled={busy}
-                onClick={() => void startCheckout(state.transfer?.id ?? "")}
+                onClick={() => void startAcquisition(state.transfer?.id ?? "")}
               >
-                {t("ownershipTransferSection.recipient.subscribe")}
+                {t("ownershipTransferSection.recipient.proceed")}
               </button>
             ) : null}
             <p>

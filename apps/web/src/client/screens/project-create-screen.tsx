@@ -22,14 +22,14 @@ export function ProjectCreateScreen() {
   const submitLockRef = useRef(false);
   const idempotencyKeyRef = useRef(crypto.randomUUID());
   const [searchParams] = useSearchParams();
-  const checkoutCancelled = searchParams.get("checkout") === "cancel";
+  const acquisitionCancelled = searchParams.get("acquisition") === "cancel";
 
   const handleNameChange = (value: string) => {
     idempotencyKeyRef.current = crypto.randomUUID();
     setName(value);
   };
 
-  const startCheckout = async (): Promise<void> => {
+  const startAcquisition = async (): Promise<void> => {
     const response = await fetch("/api/project-creation-requests", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -109,8 +109,8 @@ export function ProjectCreateScreen() {
             .clone()
             .json()
             .catch(() => null)) as { code?: string } | null;
-          if (body?.code === "checkout_required") {
-            await startCheckout();
+          if (body?.code === "acquisition_required") {
+            await startAcquisition();
             return;
           }
         }
@@ -168,9 +168,9 @@ export function ProjectCreateScreen() {
         <p className="mt-1 text-sm text-gray-600">
           {t("projectCreateScreen.description")}
         </p>
-        {checkoutCancelled ? (
+        {acquisitionCancelled ? (
           <p className="mt-4 text-sm text-gray-700" role="status">
-            {t("projectCreateScreen.checkoutCancelled")}
+            {t("projectCreateScreen.acquisitionCancelled")}
           </p>
         ) : null}
         <ProjectCreateForm

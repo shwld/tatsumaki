@@ -1,0 +1,2 @@
+ALTER TABLE project_creation_requests RENAME COLUMN purchaser_user_id TO requester_user_id;
+ALTER TABLE project_creation_requests RENAME COLUMN checkout_request_id TO acquisition_request_id;
