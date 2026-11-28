@@ -105,7 +105,7 @@ for (const theme of themeVariants) {
     );
   });
 
-  test(`project create completion waits for payment (${theme})`, async ({
+  test(`project create completion checks eligibility (${theme})`, async ({
     page,
   }) => {
     await setThemeMode(page, theme);
@@ -125,7 +125,7 @@ for (const theme of themeVariants) {
       page.getByRole("heading", { name: "プロジェクトを作成しています" }),
     ).toBeVisible();
     await expect(
-      page.getByText("お支払いの反映を確認しています..."),
+      page.getByText("プロジェクトを作成できるか確認しています..."),
     ).toBeVisible();
   });
 }
