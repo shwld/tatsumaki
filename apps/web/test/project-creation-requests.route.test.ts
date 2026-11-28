@@ -157,6 +157,18 @@ describe("project creation requests", () => {
     expect(calls[1][0].requestId).toBe(calls[0][0].requestId);
   });
 
+  it("does not start a new acquisition when the host has disabled it", async () => {
+    const { post, createCheckoutSession } = setup();
+    const response = await post(
+      "user-1",
+      "/project-creation-requests",
+      { name: "Alpha", idempotencyKey: "key-12345678" },
+      { CHECKOUT_ENABLED: "false" },
+    );
+    expect(response.status).toBe(409);
+    expect(createCheckoutSession).not.toHaveBeenCalled();
+  });
+
   it("reports when the provider does not offer acquisition", async () => {
     const { post, fake, createCheckoutSession } = setup();
     fake.checkoutFail = true;

@@ -10,6 +10,7 @@ import {
 import { D1ProjectCreationRequestRepository } from "../../infrastructure/db/repositories/d1-project-creation-request-repository";
 import { D1ProjectRepository } from "../../infrastructure/db/repositories/d1-project-repository";
 import { ControlPlaneCreationAcquisition } from "../../infrastructure/entitlements/control-plane-creation-acquisition";
+import { isCheckoutEnabled } from "./billing";
 import { ControlPlaneCreationEligibility } from "../../infrastructure/entitlements/control-plane-creation-eligibility";
 import type { Env } from "../../index";
 
@@ -18,7 +19,7 @@ const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
 export const projectCreationRequestsRoute = new Hono<Env>();
 
 projectCreationRequestsRoute.post("/project-creation-requests", async (c) => {
-  if (c.env.ENTITLEMENT_MODE !== "control-plane" || !c.env.CONTROL_PLANE) {
+  if (!isCheckoutEnabled(c.env) || !c.env.CONTROL_PLANE) {
     return c.json({ error: "Creation is not available" }, 409);
   }
 
