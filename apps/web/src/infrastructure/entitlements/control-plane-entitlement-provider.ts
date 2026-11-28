@@ -21,6 +21,7 @@ export interface ControlPlaneRpc {
   startCreationAcquisition(input: {
     accountId: string;
     projectId: string;
+    requestedAt: string;
     projectName: string;
     requestId: string;
     successUrl: string;

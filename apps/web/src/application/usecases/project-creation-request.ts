@@ -89,6 +89,7 @@ export async function startProjectCreation(
     const session = await deps.acquisition.start({
       accountId: input.userId,
       projectId: request.projectId,
+      requestedAt: requestedAt(request.createdAt),
       projectName: request.name,
       requestId: request.checkoutRequestId,
       successUrl: input.successUrl(request.projectId),
