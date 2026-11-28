@@ -136,17 +136,7 @@ describe("owned project operations", () => {
         },
       ],
     });
-    expect(controlPlane.syncProjectDisplayNames).toHaveBeenCalledWith({
-      billingAccountId: "user-1",
-      projects: [{ projectId: owned, name: "Owned" }],
-    });
-  });
-
-  it("still lists when the display name repair fails", async () => {
-    await createProject("user-1");
-    const { list, controlPlane } = setup();
-    controlPlane.syncProjectDisplayNames.mockRejectedValue(new Error("down"));
-    expect((await list("user-1")).status).toBe(200);
+    expect(controlPlane.syncProjectDisplayNames).not.toHaveBeenCalled();
   });
 
   it("offers account operations without owned projects", async () => {

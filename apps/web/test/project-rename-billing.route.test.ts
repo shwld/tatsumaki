@@ -6,6 +6,8 @@ import type { Bindings, Env } from "../src/index";
 import type { CurrentUser } from "../src/presentation/middleware/access-auth";
 import { projectsRoute } from "../src/presentation/routes/projects";
 import { resetDatabase } from "./helpers/db";
+import { D1ProjectNameNotifications } from "../src/infrastructure/db/repositories/d1-project-name-notifications";
+import { notifyProjectRenames } from "../src/application/usecases/notify-project-renames";
 
 const createProject = async (name: string, ownerUserId: string) => {
   const result = await new D1ProjectRepository(env.DB).create({
@@ -39,60 +41,50 @@ const rename = (
   );
 };
 
-const controlPlane = (syncProjectDisplayNames: ReturnType<typeof vi.fn>) =>
-  ({
-    ENTITLEMENT_MODE: "control-plane",
-    CONTROL_PLANE: { syncProjectDisplayNames },
-  }) as unknown as Partial<Bindings>;
-
-describe("project rename and subscription display name", () => {
-  beforeEach(async () => {
-    await resetDatabase(env.DB);
-  });
-
-  it("syncs the new name to the subscription display name", async () => {
+describe("project rename notifications", () => {
+  beforeEach(async () => resetDatabase(env.DB));
+  it("records a rename and retries its notification after provider failure", async () => {
     const projectId = await createProject("Old", "owner");
-    const sync = vi.fn(async () => ({ updatedSubscriptionCount: 1 }));
-
-    const response = await rename(
-      "owner",
-      projectId,
-      "New",
-      controlPlane(sync),
-    );
-
-    expect(response.status).toBe(200);
-    expect(sync).toHaveBeenCalledWith({
-      billingAccountId: "owner",
-      projects: [{ projectId, name: "New" }],
-    });
+    expect((await rename("owner", projectId, "New", {})).status).toBe(200);
+    const notifications = new D1ProjectNameNotifications(env.DB);
+    expect(await notifications.listPending(10)).toEqual([
+      { projectId, name: "New", revision: 1 },
+    ]);
+    const recordRenamed = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("down"))
+      .mockResolvedValueOnce(undefined);
+    await notifyProjectRenames({ notifications, provider: { recordRenamed } });
+    expect(await notifications.listPending(10)).toHaveLength(1);
+    await notifyProjectRenames({ notifications, provider: { recordRenamed } });
+    expect(await notifications.listPending(10)).toHaveLength(0);
   });
-
-  it("keeps the rename when the sync fails", async () => {
+  it("keeps a newer rename pending when an older event is acknowledged", async () => {
     const projectId = await createProject("Old", "owner");
-    const sync = vi.fn(async () => {
-      throw new Error("control plane down");
-    });
-
-    const response = await rename(
-      "owner",
-      projectId,
-      "New",
-      controlPlane(sync),
-    );
-
-    expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ project: { name: "New" } });
+    await rename("owner", projectId, "First", {});
+    const notifications = new D1ProjectNameNotifications(env.DB);
+    const first = (await notifications.listPending(10))[0];
+    await rename("owner", projectId, "Second", {});
+    await notifications.markDelivered(first);
+    expect(await notifications.listPending(10)).toEqual([
+      { projectId, name: "Second", revision: 2 },
+    ]);
   });
-
-  it("does not call billing when the name is unchanged or self-hosted", async () => {
+  it("removes a pending name notification when the project is deleted", async () => {
+    const projectId = await createProject("Old", "owner");
+    await rename("owner", projectId, "New", {});
+    const notifications = new D1ProjectNameNotifications(env.DB);
+    expect(await notifications.listPending(10)).toHaveLength(1);
+    await env.DB.prepare("DELETE FROM projects WHERE id = ?")
+      .bind(projectId)
+      .run();
+    expect(await notifications.listPending(10)).toHaveLength(0);
+  });
+  it("does not record an unchanged name", async () => {
     const projectId = await createProject("Same", "owner");
-    const sync = vi.fn();
-
-    await rename("owner", projectId, "Same", controlPlane(sync));
-    const selfHosted = await rename("owner", projectId, "Other", {});
-
-    expect(sync).not.toHaveBeenCalled();
-    expect(selfHosted.status).toBe(200);
+    await rename("owner", projectId, "Same", {});
+    expect(
+      await new D1ProjectNameNotifications(env.DB).listPending(10),
+    ).toHaveLength(0);
   });
 });

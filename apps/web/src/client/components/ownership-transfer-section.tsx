@@ -12,10 +12,8 @@ type Transfer = {
   toUserId: string;
   expiresAt: string;
   role: "requester" | "recipient";
-  state: "pending" | "processing" | "completed" | "review";
-  outcome?: "switched" | "not-switched";
-  recipientSubscribed?: boolean | null;
-  checkout?: "available" | "disabled" | "otherSubscription";
+  state: "pending" | "completed";
+  acquisition?: "available" | "disabled";
 };
 
 type LoadState =
@@ -26,27 +24,21 @@ type LoadState =
 
 type ErrorKey =
   | "generic"
-  | "noSubscription"
   | "alreadyPending"
   | "invalidRecipient"
   | "notPending"
   | "checkoutDisabled"
-  | "paymentConfirmed"
-  | "projectDeleting"
-  | "alreadySubscribed";
+  | "projectDeleting";
 
 const BUTTON_CLASS =
   "inline-flex min-h-11 items-center justify-center rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-800 transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60";
 
 const ERROR_BY_CODE: Record<string, ErrorKey> = {
-  no_subscription: "noSubscription",
   already_pending: "alreadyPending",
   invalid_recipient: "invalidRecipient",
   not_pending: "notPending",
   checkout_disabled: "checkoutDisabled",
-  payment_confirmed: "paymentConfirmed",
   project_deleting: "projectDeleting",
-  already_subscribed: "alreadySubscribed",
 };
 
 const RETURN_POLL_INTERVAL_MS = 3000;
@@ -138,7 +130,6 @@ export function OwnershipTransferSection({
     if (
       !transferState ||
       transferState.state === "pending" ||
-      transferState.outcome !== "switched" ||
       notifiedTransferId.current === transferState.id
     ) {
       return;
@@ -151,24 +142,23 @@ export function OwnershipTransferSection({
     onOwnershipSwitched?.();
   }, [transferState, isOwner, onOwnershipSwitched]);
 
-  // 購読の反映は決済の後に遅れる。戻り先や別タブに依らず、確認できるまで(確認不能も含め)取り直す。
-  const awaitingPayment =
+  // 受け手の手続きの完了を、画面に戻った後も確認する。
+  const awaitingTransfer =
     state.status === "ready" &&
-    ((state.transfer?.state === "pending" &&
-      state.transfer.role === "recipient") ||
-      state.transfer?.state === "processing");
+    state.transfer?.state === "pending" &&
+    state.transfer.role === "recipient";
   const pollsLeft = useRef(RETURN_POLL_MAX_ATTEMPTS);
   useEffect(() => {
-    if (!awaitingPayment || pollsLeft.current <= 0) return;
+    if (!awaitingTransfer || pollsLeft.current <= 0) return;
     const timer = window.setTimeout(() => {
       pollsLeft.current -= 1;
       reload();
     }, RETURN_POLL_INTERVAL_MS);
     return () => window.clearTimeout(timer);
-  }, [awaitingPayment, attempt, reload]);
-  // 別タブで決済して戻った場合や、反映が遅れて取り直しの回数を使い切った場合に、再び確認する。
+  }, [awaitingTransfer, attempt, reload]);
+  // 別タブから戻ったときにも確認する。
   useEffect(() => {
-    if (!awaitingPayment) return;
+    if (!awaitingTransfer) return;
     const revalidate = () => {
       pollsLeft.current = RETURN_POLL_MAX_ATTEMPTS;
       reload();
@@ -179,7 +169,7 @@ export function OwnershipTransferSection({
       window.removeEventListener("focus", revalidate);
       window.removeEventListener("pageshow", revalidate);
     };
-  }, [awaitingPayment, reload]);
+  }, [awaitingTransfer, reload]);
 
   const startCheckout = async (transferId: string): Promise<void> => {
     setBusy(true);
@@ -281,17 +271,14 @@ export function OwnershipTransferSection({
                   })}
             </p>
             <p>
-              {state.transfer.role === "requester"
-                ? t("ownershipTransferSection.requester.next")
-                : state.transfer.recipientSubscribed
-                  ? t("ownershipTransferSection.recipient.paid")
-                  : state.transfer.checkout === "otherSubscription"
-                    ? t("ownershipTransferSection.recipient.otherSubscription")
-                    : t("ownershipTransferSection.recipient.next")}
+              {t(
+                state.transfer.role === "requester"
+                  ? "ownershipTransferSection.requester.next"
+                  : "ownershipTransferSection.recipient.next",
+              )}
             </p>
             {state.transfer.role === "recipient" &&
-            state.transfer.recipientSubscribed === false &&
-            state.transfer.checkout === "available" ? (
+            state.transfer.acquisition === "available" ? (
               <button
                 type="button"
                 className={BUTTON_CLASS}
@@ -308,25 +295,21 @@ export function OwnershipTransferSection({
                 }).format(new Date(state.transfer.expiresAt)),
               })}
             </p>
-            {state.transfer.recipientSubscribed ? null : (
-              <button
-                type="button"
-                className={BUTTON_CLASS}
-                disabled={busy}
-                onClick={() =>
-                  void send(
-                    state.transfer?.role === "requester"
-                      ? "/cancel"
-                      : "/decline",
-                    { transferId: state.transfer?.id },
-                  )
-                }
-              >
-                {state.transfer.role === "requester"
-                  ? t("ownershipTransferSection.requester.cancel")
-                  : t("ownershipTransferSection.recipient.decline")}
-              </button>
-            )}
+            <button
+              type="button"
+              className={BUTTON_CLASS}
+              disabled={busy}
+              onClick={() =>
+                void send(
+                  state.transfer?.role === "requester" ? "/cancel" : "/decline",
+                  { transferId: state.transfer?.id },
+                )
+              }
+            >
+              {state.transfer.role === "requester"
+                ? t("ownershipTransferSection.requester.cancel")
+                : t("ownershipTransferSection.recipient.decline")}
+            </button>
           </div>
         ) : (
           <div className="space-y-3">
@@ -334,11 +317,7 @@ export function OwnershipTransferSection({
               <div className="space-y-2">
                 <p className="font-semibold text-gray-900">
                   {t(
-                    `ownershipTransferSection.${
-                      state.transfer.outcome === "not-switched"
-                        ? "refundReview"
-                        : state.transfer.state
-                    }.${state.transfer.role}`,
+                    `ownershipTransferSection.completed.${state.transfer.role}`,
                     {
                       name: nameOf(
                         state.transfer.role === "requester"

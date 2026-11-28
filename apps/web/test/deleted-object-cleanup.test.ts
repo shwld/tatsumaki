@@ -51,7 +51,6 @@ async function deleteLeaver() {
       new D1UserRepository(env.DB),
       new D1ProjectRepository(env.DB),
       { userId: "leaver", confirmEmail: "leaver@example.com", now: new Date() },
-      { waitUntil: () => undefined },
     )
   )._unsafeUnwrap();
 }

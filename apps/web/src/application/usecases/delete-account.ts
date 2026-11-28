@@ -7,8 +7,6 @@ import type {
   UserRepository,
   UserRepositoryError,
 } from "../../domain/repositories/user-repository";
-import type { TransferCheckoutExpiryGateway } from "../ports/transfer-checkout-expiry-gateway";
-import { expireTransferCheckouts } from "./ownership-transfer";
 
 export const ACCOUNT_NOT_FOUND_ERROR = "ACCOUNT_NOT_FOUND_ERROR" as const;
 export const ACCOUNT_HAS_SOLE_OWNER_PROJECTS_ERROR =
@@ -32,10 +30,6 @@ export async function deleteAccount(
   userRepository: UserRepository,
   projectRepository: ProjectRepository,
   input: { userId: string; confirmEmail: string; now: Date },
-  afterCommit: {
-    checkoutExpiry?: TransferCheckoutExpiryGateway;
-    waitUntil: (task: Promise<void>) => void;
-  },
 ): Promise<Result<true, DeleteAccountError>> {
   const userResult = await userRepository.findById(input.userId);
   if (userResult.isErr()) return err(userResult.error);
@@ -73,14 +67,6 @@ export async function deleteAccount(
   //   users                         → DELETE
   const deleteResult = await userRepository.delete(input.userId, input.now);
   if (deleteResult.isErr()) return err(deleteResult.error);
-  if (deleteResult.value.voidedTransfers.length > 0) {
-    afterCommit.waitUntil(
-      expireTransferCheckouts(
-        afterCommit.checkoutExpiry,
-        deleteResult.value.voidedTransfers,
-      ),
-    );
-  }
 
   return ok(true);
 }

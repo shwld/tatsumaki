@@ -52,11 +52,11 @@ export function ProjectCreateScreen() {
       return;
     }
     const data = (await response.json()) as {
-      kind?: "checkout" | "ready";
+      kind?: "redirect" | "ready";
       projectId?: string;
       url?: string;
     };
-    if (data.kind === "checkout" && data.url) {
+    if (data.kind === "redirect" && data.url) {
       window.location.assign(data.url);
       return;
     }

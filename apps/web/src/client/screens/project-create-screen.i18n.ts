@@ -5,7 +5,7 @@ export const projectCreateScreenJa = {
     },
     requestError: "プロジェクトの作成に失敗しました",
     checkoutCancelled:
-      "お支払いはキャンセルされました。プロジェクトはまだ作成されていません。",
+      "手続きはキャンセルされました。プロジェクトはまだ作成されていません。",
     permission: {
       nextAction: "プロジェクトOwnerに招待を依頼してください。",
       retryHint: "入力中のプロジェクト名を保持したまま再試行できます。",
@@ -25,7 +25,7 @@ export const projectCreateScreenEn = {
     },
     requestError: "Failed to create project",
     checkoutCancelled:
-      "The payment was cancelled. No project has been created yet.",
+      "The action was cancelled. No project has been created yet.",
     permission: {
       nextAction: "Ask a project owner to invite you.",
       retryHint: "You can retry while keeping the project name you entered.",

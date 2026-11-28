@@ -51,7 +51,6 @@ import type { UserAvatarObjectStore } from "../../application/ports/user-avatar-
 import type { Env } from "../../index";
 import { ACCESS_LOGOUT_PATH, resolveAccessUrl } from "../cloudflare-access";
 import { computeGravatarHash } from "../lib/gravatar";
-import { createTransferCheckoutExpiry } from "./billing";
 
 export const authRoute = new Hono<Env>();
 
@@ -530,15 +529,11 @@ authRoute.delete("/auth/me", async (c) => {
   const userRepository = new D1UserRepository(c.env.DB);
   const projectRepository = new D1ProjectRepository(c.env.DB);
 
-  const result = await deleteAccount(
-    userRepository,
-    projectRepository,
-    { userId: currentUser.id, confirmEmail, now: new Date() },
-    {
-      checkoutExpiry: createTransferCheckoutExpiry(c.env),
-      waitUntil: (task) => c.executionCtx.waitUntil(task),
-    },
-  );
+  const result = await deleteAccount(userRepository, projectRepository, {
+    userId: currentUser.id,
+    confirmEmail,
+    now: new Date(),
+  });
 
   if (result.isErr()) {
     if (result.error === ACCOUNT_NOT_FOUND_ERROR) {

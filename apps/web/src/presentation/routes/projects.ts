@@ -50,10 +50,8 @@ import {
   toProjectWriteDenial,
 } from "../../infrastructure/entitlements/project-write-guard";
 import {
-  createDeleteProjectBilling,
-  createProjectDisplayNameGateway,
+  createProjectDeletionNotifications,
   createEntitlementProvider,
-  createTransferCheckoutExpiry,
 } from "./billing";
 import { requireProjectMembership } from "./project-membership";
 import { computeGravatarHash } from "../lib/gravatar";
@@ -632,17 +630,6 @@ projectsRoute.patch("/projects/:projectId/settings", async (c) => {
   }
 
   const updatedProject = updatedResult.value;
-  if (name !== undefined && name !== beforeProject.name) {
-    // 名前変更は購読の表示名の同期失敗で失敗させない。購読一覧を開いたときにも再同期される。
-    try {
-      await createProjectDisplayNameGateway(c.env)?.syncProjectDisplayNames({
-        billingAccountId: membership.member.userId,
-        projects: [{ projectId, name }],
-      });
-    } catch {
-      console.error("Failed to sync project display name");
-    }
-  }
   const calendarChanged =
     (sprintDurationDays !== undefined &&
       sprintDurationDays !== beforeProject.sprintDurationDays) ||
@@ -721,7 +708,7 @@ projectsRoute.delete("/projects/:projectId", async (c) => {
   const result = await deleteProject(
     {
       repository: membership.repository,
-      billing: createDeleteProjectBilling(c.env),
+      notifications: createProjectDeletionNotifications(c.env),
     },
     {
       projectId,
@@ -808,8 +795,6 @@ projectsRoute.patch("/projects/:projectId/members/:memberUserId", async (c) => {
   const updatedResult = await changeProjectMemberRole(
     {
       projects: membership.repository,
-      checkoutExpiry: createTransferCheckoutExpiry(c.env),
-      waitUntil: (task) => c.executionCtx.waitUntil(task),
     },
     { projectId, userId: memberUserId, role, now: new Date() },
   );

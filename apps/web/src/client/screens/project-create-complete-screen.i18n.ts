@@ -1,12 +1,12 @@
 export const projectCreateCompleteScreenJa = {
   projectCreateCompleteScreen: {
     title: "プロジェクトを作成しています",
-    waiting: "お支払いの反映を確認しています...",
+    waiting: "プロジェクトを作成できるか確認しています...",
     closeNotice: "このページを閉じても作成は続きます。",
     delayed:
-      "お支払いの反映に時間がかかっています。しばらくしてから「もう一度確認」を押してください。",
-    grace:
-      "お支払いを確認できていません。支払い方法を確認のうえ、もう一度お試しください。",
+      "確認に時間がかかっています。しばらくしてから「もう一度確認」を押してください。",
+    denied:
+      "この作成依頼は終了しました。プロジェクト作成からやり直してください。",
     error:
       "プロジェクトを作成できませんでした。時間をおいてもう一度お試しください。",
     notFound:
@@ -19,12 +19,12 @@ export const projectCreateCompleteScreenJa = {
 export const projectCreateCompleteScreenEn = {
   projectCreateCompleteScreen: {
     title: "Creating your project",
-    waiting: "Confirming your payment...",
+    waiting: "Checking whether your project can be created...",
     closeNotice: "Creation continues even if you close this page.",
     delayed:
-      "Your payment is taking longer than expected to apply. Please try again in a moment.",
-    grace:
-      "We could not confirm your payment. Please check your payment method and try again.",
+      "Confirmation is taking longer than expected. Please try again in a moment.",
+    denied:
+      "This creation request has ended. Please start again from project creation.",
     error: "Could not create the project. Please try again in a moment.",
     notFound:
       "This creation request was not found. Please start again from project creation.",

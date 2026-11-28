@@ -10,6 +10,7 @@ import { recoverOwnershipTransfersScheduled } from "./presentation/scheduled/rec
 import { logUnhandledError } from "./presentation/lib/log-unhandled-error";
 import { recoverProjectDeletionsScheduled } from "./presentation/scheduled/recover-project-deletions";
 import { sweepUnreferencedObjectsScheduled } from "./presentation/scheduled/sweep-unreferenced-objects";
+import { notifyProjectRenamesScheduled } from "./presentation/scheduled/notify-project-renames";
 import { recoverProjectCreationsScheduled } from "./presentation/scheduled/recover-project-creations";
 import { ensureIterationsForAllProjects } from "./presentation/scheduled/ensure-iterations";
 import { healthRoute } from "./presentation/routes/health";
@@ -362,6 +363,7 @@ export default {
     // Independent of the iteration work above: neither can fail the other.
     ctx.waitUntil(cleanupArtifactsScheduled(env));
     ctx.waitUntil(sweepUnreferencedObjectsScheduled(env));
+    ctx.waitUntil(notifyProjectRenamesScheduled(env));
     ctx.waitUntil(recoverProjectCreationsScheduled(env));
     ctx.waitUntil(recoverProjectDeletionsScheduled(env));
     ctx.waitUntil(recoverOwnershipTransfersScheduled(env));

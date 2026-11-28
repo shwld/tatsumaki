@@ -189,32 +189,16 @@ describe("ownership transfer request routes", () => {
     expect((await call("owner", projectId, "POST", "", {})).status).toBe(400);
   });
 
-  it("rejects a co-owner who is not the payer of the subscription", async () => {
+  it("allows an owner to request a transfer without consulting billing details", async () => {
     const projectId = await createProject("owner");
     await addMember(projectId, "co", "owner");
     await addMember(projectId, "bob", "member");
-    const { call } = setup({ lifecycle: null });
-
+    const { call, listProjectBilling } = setup({ listFails: true });
     const response = await call("co", projectId, "POST", "", {
       toUserId: "bob",
     });
-    expect(response.status).toBe(409);
-    expect(await response.json()).toMatchObject({ code: "no_subscription" });
-  });
-
-  it("refuses when the subscription ended or cannot be verified", async () => {
-    const projectId = await createProject("owner");
-    await addMember(projectId, "bob", "member");
-    const ended = setup({ lifecycle: "ended" });
-    expect(
-      (await ended.call("owner", projectId, "POST", "", { toUserId: "bob" }))
-        .status,
-    ).toBe(409);
-    const down = setup({ listFails: true });
-    expect(
-      (await down.call("owner", projectId, "POST", "", { toUserId: "bob" }))
-        .status,
-    ).toBe(503);
+    expect(response.status).toBe(201);
+    expect(listProjectBilling).not.toHaveBeenCalled();
   });
 
   it("allows only one pending transfer per project", async () => {

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, inArray, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, lte, or, sql } from "drizzle-orm";
 import { err, ok, type Result } from "neverthrow";
 import { ulid } from "ulid";
 import {
@@ -7,8 +7,6 @@ import {
   OWNERSHIP_TRANSFER_REPOSITORY_ERROR,
   type OwnershipTransfer,
   type OwnershipTransferRepositoryError,
-  type OwnershipTransferSettlementOutcome,
-  type OwnershipTransferSettlementStatus,
   type OwnershipTransferStatus,
   type ProjectOwnershipTransferRepository,
 } from "../../../domain/repositories/project-ownership-transfer-repository";
@@ -25,10 +23,6 @@ export const toTransfer = (row: Row): OwnershipTransfer => ({
   toUserId: row.toUserId,
   status: row.status as OwnershipTransferStatus,
   expiresAt: row.expiresAt,
-  settlementOutcome:
-    row.settlementOutcome as OwnershipTransferSettlementOutcome | null,
-  settlementStatus:
-    row.settlementStatus as OwnershipTransferSettlementStatus | null,
   endedAt: row.endedAt,
 });
 
@@ -37,8 +31,7 @@ const endedValues = (
   nowIso: string,
 ) => ({
   status,
-  settlementOutcome: "not-switched" as const,
-  settlementStatus: "pending" as const,
+  outcomeNotified: 0,
   endedAt: nowIso,
   updatedAt: nowIso,
 });
@@ -113,6 +106,53 @@ export class D1ProjectOwnershipTransferRepository
 
   constructor(private readonly d1: D1Database) {
     this.db = createDb(d1);
+  }
+
+  async hasUnnotifiedSwitch(
+    projectId: string,
+  ): Promise<Result<boolean, OwnershipTransferRepositoryError>> {
+    try {
+      const row = await this.d1
+        .prepare(
+          "SELECT id FROM project_ownership_transfers WHERE project_id = ? AND status = 'completed' AND outcome_notified = 0 LIMIT 1",
+        )
+        .bind(projectId)
+        .first();
+      return ok(row !== null);
+    } catch {
+      return err(OWNERSHIP_TRANSFER_REPOSITORY_ERROR);
+    }
+  }
+
+  async listUnnotifiedOutcomes(
+    limit: number,
+  ): Promise<Result<OwnershipTransfer[], OwnershipTransferRepositoryError>> {
+    try {
+      const rows = await this.db
+        .select()
+        .from(table)
+        .where(eq(table.outcomeNotified, 0))
+        .orderBy(asc(table.updatedAt), asc(table.id))
+        .limit(limit)
+        .all();
+      return ok(rows.map(toTransfer));
+    } catch {
+      return err(OWNERSHIP_TRANSFER_REPOSITORY_ERROR);
+    }
+  }
+
+  async markOutcomeNotified(
+    id: string,
+  ): Promise<Result<void, OwnershipTransferRepositoryError>> {
+    try {
+      await this.db
+        .update(table)
+        .set({ outcomeNotified: 1 })
+        .where(eq(table.id, id));
+      return ok(undefined);
+    } catch {
+      return err(OWNERSHIP_TRANSFER_REPOSITORY_ERROR);
+    }
   }
 
   async create(input: {
@@ -243,65 +283,6 @@ export class D1ProjectOwnershipTransferRepository
     }
   }
 
-  async findUnsettledSwitch(
-    projectId: string,
-  ): Promise<
-    Result<OwnershipTransfer | null, OwnershipTransferRepositoryError>
-  > {
-    try {
-      const row = await this.db
-        .select()
-        .from(table)
-        .where(
-          and(
-            eq(table.projectId, projectId),
-            eq(table.status, "completed"),
-            inArray(table.settlementStatus, ["pending", "review"]),
-          ),
-        )
-        .limit(1)
-        .get();
-      return ok(row ? toTransfer(row) : null);
-    } catch {
-      return err(OWNERSHIP_TRANSFER_REPOSITORY_ERROR);
-    }
-  }
-
-  async findNoticeFor(
-    projectId: string,
-    userId: string,
-  ): Promise<
-    Result<OwnershipTransfer | null, OwnershipTransferRepositoryError>
-  > {
-    try {
-      const row = await this.db
-        .select()
-        .from(table)
-        .where(
-          and(
-            eq(table.projectId, projectId),
-            or(
-              and(
-                eq(table.status, "completed"),
-                or(eq(table.fromUserId, userId), eq(table.toUserId, userId)),
-              ),
-              and(
-                eq(table.settlementOutcome, "not-switched"),
-                eq(table.settlementStatus, "review"),
-                eq(table.toUserId, userId),
-              ),
-            ),
-          ),
-        )
-        .orderBy(desc(table.createdAt), desc(table.id))
-        .limit(1)
-        .get();
-      return ok(row ? toTransfer(row) : null);
-    } catch {
-      return err(OWNERSHIP_TRANSFER_REPOSITORY_ERROR);
-    }
-  }
-
   async expireOverdue(
     now: Date,
   ): Promise<Result<void, OwnershipTransferRepositoryError>> {
@@ -340,23 +321,6 @@ export class D1ProjectOwnershipTransferRepository
     }
   }
 
-  async listUnsettled(
-    limit: number,
-  ): Promise<Result<OwnershipTransfer[], OwnershipTransferRepositoryError>> {
-    try {
-      const rows = await this.db
-        .select()
-        .from(table)
-        .where(eq(table.settlementStatus, "pending"))
-        .orderBy(asc(table.updatedAt), asc(table.id))
-        .limit(limit)
-        .all();
-      return ok(rows.map(toTransfer));
-    } catch {
-      return err(OWNERSHIP_TRANSFER_REPOSITORY_ERROR);
-    }
-  }
-
   async complete(input: {
     id: string;
     now: Date;
@@ -367,7 +331,7 @@ export class D1ProjectOwnershipTransferRepository
         this.d1
           .prepare(
             `UPDATE project_ownership_transfers
-             SET status = 'completed', settlement_outcome = 'switched', settlement_status = 'pending',
+             SET status = 'completed', outcome_notified = 0,
                  ended_at = ?1, updated_at = ?1
              WHERE id = ?2 AND status = 'pending' AND expires_at > ?1
                AND EXISTS (SELECT 1 FROM project_members m
@@ -380,7 +344,7 @@ export class D1ProjectOwnershipTransferRepository
                                WHERE d.project_id = project_ownership_transfers.project_id)
                AND NOT EXISTS (SELECT 1 FROM project_ownership_transfers earlier
                                WHERE earlier.project_id = project_ownership_transfers.project_id
-                                 AND earlier.status = 'completed' AND earlier.settlement_status IN ('pending', 'review'))`,
+                                 AND earlier.status = 'completed' AND earlier.outcome_notified = 0)`,
           )
           .bind(nowIso, input.id),
         this.d1
@@ -415,27 +379,6 @@ export class D1ProjectOwnershipTransferRepository
         .update(table)
         .set({ updatedAt: now.toISOString() })
         .where(eq(table.id, id));
-      return ok(undefined);
-    } catch {
-      return err(OWNERSHIP_TRANSFER_REPOSITORY_ERROR);
-    }
-  }
-
-  async markSettlement(input: {
-    id: string;
-    status: OwnershipTransferSettlementStatus;
-    note?: string;
-    now: Date;
-  }): Promise<Result<void, OwnershipTransferRepositoryError>> {
-    try {
-      await this.db
-        .update(table)
-        .set({
-          settlementStatus: input.status,
-          settlementNote: input.note ?? null,
-          updatedAt: input.now.toISOString(),
-        })
-        .where(eq(table.id, input.id));
       return ok(undefined);
     } catch {
       return err(OWNERSHIP_TRANSFER_REPOSITORY_ERROR);

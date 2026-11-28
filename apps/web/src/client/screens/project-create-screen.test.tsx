@@ -255,7 +255,7 @@ describe("ProjectCreateScreen", () => {
       );
     };
 
-    it("redirects to Checkout when direct creation requires payment", async () => {
+    it("redirects to the provider when direct creation requires acquisition", async () => {
       vi.mocked(fetch)
         .mockResolvedValueOnce(
           json({ error: "pay first", code: "checkout_required" }, 409),
@@ -263,7 +263,7 @@ describe("ProjectCreateScreen", () => {
         .mockResolvedValueOnce(
           json(
             {
-              kind: "checkout",
+              kind: "redirect",
               projectId: "p1",
               url: "https://checkout.stripe.com/c/pay/x",
             },

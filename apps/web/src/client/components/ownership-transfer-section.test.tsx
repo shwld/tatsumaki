@@ -77,7 +77,7 @@ describe("OwnershipTransferSection", () => {
     await waitFor(() => expect(container.textContent).toBe(""));
   });
 
-  it("lets the owner nominate a member after seeing the subscription notice", async () => {
+  it("lets the owner nominate a member after seeing the transfer notice", async () => {
     routes(null, "control-plane", {
       "POST /api/billing/projects/p1/ownership-transfer": () =>
         json({ transfer: pendingTransfer("requester") }, 201),
@@ -85,7 +85,7 @@ describe("OwnershipTransferSection", () => {
     renderSection(true);
 
     const select = await screen.findByLabelText("譲渡先のメンバー");
-    expect(screen.getByText(/あなたの購読は終了します/)).toBeTruthy();
+    expect(screen.getByText(/所有権が切り替わります/)).toBeTruthy();
     fireEvent.change(select, { target: { value: "bob" } });
     fireEvent.click(screen.getByRole("button", { name: "譲渡を申請する" }));
 
@@ -136,12 +136,8 @@ describe("OwnershipTransferSection", () => {
   });
 
   it.each([
-    ["processing", "requester", /Bob さんに移しました.*日割り返金を処理/],
-    ["processing", "recipient", /あなたがオーナーになりました/],
-    ["completed", "requester", /Bob さんに譲渡しました.*返金しました/],
+    ["completed", "requester", /Bob さんに譲渡しました/],
     ["completed", "recipient", /所有権の譲渡が完了しました/],
-    ["review", "requester", /返金を自動では処理できませんでした/],
-    ["review", "recipient", /運営が確認しています/],
   ] as const)("shows the %s state to the %s without any action", async (transferState, role, text) => {
     routes({ ...pendingTransfer(role), state: transferState });
     renderSection(role === "requester");
@@ -149,19 +145,6 @@ describe("OwnershipTransferSection", () => {
     expect(await screen.findByText(text)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "申請を取り消す" })).toBeNull();
     expect(screen.queryByRole("button", { name: "辞退する" })).toBeNull();
-  });
-
-  it("tells the recipient their payment was not refunded when the transfer did not go through", async () => {
-    routes({
-      ...pendingTransfer("recipient"),
-      state: "review",
-      outcome: "not-switched",
-    });
-    renderSection(false);
-    expect(
-      await screen.findByText(/返金を自動では処理できませんでした/),
-    ).toBeTruthy();
-    expect(screen.queryByText(/所有権を .* に移しました/)).toBeNull();
   });
 
   it("lets the new owner start another transfer after one completed", async () => {
@@ -189,7 +172,6 @@ describe("OwnershipTransferSection", () => {
   it("asks the page to refresh permissions when it first sees the ownership switch", async () => {
     let current: unknown = {
       ...pendingTransfer("recipient"),
-      recipientSubscribed: false,
     };
     vi.mocked(fetch).mockImplementation(async (input) => {
       const url = String(input);
@@ -211,12 +193,12 @@ describe("OwnershipTransferSection", () => {
         </AuthErrorProvider>
       </MemoryRouter>,
     );
-    await screen.findByText(/月額 3,850 円/);
+    await screen.findByText(/必要な手続きを完了/);
     expect(onSwitched).not.toHaveBeenCalled();
 
     current = {
       ...pendingTransfer("recipient"),
-      state: "processing",
+      state: "completed",
       outcome: "switched",
     };
     fireEvent(window, new Event("focus"));
@@ -267,10 +249,10 @@ describe("OwnershipTransferSection", () => {
     expect(onSwitched).not.toHaveBeenCalled();
   });
 
-  it("explains a rejected request from a non-payer", async () => {
+  it("explains a rejected recipient", async () => {
     routes(null, "control-plane", {
       "POST /api/billing/projects/p1/ownership-transfer": () =>
-        json({ code: "no_subscription" }, 409),
+        json({ code: "invalid_recipient" }, 422),
     });
     renderSection(true);
     fireEvent.change(await screen.findByLabelText("譲渡先のメンバー"), {
@@ -279,7 +261,7 @@ describe("OwnershipTransferSection", () => {
     fireEvent.click(screen.getByRole("button", { name: "譲渡を申請する" }));
     expect(await screen.findByRole("alert")).toHaveProperty(
       "textContent",
-      expect.stringContaining("支払者ではない"),
+      expect.stringContaining("このメンバーには譲渡できません"),
     );
   });
 
@@ -289,8 +271,7 @@ describe("OwnershipTransferSection", () => {
     routes(
       {
         ...pendingTransfer("recipient"),
-        recipientSubscribed: false,
-        checkout: "available",
+        acquisition: "available",
       },
       "control-plane",
       {
@@ -300,8 +281,8 @@ describe("OwnershipTransferSection", () => {
     );
     renderSection(false);
 
-    expect(await screen.findByText(/3,850 円/)).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "購読して引き継ぐ" }));
+    expect(await screen.findByText(/必要な手続きを完了/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "手続きを進める" }));
 
     await waitFor(() =>
       expect(assign).toHaveBeenCalledWith("https://checkout.stripe.test/s"),
@@ -315,22 +296,11 @@ describe("OwnershipTransferSection", () => {
     );
   });
 
-  it("does not offer the Checkout again once the recipient's subscription is confirmed", async () => {
-    routes({ ...pendingTransfer("recipient"), recipientSubscribed: true });
-    renderSection(false);
-
-    expect(await screen.findByText(/購読を確認しました/)).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "購読して引き継ぐ" })).toBe(
-      null,
-    );
-  });
-
-  it("explains when new subscriptions are paused", async () => {
+  it("explains when the action is unavailable", async () => {
     routes(
       {
         ...pendingTransfer("recipient"),
-        recipientSubscribed: false,
-        checkout: "available",
+        acquisition: "available",
       },
       "control-plane",
       {
@@ -340,23 +310,15 @@ describe("OwnershipTransferSection", () => {
     );
     renderSection(false);
     fireEvent.click(
-      await screen.findByRole("button", { name: "購読して引き継ぐ" }),
+      await screen.findByRole("button", { name: "手続きを進める" }),
     );
     expect(await screen.findByRole("alert")).toHaveProperty(
       "textContent",
-      expect.stringContaining("停止"),
+      expect.stringContaining("受け付けていません"),
     );
   });
 
-  it("hides the decline button once the recipient's subscription is confirmed", async () => {
-    routes({ ...pendingTransfer("recipient"), recipientSubscribed: true });
-    renderSection(false);
-
-    await screen.findByText(/購読を確認しました/);
-    expect(screen.queryByRole("button", { name: "辞退する" })).toBe(null);
-  });
-
-  it("keeps checking the subscription without the Checkout return URL", async () => {
+  it("keeps checking ownership without a return URL", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
       let subscribed = false;
@@ -369,51 +331,35 @@ describe("OwnershipTransferSection", () => {
         return json({
           transfer: {
             ...pendingTransfer("recipient"),
-            recipientSubscribed: subscribed,
-            checkout: "available",
+            ...(subscribed
+              ? { state: "completed" }
+              : { acquisition: "available" }),
           },
         });
       });
       renderSection(false);
-      await screen.findByRole("button", { name: "購読して引き継ぐ" });
+      await screen.findByRole("button", { name: "手続きを進める" });
 
       subscribed = true;
       await vi.advanceTimersByTimeAsync(3500);
 
-      expect(await screen.findByText(/購読を確認しました/)).toBeTruthy();
+      expect(
+        await screen.findByText(/所有権の譲渡が完了しました/),
+      ).toBeTruthy();
     } finally {
       vi.useRealTimers();
     }
   });
 
-  it("does not offer the Checkout while subscriptions for transfers are not open yet", async () => {
+  it("does not offer acquisition while it is unavailable", async () => {
     routes({
       ...pendingTransfer("recipient"),
-      recipientSubscribed: false,
-      checkout: "disabled",
+      acquisition: "disabled",
     });
     renderSection(false);
 
     await screen.findByRole("button", { name: "辞退する" });
-    expect(screen.getByText(/3,850 円/)).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "購読して引き継ぐ" })).toBe(
-      null,
-    );
-  });
-
-  it("tells the recipient to wait while their subscription for another request is refunded", async () => {
-    routes({
-      ...pendingTransfer("recipient"),
-      recipientSubscribed: false,
-      checkout: "otherSubscription",
-    });
-    renderSection(false);
-
-    expect(await screen.findByText(/その購読が解約されると/)).toBeTruthy();
-    expect(screen.queryByText(/3,850 円/)).toBe(null);
-    expect(screen.queryByRole("button", { name: "購読して引き継ぐ" })).toBe(
-      null,
-    );
-    expect(screen.getByRole("button", { name: "辞退する" })).toBeTruthy();
+    expect(screen.getByText(/必要な手続きを完了/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "手続きを進める" })).toBe(null);
   });
 });

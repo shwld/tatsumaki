@@ -14,10 +14,11 @@ export const projectCreationRequestsTable = sqliteTable(
     materializeFailureCount: integer("materialize_failure_count")
       .notNull()
       .default(0),
-    paymentEvidence: integer("payment_evidence").notNull().default(0),
     nextAttemptAt: text("next_attempt_at"),
     lastError: text("last_error"),
     stalledReason: text("stalled_reason"),
+    outcomeNotified: integer("outcome_notified").notNull().default(1),
+    outcomeAt: text("outcome_at"),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
     updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
