@@ -1,10 +1,30 @@
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { unstable_readConfig } from "wrangler";
 import {
   createDeploymentConfig,
   deploymentCommands,
 } from "../scripts/deploy-config";
 
+const readTrackedConfig = () =>
+  unstable_readConfig({
+    config: fileURLToPath(new URL("../wrangler.toml", import.meta.url)),
+  });
+
 describe("deployment configuration", () => {
+  it("keeps Workers Logs enabled without invocation logs in the hosted config", () => {
+    const result = createDeploymentConfig(readTrackedConfig(), {
+      controlPlaneService: "control-plane-production",
+      d1DatabaseId: "00000000-0000-4000-8000-000000000000",
+      oauthKvNamespaceId: "0".repeat(32),
+    });
+    expect(result.observability).toMatchObject({
+      enabled: true,
+      head_sampling_rate: 1,
+      logs: { invocation_logs: false },
+    });
+  });
+
   const base = {
     name: "hosted-app",
     main: "src/index.ts",

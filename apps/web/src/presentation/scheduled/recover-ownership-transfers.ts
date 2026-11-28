@@ -21,6 +21,8 @@ export async function recoverOwnershipTransfersScheduled(
       console.info("Ownership transfer recovery finished", summary);
     }
   } catch (error) {
-    console.error("Ownership transfer recovery failed", error);
+    console.error("Ownership transfer recovery failed", {
+      errorType: error instanceof Error ? error.name : "unknown",
+    });
   }
 }
