@@ -70,6 +70,16 @@ describe("project rename notifications", () => {
       { projectId, name: "Second", revision: 2 },
     ]);
   });
+  it("removes a pending name notification when the project is deleted", async () => {
+    const projectId = await createProject("Old", "owner");
+    await rename("owner", projectId, "New", {});
+    const notifications = new D1ProjectNameNotifications(env.DB);
+    expect(await notifications.listPending(10)).toHaveLength(1);
+    await env.DB.prepare("DELETE FROM projects WHERE id = ?")
+      .bind(projectId)
+      .run();
+    expect(await notifications.listPending(10)).toHaveLength(0);
+  });
   it("does not record an unchanged name", async () => {
     const projectId = await createProject("Same", "owner");
     await rename("owner", projectId, "Same", {});
