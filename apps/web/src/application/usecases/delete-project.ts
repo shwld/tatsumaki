@@ -35,13 +35,6 @@ export type DeleteProjectDeps = {
 const failureMessage = (error: unknown): string =>
   (error instanceof Error ? error.name : "unknown").slice(0, 200);
 
-const logDeletion = (
-  event: "project.deletion.accepted" | "project.deletion.completed",
-  fields: { projectId: string; actorUserId: string; projectDeleted?: boolean },
-): void => {
-  console.info({ event, ...fields });
-};
-
 /**
  * 課金の終了と DB 削除は 1 つのトランザクションにできないため、先に削除要求を永続化し、
  * 課金終了(冪等)→ 本体削除 → 要求の完了印の順に進める。どこで途切れても要求が残り、
@@ -50,7 +43,7 @@ const logDeletion = (
 async function closeBillingAndDelete(
   repository: ProjectRepository,
   billing: NonNullable<DeleteProjectDeps["billing"]>,
-  { projectId, actorUserId }: { projectId: string; actorUserId: string },
+  projectId: string,
 ): Promise<Result<boolean, DeleteProjectError>> {
   try {
     await billing.gateway.closeProjectBilling({ projectId });
@@ -70,11 +63,6 @@ async function closeBillingAndDelete(
     await billing.requests.recordFailure(projectId, "project_delete_failed");
     return err(PROJECT_DELETE_PENDING_ERROR);
   }
-  logDeletion("project.deletion.completed", {
-    projectId,
-    actorUserId,
-    projectDeleted: deleteResult.value,
-  });
   const completed = await billing.requests.complete(projectId);
   if (completed.isErr()) {
     // 本体は削除済み。残った要求は復旧ジョブが完了させる。
@@ -101,7 +89,6 @@ export async function deleteProject(
     return err(PROJECT_NAME_CONFIRMATION_MISMATCH_ERROR);
   }
 
-  const actor = { projectId: input.projectId, actorUserId: input.userId };
   let deleted: Result<boolean, DeleteProjectError>;
   if (deps.billing) {
     const opened = await deps.billing.requests.open({
@@ -120,17 +107,13 @@ export async function deleteProject(
       }
       return err(PROJECT_DELETE_FORBIDDEN_ERROR);
     }
-    logDeletion("project.deletion.accepted", actor);
-    deleted = await closeBillingAndDelete(deps.repository, deps.billing, actor);
+    deleted = await closeBillingAndDelete(
+      deps.repository,
+      deps.billing,
+      input.projectId,
+    );
   } else {
-    logDeletion("project.deletion.accepted", actor);
     deleted = await deps.repository.delete(input.projectId);
-    if (deleted.isOk()) {
-      logDeletion("project.deletion.completed", {
-        ...actor,
-        projectDeleted: deleted.value,
-      });
-    }
   }
 
   if (deleted.isErr()) {
@@ -177,10 +160,7 @@ export async function recoverProjectDeletions(
       const result = await closeBillingAndDelete(
         deps.repository,
         deps.billing,
-        {
-          projectId: request.projectId,
-          actorUserId: request.requestedByUserId,
-        },
+        request.projectId,
       );
       if (result.isErr()) {
         summary.stillPending += 1;
