@@ -18,6 +18,8 @@ export async function recoverProjectDeletionsScheduled(
       console.info("Project deletion recovery finished", summary);
     }
   } catch (error) {
-    console.error("Project deletion recovery failed", error);
+    console.error("Project deletion recovery failed", {
+      errorType: error instanceof Error ? error.name : "unknown",
+    });
   }
 }

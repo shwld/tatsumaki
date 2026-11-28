@@ -1,6 +1,6 @@
 import { env } from "cloudflare:test";
 import { err } from "neverthrow";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   PROJECT_DELETE_FORBIDDEN_ERROR,
   PROJECT_DELETE_PENDING_ERROR,
@@ -348,5 +348,88 @@ describe("recoverProjectDeletions", () => {
     )._unsafeUnwrap();
 
     expect(pending.map((request) => request.projectId)).toEqual([second.id]);
+  });
+});
+
+describe("project deletion logs", () => {
+  beforeEach(async () => {
+    await resetDatabase(env.DB);
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const captureLogs = () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    return () => info.mock.calls.map(([entry]) => entry);
+  };
+
+  it.each([
+    "with billing",
+    "self-hosted",
+  ])("records acceptance and completion with the actor (%s)", async (mode) => {
+    const project = await seedProject();
+    const { deps } = setup();
+    const logs = captureLogs();
+
+    await deleteProject(
+      mode === "with billing" ? deps : { repository: deps.repository },
+      {
+        projectId: project.id,
+        userId: "owner",
+        confirmProjectName: "Billing Target",
+      },
+    );
+
+    const actor = { projectId: project.id, actorUserId: "owner" };
+    expect(logs()).toEqual([
+      { event: "project.deletion.accepted", ...actor },
+      {
+        event: "project.deletion.completed",
+        ...actor,
+        projectDeleted: true,
+      },
+    ]);
+  });
+
+  it("records nothing when the request is rejected", async () => {
+    const project = await seedProject();
+    const { deps } = setup();
+    const logs = captureLogs();
+
+    await deleteProject(deps, {
+      projectId: project.id,
+      userId: "owner",
+      confirmProjectName: "wrong",
+    });
+    await deleteProject(deps, {
+      projectId: project.id,
+      userId: "stranger",
+      confirmProjectName: "Billing Target",
+    });
+
+    expect(logs()).toEqual([]);
+  });
+
+  it("records a completion by recovery under the original requester", async () => {
+    const project = await seedProject();
+    const { deps, closeProjectBilling } = setup();
+    closeProjectBilling.mockRejectedValueOnce(new Error("unavailable"));
+    const logs = captureLogs();
+    const actor = { projectId: project.id, actorUserId: "owner" };
+
+    await deleteProject(deps, {
+      projectId: project.id,
+      userId: "owner",
+      confirmProjectName: "Billing Target",
+    });
+    expect(logs()).toEqual([{ event: "project.deletion.accepted", ...actor }]);
+
+    await recoverProjectDeletions(deps);
+    expect(logs().at(-1)).toEqual({
+      event: "project.deletion.completed",
+      ...actor,
+      projectDeleted: true,
+    });
   });
 });

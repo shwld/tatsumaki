@@ -9,6 +9,17 @@ story #444。方針は [ADR-0015](adr/adr-0015-project-scoped-billing.md) を参
 - 行があり、プロジェクトも残っている: Control Plane の解約を確認できていない。1 時間ごとの scheduled が再試行する。
 - 行があり、プロジェクトが無い: 本体削除の直後に途切れた。次の scheduled が行だけを消す。
 
+## 削除の追跡
+
+Workers Logs で `projectId` を検索する。ログの保持は数日のため([保持期間](https://developers.cloudflare.com/observability/pricing/))、早めに確認する。
+
+| `event` | 意味 |
+| --- | --- |
+| `project.deletion.accepted` | 権限と確認名を検証して削除を受け付けた |
+| `project.deletion.completed` | 本体の削除処理が終わった。`projectDeleted: false` は本体が先に消えていた |
+
+`actorUserId` は削除した利用者の ID。定期復旧による完了では、要求を受け付けた利用者の ID になる。
+
 ## 未完了の一覧
 
 ```sql

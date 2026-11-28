@@ -30,6 +30,8 @@ export async function cleanupArtifactsScheduled(env: {
       console.info("Artifact cleanup finished", summary);
     }
   } catch (error) {
-    console.error("Artifact cleanup failed", error);
+    console.error("Artifact cleanup failed", {
+      errorType: error instanceof Error ? error.name : "unknown",
+    });
   }
 }

@@ -346,8 +346,6 @@ projectsRoute.post("/projects/:projectId/invitations", async (c) => {
     console.error("Failed to create invitation notification", {
       projectId,
       invitationId: invitation.id,
-      targetUserId: invitation.targetUserId,
-      targetEmail: invitation.targetEmail,
     });
   }
 

@@ -7,6 +7,7 @@ import { Hono, type Context } from "hono";
 import { recordBurndownSnapshotsAllActiveIterations } from "./application/usecases/burndown-chart";
 import { cleanupArtifactsScheduled } from "./presentation/scheduled/cleanup-artifacts";
 import { recoverOwnershipTransfersScheduled } from "./presentation/scheduled/recover-ownership-transfers";
+import { logUnhandledError } from "./presentation/lib/log-unhandled-error";
 import { recoverProjectDeletionsScheduled } from "./presentation/scheduled/recover-project-deletions";
 import { sweepUnreferencedObjectsScheduled } from "./presentation/scheduled/sweep-unreferenced-objects";
 import { recoverProjectCreationsScheduled } from "./presentation/scheduled/recover-project-creations";
@@ -118,6 +119,7 @@ type OAuthUserProps = {
 
 const app = new Hono<Env>();
 const PROGRAMMATIC_API_BASE_PATH = "/programmatic-api";
+app.onError(logUnhandledError);
 
 app.use("/invite", async (c, next) => {
   c.header("Referrer-Policy", "no-referrer");
@@ -232,6 +234,7 @@ class McpOAuthApiHandler extends WorkerEntrypoint<OAuthBindings> {
     }
     if (url.pathname.startsWith(`${PROGRAMMATIC_API_BASE_PATH}/v1`)) {
       const cliApp = new Hono<Env>();
+      cliApp.onError(logUnhandledError);
       cliApp.use("*", async (c, next) => {
         c.set("currentUser", currentUser);
         await next();

@@ -24,6 +24,8 @@ export async function recoverProjectCreationsScheduled(
       console.info("Project creation recovery finished", summary);
     }
   } catch (error) {
-    console.error("Project creation recovery failed", error);
+    console.error("Project creation recovery failed", {
+      errorType: error instanceof Error ? error.name : "unknown",
+    });
   }
 }

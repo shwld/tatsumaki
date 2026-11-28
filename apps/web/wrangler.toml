@@ -5,6 +5,14 @@ compatibility_date = "2025-03-05"
 compatibility_flags = ["global_fetch_strictly_public"]
 keep_vars = true
 
+[observability]
+enabled = true
+head_sampling_rate = 1
+
+# Invocation logs record request URLs, which carry artifact capability tokens and story search text.
+[observability.logs]
+invocation_logs = false
+
 [assets]
 directory = "./dist/client"
 binding = "ASSETS"
