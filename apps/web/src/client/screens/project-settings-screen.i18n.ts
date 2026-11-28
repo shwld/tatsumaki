@@ -23,7 +23,7 @@ export const projectSettingsScreenJa = {
       deleteFailed: "プロジェクトの削除に失敗しました",
       deleted: "プロジェクトを削除しました",
       deletePending:
-        "削除を受け付けましたが、まだ完了していません。課金の終了などを確認でき次第、自動で再試行して削除します",
+        "削除を受け付けましたが、まだ完了していません。利用の終了などを確認でき次第、自動で再試行して削除します",
     },
     general: {
       title: "基本設定",
@@ -88,7 +88,7 @@ export const projectSettingsScreenJa = {
     danger: {
       title: "危険操作: プロジェクト削除",
       description:
-        "この操作は取り消せません。有料プランの購読は即時に解約され、未使用の期間も返金されません。期間末まで使いたい場合は、削除する前にアカウント画面の利用状態で、このプロジェクトの「利用を終了」を選んでください。削除するにはプロジェクト名を正確に入力してください。",
+        "この操作は取り消せません。利用期間が残っていても、このプロジェクトの利用は即時に終了し、残りの期間は戻りません。期間末まで使いたい場合は、削除する前にアカウント画面の利用状態で、このプロジェクトの「利用を終了」を選んでください。削除するにはプロジェクト名を正確に入力してください。",
       confirmName: "確認用プロジェクト名",
       delete: "プロジェクトを削除する",
       deleting: "削除中...",
@@ -121,7 +121,7 @@ export const projectSettingsScreenEn = {
       deleteFailed: "Failed to delete the project",
       deleted: "Project deleted",
       deletePending:
-        "Deletion was accepted but is not complete yet. It will be retried automatically once billing is confirmed ended",
+        "Deletion was accepted but is not complete yet. It will be retried automatically once the end of usage is confirmed",
     },
     general: {
       title: "General settings",
@@ -186,7 +186,7 @@ export const projectSettingsScreenEn = {
     danger: {
       title: "Danger zone: delete project",
       description:
-        "This cannot be undone. Any paid subscription is canceled immediately and the unused period is not refunded. To use it until the period end, choose End usage for this project under Usage on the account page before deleting. Enter the project name exactly to delete it.",
+        "This cannot be undone. Any remaining usage period ends immediately and cannot be recovered. To use it until the period end, choose End usage for this project under Usage on the account page before deleting. Enter the project name exactly to delete it.",
       confirmName: "Confirm project name",
       delete: "Delete project",
       deleting: "Deleting...",

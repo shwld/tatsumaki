@@ -70,7 +70,7 @@ describe("ProjectUsageScope", () => {
       "fetch",
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         if (init?.method === "POST") return startAnswer();
-        return String(input).startsWith("/api/billing/operations")
+        return String(input).startsWith("/api/usage/operations")
           ? operationsAnswer()
           : usageAnswer();
       }),
@@ -122,7 +122,7 @@ describe("ProjectUsageScope", () => {
     expect(screen.queryByRole("button")).toBeNull();
     expect(screen.getByText("read-only")).toBeTruthy();
     expect(fetch).not.toHaveBeenCalledWith(
-      expect.stringContaining("/api/billing/operations"),
+      expect.stringContaining("/api/usage/operations"),
     );
   });
 
@@ -155,7 +155,7 @@ describe("ProjectUsageScope", () => {
       expect(assign).toHaveBeenCalledWith("https://provider.example/s"),
     );
     expect(fetch).toHaveBeenCalledWith(
-      "/api/billing/projects/p1/operations/resume?from=settings",
+      "/api/usage/projects/p1/operations/resume?from=settings",
       { method: "POST" },
     );
   });

@@ -80,7 +80,7 @@ beforeEach(async () => {
   const created = await SELF.fetch("https://localhost/api/projects", {
     method: "POST",
     headers,
-    body: JSON.stringify({ name: "Invite Billing" }),
+    body: JSON.stringify({ name: "Invite Usage" }),
   });
   projectId = ((await created.json()) as { project: { id: string } }).project
     .id;
@@ -115,7 +115,7 @@ const methods = [
   ["targeted invitation", acceptTargeted],
 ] as const;
 
-describe.each(methods)("%s accept billing gate", (_name, accept) => {
+describe.each(methods)("%s accept usage gate", (_name, accept) => {
   it("rejects a suspended project and leaves state untouched, then joins after resume", async () => {
     const before = await pendingCount();
     const res = await accept(
@@ -167,7 +167,7 @@ describe.each(methods)("%s accept billing gate", (_name, accept) => {
 });
 
 describe("accept keeps existing errors", () => {
-  it("answers 410 for an unknown token without consulting billing", async () => {
+  it("answers 410 for an unknown token without consulting the provider", async () => {
     token = "A".repeat(43);
     let called = 0;
     const res = await acceptLink(

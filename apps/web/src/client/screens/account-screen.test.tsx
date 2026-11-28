@@ -22,10 +22,8 @@ const defaultNotificationSettings = {
   updatedAt: "2024-01-01T00:00:00.000Z",
 };
 
-const defaultBillingResponse = {
+const defaultUsageModeResponse = {
   mode: "control-plane",
-  checkoutEnabled: true,
-  projectCreation: "checkout",
 };
 
 const defaultAccount = {
@@ -41,8 +39,7 @@ const stubFetchRoutes = (overrides: FetchRoutes = {}) => {
     "GET /api/auth/me": () => buildJsonResponse(defaultAccount),
     "GET /api/auth/me/notification-settings": () =>
       buildJsonResponse(defaultNotificationSettings),
-    "GET /api/billing/entitlement": () =>
-      buildJsonResponse(defaultBillingResponse),
+    "GET /api/usage/mode": () => buildJsonResponse(defaultUsageModeResponse),
     ...overrides,
   };
   const fetchMock = vi.mocked(fetch);
@@ -232,7 +229,7 @@ describe("AccountScreen", () => {
   });
   const renderWithEntitlement = (entitlementResponse: Response) => {
     stubFetchRoutes({
-      "GET /api/billing/entitlement": () => entitlementResponse,
+      "GET /api/usage/mode": () => entitlementResponse,
     });
 
     render(
@@ -247,7 +244,7 @@ describe("AccountScreen", () => {
   };
 
   it("shows the usage of owned projects on a hosted deployment", async () => {
-    renderWithEntitlement(buildJsonResponse(defaultBillingResponse));
+    renderWithEntitlement(buildJsonResponse(defaultUsageModeResponse));
 
     expect(
       await screen.findByTestId("owned-project-usage"),
@@ -255,9 +252,7 @@ describe("AccountScreen", () => {
   });
 
   it("shows no operation when self-hosted", async () => {
-    renderWithEntitlement(
-      buildJsonResponse({ mode: "self-hosted", checkoutEnabled: false }),
-    );
+    renderWithEntitlement(buildJsonResponse({ mode: "self-hosted" }));
 
     expect(
       await screen.findByText("このサービスには利用上限がありません。"),

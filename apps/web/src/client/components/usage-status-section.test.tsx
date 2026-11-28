@@ -57,9 +57,7 @@ beforeEach(() => {
       if (init?.method === "POST") {
         return json({ url: "https://provider.example/s" }, 201);
       }
-      return String(input) === "/api/billing/entitlement"
-        ? mode()
-        : operations();
+      return String(input) === "/api/usage/mode" ? mode() : operations();
     }),
   );
 });
@@ -80,8 +78,8 @@ describe("UsageStatusSection", () => {
   });
 
   it.each([
-    ["アカウント全体の管理", "/api/billing/account-operations/manage"],
-    ["Alpha: 管理", "/api/billing/projects/p1/operations/manage?from=account"],
+    ["アカウント全体の管理", "/api/usage/account-operations/manage"],
+    ["Alpha: 管理", "/api/usage/projects/p1/operations/manage?from=account"],
   ])("moves to the destination of %s", async (name, path) => {
     renderWith(<UsageStatusSection />);
     fireEvent.click(await screen.findByRole("button", { name }));
@@ -133,7 +131,7 @@ describe("ProjectUsageSection", () => {
     expect(screen.queryByText("閲覧のみ")).toBeNull();
     await waitFor(() => expect(assign).toHaveBeenCalled());
     expect(fetch).toHaveBeenCalledWith(
-      "/api/billing/projects/p1/operations/manage?from=settings",
+      "/api/usage/projects/p1/operations/manage?from=settings",
       { method: "POST" },
     );
   });

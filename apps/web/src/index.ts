@@ -34,7 +34,7 @@ import { savedFiltersRoute } from "./presentation/routes/saved-filters";
 import { projectApiKeysRoute } from "./presentation/routes/project-api-keys";
 import { apiKeyRoute } from "./presentation/routes/api-key";
 import { onboardingRoute } from "./presentation/routes/onboarding";
-import { billingRoute } from "./presentation/routes/billing";
+import { usageRoute } from "./presentation/routes/usage";
 import { projectCreationRequestsRoute } from "./presentation/routes/project-creation-requests";
 import { invitationLinksRoute } from "./presentation/routes/invitation-links";
 import { artifactContentRoute } from "./presentation/routes/artifact-content/routes";
@@ -92,9 +92,6 @@ export type Bindings = {
   CONTROL_PLANE?: ControlPlaneRpc;
   ENTITLEMENT_MODE?: string;
   PROJECT_WRITE_ENFORCEMENT?: string;
-  CHECKOUT_ENABLED?: string;
-  /** 所有者の切替・旧購読の解約・返金が揃うまで、譲渡の Checkout を既定で止める。 */
-  TRANSFER_CHECKOUT_ENABLED?: string;
   TERMS_URL?: string;
   PRIVACY_URL?: string;
   TURNSTILE_SITE_KEY?: string;
@@ -152,7 +149,7 @@ protectedApi.route("/", projectHistoryRoute);
 protectedApi.route("/", savedFiltersRoute);
 protectedApi.route("/", myWorkRoute);
 protectedApi.route("/", projectApiKeysRoute);
-protectedApi.route("/", billingRoute);
+protectedApi.route("/", usageRoute);
 protectedApi.route("/", projectCreationRequestsRoute);
 protectedApi.route("/", artifactPreviewTokenRoute);
 // The Web shows artifacts but never creates, edits or downloads them

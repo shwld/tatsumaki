@@ -52,7 +52,7 @@ import {
 import {
   createProjectDeletionNotifications,
   createEntitlementProvider,
-} from "./billing";
+} from "./usage";
 import { requireProjectMembership } from "./project-membership";
 import { computeGravatarHash } from "../lib/gravatar";
 
@@ -149,8 +149,8 @@ projectsRoute.post("/projects", async (c) => {
   if (c.env.ENTITLEMENT_MODE === "control-plane") {
     return c.json(
       {
-        error: "Projects are created after payment through checkout.",
-        code: "checkout_required",
+        error: "Projects are created through a creation request.",
+        code: "acquisition_required",
       },
       409,
     );
@@ -718,7 +718,7 @@ projectsRoute.delete("/projects/:projectId", async (c) => {
   );
   if (result.isErr()) {
     if (result.error === PROJECT_DELETE_PENDING_ERROR) {
-      // 受付済みだが未完了(課金の終了未確認、または本体削除の失敗)。成功とは返さない。
+      // 受付済みだが未完了(提供者への削除通知が未完了、または本体削除の失敗)。成功とは返さない。
       return c.json(
         {
           error:

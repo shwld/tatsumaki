@@ -5,7 +5,6 @@ import { listOwnedProjectUsage } from "../../application/usecases/list-owned-pro
 import {
   OPERATION_FORBIDDEN_ERROR,
   OPERATION_NOT_FOUND_ERROR,
-  OPERATION_NOT_OFFERED_ERROR,
   OPERATION_PROJECT_DELETING_ERROR,
   startProjectOperation,
 } from "../../application/usecases/start-project-operation";
@@ -16,9 +15,8 @@ import {
   closeOwnershipTransfer,
   getOwnershipTransfer,
   requestOwnershipTransfer,
-  startTransferCheckout,
+  startTransferAcquisition,
   TRANSFER_ALREADY_PENDING_ERROR,
-  TRANSFER_CHECKOUT_DISABLED_ERROR,
   TRANSFER_FORBIDDEN_ERROR,
   TRANSFER_INVALID_RECIPIENT_ERROR,
   TRANSFER_NOT_FOUND_ERROR,
@@ -54,7 +52,7 @@ export const createEntitlementProvider = (
   return new UnlimitedEntitlementProvider();
 };
 
-/** セルフホストは課金 RPC を呼ばないため undefined。 */
+/** セルフホストは提供者の RPC を呼ばないため undefined。 */
 export const createProjectDeletionNotificationGateway = (
   bindings: Bindings,
 ): ProjectDeletionNotificationGateway | undefined => {
@@ -69,7 +67,7 @@ export const createProjectDeletionNotificationGateway = (
   );
 };
 
-/** セルフホストは課金 RPC を呼ばないため undefined。 */
+/** セルフホストは提供者の RPC を呼ばないため undefined。 */
 export const createProjectDeletionNotifications = (bindings: Bindings) => {
   const gateway = createProjectDeletionNotificationGateway(bindings);
   return gateway
@@ -80,30 +78,18 @@ export const createProjectDeletionNotifications = (bindings: Bindings) => {
     : undefined;
 };
 
-export const isCheckoutEnabled = (bindings: Bindings): boolean =>
-  bindings.ENTITLEMENT_MODE === "control-plane" &&
-  bindings.CHECKOUT_ENABLED === "true";
+export const usageRoute = new Hono<Env>();
 
-export const isTransferCheckoutEnabled = (bindings: Bindings): boolean =>
-  isCheckoutEnabled(bindings) && bindings.TRANSFER_CHECKOUT_ENABLED === "true";
+usageRoute.get("/usage/mode", (c) =>
+  c.json({
+    mode:
+      c.env.ENTITLEMENT_MODE === "control-plane"
+        ? "control-plane"
+        : "self-hosted",
+  }),
+);
 
-export const billingRoute = new Hono<Env>();
-
-billingRoute.get("/billing/entitlement", (c) => {
-  const controlPlane = c.env.ENTITLEMENT_MODE === "control-plane";
-  const checkoutEnabled = isCheckoutEnabled(c.env);
-  return c.json({
-    mode: controlPlane ? "control-plane" : "self-hosted",
-    checkoutEnabled,
-    projectCreation: !controlPlane
-      ? "direct"
-      : checkoutEnabled
-        ? "checkout"
-        : "disabled",
-  });
-});
-
-billingRoute.get("/billing/operations", async (c) => {
+usageRoute.get("/usage/operations", async (c) => {
   if (c.env.ENTITLEMENT_MODE !== "control-plane" || !c.env.CONTROL_PLANE) {
     return c.json({ error: "Operations are not available" }, 409);
   }
@@ -116,7 +102,6 @@ billingRoute.get("/billing/operations", async (c) => {
     {
       userId: c.get("currentUser").id,
       locale: c.req.query("locale") === "en" ? "en" : "ja",
-      checkoutEnabled: isCheckoutEnabled(c.env),
     },
   );
   if (result.isErr()) {
@@ -125,7 +110,7 @@ billingRoute.get("/billing/operations", async (c) => {
   return c.json(result.value);
 });
 
-billingRoute.post("/billing/account-operations/manage", async (c) => {
+usageRoute.post("/usage/account-operations/manage", async (c) => {
   if (c.env.ENTITLEMENT_MODE !== "control-plane" || !c.env.CONTROL_PLANE) {
     return c.json({ error: "Operations are not available" }, 409);
   }
@@ -149,8 +134,8 @@ billingRoute.post("/billing/account-operations/manage", async (c) => {
 });
 
 // /projects/:projectId 配下に置くと閲覧のみの書き込みゲートに止められるため、別パスにする。
-billingRoute.post(
-  "/billing/projects/:projectId/operations/:operation",
+usageRoute.post(
+  "/usage/projects/:projectId/operations/:operation",
   async (c) => {
     if (c.env.ENTITLEMENT_MODE !== "control-plane" || !c.env.CONTROL_PLANE) {
       return c.json({ error: "Operations are not available" }, 409);
@@ -182,7 +167,6 @@ billingRoute.post(
         successUrl: `${projectUrl}?operation=resume`,
         cancelUrl: `${projectUrl}?operation=resume-cancel`,
       },
-      isCheckoutEnabled(c.env),
     );
 
     if (result.isOk()) return c.json({ url: result.value.url }, 201);
@@ -191,14 +175,6 @@ billingRoute.post(
         return c.json({ error: "Project not found" }, 404);
       case OPERATION_FORBIDDEN_ERROR:
         return c.json({ error: "Only the owner can do this" }, 403);
-      case OPERATION_NOT_OFFERED_ERROR:
-        return c.json(
-          {
-            error: "The operation is not available",
-            code: "operation_not_offered",
-          },
-          409,
-        );
       case OPERATION_PROJECT_DELETING_ERROR:
         return c.json(
           { error: "Project is being deleted", code: "project_deleting" },
@@ -252,14 +228,6 @@ const ownershipTransferErrorResponse = (error: OwnershipTransferError) => {
         body: { error: "Project is being deleted", code: "project_deleting" },
         status: 409 as const,
       };
-    case TRANSFER_CHECKOUT_DISABLED_ERROR:
-      return {
-        body: {
-          error: "Checkout is not available",
-          code: "checkout_disabled",
-        },
-        status: 409 as const,
-      };
     default:
       console.error("Ownership transfer unavailable", { reason: error });
       return {
@@ -284,79 +252,71 @@ const transferDeps = (bindings: Bindings) => ({
   transfers: new D1ProjectOwnershipTransferRepository(bindings.DB),
 });
 
-// セルフホストは従来のロール操作を維持するため、課金付き譲渡は公式ホスト版だけ。
-billingRoute.use(
-  "/billing/projects/:projectId/ownership-transfer/*",
+// セルフホストは従来のロール操作を維持するため、提供者を介す譲渡は公式ホスト版だけ。
+usageRoute.use(
+  "/usage/projects/:projectId/ownership-transfer/*",
   async (c, next) => {
     if (c.env.ENTITLEMENT_MODE !== "control-plane" || !c.env.CONTROL_PLANE) {
-      return c.json({ error: "Billing is not available" }, 409);
+      return c.json({ error: "Ownership transfer is not available" }, 409);
     }
     await next();
   },
 );
-billingRoute.get(
-  "/billing/projects/:projectId/ownership-transfer",
-  async (c) => {
-    const services = createTransferServices(c.env);
-    if (!services)
-      return c.json({ error: "Operations are not available" }, 409);
-    const result = await getOwnershipTransfer(
-      {
-        ...transferDeps(c.env),
-        ...services,
-        acquisitionAvailable: isTransferCheckoutEnabled(c.env),
-      },
-      {
-        userId: c.get("currentUser").id,
-        projectId: c.req.param("projectId"),
-        now: new Date(),
-      },
-    );
-    if (result.isErr()) {
-      const { body, status } = ownershipTransferErrorResponse(result.error);
-      return c.json(body, status);
-    }
-    return c.json({ transfer: result.value });
-  },
-);
+usageRoute.get("/usage/projects/:projectId/ownership-transfer", async (c) => {
+  const services = createTransferServices(c.env);
+  if (!services) return c.json({ error: "Operations are not available" }, 409);
+  const result = await getOwnershipTransfer(
+    {
+      ...transferDeps(c.env),
+      ...services,
+    },
+    {
+      userId: c.get("currentUser").id,
+      projectId: c.req.param("projectId"),
+      now: new Date(),
+    },
+  );
+  if (result.isErr()) {
+    const { body, status } = ownershipTransferErrorResponse(result.error);
+    return c.json(body, status);
+  }
+  return c.json({ transfer: result.value });
+});
 
-billingRoute.post(
-  "/billing/projects/:projectId/ownership-transfer",
+usageRoute.post("/usage/projects/:projectId/ownership-transfer", async (c) => {
+  const controlPlane = c.env.CONTROL_PLANE;
+  if (!controlPlane)
+    return c.json({ error: "Ownership transfer is not available" }, 409);
+  const body = (await c.req.json().catch(() => null)) as {
+    toUserId?: unknown;
+  } | null;
+  if (!body || typeof body.toUserId !== "string" || body.toUserId === "") {
+    return c.json({ error: "toUserId is required" }, 400);
+  }
+  const result = await requestOwnershipTransfer(
+    {
+      ...transferDeps(c.env),
+    },
+    {
+      userId: c.get("currentUser").id,
+      projectId: c.req.param("projectId"),
+      toUserId: body.toUserId,
+      now: new Date(),
+    },
+  );
+  if (result.isErr()) {
+    const response = ownershipTransferErrorResponse(result.error);
+    return c.json(response.body, response.status);
+  }
+  return c.json({ transfer: result.value }, 201);
+});
+
+usageRoute.post(
+  "/usage/projects/:projectId/ownership-transfer/acquisition",
   async (c) => {
     const controlPlane = c.env.CONTROL_PLANE;
     if (!controlPlane)
-      return c.json({ error: "Billing is not available" }, 409);
-    const body = (await c.req.json().catch(() => null)) as {
-      toUserId?: unknown;
-    } | null;
-    if (!body || typeof body.toUserId !== "string" || body.toUserId === "") {
-      return c.json({ error: "toUserId is required" }, 400);
-    }
-    const result = await requestOwnershipTransfer(
-      {
-        ...transferDeps(c.env),
-      },
-      {
-        userId: c.get("currentUser").id,
-        projectId: c.req.param("projectId"),
-        toUserId: body.toUserId,
-        now: new Date(),
-      },
-    );
-    if (result.isErr()) {
-      const response = ownershipTransferErrorResponse(result.error);
-      return c.json(response.body, response.status);
-    }
-    return c.json({ transfer: result.value }, 201);
-  },
-);
-
-billingRoute.post(
-  "/billing/projects/:projectId/ownership-transfer/checkout",
-  async (c) => {
-    const controlPlane = c.env.CONTROL_PLANE;
-    if (!controlPlane)
-      return c.json({ error: "Billing is not available" }, 409);
+      return c.json({ error: "Ownership transfer is not available" }, 409);
     const body = (await c.req.json().catch(() => null)) as {
       transferId?: unknown;
     } | null;
@@ -370,7 +330,7 @@ billingRoute.post(
     const projectId = c.req.param("projectId");
     const base = `${new URL(c.req.url).origin}/projects/${encodeURIComponent(projectId)}/settings`;
     const projects = new D1ProjectRepository(c.env.DB);
-    const result = await startTransferCheckout(
+    const result = await startTransferAcquisition(
       {
         ...transferDeps(c.env),
         projects,
@@ -384,10 +344,9 @@ billingRoute.post(
         projectId,
         transferId: body.transferId,
         now: new Date(),
-        successUrl: `${base}?billing=transfer`,
-        cancelUrl: `${base}?billing=transfer-cancel`,
+        successUrl: `${base}?transfer=return`,
+        cancelUrl: `${base}?transfer=cancel`,
       },
-      isTransferCheckoutEnabled(c.env),
     );
     if (result.isErr()) {
       const response = ownershipTransferErrorResponse(result.error);
@@ -401,8 +360,8 @@ for (const [path, as] of [
   ["cancel", "requester"],
   ["decline", "recipient"],
 ] as const) {
-  billingRoute.post(
-    `/billing/projects/:projectId/ownership-transfer/${path}`,
+  usageRoute.post(
+    `/usage/projects/:projectId/ownership-transfer/${path}`,
     async (c) => {
       const body = (await c.req.json().catch(() => null)) as {
         transferId?: unknown;

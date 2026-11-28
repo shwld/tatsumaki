@@ -1,7 +1,7 @@
 import { recoverProjectDeletions } from "../../application/usecases/delete-project";
 import { D1ProjectRepository } from "../../infrastructure/db/repositories/d1-project-repository";
 import type { Bindings } from "../../index";
-import { createProjectDeletionNotifications } from "../routes/billing";
+import { createProjectDeletionNotifications } from "../routes/usage";
 
 /** Never throws: a recovery failure must not affect other scheduled work. */
 export async function recoverProjectDeletionsScheduled(

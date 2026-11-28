@@ -8,7 +8,7 @@
 
 次が完了してから本番ポリシーを開く。順序は ADR-0011 の Consequences に従う。
 
-- Control Plane の free プラン(`FREE_MAX_OWNED_PROJECTS=0`)と `ENTITLEMENT_MODE=control-plane` が本番で有効
+- `ENTITLEMENT_MODE=control-plane` が本番で有効
 - オンボーディング・API key 発行・`/oauth/register` のレート制限(`ONBOARDING_RATE_LIMITER`、`API_KEY_RATE_LIMITER`、`OAUTH_REGISTER_RATE_LIMITER`)が本番 Worker にバインドされている
 - 規約同意と Turnstile(下記)が設定済み
 - `ARTIFACT_CONTENT_ORIGIN` と `ARTIFACT_APP_ORIGIN` が設定済み。未設定なら artifact の preview は無効のままになる(ADR-0012 §5)

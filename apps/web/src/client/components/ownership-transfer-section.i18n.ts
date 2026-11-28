@@ -21,7 +21,7 @@ export const ownershipTransferSectionJa = {
     recipient: {
       status: "{{name}} さんから所有権の譲渡を申請されています。",
       next: "所有権を引き継ぐには、必要な手続きを完了してください。切り替わるまで権限は変わりません。引き継がない場合は辞退できます。",
-      subscribe: "手続きを進める",
+      proceed: "手続きを進める",
       decline: "辞退する",
     },
     completed: {
@@ -34,7 +34,6 @@ export const ownershipTransferSectionJa = {
       alreadyPending: "すでに有効な譲渡の申請があります。",
       invalidRecipient: "このメンバーには譲渡できません。",
       notPending: "申請はすでに終了しています。最新の状態を表示します。",
-      checkoutDisabled: "現在、手続きを受け付けていません。",
       projectDeleting: "このプロジェクトは削除手続き中です。",
     },
   },
@@ -63,7 +62,7 @@ export const ownershipTransferSectionEn = {
     recipient: {
       status: "{{name}} asked you to take over ownership.",
       next: "Complete the required steps to take over ownership. Your permissions remain unchanged until the switch. You can decline the request.",
-      subscribe: "Continue",
+      proceed: "Continue",
       decline: "Decline",
     },
     completed: {
@@ -76,7 +75,6 @@ export const ownershipTransferSectionEn = {
       alreadyPending: "A transfer request is already pending.",
       invalidRecipient: "Ownership cannot be transferred to this member.",
       notPending: "The request has already ended. Showing the latest state.",
-      checkoutDisabled: "This action is currently unavailable.",
       projectDeleting: "This project is being deleted.",
     },
   },

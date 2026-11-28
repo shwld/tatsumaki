@@ -28,10 +28,10 @@ const routes = (
     const url = String(input);
     const key = `${init?.method ?? "GET"} ${url}`;
     if (extra[key]) return extra[key]();
-    if (url === "/api/billing/entitlement") return json({ mode });
+    if (url === "/api/usage/mode") return json({ mode });
     if (url === "/api/auth/me") return json({ id: "owner" });
     if (url === "/api/projects/p1/members") return json(members);
-    if (url === "/api/billing/projects/p1/ownership-transfer") {
+    if (url === "/api/usage/projects/p1/ownership-transfer") {
       return json({ transfer });
     }
     return json({ ok: true });
@@ -79,7 +79,7 @@ describe("OwnershipTransferSection", () => {
 
   it("lets the owner nominate a member after seeing the transfer notice", async () => {
     routes(null, "control-plane", {
-      "POST /api/billing/projects/p1/ownership-transfer": () =>
+      "POST /api/usage/projects/p1/ownership-transfer": () =>
         json({ transfer: pendingTransfer("requester") }, 201),
     });
     renderSection(true);
@@ -91,7 +91,7 @@ describe("OwnershipTransferSection", () => {
 
     await waitFor(() =>
       expect(fetch).toHaveBeenCalledWith(
-        "/api/billing/projects/p1/ownership-transfer",
+        "/api/usage/projects/p1/ownership-transfer",
         expect.objectContaining({
           method: "POST",
           body: JSON.stringify({ toUserId: "bob" }),
@@ -110,7 +110,7 @@ describe("OwnershipTransferSection", () => {
     fireEvent.click(screen.getByRole("button", { name: "申請を取り消す" }));
     await waitFor(() =>
       expect(fetch).toHaveBeenCalledWith(
-        "/api/billing/projects/p1/ownership-transfer/cancel",
+        "/api/usage/projects/p1/ownership-transfer/cancel",
         expect.objectContaining({
           method: "POST",
           body: JSON.stringify({ transferId: "t1" }),
@@ -129,7 +129,7 @@ describe("OwnershipTransferSection", () => {
     fireEvent.click(screen.getByRole("button", { name: "辞退する" }));
     await waitFor(() =>
       expect(fetch).toHaveBeenCalledWith(
-        "/api/billing/projects/p1/ownership-transfer/decline",
+        "/api/usage/projects/p1/ownership-transfer/decline",
         expect.objectContaining({ method: "POST" }),
       ),
     );
@@ -175,8 +175,7 @@ describe("OwnershipTransferSection", () => {
     };
     vi.mocked(fetch).mockImplementation(async (input) => {
       const url = String(input);
-      if (url === "/api/billing/entitlement")
-        return json({ mode: "control-plane" });
+      if (url === "/api/usage/mode") return json({ mode: "control-plane" });
       if (url === "/api/auth/me") return json({ id: "bob" });
       if (url === "/api/projects/p1/members") return json(members);
       return json({ transfer: current });
@@ -251,7 +250,7 @@ describe("OwnershipTransferSection", () => {
 
   it("explains a rejected recipient", async () => {
     routes(null, "control-plane", {
-      "POST /api/billing/projects/p1/ownership-transfer": () =>
+      "POST /api/usage/projects/p1/ownership-transfer": () =>
         json({ code: "invalid_recipient" }, 422),
     });
     renderSection(true);
@@ -265,7 +264,7 @@ describe("OwnershipTransferSection", () => {
     );
   });
 
-  it("lets the recipient start the Checkout for the pending request", async () => {
+  it("lets the recipient start the acquisition for the pending request", async () => {
     const assign = vi.fn();
     vi.stubGlobal("location", { ...window.location, assign, search: "" });
     routes(
@@ -275,8 +274,8 @@ describe("OwnershipTransferSection", () => {
       },
       "control-plane",
       {
-        "POST /api/billing/projects/p1/ownership-transfer/checkout": () =>
-          json({ url: "https://checkout.stripe.test/s" }, 201),
+        "POST /api/usage/projects/p1/ownership-transfer/acquisition": () =>
+          json({ url: "https://provider.example/s" }, 201),
       },
     );
     renderSection(false);
@@ -285,10 +284,10 @@ describe("OwnershipTransferSection", () => {
     fireEvent.click(screen.getByRole("button", { name: "手続きを進める" }));
 
     await waitFor(() =>
-      expect(assign).toHaveBeenCalledWith("https://checkout.stripe.test/s"),
+      expect(assign).toHaveBeenCalledWith("https://provider.example/s"),
     );
     expect(fetch).toHaveBeenCalledWith(
-      "/api/billing/projects/p1/ownership-transfer/checkout",
+      "/api/usage/projects/p1/ownership-transfer/acquisition",
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({ transferId: "t1" }),
@@ -304,8 +303,8 @@ describe("OwnershipTransferSection", () => {
       },
       "control-plane",
       {
-        "POST /api/billing/projects/p1/ownership-transfer/checkout": () =>
-          json({ code: "checkout_disabled" }, 409),
+        "POST /api/usage/projects/p1/ownership-transfer/acquisition": () =>
+          json({ error: "unavailable" }, 503),
       },
     );
     renderSection(false);
@@ -314,24 +313,23 @@ describe("OwnershipTransferSection", () => {
     );
     expect(await screen.findByRole("alert")).toHaveProperty(
       "textContent",
-      expect.stringContaining("受け付けていません"),
+      expect.stringContaining("操作できませんでした"),
     );
   });
 
   it("keeps checking ownership without a return URL", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
-      let subscribed = false;
+      let acquired = false;
       vi.mocked(fetch).mockImplementation(async (input) => {
         const url = String(input);
-        if (url === "/api/billing/entitlement")
-          return json({ mode: "control-plane" });
+        if (url === "/api/usage/mode") return json({ mode: "control-plane" });
         if (url === "/api/auth/me") return json({ id: "bob" });
         if (url === "/api/projects/p1/members") return json(members);
         return json({
           transfer: {
             ...pendingTransfer("recipient"),
-            ...(subscribed
+            ...(acquired
               ? { state: "completed" }
               : { acquisition: "available" }),
           },
@@ -340,7 +338,7 @@ describe("OwnershipTransferSection", () => {
       renderSection(false);
       await screen.findByRole("button", { name: "手続きを進める" });
 
-      subscribed = true;
+      acquired = true;
       await vi.advanceTimersByTimeAsync(3500);
 
       expect(
@@ -354,7 +352,6 @@ describe("OwnershipTransferSection", () => {
   it("does not offer acquisition while it is unavailable", async () => {
     routes({
       ...pendingTransfer("recipient"),
-      acquisition: "disabled",
     });
     renderSection(false);
 

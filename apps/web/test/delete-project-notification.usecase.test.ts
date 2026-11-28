@@ -12,7 +12,7 @@ import { D1ProjectDeletionRequestRepository } from "../src/infrastructure/db/rep
 import { D1ProjectRepository } from "../src/infrastructure/db/repositories/d1-project-repository";
 import { resetDatabase } from "./helpers/db";
 
-const seedProject = async (name = "Billing Target") => {
+const seedProject = async (name = "Deletion Target") => {
   const result = await new D1ProjectRepository(env.DB).create({
     name,
     ownerUserId: "owner",
@@ -50,7 +50,7 @@ describe("deleteProject with notifications", () => {
     const result = await deleteProject(deps, {
       projectId: project.id,
       userId: "owner",
-      confirmProjectName: "Billing Target",
+      confirmProjectName: "Deletion Target",
     });
 
     expect(result.isOk()).toBe(true);
@@ -73,7 +73,7 @@ describe("deleteProject with notifications", () => {
     const result = await deleteProject(deps, {
       projectId: project.id,
       userId: "owner",
-      confirmProjectName: "Billing Target",
+      confirmProjectName: "Deletion Target",
     });
 
     expect(result._unsafeUnwrapErr()).toBe(PROJECT_DELETE_FORBIDDEN_ERROR);
@@ -101,7 +101,7 @@ describe("deleteProject with notifications", () => {
     const result = await deleteProject(deps, {
       projectId: project.id,
       userId: "owner",
-      confirmProjectName: "Billing Target",
+      confirmProjectName: "Deletion Target",
     });
 
     expect(result._unsafeUnwrapErr()).toBe(PROJECT_DELETE_FORBIDDEN_ERROR);
@@ -122,7 +122,7 @@ describe("deleteProject with notifications", () => {
     const result = await deleteProject(deps, {
       projectId: project.id,
       userId: "owner",
-      confirmProjectName: "Billing Target",
+      confirmProjectName: "Deletion Target",
     });
 
     expect(result._unsafeUnwrapErr()).toBe("PROJECT_NOT_FOUND_ERROR");
@@ -155,7 +155,7 @@ describe("deleteProject with notifications", () => {
     const result = await deleteProject(deps, {
       projectId: project.id,
       userId: "owner",
-      confirmProjectName: "Billing Target",
+      confirmProjectName: "Deletion Target",
     });
 
     expect(result._unsafeUnwrapErr()).toBe(PROJECT_DELETE_PENDING_ERROR);
@@ -174,7 +174,7 @@ describe("deleteProject with notifications", () => {
     const input = {
       projectId: project.id,
       userId: "owner",
-      confirmProjectName: "Billing Target",
+      confirmProjectName: "Deletion Target",
     };
     await deleteProject(deps, input);
 
@@ -194,7 +194,7 @@ describe("deleteProject with notifications", () => {
     const result = await deleteProject(deps, {
       projectId: project.id,
       userId: "owner",
-      confirmProjectName: "Billing Target",
+      confirmProjectName: "Deletion Target",
     });
 
     expect(result._unsafeUnwrapErr()).toBe(PROJECT_DELETE_PENDING_ERROR);
@@ -211,7 +211,7 @@ describe("deleteProject with notifications", () => {
     const result = await deleteProject(deps, {
       projectId: project.id,
       userId: "owner",
-      confirmProjectName: "Billing Target",
+      confirmProjectName: "Deletion Target",
     });
 
     expect(result._unsafeUnwrapErr()).toBe("PROJECT_REPOSITORY_ERROR");
@@ -228,7 +228,7 @@ describe("deleteProject with notifications", () => {
       {
         projectId: project.id,
         userId: "owner",
-        confirmProjectName: "Billing Target",
+        confirmProjectName: "Deletion Target",
       },
     );
 

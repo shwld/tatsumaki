@@ -24,10 +24,10 @@ type Row = typeof projectCreationRequestsTable.$inferSelect;
 
 const toRequest = (row: Row): ProjectCreationRequest => ({
   projectId: row.projectId,
-  purchaserUserId: row.purchaserUserId,
+  requesterUserId: row.requesterUserId,
   name: row.name,
   idempotencyKey: row.idempotencyKey,
-  checkoutRequestId: row.checkoutRequestId,
+  acquisitionRequestId: row.acquisitionRequestId,
   status: row.status as ProjectCreationRequestStatus,
   attemptCount: row.attemptCount,
   materializeFailureCount: row.materializeFailureCount,
@@ -61,20 +61,20 @@ export class D1ProjectCreationRequestRepository
   async listUnnotified(limit: number) {
     try {
       const result = await this.d1
-        .prepare(`SELECT project_id, purchaser_user_id, status, outcome_at
+        .prepare(`SELECT project_id, requester_user_id, status, outcome_at
         FROM project_creation_requests WHERE outcome_notified = 0 AND outcome_at IS NOT NULL
         ORDER BY updated_at, project_id LIMIT ?`)
         .bind(limit)
         .all<{
           project_id: string;
-          purchaser_user_id: string;
+          requester_user_id: string;
           status: string;
           outcome_at: string;
         }>();
       return ok(
         result.results.map((row) => ({
           projectId: row.project_id,
-          accountId: row.purchaser_user_id,
+          accountId: row.requester_user_id,
           outcome:
             row.status === "created"
               ? ("created" as const)
@@ -133,8 +133,8 @@ export class D1ProjectCreationRequestRepository
         .where(
           and(
             eq(
-              projectCreationRequestsTable.purchaserUserId,
-              input.purchaserUserId,
+              projectCreationRequestsTable.requesterUserId,
+              input.requesterUserId,
             ),
             eq(
               projectCreationRequestsTable.idempotencyKey,
@@ -188,7 +188,7 @@ export class D1ProjectCreationRequestRepository
              WHERE EXISTS (${PENDING_REQUEST})
              ON CONFLICT(project_id, user_id) DO NOTHING`,
           )
-          .bind(request.projectId, request.purchaserUserId, request.projectId),
+          .bind(request.projectId, request.requesterUserId, request.projectId),
         this.d1
           .prepare(
             `UPDATE project_creation_requests

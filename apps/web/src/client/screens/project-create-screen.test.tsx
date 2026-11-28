@@ -230,7 +230,7 @@ describe("ProjectCreateScreen", () => {
     expect(input.className).toContain("border-red-500");
   });
 
-  describe("hosted checkout", () => {
+  describe("hosted acquisition", () => {
     const assign = vi.fn();
     const json = (body: unknown, status = 200) =>
       new Response(JSON.stringify(body), {
@@ -258,14 +258,14 @@ describe("ProjectCreateScreen", () => {
     it("redirects to the provider when direct creation requires acquisition", async () => {
       vi.mocked(fetch)
         .mockResolvedValueOnce(
-          json({ error: "pay first", code: "checkout_required" }, 409),
+          json({ error: "pay first", code: "acquisition_required" }, 409),
         )
         .mockResolvedValueOnce(
           json(
             {
               kind: "redirect",
               projectId: "p1",
-              url: "https://checkout.stripe.com/c/pay/x",
+              url: "https://provider.example/session",
             },
             201,
           ),
@@ -275,9 +275,7 @@ describe("ProjectCreateScreen", () => {
       submitName("Alpha");
 
       await waitFor(() =>
-        expect(assign).toHaveBeenCalledWith(
-          "https://checkout.stripe.com/c/pay/x",
-        ),
+        expect(assign).toHaveBeenCalledWith("https://provider.example/session"),
       );
       const [, init] = vi.mocked(fetch).mock.calls[1];
       expect(vi.mocked(fetch).mock.calls[1][0]).toBe(
@@ -291,9 +289,9 @@ describe("ProjectCreateScreen", () => {
 
     it("reuses the idempotency key for a retry with the same name", async () => {
       vi.mocked(fetch)
-        .mockResolvedValueOnce(json({ code: "checkout_required" }, 409))
+        .mockResolvedValueOnce(json({ code: "acquisition_required" }, 409))
         .mockResolvedValueOnce(json({ error: "down" }, 503))
-        .mockResolvedValueOnce(json({ code: "checkout_required" }, 409))
+        .mockResolvedValueOnce(json({ code: "acquisition_required" }, 409))
         .mockResolvedValueOnce(json({ error: "down" }, 503));
 
       renderScreen();

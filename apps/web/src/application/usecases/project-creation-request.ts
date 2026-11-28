@@ -14,15 +14,15 @@ export const PROJECT_CREATION_REQUEST_NOT_FOUND_ERROR =
   "PROJECT_CREATION_REQUEST_NOT_FOUND_ERROR" as const;
 export const PROJECT_CREATION_ENTITLEMENT_UNAVAILABLE_ERROR =
   "PROJECT_CREATION_ENTITLEMENT_UNAVAILABLE_ERROR" as const;
-export const PROJECT_CREATION_CHECKOUT_UNAVAILABLE_ERROR =
-  "PROJECT_CREATION_CHECKOUT_UNAVAILABLE_ERROR" as const;
+export const PROJECT_CREATION_ACQUISITION_UNAVAILABLE_ERROR =
+  "PROJECT_CREATION_ACQUISITION_UNAVAILABLE_ERROR" as const;
 export const PROJECT_CREATION_FAILED_ERROR =
   "PROJECT_CREATION_FAILED_ERROR" as const;
 
 export type StartProjectCreationError =
   | typeof INVALID_PROJECT_NAME_ERROR
   | typeof PROJECT_CREATION_ENTITLEMENT_UNAVAILABLE_ERROR
-  | typeof PROJECT_CREATION_CHECKOUT_UNAVAILABLE_ERROR
+  | typeof PROJECT_CREATION_ACQUISITION_UNAVAILABLE_ERROR
   | typeof PROJECT_CREATION_FAILED_ERROR;
 
 export type StartProjectCreationResult =
@@ -52,8 +52,8 @@ export async function startProjectCreation(
 
   const opened = await deps.requests.open({
     projectId: ulid(),
-    checkoutRequestId: crypto.randomUUID(),
-    purchaserUserId: input.userId,
+    acquisitionRequestId: crypto.randomUUID(),
+    requesterUserId: input.userId,
     name,
     idempotencyKey: input.idempotencyKey,
   });
@@ -72,7 +72,7 @@ export async function startProjectCreation(
   try {
     eligibility = await deps.eligibility.getEligibility({
       projectId: request.projectId,
-      accountId: request.purchaserUserId,
+      accountId: request.requesterUserId,
       requestedAt: requestedAt(request.createdAt),
     });
   } catch {
@@ -91,7 +91,7 @@ export async function startProjectCreation(
       projectId: request.projectId,
       requestedAt: requestedAt(request.createdAt),
       projectName: request.name,
-      requestId: request.checkoutRequestId,
+      requestId: request.acquisitionRequestId,
       successUrl: input.successUrl(request.projectId),
       cancelUrl: input.cancelUrl,
     });
@@ -101,7 +101,7 @@ export async function startProjectCreation(
       url: session.url,
     });
   } catch {
-    return err(PROJECT_CREATION_CHECKOUT_UNAVAILABLE_ERROR);
+    return err(PROJECT_CREATION_ACQUISITION_UNAVAILABLE_ERROR);
   }
 }
 
@@ -130,7 +130,7 @@ export async function completeProjectCreation(
     return err(PROJECT_CREATION_FAILED_ERROR);
   }
   const request = found.value;
-  if (!request || request.purchaserUserId !== input.userId) {
+  if (!request || request.requesterUserId !== input.userId) {
     return err(PROJECT_CREATION_REQUEST_NOT_FOUND_ERROR);
   }
 
@@ -159,7 +159,7 @@ export async function completeProjectCreation(
   try {
     eligibility = await deps.eligibility.getEligibility({
       projectId: request.projectId,
-      accountId: request.purchaserUserId,
+      accountId: request.requesterUserId,
       requestedAt: new Date(
         `${request.createdAt.replace(" ", "T")}Z`,
       ).toISOString(),
@@ -248,7 +248,7 @@ export async function recoverProjectCreations(
     try {
       const eligibility = await deps.eligibility.getEligibility({
         projectId: request.projectId,
-        accountId: request.purchaserUserId,
+        accountId: request.requesterUserId,
         requestedAt: requestedAt(request.createdAt),
       });
       if (eligibility.status === "denied") {

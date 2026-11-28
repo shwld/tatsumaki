@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { D1ProjectRepository } from "../src/infrastructure/db/repositories/d1-project-repository";
 import type { Bindings, Env } from "../src/index";
 import type { CurrentUser } from "../src/presentation/middleware/access-auth";
-import { billingRoute } from "../src/presentation/routes/billing";
+import { usageRoute } from "../src/presentation/routes/usage";
 import { resetDatabase } from "./helpers/db";
 
 const buildApp = (userId: string) => {
@@ -13,52 +13,18 @@ const buildApp = (userId: string) => {
     c.set("currentUser", { id: userId } as CurrentUser);
     await next();
   });
-  app.route("/", billingRoute);
+  app.route("/", usageRoute);
   return app;
 };
 
-type Options = {
-  lifecycle?: "live" | "ending" | "ended" | null;
-  listFails?: boolean;
-  selfHosted?: boolean;
-};
-
-const setup = (options: Options = {}) => {
-  const listProjectBilling = vi.fn(
-    async ({
-      billingAccountId,
-      projectIds,
-    }: {
-      billingAccountId: string;
-      projectIds: string[];
-    }) => {
-      if (options.listFails) throw new Error("cp down");
-      return {
-        projects: projectIds.map((projectId) => ({
-          projectId,
-          entitlementState: "active",
-          subscription:
-            billingAccountId !== "owner" || options.lifecycle === null
-              ? null
-              : {
-                  lifecycle: options.lifecycle ?? "live",
-                  endsAt: null,
-                  nextBilling: { status: "none" as const },
-                  transferId: null,
-                },
-        })),
-      };
-    },
-  );
+const setup = (options: { selfHosted?: boolean } = {}) => {
+  const getProjectEntitlement = vi.fn();
   const bindings = (options.selfHosted
     ? { DB: env.DB }
     : {
         DB: env.DB,
         ENTITLEMENT_MODE: "control-plane",
-        CONTROL_PLANE: {
-          getProjectEntitlement: vi.fn(),
-          listProjectBilling,
-        },
+        CONTROL_PLANE: { getProjectEntitlement },
       }) as unknown as Bindings;
   const call = async (
     userId: string,
@@ -77,7 +43,7 @@ const setup = (options: Options = {}) => {
       body = { transferId: row?.id ?? "none" };
     }
     return buildApp(userId).request(
-      `https://tatsumaki.example/billing/projects/${projectId}/ownership-transfer${suffix}`,
+      `https://tatsumaki.example/usage/projects/${projectId}/ownership-transfer${suffix}`,
       {
         method,
         ...(body === undefined
@@ -90,7 +56,7 @@ const setup = (options: Options = {}) => {
       bindings,
     );
   };
-  return { call, listProjectBilling };
+  return { call, getProjectEntitlement };
 };
 
 const createProject = async (ownerUserId: string) => {
@@ -114,7 +80,7 @@ describe("ownership transfer request routes", () => {
     await resetDatabase(env.DB);
   });
 
-  it("lets the paying owner nominate an existing member without changing roles", async () => {
+  it("lets the owner nominate an existing member without changing roles", async () => {
     const projectId = await createProject("owner");
     await addMember(projectId, "bob", "member");
     const { call } = setup();
@@ -189,16 +155,16 @@ describe("ownership transfer request routes", () => {
     expect((await call("owner", projectId, "POST", "", {})).status).toBe(400);
   });
 
-  it("allows an owner to request a transfer without consulting billing details", async () => {
+  it("allows an owner to request a transfer without consulting the provider", async () => {
     const projectId = await createProject("owner");
     await addMember(projectId, "co", "owner");
     await addMember(projectId, "bob", "member");
-    const { call, listProjectBilling } = setup({ listFails: true });
+    const { call, getProjectEntitlement } = setup();
     const response = await call("co", projectId, "POST", "", {
       toUserId: "bob",
     });
     expect(response.status).toBe(201);
-    expect(listProjectBilling).not.toHaveBeenCalled();
+    expect(getProjectEntitlement).not.toHaveBeenCalled();
   });
 
   it("allows only one pending transfer per project", async () => {

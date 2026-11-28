@@ -62,10 +62,10 @@ describe("requireProjectWritable", () => {
   it("lets operation and ownership-transfer routes through a view-only project", async () => {
     const env = bindings(async () => usage("read_only"));
     for (const path of [
-      "/api/billing/projects/p1/operations/resume",
-      "/api/billing/projects/p1/ownership-transfer",
-      "/api/billing/projects/p1/ownership-transfer/cancel",
-      "/api/billing/projects/p1/ownership-transfer/decline",
+      "/api/usage/projects/p1/operations/resume",
+      "/api/usage/projects/p1/ownership-transfer",
+      "/api/usage/projects/p1/ownership-transfer/cancel",
+      "/api/usage/projects/p1/ownership-transfer/decline",
     ]) {
       const response = await call("POST", path, env);
       expect(response.status, path).toBe(200);

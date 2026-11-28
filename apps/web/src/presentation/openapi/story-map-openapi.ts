@@ -255,7 +255,7 @@ export function registerStoryMapOpenApi(app: OpenAPIHono) {
         429: { description: "Body: { code: rate_limited }" },
         503: {
           description:
-            "Body: { code: entitlement_unavailable }. Billing state could not be checked",
+            "Body: { code: entitlement_unavailable }. Usage state could not be checked",
         },
       },
     }),

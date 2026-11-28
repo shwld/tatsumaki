@@ -24,7 +24,7 @@ const buildApp = (userId: string) => {
 type Fake = {
   state: "active" | "grace" | "suspended";
   fail: boolean;
-  checkoutFail: boolean;
+  acquisitionFail: boolean;
   entitlementProjectId: string | null;
   creationDenied: boolean;
 };
@@ -33,13 +33,13 @@ const setup = () => {
   const fake: Fake = {
     state: "suspended",
     fail: false,
-    checkoutFail: false,
+    acquisitionFail: false,
     entitlementProjectId: null,
     creationDenied: false,
   };
-  const createCheckoutSession = vi.fn(async () => {
-    if (fake.checkoutFail) throw new Error("down");
-    return { url: "https://checkout.stripe.com/c/pay/cs_test" };
+  const startAcquisition = vi.fn(async () => {
+    if (fake.acquisitionFail) throw new Error("down");
+    return { url: "https://provider.example/session" };
   });
   const getProjectEntitlement = vi.fn(
     async ({ projectId }: { projectId: string }) => {
@@ -70,14 +70,10 @@ const setup = () => {
   const bindings = {
     DB: env.DB,
     ENTITLEMENT_MODE: "control-plane",
-    CHECKOUT_ENABLED: "true",
     CONTROL_PLANE: {
       getProjectEntitlement,
       getCreationEligibility,
-      startCreationAcquisition: createCheckoutSession,
-      createCheckoutSession,
-      listProjectBilling: vi.fn(),
-      createPortalSession: vi.fn(),
+      startCreationAcquisition: startAcquisition,
     },
   } as unknown as Bindings;
   const post = (
@@ -95,7 +91,7 @@ const setup = () => {
       },
       { ...bindings, ...overrides },
     );
-  return { fake, createCheckoutSession, getProjectEntitlement, post };
+  return { fake, startAcquisition, getProjectEntitlement, post };
 };
 
 const countProjects = async () =>
@@ -108,8 +104,8 @@ describe("project creation requests", () => {
     await resetDatabase(env.DB);
   });
 
-  it("opens a checkout without creating the project", async () => {
-    const { post, createCheckoutSession } = setup();
+  it("starts an acquisition without creating the project", async () => {
+    const { post, startAcquisition } = setup();
 
     const response = await post("user-1", "/project-creation-requests", {
       name: " Alpha ",
@@ -124,22 +120,22 @@ describe("project creation requests", () => {
     };
     expect(body).toMatchObject({
       kind: "redirect",
-      url: "https://checkout.stripe.com/c/pay/cs_test",
+      url: "https://provider.example/session",
     });
-    expect(createCheckoutSession).toHaveBeenCalledWith({
+    expect(startAcquisition).toHaveBeenCalledWith({
       accountId: "user-1",
       projectId: body.projectId,
       requestedAt: expect.any(String),
       projectName: expect.any(String),
       requestId: expect.stringMatching(/^[0-9a-f-]{36}$/),
       successUrl: `${ORIGIN}/projects/new/complete?request=${body.projectId}`,
-      cancelUrl: `${ORIGIN}/projects/new?checkout=cancel`,
+      cancelUrl: `${ORIGIN}/projects/new?acquisition=cancel`,
     });
     expect(await countProjects()).toBe(0);
   });
 
   it("reuses the same request for a repeated submit", async () => {
-    const { post, createCheckoutSession } = setup();
+    const { post, startAcquisition } = setup();
     const submit = async () =>
       (await (
         await post("user-1", "/project-creation-requests", {
@@ -152,33 +148,21 @@ describe("project creation requests", () => {
     const second = await submit();
 
     expect(second.projectId).toBe(first.projectId);
-    const calls = createCheckoutSession.mock.calls as unknown as [
+    const calls = startAcquisition.mock.calls as unknown as [
       { requestId: string },
     ][];
     expect(calls[1][0].requestId).toBe(calls[0][0].requestId);
   });
 
-  it("does not start a new acquisition when the host has disabled it", async () => {
-    const { post, createCheckoutSession } = setup();
-    const response = await post(
-      "user-1",
-      "/project-creation-requests",
-      { name: "Alpha", idempotencyKey: "key-12345678" },
-      { CHECKOUT_ENABLED: "false" },
-    );
-    expect(response.status).toBe(409);
-    expect(createCheckoutSession).not.toHaveBeenCalled();
-  });
-
   it("reports when the provider does not offer acquisition", async () => {
-    const { post, fake, createCheckoutSession } = setup();
-    fake.checkoutFail = true;
+    const { post, fake, startAcquisition } = setup();
+    fake.acquisitionFail = true;
     const response = await post("user-1", "/project-creation-requests", {
       name: "Alpha",
       idempotencyKey: "key-12345678",
     });
     expect(response.status).toBe(503);
-    expect(createCheckoutSession).toHaveBeenCalledOnce();
+    expect(startAcquisition).toHaveBeenCalledOnce();
   });
 
   it("rejects an empty name and a malformed idempotency key", async () => {
@@ -211,35 +195,35 @@ describe("project creation requests", () => {
     expect(unreachable.status).toBe(503);
 
     fake.fail = false;
-    fake.checkoutFail = true;
-    const checkoutDown = await post("user-1", "/project-creation-requests", {
+    fake.acquisitionFail = true;
+    const providerDown = await post("user-1", "/project-creation-requests", {
       name: "A",
       idempotencyKey: "key-87654321",
     });
-    expect(checkoutDown.status).toBe(503);
+    expect(providerDown.status).toBe(503);
   });
 
-  it("does not start a second checkout for a project that is already active", async () => {
-    const { post, fake, createCheckoutSession } = setup();
+  it("does not start a second acquisition for a project that is already active", async () => {
+    const { post, fake, startAcquisition } = setup();
     fake.state = "active";
     const response = await post("user-1", "/project-creation-requests", {
       name: "A",
       idempotencyKey: "key-12345678",
     });
     expect(await response.json()).toMatchObject({ kind: "ready" });
-    expect(createCheckoutSession).not.toHaveBeenCalled();
+    expect(startAcquisition).not.toHaveBeenCalled();
   });
 
   it("leaves the acquisition decision to the provider", async () => {
-    const { post, fake, createCheckoutSession } = setup();
+    const { post, fake, startAcquisition } = setup();
     fake.state = "grace";
-    fake.checkoutFail = true;
+    fake.acquisitionFail = true;
     const response = await post("user-1", "/project-creation-requests", {
       name: "A",
       idempotencyKey: "key-12345678",
     });
     expect(response.status).toBe(503);
-    expect(createCheckoutSession).toHaveBeenCalledOnce();
+    expect(startAcquisition).toHaveBeenCalledOnce();
   });
 
   describe("completion", () => {
@@ -518,25 +502,11 @@ describe("project creation requests", () => {
       const projectId = await open(ctx);
       const response = await ctx.post(
         "user-1",
-        `/project-creation-requests/${projectId}/complete?checkout=success`,
-        { status: "paid" },
+        `/project-creation-requests/${projectId}/complete?acquisition=success`,
+        { status: "allowed" },
       );
       expect(response.status).toBe(202);
       expect(await countProjects()).toBe(0);
-    });
-
-    it("completes an existing request when new checkout is disabled", async () => {
-      const ctx = setup();
-      const projectId = await open(ctx);
-      ctx.fake.state = "active";
-      const response = await ctx.post(
-        "user-1",
-        `/project-creation-requests/${projectId}/complete`,
-        {},
-        { CHECKOUT_ENABLED: "false" },
-      );
-      expect(response.status).toBe(200);
-      expect(await countProjects()).toBe(1);
     });
   });
 
@@ -556,7 +526,9 @@ describe("project creation requests", () => {
     const { post } = setup();
     const response = await post("user-1", "/projects", { name: "Sneaky" });
     expect(response.status).toBe(409);
-    expect(await response.json()).toMatchObject({ code: "checkout_required" });
+    expect(await response.json()).toMatchObject({
+      code: "acquisition_required",
+    });
     expect(await countProjects()).toBe(0);
   });
 });
